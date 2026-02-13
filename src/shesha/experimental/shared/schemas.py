@@ -19,7 +19,7 @@ class TopicRename(BaseModel):
 
 class TopicInfo(BaseModel):
     name: str
-    paper_count: int
+    document_count: int
     size: str
     project_id: str
 

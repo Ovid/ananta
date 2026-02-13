@@ -28,12 +28,12 @@ def test_topic_rename():
 def test_topic_info():
     t = TopicInfo(
         name="Abiogenesis",
-        paper_count=5,
+        document_count=5,
         size="2.3 MB",
         project_id="2026-02-12-abiogenesis",
     )
     assert t.name == "Abiogenesis"
-    assert t.paper_count == 5
+    assert t.document_count == 5
     assert t.size == "2.3 MB"
     assert t.project_id == "2026-02-12-abiogenesis"
 

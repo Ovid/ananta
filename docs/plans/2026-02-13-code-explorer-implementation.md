@@ -12,6 +12,14 @@
 
 **Reuse policy:** Before writing any code, check whether an existing implementation can be reused or adapted. When uncertain, ask.
 
+**Cross-cutting concerns to enforce in every task:**
+- No leading underscores on metadata filenames (`meta.json`, `topic.json`, `conversation.json` — NOT `_meta.json`)
+- `document_ids` in all shared/generic code (`paper_ids` only at the arxiv boundary layer)
+- `WebConversationSession` uses `CONVERSATION_FILE = "conversation.json"` (rename from `_conversation.json`)
+- Full git clones (not shallow) — verify `RepoIngester` default is `--depth` unset
+- `.well-known/{path}` route suppression goes in shared `app_factory.py`
+- Logo/images static file serving goes in shared `app_factory.py` (parameterized `images_dir`)
+
 ---
 
 ## Phase 1: Shared Backend Module
@@ -66,7 +74,10 @@ Expected: FAIL — `ModuleNotFoundError`
 
 **Step 3: Create shared/session.py**
 
-Copy `web/session.py` to `shared/session.py`. Rename `paper_ids` → `document_ids` in the `Exchange` dataclass and all references. Keep all other logic identical.
+Copy `web/session.py` to `shared/session.py`. Changes:
+- Rename `paper_ids` → `document_ids` in the `Exchange` dataclass and all references
+- Rename `CONVERSATION_FILE = "_conversation.json"` → `CONVERSATION_FILE = "conversation.json"` (no leading underscore per design)
+Keep all other logic identical.
 
 **Step 4: Run tests to verify they pass**
 
@@ -105,7 +116,7 @@ Expected: FAIL — `ModuleNotFoundError`
 
 **Step 3: Create shared/schemas.py with generic models only**
 
-Copy only the generic Pydantic models from `web/schemas.py`. Leave arxiv-specific models in `web/schemas.py`.
+Copy only the generic Pydantic models from `web/schemas.py`. In `ExchangeSchema`, rename the `paper_ids` field to `document_ids`. Leave arxiv-specific models (`PaperAdd`, `PaperInfo`, `SearchResult`, `DownloadTaskStatus`) in `web/schemas.py`. The arxiv `web/schemas.py` will later (Task 7) create an `ArxivExchangeSchema` that aliases `document_ids` back to `paper_ids` for backward compatibility with the arxiv frontend.
 
 **Step 4: Run tests**
 
@@ -208,6 +219,7 @@ def create_app(
     state: Any,
     title: str,
     static_dir: Path | None = None,
+    images_dir: Path | None = None,
     ws_handler: Callable | None = None,
     extra_routers: list[APIRouter] | None = None,
 ) -> FastAPI:
@@ -216,9 +228,11 @@ def create_app(
 The factory:
 1. Creates FastAPI with lifespan that calls `state.shesha.start()` / `state.shesha.stop()`
 2. Adds CORS middleware
-3. Mounts WebSocket endpoint at `/api/ws`
-4. Mounts static files from `static_dir` if provided
-5. Includes any extra routers
+3. Adds `.well-known/{path}` catch-all route (suppresses Chrome DevTools probing)
+4. Mounts WebSocket endpoint at `/api/ws`
+5. Mounts static files from `static_dir` if provided (built frontend)
+6. Mounts images from `images_dir` at `/static` if provided (logo, etc.)
+7. Includes any extra routers
 
 **Step 4: Run tests**
 
@@ -256,21 +270,37 @@ Expected: FAIL
 
 **Step 3: Implement shared/routes.py**
 
-Create a function that returns a `FastAPI APIRouter` with all generic routes. The router is parameterized by the state object (which must have `shesha`, `topic_mgr`, `model` attributes).
+Create a function that returns a `FastAPI APIRouter` with the generic routes. The function should accept flags to control which route groups are included, since not all apps need all routes.
 
-Routes to include:
+```python
+def create_shared_router(
+    state: Any,
+    include_per_topic_history: bool = True,
+    include_context_budget: bool = True,
+) -> APIRouter:
+```
+
+**Always included:**
 - `GET /api/topics` — list topics with document counts
 - `POST /api/topics` — create topic
 - `PATCH /api/topics/{name}` — rename topic
 - `DELETE /api/topics/{name}` — delete topic
-- `GET /api/topics/{name}/traces` — list traces
+- `GET /api/topics/{name}/traces` — list traces (see note below)
 - `GET /api/topics/{name}/traces/{trace_id}` — get trace detail
-- `GET /api/topics/{name}/history` — get conversation history
-- `DELETE /api/topics/{name}/history` — clear history
-- `GET /api/topics/{name}/export` — export transcript
 - `GET /api/model` — get model info
 - `PUT /api/model` — update model
+
+**Optional (`include_per_topic_history=True`, used by arxiv explorer):**
+- `GET /api/topics/{name}/history` — get per-topic conversation history
+- `DELETE /api/topics/{name}/history` — clear per-topic history
+- `GET /api/topics/{name}/export` — export per-topic transcript
+
+**Optional (`include_context_budget=True`, used by arxiv explorer):**
 - `GET /api/topics/{name}/context-budget` — calculate token budget
+
+The code explorer will set `include_per_topic_history=False` and `include_context_budget=False`, since it uses global history (Task 27) and doesn't need context-budget.
+
+**Note on trace routes for multi-repo topics:** When a topic contains multiple repos, `GET /api/topics/{name}/traces` must aggregate traces across all referenced projects. The route should accept the topic name, look up all project_ids via the TopicManager, and merge their trace listings sorted by timestamp.
 
 **Step 4: Run tests**
 
@@ -461,29 +491,18 @@ The shared frontend is a local library package. It does NOT have its own Vite bu
 }
 ```
 
-**Step 2: Create index.ts barrel export**
+**Step 2: Create index.ts as an empty placeholder**
 
 ```typescript
-// Components
-export { ChatArea } from './components/ChatArea';
-export { ChatMessage } from './components/ChatMessage';
-export { StatusBar } from './components/StatusBar';
-export { TraceViewer } from './components/TraceViewer';
-export { Header } from './components/Header';
-export { TopicSidebar } from './components/TopicSidebar';
-export { ConfirmDialog } from './components/ConfirmDialog';
-export { Toast, showToast } from './components/Toast';
-
-// Hooks
-export { useWebSocket } from './hooks/useWebSocket';
-export { useTheme } from './hooks/useTheme';
-
-// Types
-export type * from './types';
-
-// API
-export { genericApi } from './api/client';
+// Barrel exports will be added as components are extracted in Tasks 13-19.
+// Each extraction task adds its export line here.
 ```
+
+**Note:** Do NOT add all export lines up front — the referenced modules don't exist yet and TypeScript would error. Each subsequent task (13-19) adds its export line to this file as part of its commit. By the end of Task 19, the barrel will contain:
+- Components: ChatArea, ChatMessage, StatusBar, TraceViewer, Header, TopicSidebar, ConfirmDialog, Toast
+- Hooks: useWebSocket, useTheme
+- Types: all shared types
+- API: genericApi
 
 **Step 3: Create tsconfig.json**
 
@@ -568,13 +587,14 @@ git commit -m "feat: extract hooks to shared frontend"
 
 ### Task 15: Extract fully generic components
 
-StatusBar, ConfirmDialog, Toast, TraceViewer are fully generic — no arxiv references.
+StatusBar, ConfirmDialog, Toast, TraceViewer are fully generic — no arxiv references. Also extract HelpPanel as a shared component — it renders static help content from a JSON file, which each app can customize by providing its own `help-content.json`.
 
 **Files:**
 - Create: `src/shesha/experimental/shared/frontend/src/components/StatusBar.tsx`
 - Create: `src/shesha/experimental/shared/frontend/src/components/ConfirmDialog.tsx`
 - Create: `src/shesha/experimental/shared/frontend/src/components/Toast.tsx`
 - Create: `src/shesha/experimental/shared/frontend/src/components/TraceViewer.tsx`
+- Create: `src/shesha/experimental/shared/frontend/src/components/HelpPanel.tsx`
 - Create corresponding `__tests__/` files
 - Modify: arxiv imports to use shared versions
 
@@ -759,13 +779,19 @@ interface TopicSidebarProps {
   selectedDocuments: Set<string>;
   onSelectionChange: (selected: Set<string>) => void;
   onDocumentClick: (doc: DocumentItem) => void;
+  onDocumentsLoaded?: (docs: DocumentItem[]) => void;  // Callback when docs load (arxiv needs this)
   loadDocuments: (topicName: string) => Promise<DocumentItem[]>;
   addButton?: React.ReactNode;  // Slot for "Add Repo" / "Add Paper" button
+  uncategorizedDocs?: DocumentItem[];  // Docs not in any topic (code explorer's "Uncategorized" group)
   style?: React.CSSProperties;
 }
 ```
 
 The shared sidebar handles topic CRUD, expand/collapse, checkboxes, and delegates document loading to the `loadDocuments` prop. For cross-topic selection (code explorer's requirement), the checkbox state is managed by the parent via `selectedDocuments` / `onSelectionChange`.
+
+**Critical behavior for cross-topic selection:** The "All" and "None" buttons must be scoped to the current topic only. "All" adds the current topic's documents to `selectedDocuments` (preserving selections in other topics). "None" removes only the current topic's documents. This differs from the existing arxiv behavior where "None" clears everything.
+
+**Uncategorized group:** When `uncategorizedDocs` is provided, the sidebar renders an "Uncategorized" section at the bottom showing repos not in any topic, with the same checkbox behavior.
 
 **Step 4: Run test, expect PASS**
 
@@ -840,7 +866,69 @@ Expected: All PASS
 
 ## Phase 4: Code Explorer Backend
 
-### Task 21: Create code_explorer module skeleton
+### Task 21: Create or generalize TopicManager for repo references
+
+The existing `TopicManager` (from `src/shesha/experimental/arxiv/topics.py`) maps topics to projects 1:1 (each topic IS a project). The code explorer needs a fundamentally different model: topics hold *references* to repos (project_ids), and a single repo can appear in multiple topics.
+
+**Files:**
+- Create: `src/shesha/experimental/code_explorer/topics.py`
+- Create: `tests/unit/experimental/code_explorer/test_topics.py`
+- Reference: `src/shesha/experimental/arxiv/topics.py` (read first to understand existing pattern)
+
+**Step 1: Read existing TopicManager**
+
+Understand its API: `create()`, `rename()`, `delete()`, `list_topics()`, `resolve()`. Decide whether to subclass or build fresh.
+
+**Step 2: Write failing tests**
+
+Test:
+- Create topic, list topics
+- Add repo reference to topic (`add_repo(topic, project_id)`)
+- List repos in topic (`list_repos(topic) -> list[str]`)
+- Remove repo from topic
+- Same repo in multiple topics
+- List all repos across all topics (`list_all_repos() -> list[str]`)
+- List uncategorized repos (`list_uncategorized(all_project_ids) -> list[str]`) — repos not in any topic
+- Topic metadata stored as `topic.json` (no leading underscore)
+- Delete topic removes references but not repos
+
+Run: `pytest tests/unit/experimental/code_explorer/test_topics.py -v`
+Expected: FAIL
+
+**Step 3: Implement CodeExplorerTopicManager**
+
+```python
+class CodeExplorerTopicManager:
+    """Manages topics as lightweight reference containers for repos."""
+
+    def __init__(self, topics_dir: Path) -> None: ...
+    def create(self, name: str) -> None: ...
+    def rename(self, old_name: str, new_name: str) -> None: ...
+    def delete(self, name: str) -> None: ...
+    def list_topics(self) -> list[str]: ...
+    def add_repo(self, topic: str, project_id: str) -> None: ...
+    def remove_repo(self, topic: str, project_id: str) -> None: ...
+    def list_repos(self, topic: str) -> list[str]: ...
+    def list_all_repos(self) -> list[str]: ...
+    def find_topics_for_repo(self, project_id: str) -> list[str]: ...
+    def remove_repo_from_all(self, project_id: str) -> None: ...
+```
+
+Each topic is a directory with a `topic.json` file containing `{"repos": ["project-id-1", "project-id-2"]}`.
+
+**Step 4: Run tests, expect PASS**
+
+**Step 5: Commit**
+
+```bash
+git add src/shesha/experimental/code_explorer/topics.py \
+        tests/unit/experimental/code_explorer/test_topics.py
+git commit -m "feat: CodeExplorerTopicManager with repo references"
+```
+
+---
+
+### Task 22: Create code_explorer module skeleton
 
 **Files:**
 - Create: `src/shesha/experimental/code_explorer/__init__.py`
@@ -919,7 +1007,8 @@ Expected: FAIL
 @dataclass
 class CodeExplorerState:
     shesha: Shesha
-    topic_mgr: TopicManager
+    topic_mgr: CodeExplorerTopicManager
+    session: WebConversationSession  # Global session stored at data root
     model: str
 ```
 
@@ -927,7 +1016,8 @@ class CodeExplorerState:
 1. Storage directory (default `~/.shesha/code-explorer/` or `--data-dir`)
 2. `SheshaConfig` with storage path
 3. `Shesha` instance
-4. `TopicManager` for repo references per topic
+4. `CodeExplorerTopicManager` (from Task 21) with `topics_dir = data_dir / "topics"`
+5. `WebConversationSession` with `project_dir = data_dir` (global, not per-topic)
 
 **Step 4: Run test, expect PASS**
 
@@ -1001,9 +1091,10 @@ git commit -m "feat: code explorer Pydantic schemas"
 **Step 1: Write failing tests**
 
 Test:
+- `GET /api/repos` — list ALL repos (needed for Uncategorized group computation)
 - `POST /api/repos` — add repo (mock shesha.create_project_from_repo)
 - `GET /api/repos/{id}` — get repo info
-- `DELETE /api/repos/{id}` — delete repo
+- `DELETE /api/repos/{id}` — delete repo (also removes from all topics via `CodeExplorerTopicManager.remove_repo_from_all`)
 - `POST /api/repos/{id}/check-updates` — check for updates
 - `POST /api/repos/{id}/apply-updates` — apply updates
 - Singleton behavior: adding same URL twice returns existing project
@@ -1012,7 +1103,10 @@ Test:
 
 Use shared `create_app()` factory. Add a code-explorer-specific router with repo routes. Each route delegates to the corresponding `shesha` API method.
 
-Key: `POST /api/repos` must check if the URL is already ingested (singleton behavior). If a `topic` is provided, add the reference.
+Key behaviors:
+- `GET /api/repos` returns all repos with their info. The frontend uses this plus `TopicManager.list_all_repos()` to compute the Uncategorized group (repos not in any topic).
+- `POST /api/repos` must check if the URL is already ingested (singleton behavior). If a `topic` is provided, add the reference via `CodeExplorerTopicManager.add_repo()`.
+- `DELETE /api/repos/{id}` calls `CodeExplorerTopicManager.remove_repo_from_all()` before deleting the project and clone.
 
 **Step 3: Run tests, expect PASS**
 
@@ -1096,7 +1190,9 @@ Test:
 
 **Step 2: Implement global history routes**
 
-Use the shared `WebConversationSession` with a single global session (not per-topic).
+Use the shared `WebConversationSession` with a single global session (not per-topic). The `WebConversationSession` constructor takes a `project_dir` — for the code explorer, pass the data root directory (`~/.shesha/code-explorer/`) so `conversation.json` is stored at the top level, not inside a project directory.
+
+The `CodeExplorerState` should hold a single `session: WebConversationSession` initialized with the data root. The WebSocket handler and these history routes all use the same session instance.
 
 **Step 3: Run tests, expect PASS**
 
@@ -1119,16 +1215,30 @@ git commit -m "feat: code explorer global history routes"
 **Step 1: Write failing tests**
 
 Test:
-- Query with multiple `document_ids` merges documents from multiple projects
-- Per-repo analysis is concatenated as context
+- Query with `document_ids: ["project-a", "project-b"]` loads documents from both projects
+- Documents are merged with project separators (e.g., `--- project-a ---` prefix)
+- Per-repo analysis from each project is concatenated as context prefix
 - Cancel works
+- Session records which `document_ids` (project_ids) were consulted
 
 **Step 2: Implement WebSocket handler**
 
-Use the shared `websocket_handler()`. Provide a `build_context` function that:
-1. Loads analysis for each selected project
-2. Formats analyses as context (reuse `format_analysis_as_context` from `script_utils`)
-3. Returns the concatenated context string
+Use the shared `websocket_handler()`. The WebSocket `query` message format:
+```json
+{"type": "query", "question": "...", "document_ids": ["project-a", "project-b"]}
+```
+
+Here `document_ids` are actually `project_id`s — each one maps to a shesha Project. The shared handler receives them and calls the code explorer's `build_context` callback.
+
+Provide a `build_context` function that:
+1. For each project_id in `document_ids`: load all documents via `storage.list_documents(project_id)`
+2. Merge all documents into a single list (the RLM engine receives them all)
+3. Load analysis for each project via `shesha.get_analysis(project_id)`
+4. Format each analysis using `format_analysis_as_context()` (check `examples/script_utils.py` for reuse)
+5. Concatenate analyses with project headers as the context prefix
+6. Record the consulted project_ids in the session exchange
+
+Also provide a `load_documents` callback that merges documents across projects (the shared handler needs this to pass the right document set to the RLM engine).
 
 No extra handlers needed (no citation checking).
 
@@ -1364,6 +1474,7 @@ import { genericApi } from '@shesha/shared-ui';
 export const api = {
   ...genericApi,
   repos: {
+    list: () => fetch('/api/repos'),  // All repos (for Uncategorized group computation)
     add: (data: { url: string; topic?: string }) => fetch('/api/repos', ...),
     get: (id: string) => fetch(`/api/repos/${id}`),
     delete: (id: string) => fetch(`/api/repos/${id}`, { method: 'DELETE' }),
@@ -1421,6 +1532,7 @@ Expected: Build succeeds, outputs to `dist/`
 
 Same multi-stage pattern:
 - Stage 1: Node 20, build frontend from `src/shesha/experimental/code_explorer/frontend/`
+  - **Important:** Must COPY both `code_explorer/frontend/` AND `shared/frontend/` into the build context, since code_explorer depends on `@shesha/shared-ui` as a local path dependency. Copy shared first, then code_explorer, then `npm ci && npm run build`.
 - Stage 2: Python 3.12-slim, pip install, copy built frontend
 - Entry point: `shesha-code --no-browser --data-dir /data`
 

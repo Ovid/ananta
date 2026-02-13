@@ -171,6 +171,7 @@ No paper cache, no arXiv searcher, no citation verifier.
 - `WebSocket /api/ws` — Query streaming + cancel
 
 **Code-explorer-specific:**
+- `GET /api/repos` — List all repos (needed for Uncategorized group computation)
 - `POST /api/repos` — Add repo (clone + ingest, synchronous). Body: `{ url, topic? }`
 - `GET /api/repos/{id}` — Repo info (source URL, file count, analysis status)
 - `DELETE /api/repos/{id}` — Delete repo entirely (clone + project + all topic references)

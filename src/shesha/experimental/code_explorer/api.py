@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import asdict
 
 from fastapi import APIRouter, FastAPI, HTTPException
+from fastapi.responses import PlainTextResponse
 
 from shesha.exceptions import ProjectNotFoundError
 from shesha.experimental.code_explorer.dependencies import CodeExplorerState
@@ -143,6 +144,44 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
         if analysis is None:
             raise HTTPException(404, f"No analysis exists for project '{project_id}'")
         return AnalysisResponse(**asdict(analysis))
+
+    # ------------------------------------------------------------------
+    # Topic-repo reference routes
+    # ------------------------------------------------------------------
+
+    @router.post("/topics/{name}/repos/{project_id}")
+    def add_repo_to_topic(name: str, project_id: str) -> dict[str, str]:
+        state.topic_mgr.create(name)
+        state.topic_mgr.add_repo(name, project_id)
+        return {"status": "added", "topic": name, "project_id": project_id}
+
+    @router.delete("/topics/{name}/repos/{project_id}")
+    def remove_repo_from_topic(name: str, project_id: str) -> dict[str, str]:
+        try:
+            state.topic_mgr.remove_repo(name, project_id)
+        except ValueError:
+            raise HTTPException(404, f"Repo '{project_id}' not found in topic '{name}'")
+        return {"status": "removed", "topic": name, "project_id": project_id}
+
+    # ------------------------------------------------------------------
+    # Global history routes
+    # ------------------------------------------------------------------
+
+    @router.get("/history")
+    def get_history() -> dict[str, list[dict[str, object]]]:
+        return {"exchanges": state.session.list_exchanges()}
+
+    @router.delete("/history")
+    def clear_history() -> dict[str, str]:
+        state.session.clear()
+        return {"status": "cleared"}
+
+    @router.get("/export", response_class=PlainTextResponse)
+    def export_transcript() -> PlainTextResponse:
+        return PlainTextResponse(
+            content=state.session.format_transcript(),
+            media_type="text/markdown",
+        )
 
     return router
 

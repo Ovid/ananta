@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Code Explorer web application for exploring git repositories via RLM
+- Shared web infrastructure module (`shesha.experimental.shared`) for building experimental tools
+- Developer guide for extending the web tool ecosystem (`docs/extending-web-tools.md`)
 - **Code Explorer CLI entry point** — `shesha-code` command launches the code explorer web server with `--port`, `--data-dir`, `--model`, and `--no-browser` options
 - **Code Explorer module skeleton** — new `shesha.experimental.code_explorer` module with `CodeExplorerTopicManager` for lightweight repo grouping, `CodeExplorerState` dataclass and `create_app_state()` factory, and `__main__.py` CLI entry point stub
 - **Code Explorer WebSocket handler** — cross-project query handler that loads documents from multiple repos, merges per-project analysis as context, and records consulted project_ids in the global session
@@ -23,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- arXiv Explorer refactored to use shared web infrastructure module
 - "unresolved" citations now labeled "not found in databases" to clarify external sources were tried
 - LLM-tell phrases displayed in purple (was amber) for better visual distinction
 - Papers default to selected when clicking a topic name

@@ -44,10 +44,17 @@ to the existing regex extraction with a logged warning if JSON parsing fails.
 `response_format` to the LiteLLM `completion()` call:
 
 ```python
+_OOLONG_JSON_SUFFIX = '\n\nRespond with JSON only: {"answer": "<your answer>"}'
+_PAIRS_JSON_SUFFIX = (
+    "\n\nRespond with JSON only: "
+    '{"pairs": [[id1, id2], ...]} where each pair has the smaller ID first.'
+)
+
 def call_base(prompt: str, model: str, benchmark: str) -> tuple[str, int]:
+    suffix = _OOLONG_JSON_SUFFIX if benchmark == "oolong" else _PAIRS_JSON_SUFFIX
     resp = completion(
         model=model,
-        messages=[{"role": "user", "content": prompt}],
+        messages=[{"role": "user", "content": prompt + suffix}],
         temperature=0,
         response_format={"type": "json_object"},
     )

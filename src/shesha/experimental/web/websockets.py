@@ -1,16 +1,21 @@
-"""WebSocket handlers for query execution and citation checking."""
+"""WebSocket handlers for query execution and citation checking.
+
+Delegates generic query/cancel dispatch to the shared WebSocket handler and
+registers arxiv-specific citation checking as an extra handler.  A thin
+adapter translates the arxiv frontend's ``paper_ids`` field to the shared
+handler's ``document_ids`` and back.
+"""
 
 from __future__ import annotations
 
 import asyncio
 import functools
 import logging
-import threading
 from collections.abc import Callable
+from typing import Any
 
-from fastapi import WebSocket, WebSocketDisconnect
+from fastapi import WebSocket
 
-from shesha.exceptions import DocumentNotFoundError
 from shesha.experimental.arxiv.cache import PaperCache
 from shesha.experimental.arxiv.citations import (
     ArxivVerifier,
@@ -33,13 +38,57 @@ from shesha.experimental.arxiv.verifiers import (
     OpenAlexVerifier,
     SemanticScholarVerifier,
 )
+from shesha.experimental.shared.websockets import websocket_handler as shared_ws_handler
 from shesha.experimental.web.dependencies import AppState
-from shesha.experimental.web.session import WebConversationSession
 from shesha.models import ParsedDocument
-from shesha.rlm.trace import StepType, TokenUsage
 
 logger = logging.getLogger(__name__)
 
+
+# ---------------------------------------------------------------------------
+# paper_ids <-> document_ids adapter
+# ---------------------------------------------------------------------------
+
+class _PaperIdAdapter:
+    """Wraps a WebSocket to translate ``paper_ids`` <-> ``document_ids``.
+
+    The arxiv frontend uses ``paper_ids`` in its messages, but the shared
+    handler expects ``document_ids``.  This adapter intercepts
+    :meth:`receive_json` to rename incoming ``paper_ids`` to
+    ``document_ids``, and :meth:`send_json` to rename outgoing
+    ``document_ids`` back to ``paper_ids``.
+
+    All other WebSocket methods are forwarded unchanged.
+    """
+
+    def __init__(self, ws: WebSocket) -> None:
+        self._ws = ws
+
+    async def receive_json(self, **kwargs: Any) -> Any:
+        data = await self._ws.receive_json(**kwargs)
+        # Only translate for ``query`` messages; other message types
+        # (e.g. ``check_citations``) use ``paper_ids`` natively.
+        if isinstance(data, dict) and data.get("type") == "query" and "paper_ids" in data:
+            data["document_ids"] = data.pop("paper_ids")
+        return data
+
+    async def send_json(self, data: Any, **kwargs: Any) -> None:
+        # Translate ``document_ids`` back to ``paper_ids`` for the arxiv
+        # frontend (e.g. in ``complete`` messages).
+        if isinstance(data, dict) and "document_ids" in data:
+            data = {
+                k: v for k, v in data.items() if k != "document_ids"
+            } | {"paper_ids": data["document_ids"]}
+        await self._ws.send_json(data, **kwargs)
+
+    # Forward everything else to the underlying WebSocket.
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._ws, name)
+
+
+# ---------------------------------------------------------------------------
+# Citation instruction context builder
+# ---------------------------------------------------------------------------
 
 def build_citation_instructions(paper_ids: list[str], cache: PaperCache) -> str:
     """Build citation instruction text to append to user questions.
@@ -67,200 +116,23 @@ def build_citation_instructions(paper_ids: list[str], cache: PaperCache) -> str:
     return "\n".join(lines)
 
 
-async def websocket_handler(ws: WebSocket, state: AppState) -> None:
-    """Handle WebSocket connections for queries and citation checks."""
-    await ws.accept()
-    cancel_event: threading.Event | None = None
-    query_task: asyncio.Task[None] | None = None
+def _build_arxiv_context(
+    document_ids: list[str], state: Any, loaded_docs: list[ParsedDocument]
+) -> str:
+    """Build context callback for the shared handler.
 
-    try:
-        while True:
-            data = await ws.receive_json()
-            msg_type = data.get("type")
-
-            if msg_type == "cancel":
-                if cancel_event is not None:
-                    cancel_event.set()
-                await ws.send_json({"type": "cancelled"})
-
-            elif msg_type == "query":
-                # Cancel any in-flight query before starting a new one
-                if cancel_event is not None:
-                    cancel_event.set()
-                cancel_event = threading.Event()
-                query_task = asyncio.create_task(_handle_query(ws, state, data, cancel_event))
-
-            elif msg_type == "check_citations":
-                await _handle_check_citations(ws, state, data)
-
-            else:
-                await ws.send_json(
-                    {"type": "error", "message": f"Unknown message type: {msg_type}"}
-                )
-    except WebSocketDisconnect:
-        if cancel_event is not None:
-            cancel_event.set()
-        if query_task is not None and not query_task.done():
-            query_task.cancel()
+    Appends citation instructions using the arxiv paper cache.
+    """
+    return build_citation_instructions(document_ids, state.cache)
 
 
-async def _handle_query(
-    ws: WebSocket,
-    state: AppState,
-    data: dict[str, object],
-    cancel_event: threading.Event,
+# ---------------------------------------------------------------------------
+# Citation check handler (registered as extra_handler)
+# ---------------------------------------------------------------------------
+
+async def _handle_check_citations(
+    ws: WebSocket, data: dict[str, object], state: Any
 ) -> None:
-    """Execute a query and stream progress."""
-    topic = str(data.get("topic", ""))
-    question = str(data.get("question", ""))
-
-    project_id = state.topic_mgr.resolve(topic)
-    if not project_id:
-        await ws.send_json({"type": "error", "message": f"Topic '{topic}' not found"})
-        return
-
-    doc_names = state.topic_mgr._storage.list_documents(project_id)
-    if not doc_names:
-        await ws.send_json({"type": "error", "message": "No papers in topic"})
-        return
-
-    project = state.shesha.get_project(project_id)
-
-    # Load documents filtered by paper_ids (required)
-    paper_ids = data.get("paper_ids")
-    loaded_docs: list[ParsedDocument]
-
-    if not paper_ids or not isinstance(paper_ids, list) or len(paper_ids) == 0:
-        await ws.send_json(
-            {"type": "error", "message": "Please select one or more papers before querying"}
-        )
-        return
-
-    # Load only the requested papers, skipping any that don't exist
-    loaded_docs = []
-    for pid in paper_ids:
-        try:
-            doc = state.topic_mgr._storage.get_document(project_id, str(pid))
-            loaded_docs.append(doc)
-        except DocumentNotFoundError:
-            logger.warning("Requested paper_id %r not found in project %s", pid, project_id)
-    if not loaded_docs:
-        await ws.send_json(
-            {"type": "error", "message": "No valid papers found for the given paper_ids"}
-        )
-        return
-
-    # Load session for history prefix
-    project_dir = state.topic_mgr._storage._project_path(project_id)
-    session = WebConversationSession(project_dir)
-    history_prefix = session.format_history_prefix()
-    citation_suffix = build_citation_instructions([d.name for d in loaded_docs], state.cache)
-    full_question = (history_prefix + question if history_prefix else question) + citation_suffix
-
-    # Use asyncio.Queue for thread-safe message passing from the query
-    # thread to the async WebSocket send loop.
-    message_queue: asyncio.Queue[dict[str, object] | None] = asyncio.Queue()
-    loop = asyncio.get_running_loop()
-
-    def on_progress(
-        step_type: StepType, iteration: int, content: str, token_usage: TokenUsage
-    ) -> None:
-        step_msg: dict[str, object] = {
-            "type": "step",
-            "step_type": step_type.value,
-            "iteration": iteration,
-            "content": content,
-        }
-        if token_usage.prompt_tokens > 0:
-            step_msg["prompt_tokens"] = token_usage.prompt_tokens
-            step_msg["completion_tokens"] = token_usage.completion_tokens
-        loop.call_soon_threadsafe(message_queue.put_nowait, step_msg)
-
-    await ws.send_json({"type": "status", "phase": "Starting", "iteration": 0})
-
-    # Drain the queue in a background task
-    async def drain_queue() -> None:
-        while True:
-            msg = await message_queue.get()
-            if msg is None:
-                break
-            await ws.send_json(msg)
-
-    drain_task = asyncio.create_task(drain_queue())
-
-    # Run query in thread to avoid blocking the event loop.
-    # Call the RLM engine directly so we can pass the (possibly filtered)
-    # document list instead of letting project.query() reload all docs.
-    rlm_engine = project._rlm_engine
-    if rlm_engine is None:
-        await ws.send_json({"type": "error", "message": "Query engine not configured"})
-        await message_queue.put(None)
-        await drain_task
-        return
-
-    storage = state.topic_mgr._storage
-    try:
-        result = await loop.run_in_executor(
-            None,
-            lambda: rlm_engine.query(
-                documents=[d.content for d in loaded_docs],
-                question=full_question,
-                doc_names=[d.name for d in loaded_docs],
-                on_progress=on_progress,
-                storage=storage,
-                project_id=project_id,
-                cancel_event=cancel_event,
-            ),
-        )
-    except Exception as exc:
-        await message_queue.put(None)
-        await drain_task
-        await ws.send_json({"type": "error", "message": str(exc)})
-        return
-
-    # Signal the drain task to stop, then wait for it
-    await message_queue.put(None)
-    await drain_task
-
-    # Save to session
-    trace_id = None
-    traces = state.topic_mgr._storage.list_traces(project_id)
-    if traces:
-        trace_id = traces[-1].stem
-
-    consulted_paper_ids = [d.name for d in loaded_docs]
-
-    session.add_exchange(
-        question=question,
-        answer=result.answer,
-        trace_id=trace_id,
-        tokens={
-            "prompt": result.token_usage.prompt_tokens,
-            "completion": result.token_usage.completion_tokens,
-            "total": result.token_usage.total_tokens,
-        },
-        execution_time=result.execution_time,
-        model=state.model,
-        paper_ids=consulted_paper_ids,
-    )
-
-    await ws.send_json(
-        {
-            "type": "complete",
-            "answer": result.answer,
-            "trace_id": trace_id,
-            "tokens": {
-                "prompt": result.token_usage.prompt_tokens,
-                "completion": result.token_usage.completion_tokens,
-                "total": result.token_usage.total_tokens,
-            },
-            "duration_ms": int(result.execution_time * 1000),
-            "paper_ids": consulted_paper_ids,
-        }
-    )
-
-
-async def _handle_check_citations(ws: WebSocket, state: AppState, data: dict[str, object]) -> None:
     """Check citations for selected papers and stream progress."""
     topic = str(data.get("topic", ""))
     project_id = state.topic_mgr.resolve(topic)
@@ -400,3 +272,23 @@ def _check_single_paper(
         llm_phrases=llm_phrases,
     )
     return format_check_report_json(report)
+
+
+# ---------------------------------------------------------------------------
+# Public entry point
+# ---------------------------------------------------------------------------
+
+async def websocket_handler(ws: WebSocket, state: AppState) -> None:
+    """Handle WebSocket connections for queries and citation checks.
+
+    Wraps the shared handler with an adapter that translates the arxiv
+    frontend's ``paper_ids`` field to ``document_ids`` and back, and
+    registers citation checking as an extra handler.
+    """
+    adapted_ws = _PaperIdAdapter(ws)
+    await shared_ws_handler(
+        adapted_ws,  # type: ignore[arg-type]
+        state,
+        extra_handlers={"check_citations": _handle_check_citations},
+        build_context=_build_arxiv_context,
+    )

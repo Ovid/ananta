@@ -38,17 +38,24 @@ const sampleAnalysis: RepoAnalysis = {
   caveats: 'Some generated endpoints may not reflect runtime middleware.',
 }
 
-const defaultProps = {
-  repo: baseRepo,
-  analysis: sampleAnalysis,
-  onClose: vi.fn(),
-  onAnalyze: vi.fn(),
-  onCheckUpdates: vi.fn(),
-  onRemove: vi.fn(),
-}
-
-function renderDetail(overrides: Partial<typeof defaultProps> = {}) {
-  return render(<RepoDetail {...defaultProps} {...overrides} />)
+function renderDetail(overrides: {
+  repo?: RepoInfo
+  analysis?: RepoAnalysis | null
+  onClose?: () => void
+  onAnalyze?: (id: string) => void
+  onCheckUpdates?: (id: string) => void
+  onRemove?: (id: string) => void
+} = {}) {
+  const props = {
+    repo: baseRepo,
+    analysis: sampleAnalysis as RepoAnalysis | null,
+    onClose: vi.fn(),
+    onAnalyze: vi.fn(),
+    onCheckUpdates: vi.fn(),
+    onRemove: vi.fn(),
+    ...overrides,
+  }
+  return render(<RepoDetail {...props} />)
 }
 
 describe('RepoDetail', () => {

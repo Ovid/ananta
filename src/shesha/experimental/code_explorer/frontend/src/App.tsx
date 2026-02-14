@@ -288,9 +288,9 @@ export default function App() {
           onDocumentsLoaded={handleDocsLoaded}
           loadDocuments={loadDocuments}
           loadTopics={handleLoadTopics}
-          createTopic={name => api.topics.create(name)}
-          renameTopic={(o, n) => api.topics.rename(o, n)}
-          deleteTopic={name => api.topics.delete(name)}
+          createTopic={async name => { await api.topics.create(name) }}
+          renameTopic={async (o, n) => { await api.topics.rename(o, n) }}
+          deleteTopic={async name => { await api.topics.delete(name) }}
           addButton={
             <button
               onClick={() => setShowAddRepo(true)}

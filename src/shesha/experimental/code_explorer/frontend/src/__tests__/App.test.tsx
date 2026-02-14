@@ -85,8 +85,9 @@ describe('App', () => {
   it('renders connection lost banner when disconnected', async () => {
     // Override useWebSocket to return connected=false
     const sharedUi = await import('@shesha/shared-ui')
-    const useWebSocketSpy = vi.spyOn(sharedUi, 'useWebSocket' as never)
-    ;(useWebSocketSpy as ReturnType<typeof vi.fn>).mockReturnValue({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const useWebSocketSpy = vi.spyOn(sharedUi as any, 'useWebSocket')
+    useWebSocketSpy.mockReturnValue({
       connected: false,
       send: vi.fn(),
       onMessage: vi.fn(() => vi.fn()),

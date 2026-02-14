@@ -1,10 +1,10 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import type { WSMessage } from '../types'
 
-export function useWebSocket() {
+export function useWebSocket<M extends WSMessage = WSMessage>() {
   const wsRef = useRef<WebSocket | null>(null)
   const [connected, setConnected] = useState(false)
-  const listenersRef = useRef<((msg: WSMessage) => void)[]>([])
+  const listenersRef = useRef<((msg: M) => void)[]>([])
 
   useEffect(() => {
     let unmounted = false
@@ -22,7 +22,7 @@ export function useWebSocket() {
         }
       }
       ws.onmessage = (event) => {
-        const msg = JSON.parse(event.data) as WSMessage
+        const msg = JSON.parse(event.data) as M
         listenersRef.current.forEach(fn => fn(msg))
       }
 
@@ -44,7 +44,7 @@ export function useWebSocket() {
     wsRef.current?.send(JSON.stringify(data))
   }, [])
 
-  const onMessage = useCallback((fn: (msg: WSMessage) => void) => {
+  const onMessage = useCallback((fn: (msg: M) => void) => {
     listenersRef.current.push(fn)
     return () => {
       listenersRef.current = listenersRef.current.filter(f => f !== fn)

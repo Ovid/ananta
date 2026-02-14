@@ -11,14 +11,13 @@ import DownloadProgress from './components/DownloadProgress'
 import CitationReport from './components/CitationReport'
 import EmailModal, { getStoredEmail, hasEmailDecision } from './components/EmailModal'
 import PaperDetail from './components/PaperDetail'
-import { useTheme } from './hooks/useTheme'
-import { useWebSocket } from './hooks/useWebSocket'
+import { useTheme, useWebSocket } from '@shesha/shared-ui'
 import { api } from './api/client'
-import type { ContextBudget, PaperInfo, PaperReport } from './types'
+import type { ContextBudget, PaperInfo, PaperReport, WSMessage } from './types'
 
 export default function App() {
   const { dark, toggle: toggleTheme } = useTheme()
-  const { connected, send, onMessage } = useWebSocket()
+  const { connected, send, onMessage } = useWebSocket<WSMessage>()
 
   const [activeTopic, setActiveTopic] = useState<string | null>(null)
   const [modelName, setModelName] = useState('—')

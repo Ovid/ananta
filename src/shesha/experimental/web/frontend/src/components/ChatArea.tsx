@@ -1,8 +1,67 @@
-import { useState, useEffect, useRef, useCallback, type KeyboardEvent } from 'react'
+import type { ReactNode } from 'react'
+import { useCallback } from 'react'
+
+import { ChatArea as SharedChatArea } from '@shesha/shared-ui'
+import type { Exchange as SharedExchange, WSMessage as SharedWSMessage } from '@shesha/shared-ui'
 import { api } from '../api/client'
-import { showToast } from '@shesha/shared-ui'
-import ChatMessage from './ChatMessage'
 import type { Exchange, PaperInfo, WSMessage } from '../types'
+
+const CITATION_RE = /\[@arxiv:([^\]]+)\]/g
+const ARXIV_ID_RE = /(?:[\w.-]+\/\d{7}|\d{4}\.\d{4,5})(?:v\d+)?/g
+
+function renderAnswerWithCitations(
+  text: string,
+  topicPapers?: PaperInfo[],
+  onPaperClick?: (paper: PaperInfo) => void,
+): ReactNode[] {
+  const parts: ReactNode[] = []
+  let lastIndex = 0
+
+  for (const match of text.matchAll(CITATION_RE)) {
+    const rawContent = match[1]
+    const matchStart = match.index!
+
+    // Add text before this match
+    if (matchStart > lastIndex) {
+      parts.push(text.slice(lastIndex, matchStart))
+    }
+
+    // Extract all arxiv IDs from the tag (handles semicolon-separated IDs)
+    const ids = [...rawContent.matchAll(ARXIV_ID_RE)].map(m => m[0])
+
+    if (ids.length === 0) {
+      // No valid IDs found — render as literal text
+      parts.push(match[0])
+    } else {
+      for (const arxivId of ids) {
+        const paper = topicPapers?.find(p => p.arxiv_id === arxivId)
+        if (paper) {
+          parts.push(
+            <button
+              key={`cite-${matchStart}-${arxivId}`}
+              onClick={() => onPaperClick?.(paper)}
+              className="text-xs text-accent hover:underline bg-accent/5 rounded px-1 py-0.5 mx-0.5 inline"
+              title={paper.title}
+            >
+              {paper.arxiv_id}
+            </button>
+          )
+        } else {
+          parts.push(`[@arxiv:${arxivId}]`)
+        }
+      }
+    }
+
+    lastIndex = matchStart + match[0].length
+  }
+
+  // Add remaining text after last match
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex))
+  }
+
+  return parts.length > 0 ? parts : [text]
+}
 
 interface ChatAreaProps {
   topicName: string | null
@@ -18,198 +77,99 @@ interface ChatAreaProps {
 }
 
 export default function ChatArea({ topicName, connected, wsSend, wsOnMessage, onViewTrace, onClearHistory, historyVersion, selectedPapers, topicPapers, onPaperClick }: ChatAreaProps) {
-  const [exchanges, setExchanges] = useState<Exchange[]>([])
-  const [input, setInput] = useState('')
-  const [thinking, setThinking] = useState(false)
-  const [pendingQuestion, setPendingQuestion] = useState<string | null>(null)
-  const [pendingSentAt, setPendingSentAt] = useState<string>('')
-  const [phase, setPhase] = useState('')
-  const [showBanner, setShowBanner] = useState(() => {
-    return localStorage.getItem('shesha-welcome-dismissed') !== 'true'
-  })
-  const scrollRef = useRef<HTMLDivElement>(null)
+  // Translate arxiv-specific paper_ids to shared document_ids in history
+  const loadHistory = useCallback(async (topic: string): Promise<SharedExchange[]> => {
+    const data = await api.history.get(topic)
+    return data.exchanges.map((ex: Exchange) => ({
+      exchange_id: ex.exchange_id,
+      question: ex.question,
+      answer: ex.answer,
+      trace_id: ex.trace_id,
+      timestamp: ex.timestamp,
+      tokens: ex.tokens,
+      execution_time: ex.execution_time,
+      model: ex.model,
+      document_ids: ex.paper_ids,
+    }))
+  }, [])
 
-  // Load history when topic changes
-  useEffect(() => {
-    if (!topicName) {
-      setExchanges([])
-      return
-    }
-    api.history.get(topicName).then(data => {
-      setExchanges(data.exchanges as Exchange[])
-    }).catch(() => {
-      showToast('Failed to load conversation history', 'error')
-    })
-  }, [topicName, historyVersion])
-
-  // Listen for WebSocket messages
-  useEffect(() => {
-    return wsOnMessage((msg: WSMessage) => {
-      if (msg.type === 'status') {
-        setPhase(msg.phase)
-      } else if (msg.type === 'step') {
-        setPhase(`${msg.step_type} (iter ${msg.iteration})`)
-      } else if (msg.type === 'complete') {
-        setThinking(false)
-        setPendingQuestion(null)
-        setPhase('')
-        // Reload history to get the saved exchange
-        if (topicName) {
-          api.history.get(topicName).then(data => {
-            setExchanges(data.exchanges as Exchange[])
-          }).catch(() => {})
+  // Adapt wsOnMessage to filter through shared WSMessage types.
+  // The arxiv WebSocket sends paper_ids on complete, but the shared component
+  // only cares about the base message types (status, step, complete, error, cancelled).
+  const sharedWsOnMessage = useCallback(
+    (fn: (msg: SharedWSMessage) => void) => {
+      return wsOnMessage((msg: WSMessage) => {
+        if (msg.type === 'status' || msg.type === 'step' || msg.type === 'error' || msg.type === 'cancelled') {
+          fn(msg)
+        } else if (msg.type === 'complete') {
+          fn({
+            type: 'complete',
+            answer: msg.answer,
+            trace_id: msg.trace_id,
+            tokens: msg.tokens,
+            duration_ms: msg.duration_ms,
+            document_ids: msg.paper_ids,
+          })
         }
-      } else if (msg.type === 'error') {
-        setThinking(false)
-        setPendingQuestion(null)
-        setPhase('')
-        showToast(msg.message, 'error')
-      } else if (msg.type === 'cancelled') {
-        setThinking(false)
-        setPendingQuestion(null)
-        setPhase('')
-      }
-    })
-  }, [wsOnMessage, topicName])
+        // citation_progress and citation_report are arxiv-specific; not forwarded
+      })
+    },
+    [wsOnMessage],
+  )
 
-  // Auto-scroll on new messages
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
-  }, [exchanges, thinking])
+  // Build citation renderer using current topicPapers context
+  const renderAnswer = useCallback(
+    (answer: string): ReactNode => (
+      <>{renderAnswerWithCitations(answer, topicPapers, onPaperClick)}</>
+    ),
+    [topicPapers, onPaperClick],
+  )
 
-  const hasPapers = selectedPapers != null && selectedPapers.size > 0
-  const canSend = !!input.trim() && !!topicName && !thinking && connected && hasPapers
+  // Build consulted papers footer per exchange
+  const renderAnswerFooter = useCallback(
+    (exchange: SharedExchange): ReactNode => {
+      const consultedPapers = (exchange.document_ids ?? [])
+        .map(id => topicPapers?.find(p => p.arxiv_id === id))
+        .filter((p): p is PaperInfo => p != null)
 
-  const handleSend = useCallback(() => {
-    if (!canSend || !selectedPapers) return
-    const question = input.trim()
-    const msg: Record<string, unknown> = { type: 'query', topic: topicName, question, paper_ids: Array.from(selectedPapers) }
-    wsSend(msg)
-    setInput('')
-    setPendingQuestion(question)
-    setPendingSentAt(new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }))
-    setThinking(true)
-    setPhase('Starting')
-  }, [canSend, input, topicName, wsSend, selectedPapers])
+      if (consultedPapers.length === 0) return undefined
 
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSend()
-    }
-    if (e.key === 'Escape' && thinking) {
-      wsSend({ type: 'cancel' })
-    }
-  }
-
-  const dismissBanner = () => {
-    setShowBanner(false)
-    localStorage.setItem('shesha-welcome-dismissed', 'true')
-  }
-
-  if (!topicName) {
-    return (
-      <div className="flex-1 flex items-center justify-center text-text-dim text-sm">
-        Select or create a topic to begin.
-      </div>
-    )
-  }
+      return (
+        <div className="mt-2 pt-2 border-t border-border">
+          <div className="text-[10px] text-text-dim mb-1">Consulted papers:</div>
+          <div className="flex flex-wrap gap-1">
+            {consultedPapers.map(paper => (
+              <button
+                key={paper.arxiv_id}
+                onClick={() => onPaperClick?.(paper)}
+                className="text-[10px] text-accent hover:underline bg-accent/5 rounded px-1.5 py-0.5"
+                title={paper.title}
+              >
+                {paper.arxiv_id}
+              </button>
+            ))}
+          </div>
+        </div>
+      )
+    },
+    [topicPapers, onPaperClick],
+  )
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 min-h-0">
-      {/* Experimental welcome banner */}
-      {showBanner && (
-        <div className="bg-amber/5 border-b border-amber/20 px-4 py-2 flex items-center justify-between text-xs text-amber">
-          <span>
-            This is experimental software. Some features may be incomplete.
-            Click the <strong>?</strong> icon in the header for help.
-          </span>
-          <button onClick={dismissBanner} className="ml-2 hover:text-amber/80">&times;</button>
-        </div>
-      )}
-
-      {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0 px-4">
-        {exchanges.length === 0 && !thinking && (
-          <div className="flex items-center justify-center h-full text-text-dim text-sm">
-            Ask a question about the papers in this topic.
-          </div>
-        )}
-        {exchanges.map(ex => (
-          <ChatMessage key={ex.exchange_id} exchange={ex} onViewTrace={onViewTrace} topicPapers={topicPapers} onPaperClick={onPaperClick} />
-        ))}
-
-        {/* Pending question (shown immediately before answer arrives) */}
-        {pendingQuestion && (
-          <div className="flex flex-col gap-3 py-3">
-            <div className="flex flex-col items-end gap-0.5">
-              <div className="max-w-[70%] bg-accent/10 border border-accent/20 rounded-lg px-3 py-2 text-sm text-text-primary">
-                {pendingQuestion}
-              </div>
-              <span className="text-[10px] text-text-dim mr-1">{pendingSentAt}</span>
-            </div>
-          </div>
-        )}
-
-        {/* Thinking indicator */}
-        {thinking && (
-          <div className="flex justify-start py-3">
-            <div className="bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-text-dim">
-              <span className="inline-flex gap-1">
-                <span className="animate-bounce" style={{ animationDelay: '0ms' }}>.</span>
-                <span className="animate-bounce" style={{ animationDelay: '150ms' }}>.</span>
-                <span className="animate-bounce" style={{ animationDelay: '300ms' }}>.</span>
-              </span>
-              {phase && <span className="ml-2 text-xs">{phase}</span>}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Input */}
-      <div className="border-t border-border bg-surface-1 px-4 py-3">
-        <div className="flex gap-2">
-          <textarea
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={!connected || !hasPapers}
-            placeholder={
-              !connected ? 'Reconnecting...'
-              : !hasPapers ? 'Select papers in the sidebar first...'
-              : 'Ask a question...'
-            }
-            rows={1}
-            className="flex-1 bg-surface-2 border border-border rounded px-3 py-2 text-sm text-text-primary resize-none focus:outline-none focus:border-accent disabled:opacity-50"
-          />
-          {thinking ? (
-            <button
-              onClick={() => wsSend({ type: 'cancel' })}
-              className="px-4 py-2 bg-red text-white rounded text-sm font-medium hover:bg-red/90 transition-colors"
-            >
-              Cancel
-            </button>
-          ) : (
-            <button
-              onClick={handleSend}
-              disabled={!canSend}
-              className="px-4 py-2 bg-accent text-surface-0 rounded text-sm font-medium hover:bg-accent/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              Send
-            </button>
-          )}
-          <button
-            onClick={onClearHistory}
-            disabled={thinking}
-            className="p-2 text-text-dim hover:text-red transition-colors disabled:opacity-30"
-            title="Clear conversation"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-          </button>
-        </div>
-      </div>
-    </div>
+    <SharedChatArea
+      topicName={topicName}
+      connected={connected}
+      wsSend={wsSend}
+      wsOnMessage={sharedWsOnMessage}
+      onViewTrace={onViewTrace}
+      onClearHistory={onClearHistory}
+      historyVersion={historyVersion}
+      selectedDocuments={selectedPapers}
+      emptySelectionMessage="Select papers in the sidebar first..."
+      placeholder="Ask a question..."
+      loadHistory={loadHistory}
+      renderAnswer={renderAnswer}
+      renderAnswerFooter={renderAnswerFooter}
+    />
   )
 }

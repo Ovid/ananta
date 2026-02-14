@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Source badges** — citation report shows where each citation was verified (arXiv, CrossRef, OpenAlex, S2)
 - **Email modal for polite-pool access** — optional email stored in browser localStorage gives faster API access to CrossRef and OpenAlex
 - **Inline paper citations** — LLM responses in arXiv Explorer now cite papers by arxiv ID with clickable links that open the paper detail view
+- **Shared ChatArea and ChatMessage components** — extracted parameterized versions to shared-ui package with `selectedDocuments`/`document_ids` naming, optional `renderAnswer` and `renderAnswerFooter` props for domain-specific customization
 
 ### Changed
 

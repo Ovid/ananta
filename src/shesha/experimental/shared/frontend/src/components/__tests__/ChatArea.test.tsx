@@ -1,0 +1,261 @@
+import { render, screen, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { describe, it, expect, vi, beforeAll } from 'vitest'
+
+beforeAll(() => {
+  const store: Record<string, string> = {}
+  Object.defineProperty(globalThis, 'localStorage', {
+    value: {
+      getItem: (k: string) => store[k] ?? null,
+      setItem: (k: string, v: string) => { store[k] = v },
+      removeItem: (k: string) => { delete store[k] },
+      clear: () => { for (const k in store) delete store[k] },
+    },
+    configurable: true,
+  })
+  Element.prototype.scrollTo = vi.fn()
+})
+
+import ChatArea from '../ChatArea'
+
+describe('ChatArea (shared) - no topic', () => {
+  it('shows placeholder when no topic is selected', async () => {
+    await act(async () => {
+      render(
+        <ChatArea
+          topicName={null}
+          connected={true}
+          wsSend={vi.fn()}
+          wsOnMessage={vi.fn().mockReturnValue(() => {})}
+          onViewTrace={vi.fn()}
+          onClearHistory={vi.fn()}
+          historyVersion={0}
+          loadHistory={vi.fn().mockResolvedValue([])}
+        />
+      )
+    })
+    expect(screen.getByText('Select or create a topic to begin.')).toBeInTheDocument()
+  })
+})
+
+describe('ChatArea (shared) - input disabled state', () => {
+  const baseProps = {
+    topicName: 'chess',
+    connected: true,
+    wsSend: vi.fn(),
+    wsOnMessage: vi.fn().mockReturnValue(() => {}),
+    onViewTrace: vi.fn(),
+    onClearHistory: vi.fn(),
+    historyVersion: 0,
+    loadHistory: vi.fn().mockResolvedValue([]),
+  }
+
+  it('disables textarea when no documents are selected', async () => {
+    await act(async () => {
+      render(
+        <ChatArea
+          {...baseProps}
+          selectedDocuments={new Set()}
+          emptySelectionMessage="Select documents in the sidebar first..."
+        />
+      )
+    })
+    const textarea = screen.getByPlaceholderText('Select documents in the sidebar first...')
+    expect(textarea).toBeDisabled()
+  })
+
+  it('enables textarea when documents are selected', async () => {
+    await act(async () => {
+      render(
+        <ChatArea
+          {...baseProps}
+          selectedDocuments={new Set(['doc-1'])}
+        />
+      )
+    })
+    const textarea = screen.getByPlaceholderText('Ask a question...')
+    expect(textarea).not.toBeDisabled()
+  })
+
+  it('uses custom placeholder text', async () => {
+    await act(async () => {
+      render(
+        <ChatArea
+          {...baseProps}
+          selectedDocuments={new Set(['doc-1'])}
+          placeholder="Ask about your code..."
+        />
+      )
+    })
+    expect(screen.getByPlaceholderText('Ask about your code...')).toBeInTheDocument()
+  })
+
+  it('defaults placeholder to "Ask a question..." when not provided', async () => {
+    await act(async () => {
+      render(
+        <ChatArea
+          {...baseProps}
+          selectedDocuments={new Set(['doc-1'])}
+        />
+      )
+    })
+    expect(screen.getByPlaceholderText('Ask a question...')).toBeInTheDocument()
+  })
+})
+
+describe('ChatArea (shared) - sends document_ids in query', () => {
+  it('sends document_ids array in WebSocket message', async () => {
+    const user = userEvent.setup()
+    const wsSend = vi.fn()
+
+    await act(async () => {
+      render(
+        <ChatArea
+          topicName="chess"
+          connected={true}
+          wsSend={wsSend}
+          wsOnMessage={vi.fn().mockReturnValue(() => {})}
+          onViewTrace={vi.fn()}
+          onClearHistory={vi.fn()}
+          historyVersion={0}
+          selectedDocuments={new Set(['doc-1', 'doc-2'])}
+          loadHistory={vi.fn().mockResolvedValue([])}
+        />
+      )
+    })
+
+    const textarea = screen.getByPlaceholderText('Ask a question...')
+    await user.type(textarea, 'What is chess?')
+    await user.click(screen.getByText('Send'))
+
+    expect(wsSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'query',
+        topic: 'chess',
+        question: 'What is chess?',
+        document_ids: expect.arrayContaining(['doc-1', 'doc-2']),
+      })
+    )
+  })
+})
+
+describe('ChatArea (shared) - thinking state', () => {
+  it('shows thinking indicator and pending question after send', async () => {
+    const user = userEvent.setup()
+
+    await act(async () => {
+      render(
+        <ChatArea
+          topicName="chess"
+          connected={true}
+          wsSend={vi.fn()}
+          wsOnMessage={vi.fn().mockReturnValue(() => {})}
+          onViewTrace={vi.fn()}
+          onClearHistory={vi.fn()}
+          historyVersion={0}
+          selectedDocuments={new Set(['doc-1'])}
+          loadHistory={vi.fn().mockResolvedValue([])}
+        />
+      )
+    })
+
+    const textarea = screen.getByPlaceholderText('Ask a question...')
+    await user.type(textarea, 'Hello')
+    await user.click(screen.getByText('Send'))
+
+    expect(screen.getByText('Hello')).toBeInTheDocument()
+    expect(screen.getByText('Starting')).toBeInTheDocument()
+  })
+})
+
+describe('ChatArea (shared) - cancel', () => {
+  it('sends cancel message when Cancel button is clicked', async () => {
+    const user = userEvent.setup()
+    const wsSend = vi.fn()
+
+    await act(async () => {
+      render(
+        <ChatArea
+          topicName="chess"
+          connected={true}
+          wsSend={wsSend}
+          wsOnMessage={vi.fn().mockReturnValue(() => {})}
+          onViewTrace={vi.fn()}
+          onClearHistory={vi.fn()}
+          historyVersion={0}
+          selectedDocuments={new Set(['doc-1'])}
+          loadHistory={vi.fn().mockResolvedValue([])}
+        />
+      )
+    })
+
+    const textarea = screen.getByPlaceholderText('Ask a question...')
+    await user.type(textarea, 'Hello')
+    await user.click(screen.getByText('Send'))
+
+    // After sending, Cancel button should appear
+    await user.click(screen.getByText('Cancel'))
+
+    expect(wsSend).toHaveBeenCalledWith({ type: 'cancel' })
+  })
+})
+
+describe('ChatArea (shared) - renderAnswer passthrough', () => {
+  const sampleExchange = {
+    exchange_id: 'ex-1',
+    question: 'Q?',
+    answer: 'A!',
+    timestamp: '2026-02-13T12:00:00Z',
+    tokens: { prompt: 10, completion: 5, total: 15 },
+    execution_time: 1.0,
+    trace_id: null,
+    model: 'test',
+    document_ids: ['doc-1'],
+  }
+
+  it('passes renderAnswer to ChatMessage components', async () => {
+    const renderAnswer = (answer: string) => <span data-testid="custom">{answer}</span>
+
+    await act(async () => {
+      render(
+        <ChatArea
+          topicName="chess"
+          connected={true}
+          wsSend={vi.fn()}
+          wsOnMessage={vi.fn().mockReturnValue(() => {})}
+          onViewTrace={vi.fn()}
+          onClearHistory={vi.fn()}
+          historyVersion={0}
+          selectedDocuments={new Set(['doc-1'])}
+          loadHistory={vi.fn().mockResolvedValue([sampleExchange])}
+          renderAnswer={renderAnswer}
+        />
+      )
+    })
+
+    expect(screen.getByTestId('custom')).toBeInTheDocument()
+  })
+
+  it('passes renderAnswerFooter to ChatMessage components', async () => {
+    const renderAnswerFooter = () => <div data-testid="exchange-footer">Extra</div>
+
+    await act(async () => {
+      render(
+        <ChatArea
+          topicName="chess"
+          connected={true}
+          wsSend={vi.fn()}
+          wsOnMessage={vi.fn().mockReturnValue(() => {})}
+          onViewTrace={vi.fn()}
+          onClearHistory={vi.fn()}
+          historyVersion={0}
+          selectedDocuments={new Set(['doc-1'])}
+          loadHistory={vi.fn().mockResolvedValue([sampleExchange])}
+          renderAnswerFooter={renderAnswerFooter}
+        />
+      )
+    })
+
+    expect(screen.getByTestId('exchange-footer')).toBeInTheDocument()
+  })
+})

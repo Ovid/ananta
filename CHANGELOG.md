@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Code Explorer CLI entry point** — `shesha-code` command launches the code explorer web server with `--port`, `--data-dir`, `--model`, and `--no-browser` options
 - **Code Explorer module skeleton** — new `shesha.experimental.code_explorer` module with `CodeExplorerTopicManager` for lightweight repo grouping, `CodeExplorerState` dataclass and `create_app_state()` factory, and `__main__.py` CLI entry point stub
 - **Code Explorer WebSocket handler** — cross-project query handler that loads documents from multiple repos, merges per-project analysis as context, and records consulted project_ids in the global session
 - **Multi-source citation verification** — citations are now verified against CrossRef, OpenAlex, and Semantic Scholar in addition to arXiv, dramatically reducing false "unresolved" results for non-arXiv sources

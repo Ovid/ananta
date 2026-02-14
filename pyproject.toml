@@ -60,6 +60,7 @@ web = [
 
 [project.scripts]
 shesha-web = "shesha.experimental.web.__main__:main"
+shesha-code = "shesha.experimental.code_explorer.__main__:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/shesha"]

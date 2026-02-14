@@ -1,30 +1,19 @@
-import type { TopicInfo, PaperInfo, SearchResult, TraceFull, TraceListItem, Exchange, ContextBudget, ModelInfo } from '../types'
-
-const BASE = '/api'
-
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const resp = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  })
-  if (!resp.ok) {
-    const err = await resp.json().catch(() => ({ detail: resp.statusText }))
-    throw new Error(err.detail || resp.statusText)
-  }
-  return resp.json()
-}
+import { request, sharedApi } from '@shesha/shared-ui'
+import type { TopicInfo, PaperInfo, SearchResult, Exchange } from '../types'
 
 export const api = {
+  ...sharedApi,
+  // Override topics.list to return arxiv TopicInfo (with paper_count instead of document_count)
   topics: {
+    ...sharedApi.topics,
     list: () => request<TopicInfo[]>('/topics'),
-    create: (name: string) => request<{ name: string; project_id: string }>('/topics', {
-      method: 'POST', body: JSON.stringify({ name }),
-    }),
-    rename: (name: string, newName: string) => request<{ name: string }>(`/topics/${encodeURIComponent(name)}`, {
-      method: 'PATCH', body: JSON.stringify({ new_name: newName }),
-    }),
-    delete: (name: string) => request<void>(`/topics/${encodeURIComponent(name)}`, { method: 'DELETE' }),
   },
+  // Override history.get to return arxiv Exchange (with paper_ids instead of document_ids)
+  history: {
+    ...sharedApi.history,
+    get: (topic: string) => request<{ exchanges: Exchange[] }>(`/topics/${encodeURIComponent(topic)}/history`),
+  },
+  // Arxiv-specific: paper management
   papers: {
     list: (topic: string) => request<PaperInfo[]>(`/topics/${encodeURIComponent(topic)}/papers`),
     add: (arxivId: string, topics: string[]) => request<{ task_id?: string }>('/papers/add', {
@@ -38,6 +27,7 @@ export const api = {
     ),
     search: (q: string) => request<SearchResult[]>(`/papers/search?q=${encodeURIComponent(q)}`),
   },
+  // Arxiv-specific: arxiv search
   search: (params: { q: string; author?: string; category?: string; sort_by?: string; start?: number }) => {
     const qs = new URLSearchParams()
     qs.set('q', params.q)
@@ -47,26 +37,4 @@ export const api = {
     if (params.start) qs.set('start', String(params.start))
     return request<SearchResult[]>(`/search?${qs}`)
   },
-  traces: {
-    list: (topic: string) => request<TraceListItem[]>(
-      `/topics/${encodeURIComponent(topic)}/traces`,
-    ),
-    get: (topic: string, traceId: string) => request<TraceFull>(
-      `/topics/${encodeURIComponent(topic)}/traces/${traceId}`,
-    ),
-  },
-  history: {
-    get: (topic: string) => request<{ exchanges: Exchange[] }>(`/topics/${encodeURIComponent(topic)}/history`),
-    clear: (topic: string) => request<void>(`/topics/${encodeURIComponent(topic)}/history`, { method: 'DELETE' }),
-  },
-  export: (topic: string) => fetch(`${BASE}/topics/${encodeURIComponent(topic)}/export`).then(r => r.text()),
-  model: {
-    get: () => request<ModelInfo>('/model'),
-    update: (model: string) => request<ModelInfo>('/model', {
-      method: 'PUT', body: JSON.stringify({ model }),
-    }),
-  },
-  contextBudget: (topic: string) => request<ContextBudget>(
-    `/topics/${encodeURIComponent(topic)}/context-budget`,
-  ),
 }

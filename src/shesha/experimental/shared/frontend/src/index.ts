@@ -17,3 +17,6 @@ export { default as ChatMessage } from './components/ChatMessage'
 export type { ChatMessageProps } from './components/ChatMessage'
 export { default as TopicSidebar } from './components/TopicSidebar'
 export type { TopicSidebarProps } from './components/TopicSidebar'
+
+// API client
+export { request, sharedApi } from './api/client'

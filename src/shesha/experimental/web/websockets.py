@@ -49,6 +49,7 @@ logger = logging.getLogger(__name__)
 # paper_ids <-> document_ids adapter
 # ---------------------------------------------------------------------------
 
+
 class _PaperIdAdapter:
     """Wraps a WebSocket to translate ``paper_ids`` <-> ``document_ids``.
 
@@ -76,9 +77,9 @@ class _PaperIdAdapter:
         # Translate ``document_ids`` back to ``paper_ids`` for the arxiv
         # frontend (e.g. in ``complete`` messages).
         if isinstance(data, dict) and "document_ids" in data:
-            data = {
-                k: v for k, v in data.items() if k != "document_ids"
-            } | {"paper_ids": data["document_ids"]}
+            data = {k: v for k, v in data.items() if k != "document_ids"} | {
+                "paper_ids": data["document_ids"]
+            }
         await self._ws.send_json(data, **kwargs)
 
     # Forward everything else to the underlying WebSocket.
@@ -89,6 +90,7 @@ class _PaperIdAdapter:
 # ---------------------------------------------------------------------------
 # Citation instruction context builder
 # ---------------------------------------------------------------------------
+
 
 def build_citation_instructions(paper_ids: list[str], cache: PaperCache) -> str:
     """Build citation instruction text to append to user questions.
@@ -130,9 +132,8 @@ def _build_arxiv_context(
 # Citation check handler (registered as extra_handler)
 # ---------------------------------------------------------------------------
 
-async def _handle_check_citations(
-    ws: WebSocket, data: dict[str, object], state: Any
-) -> None:
+
+async def _handle_check_citations(ws: WebSocket, data: dict[str, object], state: Any) -> None:
     """Check citations for selected papers and stream progress."""
     topic = str(data.get("topic", ""))
     project_id = state.topic_mgr.resolve(topic)
@@ -277,6 +278,7 @@ def _check_single_paper(
 # ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
+
 
 async def websocket_handler(ws: WebSocket, state: AppState) -> None:
     """Handle WebSocket connections for queries and citation checks.

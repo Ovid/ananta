@@ -1,8 +1,14 @@
 export interface TopicInfo {
   name: string
-  paper_count: number
+  document_count: number
   size: string
   project_id: string
+}
+
+export interface DocumentItem {
+  id: string
+  label: string
+  sublabel?: string
 }
 
 export interface TraceStep {

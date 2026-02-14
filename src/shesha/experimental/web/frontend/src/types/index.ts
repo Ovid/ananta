@@ -1,5 +1,5 @@
 import type {
-  TopicInfo,
+  TopicInfo as SharedTopicInfo,
   TraceStep,
   TraceListItem,
   TraceFull,
@@ -10,7 +10,12 @@ import type {
 } from '@shesha/shared-ui'
 
 // Re-export shared types that are used as-is in the arxiv frontend.
-export type { TopicInfo, TraceStep, TraceListItem, TraceFull, ContextBudget, ModelInfo }
+export type { TraceStep, TraceListItem, TraceFull, ContextBudget, ModelInfo }
+
+// Arxiv-specific: TopicInfo uses paper_count (alias for document_count).
+export interface TopicInfo extends Omit<SharedTopicInfo, 'document_count'> {
+  paper_count: number
+}
 
 // Arxiv-specific: Exchange uses paper_ids (alias for document_ids).
 export interface Exchange extends Omit<SharedExchange, 'document_ids'> {

@@ -22,6 +22,7 @@ from shesha.experimental.code_explorer.schemas import (
     RepoInfo,
     UpdateStatus,
 )
+from shesha.experimental.code_explorer.websockets import websocket_handler
 from shesha.experimental.shared.app_factory import create_app
 from shesha.models import RepoProjectResult
 
@@ -192,5 +193,6 @@ def create_api(state: CodeExplorerState) -> FastAPI:
     return create_app(
         state,
         title="Shesha Code Explorer",
+        ws_handler=lambda ws: websocket_handler(ws, state),
         extra_routers=[repo_router],
     )

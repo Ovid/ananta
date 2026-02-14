@@ -1,12 +1,12 @@
 import { render, screen, act } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
 
-vi.mock('@shesha/shared-ui', async () => {
-  const actual = await vi.importActual<typeof import('@shesha/shared-ui')>('@shesha/shared-ui')
-  return { ...actual, showToast: vi.fn() }
-})
+vi.mock('../Toast', () => ({
+  showToast: vi.fn(),
+  default: () => null,
+}))
 
-import { TraceViewer } from '@shesha/shared-ui'
+import TraceViewer from '../TraceViewer'
 
 const mockTrace = {
   trace_id: 't-1',
@@ -42,5 +42,15 @@ describe('TraceViewer scrollability', () => {
     // The scrollable area must contain both the summary and the steps
     expect(scrollable!.textContent).toContain('test-model')
     expect(scrollable!.textContent).toContain('code_generated')
+  })
+
+  it('calls fetchTrace with topicName and traceId', async () => {
+    const fetchTrace = vi.fn().mockResolvedValue(mockTrace)
+
+    await act(async () => {
+      render(<TraceViewer topicName="my-topic" traceId="t-42" onClose={vi.fn()} fetchTrace={fetchTrace} />)
+    })
+
+    expect(fetchTrace).toHaveBeenCalledWith('my-topic', 't-42')
   })
 })

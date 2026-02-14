@@ -1,7 +1,6 @@
 import { useState, useEffect, type CSSProperties, type MouseEvent } from 'react'
 import { api } from '../api/client'
-import { showToast } from './Toast'
-import ConfirmDialog from './ConfirmDialog'
+import { showToast, ConfirmDialog } from '@shesha/shared-ui'
 import type { TopicInfo, PaperInfo } from '../types'
 
 interface TopicSidebarProps {

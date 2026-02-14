@@ -1,17 +1,14 @@
 import { useState, useCallback, useEffect, useRef, type MouseEvent } from 'react'
 import Header from './components/Header'
-import StatusBar from './components/StatusBar'
-import ToastContainer, { showToast } from './components/Toast'
 import TopicSidebar from './components/TopicSidebar'
 import ChatArea from './components/ChatArea'
 import SearchPanel from './components/SearchPanel'
-import TraceViewer from './components/TraceViewer'
 import HelpPanel from './components/HelpPanel'
 import DownloadProgress from './components/DownloadProgress'
 import CitationReport from './components/CitationReport'
 import EmailModal, { getStoredEmail, hasEmailDecision } from './components/EmailModal'
 import PaperDetail from './components/PaperDetail'
-import { useTheme, useWebSocket } from '@shesha/shared-ui'
+import { useTheme, useWebSocket, StatusBar, ToastContainer, showToast, TraceViewer } from '@shesha/shared-ui'
 import { api } from './api/client'
 import type { ContextBudget, PaperInfo, PaperReport, WSMessage } from './types'
 
@@ -359,6 +356,7 @@ export default function App() {
           topicName={traceView.topic}
           traceId={traceView.traceId}
           onClose={() => setTraceView(null)}
+          fetchTrace={api.traces.get}
         />
       )}
 

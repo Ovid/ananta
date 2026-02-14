@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, type KeyboardEvent } from 'react'
 import { api } from '../api/client'
-import { showToast } from './Toast'
+import { showToast } from '@shesha/shared-ui'
 import ChatMessage from './ChatMessage'
 import type { Exchange, PaperInfo, WSMessage } from '../types'
 

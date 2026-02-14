@@ -3,3 +3,10 @@
 export type { TopicInfo, TraceStep, TraceListItem, TraceFull, Exchange, ContextBudget, ModelInfo, WSMessage } from './types'
 export { useWebSocket } from './hooks/useWebSocket'
 export { useTheme } from './hooks/useTheme'
+
+// Components
+export { default as ConfirmDialog } from './components/ConfirmDialog'
+export { default as StatusBar } from './components/StatusBar'
+export { default as ToastContainer, showToast } from './components/Toast'
+export type { ToastItem } from './components/Toast'
+export { default as TraceViewer } from './components/TraceViewer'

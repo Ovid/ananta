@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { api } from '../api/client'
 import { showToast } from './Toast'
 import type { TraceFull, TraceStep } from '../types'
 
@@ -7,6 +6,8 @@ interface TraceViewerProps {
   topicName: string
   traceId: string
   onClose: () => void
+  /** Fetch full trace data. Receives (topicName, traceId) and returns TraceFull. */
+  fetchTrace: (topicName: string, traceId: string) => Promise<TraceFull>
 }
 
 const stepTypeColors: Record<string, string> = {
@@ -19,7 +20,7 @@ const stepTypeColors: Record<string, string> = {
   semantic_verification: 'bg-purple-500',
 }
 
-export default function TraceViewer({ topicName, traceId, onClose }: TraceViewerProps) {
+export default function TraceViewer({ topicName, traceId, onClose, fetchTrace }: TraceViewerProps) {
   const [trace, setTrace] = useState<TraceFull | null>(null)
   const [loading, setLoading] = useState(true)
   const [expandedSteps, setExpandedSteps] = useState<Set<number>>(new Set())
@@ -27,14 +28,14 @@ export default function TraceViewer({ topicName, traceId, onClose }: TraceViewer
 
   useEffect(() => {
     setLoading(true)
-    api.traces.get(topicName, traceId).then(data => {
+    fetchTrace(topicName, traceId).then(data => {
       setTrace(data)
       setLoading(false)
     }).catch(() => {
       showToast('Failed to load trace', 'error')
       setLoading(false)
     })
-  }, [topicName, traceId])
+  }, [topicName, traceId, fetchTrace])
 
   const toggleStep = (idx: number) => {
     setExpandedSteps(prev => {

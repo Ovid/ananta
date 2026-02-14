@@ -23,11 +23,11 @@ vi.mock('../../api/client', () => ({
   },
 }))
 
-// Mock Toast
-vi.mock('../Toast', () => ({
-  showToast: vi.fn(),
-  default: () => null,
-}))
+// Mock Toast from shared-ui
+vi.mock('@shesha/shared-ui', async () => {
+  const actual = await vi.importActual<typeof import('@shesha/shared-ui')>('@shesha/shared-ui')
+  return { ...actual, showToast: vi.fn() }
+})
 
 import ChatArea from '../ChatArea'
 

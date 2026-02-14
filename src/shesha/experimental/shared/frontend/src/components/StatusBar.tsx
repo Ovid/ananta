@@ -37,7 +37,7 @@ export default function StatusBar({
   return (
     <footer className="h-7 border-t border-border bg-surface-1 flex items-center px-4 text-[11px] text-text-dim font-mono shrink-0">
       <span className="mr-4">
-        Project: <span className="text-text-secondary">{topicName || '—'}</span>
+        Project: <span className="text-text-secondary">{topicName || '\u2014'}</span>
       </span>
       <span className="mr-4">
         Model:{' '}

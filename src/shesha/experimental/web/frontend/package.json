@@ -11,6 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@shesha/shared-ui": "file:../../shared/frontend",
     "katex": "^0.16.28",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"

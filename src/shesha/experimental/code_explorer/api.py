@@ -1,18 +1,26 @@
 """Code explorer API.
 
 Provides repo management routes (list, add, get, delete, check/apply updates)
-for the code explorer web interface.  Uses the shared ``create_app()`` factory
-from ``shesha.experimental.shared.app_factory`` for FastAPI boilerplate, then
-adds code-explorer-specific repo routes via an extra router.
+and analysis routes for the code explorer web interface.  Uses the shared
+``create_app()`` factory from ``shesha.experimental.shared.app_factory`` for
+FastAPI boilerplate, then adds code-explorer-specific repo routes via an extra
+router.
 """
 
 from __future__ import annotations
+
+from dataclasses import asdict
 
 from fastapi import APIRouter, FastAPI, HTTPException
 
 from shesha.exceptions import ProjectNotFoundError
 from shesha.experimental.code_explorer.dependencies import CodeExplorerState
-from shesha.experimental.code_explorer.schemas import RepoAdd, RepoInfo, UpdateStatus
+from shesha.experimental.code_explorer.schemas import (
+    AnalysisResponse,
+    RepoAdd,
+    RepoInfo,
+    UpdateStatus,
+)
 from shesha.experimental.shared.app_factory import create_app
 from shesha.models import RepoProjectResult
 
@@ -117,6 +125,24 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
             status=updated.status,
             files_ingested=updated.files_ingested,
         )
+
+    @router.post("/repos/{project_id}/analyze")
+    def generate_analysis(project_id: str) -> AnalysisResponse:
+        try:
+            analysis = state.shesha.generate_analysis(project_id)
+        except ProjectNotFoundError:
+            raise HTTPException(404, f"Project '{project_id}' not found")
+        return AnalysisResponse(**asdict(analysis))
+
+    @router.get("/repos/{project_id}/analysis")
+    def get_analysis(project_id: str) -> AnalysisResponse:
+        try:
+            analysis = state.shesha.get_analysis(project_id)
+        except ProjectNotFoundError:
+            raise HTTPException(404, f"Project '{project_id}' not found")
+        if analysis is None:
+            raise HTTPException(404, f"No analysis exists for project '{project_id}'")
+        return AnalysisResponse(**asdict(analysis))
 
     return router
 

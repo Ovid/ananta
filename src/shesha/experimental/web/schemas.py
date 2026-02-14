@@ -1,23 +1,90 @@
-"""Pydantic schemas for the web API."""
+"""Pydantic schemas for the arxiv web API.
+
+Generic schemas are imported from shesha.experimental.shared.schemas and
+re-exported here for backward compatibility.  Arxiv-specific schemas
+(PaperAdd, PaperInfo, SearchResult, DownloadTaskStatus) and arxiv-flavoured
+overrides (TopicInfo with paper_count, ExchangeSchema with paper_ids) are
+defined locally.
+"""
 
 from __future__ import annotations
 
 from pydantic import BaseModel
 
+# Re-export generic schemas so existing ``from web.schemas import X`` still works.
+from shesha.experimental.shared.schemas import (
+    ContextBudget,
+    ModelInfo,
+    ModelUpdate,
+    TopicCreate,
+    TopicRename,
+    TraceFull,
+    TraceListItem,
+    TraceStepSchema,
+)
 
-class TopicCreate(BaseModel):
-    name: str
+# Ensure re-exports are visible to star-imports and static analysis.
+__all__ = [
+    "ContextBudget",
+    "ConversationHistory",
+    "DownloadTaskStatus",
+    "ExchangeSchema",
+    "ModelInfo",
+    "ModelUpdate",
+    "PaperAdd",
+    "PaperInfo",
+    "SearchResult",
+    "TopicCreate",
+    "TopicInfo",
+    "TopicRename",
+    "TraceFull",
+    "TraceListItem",
+    "TraceStepSchema",
+]
 
 
-class TopicRename(BaseModel):
-    new_name: str
+# ---------------------------------------------------------------------------
+# Arxiv-specific overrides of shared schemas
+# ---------------------------------------------------------------------------
 
 
 class TopicInfo(BaseModel):
+    """Arxiv-flavoured TopicInfo using ``paper_count`` instead of the shared
+    schema's ``document_count``."""
+
     name: str
     paper_count: int
     size: str
     project_id: str
+
+
+class ExchangeSchema(BaseModel):
+    """Arxiv-flavoured ExchangeSchema using ``paper_ids`` instead of the shared
+    schema's ``document_ids``."""
+
+    exchange_id: str
+    question: str
+    answer: str
+    trace_id: str | None = None
+    timestamp: str
+    tokens: dict[str, int]
+    execution_time: float
+    model: str
+    paper_ids: list[str] | None = None
+
+
+class ConversationHistory(BaseModel):
+    """Local override so exchanges are validated with the arxiv-flavoured
+    ``ExchangeSchema`` (which carries ``paper_ids``, not ``document_ids``).
+    Using the shared ``ConversationHistory`` would silently drop ``paper_ids``
+    during Pydantic v2 validation."""
+
+    exchanges: list[ExchangeSchema]
+
+
+# ---------------------------------------------------------------------------
+# Arxiv-only schemas (no shared equivalent)
+# ---------------------------------------------------------------------------
 
 
 class PaperAdd(BaseModel):
@@ -45,69 +112,6 @@ class SearchResult(BaseModel):
     date: str
     arxiv_url: str
     in_topics: list[str] = []
-
-
-class TraceStepSchema(BaseModel):
-    step_type: str
-    iteration: int
-    content: str
-    timestamp: str
-    tokens_used: int | None = None
-    duration_ms: int | None = None
-
-
-class TraceListItem(BaseModel):
-    trace_id: str
-    question: str
-    timestamp: str
-    status: str
-    total_tokens: int
-    duration_ms: int
-
-
-class TraceFull(BaseModel):
-    trace_id: str
-    question: str
-    model: str
-    timestamp: str
-    steps: list[TraceStepSchema]
-    total_tokens: dict[str, int]
-    total_iterations: int
-    duration_ms: int
-    status: str
-    document_ids: list[str] = []
-
-
-class ExchangeSchema(BaseModel):
-    exchange_id: str
-    question: str
-    answer: str
-    trace_id: str | None = None
-    timestamp: str
-    tokens: dict[str, int]
-    execution_time: float
-    model: str
-    paper_ids: list[str] | None = None
-
-
-class ConversationHistory(BaseModel):
-    exchanges: list[ExchangeSchema]
-
-
-class ModelInfo(BaseModel):
-    model: str
-    max_input_tokens: int | None = None
-
-
-class ModelUpdate(BaseModel):
-    model: str
-
-
-class ContextBudget(BaseModel):
-    used_tokens: int
-    max_tokens: int
-    percentage: float
-    level: str  # "green", "amber", "red"
 
 
 class DownloadTaskStatus(BaseModel):

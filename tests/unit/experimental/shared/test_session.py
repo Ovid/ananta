@@ -196,3 +196,26 @@ def test_add_exchange_document_ids_defaults_to_none(
         model="test",
     )
     assert exchange.get("document_ids") is None
+
+
+def test_custom_conversation_file(session_dir: Path) -> None:
+    """Subclasses can override the conversation filename via constructor."""
+    session_dir.mkdir(parents=True, exist_ok=True)
+    s = WebConversationSession(session_dir, conversation_file="_conversation.json")
+    s.add_exchange(
+        question="Q",
+        answer="A",
+        trace_id="t1",
+        tokens={"prompt": 10, "completion": 5, "total": 15},
+        execution_time=0.5,
+        model="test",
+    )
+
+    # Custom filename used on disk
+    assert (session_dir / "_conversation.json").exists()
+    assert not (session_dir / "conversation.json").exists()
+
+    # Reloads correctly from the custom filename
+    s2 = WebConversationSession(session_dir, conversation_file="_conversation.json")
+    assert len(s2.list_exchanges()) == 1
+    assert s2.list_exchanges()[0]["question"] == "Q"

@@ -23,10 +23,4 @@ class WebConversationSession(_SharedSession):
     """
 
     def __init__(self, project_dir: Path) -> None:
-        # Set the file path *before* the parent __init__ calls _load(),
-        # by overriding the attribute that __init__ sets.
-        # We must replicate the parent's __init__ logic because it
-        # hardcodes the filename from its own module-level constant.
-        self._file = project_dir / CONVERSATION_FILE
-        self._exchanges: list[dict[str, object]] = []
-        self._load()
+        super().__init__(project_dir, conversation_file=CONVERSATION_FILE)

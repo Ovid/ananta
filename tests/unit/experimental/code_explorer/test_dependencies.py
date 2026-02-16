@@ -80,7 +80,9 @@ class TestCreateAppState:
 
     @patch("shesha.experimental.code_explorer.dependencies.Shesha")
     @patch("shesha.experimental.code_explorer.dependencies.Path.home")
-    def test_default_data_dir(self, mock_home: MagicMock, mock_shesha_cls: MagicMock, tmp_path: Path) -> None:
+    def test_default_data_dir(
+        self, mock_home: MagicMock, mock_shesha_cls: MagicMock, tmp_path: Path
+    ) -> None:
         """create_app_state uses ~/.shesha/code-explorer/ as default data_dir."""
         mock_home.return_value = tmp_path
         state = create_app_state(data_dir=None)

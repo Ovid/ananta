@@ -1,4 +1,5 @@
 import { render, screen, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi } from 'vitest'
 
 vi.mock('../Toast', () => ({
@@ -52,5 +53,70 @@ describe('TraceViewer scrollability', () => {
     })
 
     expect(fetchTrace).toHaveBeenCalledWith('my-topic', 't-42')
+  })
+})
+
+describe('TraceViewer markdown rendering', () => {
+  it('renders final_answer step content as markdown', async () => {
+    const user = userEvent.setup()
+    const traceWithMarkdown = {
+      ...mockTrace,
+      steps: [
+        {
+          step_type: 'final_answer',
+          iteration: 1,
+          content: '# Main Heading\n\nSome **bold** text and a list:\n\n- item one\n- item two',
+          tokens_used: 20,
+          timestamp: '2025-01-01T00:00:02Z',
+        },
+      ],
+    }
+    const fetchTrace = vi.fn().mockResolvedValue(traceWithMarkdown)
+
+    await act(async () => {
+      render(<TraceViewer topicName="test" traceId="t-1" onClose={vi.fn()} fetchTrace={fetchTrace} />)
+    })
+
+    await screen.findByText(/test-model/)
+
+    // Expand the step
+    await user.click(screen.getByText('final_answer'))
+
+    // Markdown should produce an <h1> and <strong> element
+    const stepContent = document.querySelector('[data-testid="step-content-0"]')!
+    expect(stepContent.querySelector('h1')).toBeTruthy()
+    expect(stepContent.querySelector('strong')).toBeTruthy()
+    expect(stepContent.querySelector('li')).toBeTruthy()
+  })
+
+  it('renders code_generated step content as plain monospace text', async () => {
+    const user = userEvent.setup()
+    const traceWithCode = {
+      ...mockTrace,
+      steps: [
+        {
+          step_type: 'code_generated',
+          iteration: 1,
+          content: '# this is a comment\nprint("hello")',
+          tokens_used: 10,
+          timestamp: '2025-01-01T00:00:01Z',
+        },
+      ],
+    }
+    const fetchTrace = vi.fn().mockResolvedValue(traceWithCode)
+
+    await act(async () => {
+      render(<TraceViewer topicName="test" traceId="t-1" onClose={vi.fn()} fetchTrace={fetchTrace} />)
+    })
+
+    await screen.findByText(/test-model/)
+
+    // Expand the step
+    await user.click(screen.getByText('code_generated'))
+
+    // code_generated should NOT render markdown - # should not become <h1>
+    const stepContent = document.querySelector('[data-testid="step-content-0"]')!
+    expect(stepContent.querySelector('h1')).toBeFalsy()
+    expect(stepContent.textContent).toContain('# this is a comment')
   })
 })

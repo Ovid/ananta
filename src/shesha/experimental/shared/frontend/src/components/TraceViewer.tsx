@@ -1,6 +1,39 @@
 import { useState, useEffect } from 'react'
+import type { Components } from 'react-markdown'
+import Markdown from 'react-markdown'
 import { showToast } from './Toast'
 import type { TraceFull, TraceStep } from '../types'
+
+/** Step types whose content is prose/markdown rather than raw code. */
+const markdownStepTypes = new Set([
+  'final_answer',
+  'subcall_request',
+  'subcall_response',
+  'verification',
+  'semantic_verification',
+])
+
+/** Custom renderers so markdown looks good without @tailwindcss/typography. */
+const mdComponents: Components = {
+  h1: ({ children }) => <h1 className="text-base font-bold mt-3 mb-1 text-text-primary">{children}</h1>,
+  h2: ({ children }) => <h2 className="text-sm font-bold mt-3 mb-1 text-text-primary">{children}</h2>,
+  h3: ({ children }) => <h3 className="text-xs font-bold mt-2 mb-1 text-text-primary">{children}</h3>,
+  p: ({ children }) => <p className="mb-2 leading-relaxed">{children}</p>,
+  ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-0.5">{children}</ul>,
+  ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-0.5">{children}</ol>,
+  li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+  code: ({ children, className }) => {
+    const isBlock = className?.includes('language-')
+    if (isBlock) {
+      return <code className="block bg-surface-1 rounded p-2 font-mono text-text-secondary overflow-x-auto whitespace-pre">{children}</code>
+    }
+    return <code className="bg-surface-1 rounded px-1 py-0.5 font-mono text-text-secondary">{children}</code>
+  },
+  pre: ({ children }) => <pre className="mb-2">{children}</pre>,
+  strong: ({ children }) => <strong className="font-bold text-text-primary">{children}</strong>,
+  blockquote: ({ children }) => <blockquote className="border-l-2 border-accent pl-3 my-2 text-text-dim italic">{children}</blockquote>,
+  hr: () => <hr className="border-border my-3" />,
+}
 
 interface TraceViewerProps {
   topicName: string
@@ -118,6 +151,7 @@ export default function TraceViewer({ topicName, traceId, onClose, fetchTrace }:
 
 function StepCard({ step, index, expanded, onToggle }: { step: TraceStep; index: number; expanded: boolean; onToggle: () => void }) {
   const dotColor = stepTypeColors[step.step_type] || 'bg-text-dim'
+  const useMarkdown = markdownStepTypes.has(step.step_type)
 
   return (
     <div className="relative pl-5 pb-3">
@@ -139,8 +173,8 @@ function StepCard({ step, index, expanded, onToggle }: { step: TraceStep; index:
       </button>
 
       {expanded && (
-        <div className="mt-1 bg-surface-2 border border-border rounded p-2 text-xs font-mono text-text-secondary overflow-x-auto whitespace-pre-wrap">
-          {step.content}
+        <div data-testid={`step-content-${index}`} className={`mt-1 bg-surface-2 border border-border rounded p-2 text-xs text-text-secondary overflow-x-auto ${useMarkdown ? '' : 'font-mono whitespace-pre-wrap'}`}>
+          {useMarkdown ? <Markdown components={mdComponents}>{step.content}</Markdown> : step.content}
         </div>
       )}
     </div>

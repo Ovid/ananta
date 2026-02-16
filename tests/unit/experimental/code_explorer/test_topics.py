@@ -65,6 +65,14 @@ class TestCreateAndListTopics:
         topics = mgr.list_topics()
         assert topics.count("Frontend") == 1
 
+    @pytest.mark.parametrize("name", ["!!!", "   ", "---", ""])
+    def test_create_rejects_empty_slug(self, tmp_path: Path, name: str) -> None:
+        """Names that slugify to empty string are rejected, not silently
+        mapped to the topics root directory."""
+        mgr = CodeExplorerTopicManager(tmp_path)
+        with pytest.raises(ValueError, match="[Ee]mpty"):
+            mgr.create(name)
+
 
 class TestAddAndListRepos:
     """Tests for adding repos to topics and listing them."""

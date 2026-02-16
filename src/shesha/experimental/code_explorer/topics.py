@@ -55,6 +55,9 @@ class CodeExplorerTopicManager:
     def create(self, name: str) -> None:
         """Create a new topic.  Idempotent — no error if it already exists."""
         slug = _slugify(name)
+        if not slug:
+            msg = f"Topic name produces an empty slug: {name!r}"
+            raise ValueError(msg)
         topic_dir = self._topics_dir / slug
         meta_path = topic_dir / TOPIC_META_FILE
 

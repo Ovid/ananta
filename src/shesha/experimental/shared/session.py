@@ -18,9 +18,7 @@ CONVERSATION_FILE = "conversation.json"
 class WebConversationSession:
     """Manages conversation history with JSON file persistence."""
 
-    def __init__(
-        self, project_dir: Path, conversation_file: str = CONVERSATION_FILE
-    ) -> None:
+    def __init__(self, project_dir: Path, conversation_file: str = CONVERSATION_FILE) -> None:
         self._file = project_dir / conversation_file
         self._exchanges: list[dict[str, object]] = []
         self._load()

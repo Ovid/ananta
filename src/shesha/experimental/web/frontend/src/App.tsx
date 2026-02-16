@@ -21,6 +21,7 @@ export default function App() {
   const [tokens, setTokens] = useState({ prompt: 0, completion: 0, total: 0 })
   const [budget, setBudget] = useState<ContextBudget | null>(null)
   const [phase, setPhase] = useState('Ready')
+  const [documentBytes, setDocumentBytes] = useState(0)
   const [selectedPapers, setSelectedPapers] = useState<Set<string>>(new Set())
   const [viewingPaper, setViewingPaper] = useState<PaperInfo | null>(null)
   const [topicPapersList, setTopicPapersList] = useState<PaperInfo[]>([])
@@ -49,6 +50,7 @@ export default function App() {
       } else if (msg.type === 'complete') {
         setPhase('Ready')
         setTokens(msg.tokens)
+        if (msg.document_bytes != null) setDocumentBytes(msg.document_bytes)
         // Refresh context budget after query completes
         if (activeTopic) {
           api.contextBudget(activeTopic).then(setBudget).catch(() => {})
@@ -348,6 +350,7 @@ export default function App() {
         budget={budget}
         phase={phase}
         onModelClick={() => {}}
+        documentBytes={documentBytes}
       />
 
       {/* Overlays */}

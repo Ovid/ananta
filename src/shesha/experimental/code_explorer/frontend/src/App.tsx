@@ -41,6 +41,7 @@ export default function App() {
   const [tokens, setTokens] = useState({ prompt: 0, completion: 0, total: 0 })
   const [budget, setBudget] = useState<ContextBudget | null>(null)
   const [phase, setPhase] = useState('Ready')
+  const [documentBytes, setDocumentBytes] = useState(0)
   const [selectedRepos, setSelectedRepos] = useState<Set<string>>(new Set())
   const [viewingRepo, setViewingRepo] = useState<RepoInfo | null>(null)
   const [viewingAnalysis, setViewingAnalysis] = useState<RepoAnalysis | null>(null)
@@ -92,6 +93,7 @@ export default function App() {
       } else if (msg.type === 'complete') {
         setPhase('Ready')
         setTokens(msg.tokens)
+        if (msg.document_bytes != null) setDocumentBytes(msg.document_bytes)
       } else if (msg.type === 'error') {
         setPhase('Error')
         showToast(msg.message ?? 'Unknown error', 'error')
@@ -348,6 +350,7 @@ export default function App() {
         budget={budget}
         phase={phase}
         onModelClick={() => {}}
+        documentBytes={documentBytes}
       />
 
       {/* Overlays */}

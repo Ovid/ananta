@@ -178,6 +178,7 @@ async def _handle_query(
         trace_id = traces[-1].stem
 
     consulted_ids = [str(pid) for pid in document_ids]
+    document_bytes = sum(len(d.content.encode("utf-8")) for d in loaded_docs)
 
     # Save to global session
     state.session.add_exchange(
@@ -206,5 +207,6 @@ async def _handle_query(
             },
             "duration_ms": int(result.execution_time * 1000),
             "document_ids": consulted_ids,
+            "document_bytes": document_bytes,
         }
     )

@@ -26,7 +26,7 @@ export interface Exchange extends Omit<SharedExchange, 'document_ids'> {
 // and adds citation-related message types.
 export type WSMessage =
   | Exclude<SharedWSMessage, { type: 'complete' }>
-  | { type: 'complete'; answer: string; trace_id: string | null; tokens: { prompt: number; completion: number; total: number }; duration_ms: number; paper_ids?: string[] }
+  | { type: 'complete'; answer: string; trace_id: string | null; tokens: { prompt: number; completion: number; total: number }; duration_ms: number; paper_ids?: string[]; document_bytes?: number }
   | { type: 'citation_progress'; current: number; total: number; phase?: string }
   | { type: 'citation_report'; papers: PaperReport[] }
 

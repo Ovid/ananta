@@ -240,6 +240,7 @@ async def _handle_query(
         trace_id = traces[-1].stem
 
     consulted_document_ids = [d.name for d in loaded_docs]
+    document_bytes = sum(len(d.content.encode("utf-8")) for d in loaded_docs)
 
     session.add_exchange(
         question=question,
@@ -267,5 +268,6 @@ async def _handle_query(
             },
             "duration_ms": int(result.execution_time * 1000),
             "document_ids": consulted_document_ids,
+            "document_bytes": document_bytes,
         }
     )

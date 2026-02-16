@@ -115,6 +115,8 @@ def test_ws_query_returns_complete(client: TestClient, mock_state: MagicMock) ->
     assert len(complete) == 1
     assert complete[0]["answer"] == "The answer is 42."
     assert complete[0]["document_ids"] == ["doc1"]
+    # document_bytes = total UTF-8 byte size of consulted documents
+    assert complete[0]["document_bytes"] == len(b"Content of doc1")
 
 
 def test_ws_query_no_topic(client: TestClient, mock_state: MagicMock) -> None:

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """OOLONG & OOLONG-Pairs benchmark using the paper's reference RLM.
 
 Runs the same benchmarks as run_oolong_and_pairs.py but against the reference

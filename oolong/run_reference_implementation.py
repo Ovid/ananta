@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """OOLONG & OOLONG-Pairs benchmark using the paper's reference RLM.
 
 Runs the same benchmarks as run_oolong_and_pairs.py but against the reference
@@ -71,6 +71,22 @@ BACKEND_MAP = {
     "azure": "azure_openai",
 }
 
+# Transient network errors worth retrying — collect what's importable.
+_transient: list[type] = []
+try:
+    import httpx  # noqa: E402
+
+    _transient.extend([httpx.ConnectError, httpx.RemoteProtocolError, httpx.ReadError])
+except ImportError:
+    pass
+try:
+    import openai  # noqa: E402
+
+    _transient.append(openai.APIConnectionError)
+except ImportError:
+    pass
+_TRANSIENT_ERRORS: tuple[type, ...] = tuple(_transient)
+
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
@@ -140,23 +156,45 @@ def _extract_total_tokens(usage_summary) -> int:
     )
 
 
+_MAX_RETRIES = 3
+_RETRY_BASE_DELAY = 2.0
+
+
 def call_ref_rlm(
     question: str,
     context: str,
     rlm_instance: RLM,
 ) -> tuple[str, int]:
-    """Run a reference RLM query. Returns (answer_string, total_tokens)."""
-    result = rlm_instance.completion(prompt=context, root_prompt=question)
-    answer = result.response
-    if not isinstance(answer, str):
-        log.debug(
-            "RLM returned non-string answer (%s), coercing: %r",
-            type(answer).__name__,
-            answer,
-        )
-        answer = str(answer)
-    tokens = _extract_total_tokens(result.usage_summary)
-    return answer, tokens
+    """Run a reference RLM query with retry on transient network errors.
+
+    Returns (answer_string, total_tokens).
+    """
+    last_exc: Exception | None = None
+    for attempt in range(_MAX_RETRIES):
+        try:
+            result = rlm_instance.completion(prompt=context, root_prompt=question)
+            answer = result.response
+            if not isinstance(answer, str):
+                log.debug(
+                    "RLM returned non-string answer (%s), coercing: %r",
+                    type(answer).__name__,
+                    answer,
+                )
+                answer = str(answer)
+            tokens = _extract_total_tokens(result.usage_summary)
+            return answer, tokens
+        except (_TRANSIENT_ERRORS) as exc:
+            last_exc = exc
+            delay = _RETRY_BASE_DELAY * (2 ** attempt)
+            log.warning(
+                "Transient error on attempt %d/%d, retrying in %.0fs: %s",
+                attempt + 1,
+                _MAX_RETRIES,
+                delay,
+                exc,
+            )
+            time.sleep(delay)
+    raise last_exc  # type: ignore[misc]
 
 
 # ---------------------------------------------------------------------------

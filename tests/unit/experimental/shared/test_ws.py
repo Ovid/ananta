@@ -45,15 +45,21 @@ def _make_app(
     state: MagicMock,
     extra_handlers: dict[str, Callable[..., object]] | None = None,
     build_context: Callable[..., str] | None = None,
+    session_factory: Callable[..., object] | None = None,
 ) -> FastAPI:
     """Create a minimal FastAPI app wired to the shared websocket_handler."""
     app = FastAPI()
 
     @app.websocket("/ws")
     async def ws_endpoint(ws: WebSocket) -> None:
-        await websocket_handler(
-            ws, state, extra_handlers=extra_handlers, build_context=build_context
-        )
+        kwargs: dict[str, object] = {}
+        if extra_handlers is not None:
+            kwargs["extra_handlers"] = extra_handlers
+        if build_context is not None:
+            kwargs["build_context"] = build_context
+        if session_factory is not None:
+            kwargs["session_factory"] = session_factory
+        await websocket_handler(ws, state, **kwargs)  # type: ignore[arg-type]
 
     return app
 
@@ -288,3 +294,48 @@ def test_ws_query_no_engine_sends_error(client: TestClient, mock_state: MagicMoc
     errors = [m for m in messages if m["type"] == "error"]
     assert len(errors) == 1
     assert "engine" in errors[0]["message"].lower() or "configured" in errors[0]["message"].lower()
+
+
+def test_ws_session_factory_is_used(mock_state: MagicMock) -> None:
+    """When session_factory is provided, it is used instead of the default."""
+    mock_result = MagicMock()
+    mock_result.answer = "custom session answer"
+    mock_result.token_usage = TokenUsage(prompt_tokens=10, completion_tokens=5)
+    mock_result.execution_time = 0.5
+    mock_result.trace = Trace(steps=[])
+
+    mock_project = MagicMock()
+    mock_project._rlm_engine.query.return_value = mock_result
+
+    mock_state.topic_mgr.resolve.return_value = "proj-id"
+    mock_state.shesha.get_project.return_value = mock_project
+    mock_state.topic_mgr._storage.list_documents.return_value = ["doc1"]
+    mock_state.topic_mgr._storage.get_document.side_effect = lambda pid, name: _make_doc(name)
+    mock_state.topic_mgr._storage.list_traces.return_value = []
+
+    custom_session = _mock_session()
+    custom_factory = MagicMock(return_value=custom_session)
+
+    app = _make_app(mock_state, session_factory=custom_factory)
+    test_client = TestClient(app)
+
+    with test_client.websocket_connect("/ws") as ws:
+        ws.send_json(
+            {
+                "type": "query",
+                "topic": "test",
+                "question": "What?",
+                "document_ids": ["doc1"],
+            }
+        )
+        messages = []
+        while True:
+            msg = ws.receive_json()
+            messages.append(msg)
+            if msg["type"] in ("complete", "error"):
+                break
+
+    # The custom factory should have been called (not the default)
+    custom_factory.assert_called_once()
+    # And the session it returned should have been used for add_exchange
+    custom_session.add_exchange.assert_called_once()

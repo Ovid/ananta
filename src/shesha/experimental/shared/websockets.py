@@ -31,6 +31,10 @@ ExtraHandler = Callable[[WebSocket, dict[str, object], Any], Any]
 # Signature: def build_context(document_ids, state, loaded_docs) -> str
 BuildContext = Callable[[list[str], Any, list[ParsedDocument]], str]
 
+# Type alias for session factory.
+# Signature: def factory(project_dir: Path) -> WebConversationSession
+SessionFactory = Callable[..., WebConversationSession]
+
 
 async def websocket_handler(
     websocket: WebSocket,
@@ -38,6 +42,7 @@ async def websocket_handler(
     *,
     extra_handlers: dict[str, ExtraHandler] | None = None,
     build_context: BuildContext | None = None,
+    session_factory: SessionFactory | None = None,
 ) -> None:
     """Handle WebSocket connections for queries and cancellation.
 
@@ -52,6 +57,10 @@ async def websocket_handler(
     build_context:
         Optional callback that returns extra context to append to the user
         question (e.g. citation instructions, cross-repo context).
+    session_factory:
+        Callable that creates a session given a project directory Path.
+        Defaults to the shared ``WebConversationSession``.  The arXiv app
+        passes its own subclass so history uses ``_conversation.json``.
     """
     await websocket.accept()
     cancel_event: threading.Event | None = None
@@ -79,6 +88,7 @@ async def websocket_handler(
                         state,
                         cancel_event,
                         build_context=build_context,
+                        session_factory=session_factory,
                     )
                 )
 
@@ -103,6 +113,7 @@ async def _handle_query(
     cancel_event: threading.Event,
     *,
     build_context: BuildContext | None = None,
+    session_factory: SessionFactory | None = None,
 ) -> None:
     """Execute a query and stream progress via the WebSocket."""
     topic = str(data.get("topic", ""))
@@ -149,7 +160,8 @@ async def _handle_query(
 
     # Load session for history prefix
     project_dir = state.topic_mgr._storage._project_path(project_id)
-    session = WebConversationSession(project_dir)
+    factory = session_factory or WebConversationSession
+    session = factory(project_dir)
     history_prefix = session.format_history_prefix()
     full_question = history_prefix + question if history_prefix else question
 

@@ -52,7 +52,7 @@ def test_ws_query_returns_complete(client: TestClient, mock_state: MagicMock) ->
     mock_state.topic_mgr._storage.get_document.side_effect = lambda pid, name: _make_doc(name)
     mock_state.topic_mgr._storage.list_traces.return_value = []
 
-    with patch("shesha.experimental.shared.websockets.WebConversationSession") as mock_sess_cls:
+    with patch("shesha.experimental.web.websockets.WebConversationSession") as mock_sess_cls:
         mock_session = MagicMock()
         mock_session.format_history_prefix.return_value = ""
         mock_sess_cls.return_value = mock_session
@@ -100,7 +100,7 @@ def test_ws_query_engine_exception_sends_error(client: TestClient, mock_state: M
     mock_state.topic_mgr._storage.list_documents.return_value = ["doc1"]
     mock_state.topic_mgr._storage.get_document.side_effect = lambda pid, name: _make_doc(name)
 
-    with patch("shesha.experimental.shared.websockets.WebConversationSession") as mock_sess_cls:
+    with patch("shesha.experimental.web.websockets.WebConversationSession") as mock_sess_cls:
         mock_session = MagicMock()
         mock_session.format_history_prefix.return_value = ""
         mock_sess_cls.return_value = mock_session

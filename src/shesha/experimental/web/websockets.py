@@ -40,6 +40,7 @@ from shesha.experimental.arxiv.verifiers import (
 )
 from shesha.experimental.shared.websockets import websocket_handler as shared_ws_handler
 from shesha.experimental.web.dependencies import AppState
+from shesha.experimental.web.session import WebConversationSession
 from shesha.models import ParsedDocument
 
 logger = logging.getLogger(__name__)
@@ -293,4 +294,5 @@ async def websocket_handler(ws: WebSocket, state: AppState) -> None:
         state,
         extra_handlers={"check_citations": _handle_check_citations},
         build_context=_build_arxiv_context,
+        session_factory=WebConversationSession,
     )

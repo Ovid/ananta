@@ -7,9 +7,18 @@
 FROM node:20-slim AS frontend
 
 WORKDIR /build
-COPY src/shesha/experimental/web/frontend/package.json \
-     src/shesha/experimental/web/frontend/package-lock.json ./
-RUN npm ci --silent
+
+# Copy shared UI library first (local dependency)
+COPY src/shesha/experimental/shared/frontend/ /shared-ui/
+
+# Copy arxiv frontend (lockfile excluded — npm install regenerates it
+# because the local file: dependency path is rewritten for Docker context)
+COPY src/shesha/experimental/web/frontend/package.json ./
+
+# Rewrite the local dependency path for the Docker build context
+RUN sed -i 's|file:../../shared/frontend|file:/shared-ui|' package.json
+
+RUN npm install --install-links
 COPY src/shesha/experimental/web/frontend/ ./
 RUN npm run build
 

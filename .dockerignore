@@ -6,8 +6,8 @@
 .ruff_cache
 __pycache__
 *.pyc
-node_modules
-dist
+**/node_modules
+**/dist
 shesha_data
 research
 scratch

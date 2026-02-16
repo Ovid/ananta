@@ -9,8 +9,11 @@ router.
 
 from __future__ import annotations
 
+import json
 from dataclasses import asdict
+from pathlib import Path
 
+import litellm
 from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.responses import PlainTextResponse
 
@@ -18,13 +21,53 @@ from shesha.exceptions import ProjectNotFoundError
 from shesha.experimental.code_explorer.dependencies import CodeExplorerState
 from shesha.experimental.code_explorer.schemas import (
     AnalysisResponse,
+    ContextBudget,
+    ModelInfo,
+    ModelUpdate,
     RepoAdd,
     RepoInfo,
+    TopicCreate,
+    TopicInfo,
+    TopicRename,
+    TraceFull,
+    TraceListItem,
+    TraceStepSchema,
     UpdateStatus,
 )
 from shesha.experimental.code_explorer.websockets import websocket_handler
 from shesha.experimental.shared.app_factory import create_app
 from shesha.models import RepoProjectResult
+
+
+def _parse_trace_file(trace_file: Path) -> dict[str, object]:
+    """Parse a JSONL trace file into header, steps, and summary."""
+    header: dict[str, object] = {}
+    steps: list[dict[str, object]] = []
+    summary: dict[str, object] = {}
+    for line in trace_file.read_text().strip().splitlines():
+        record = json.loads(line)
+        rtype = record.get("type")
+        if rtype == "header":
+            header = record
+        elif rtype == "step":
+            steps.append(record)
+        elif rtype == "summary":
+            summary = record
+    return {"header": header, "steps": steps, "summary": summary}
+
+
+def _resolve_project_ids(state: CodeExplorerState, topic_name: str) -> list[str]:
+    """Resolve a topic name to a list of project_ids.
+
+    Falls back to all projects if the topic has no repos or doesn't exist.
+    """
+    try:
+        repos = state.topic_mgr.list_repos(topic_name)
+        if repos:
+            return repos
+    except ValueError:
+        pass
+    return state.shesha.list_projects()
 
 
 def _create_repo_router(state: CodeExplorerState) -> APIRouter:
@@ -147,6 +190,44 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
         return AnalysisResponse(**asdict(analysis))
 
     # ------------------------------------------------------------------
+    # Topic CRUD
+    # ------------------------------------------------------------------
+
+    @router.get("/topics", response_model=list[TopicInfo])
+    def list_topics() -> list[TopicInfo]:
+        names = state.topic_mgr.list_topics()
+        return [
+            TopicInfo(
+                name=n,
+                document_count=len(state.topic_mgr.list_repos(n)),
+                size="",
+                project_id="",
+            )
+            for n in names
+        ]
+
+    @router.post("/topics", status_code=201)
+    def create_topic(body: TopicCreate) -> dict[str, str]:
+        state.topic_mgr.create(body.name)
+        return {"name": body.name, "project_id": ""}
+
+    @router.patch("/topics/{name}")
+    def rename_topic(name: str, body: TopicRename) -> dict[str, str]:
+        try:
+            state.topic_mgr.rename(name, body.new_name)
+        except ValueError as e:
+            raise HTTPException(404, str(e)) from e
+        return {"name": body.new_name}
+
+    @router.delete("/topics/{name}")
+    def delete_topic(name: str) -> dict[str, str]:
+        try:
+            state.topic_mgr.delete(name)
+        except ValueError as e:
+            raise HTTPException(404, str(e)) from e
+        return {"status": "deleted", "name": name}
+
+    # ------------------------------------------------------------------
     # Topic-repo reference routes
     # ------------------------------------------------------------------
 
@@ -163,6 +244,160 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
         except ValueError:
             raise HTTPException(404, f"Repo '{project_id}' not found in topic '{name}'")
         return {"status": "removed", "topic": name, "project_id": project_id}
+
+    # ------------------------------------------------------------------
+    # Per-topic history (delegates to global session)
+    # ------------------------------------------------------------------
+
+    @router.get("/topics/{name}/history")
+    def get_topic_history(name: str) -> dict[str, list[dict[str, object]]]:
+        return {"exchanges": state.session.list_exchanges()}
+
+    @router.delete("/topics/{name}/history")
+    def clear_topic_history(name: str) -> dict[str, str]:
+        state.session.clear()
+        return {"status": "cleared"}
+
+    @router.get("/topics/{name}/export", response_class=PlainTextResponse)
+    def export_topic_transcript(name: str) -> PlainTextResponse:
+        return PlainTextResponse(
+            content=state.session.format_transcript(),
+            media_type="text/markdown",
+        )
+
+    # ------------------------------------------------------------------
+    # Traces
+    # ------------------------------------------------------------------
+
+    @router.get("/topics/{name}/traces", response_model=list[TraceListItem])
+    def list_traces(name: str) -> list[TraceListItem]:
+        # Traces are stored per-project (repo), not per-topic.
+        # Collect traces from all repos in the topic, or all repos if no topic.
+        project_ids = _resolve_project_ids(state, name)
+        items: list[TraceListItem] = []
+        for pid in project_ids:
+            trace_files = state.shesha._storage.list_traces(pid)
+            for tf in trace_files:
+                parsed = _parse_trace_file(tf)
+                header = parsed["header"]
+                summary = parsed["summary"]
+                assert isinstance(header, dict)
+                assert isinstance(summary, dict)
+                total_tokens_raw = summary.get("total_tokens", {})
+                assert isinstance(total_tokens_raw, dict)
+                items.append(
+                    TraceListItem(
+                        trace_id=tf.stem,
+                        question=str(header.get("question", "")),
+                        timestamp=str(header.get("timestamp", "")),
+                        status=str(summary.get("status", "unknown")),
+                        total_tokens=sum(total_tokens_raw.values()),
+                        duration_ms=int(summary.get("total_duration_ms", 0)),
+                    )
+                )
+        return items
+
+    @router.get("/topics/{name}/traces/{trace_id:path}", response_model=TraceFull)
+    def get_trace(name: str, trace_id: str) -> TraceFull:
+        project_ids = _resolve_project_ids(state, name)
+        for pid in project_ids:
+            trace_files = state.shesha._storage.list_traces(pid)
+            for tf in trace_files:
+                parsed = _parse_trace_file(tf)
+                header = parsed["header"]
+                assert isinstance(header, dict)
+                if tf.stem == trace_id or header.get("trace_id") == trace_id:
+                    summary = parsed["summary"]
+                    steps_raw = parsed["steps"]
+                    assert isinstance(summary, dict)
+                    assert isinstance(steps_raw, list)
+                    total_tokens_raw = summary.get("total_tokens", {})
+                    assert isinstance(total_tokens_raw, dict)
+                    steps = [
+                        TraceStepSchema(
+                            step_type=str(s.get("step_type", "")),
+                            iteration=int(s.get("iteration", 0)),
+                            content=str(s.get("content", "")),
+                            timestamp=str(s.get("timestamp", "")),
+                            tokens_used=s.get("tokens_used"),
+                            duration_ms=s.get("duration_ms"),
+                        )
+                        for s in steps_raw
+                    ]
+                    doc_ids_raw = header.get("document_ids", [])
+                    doc_ids = list(doc_ids_raw) if isinstance(doc_ids_raw, list) else []
+                    return TraceFull(
+                        trace_id=trace_id,
+                        question=str(header.get("question", "")),
+                        model=str(header.get("model", "")),
+                        timestamp=str(header.get("timestamp", "")),
+                        steps=steps,
+                        total_tokens=total_tokens_raw,
+                        total_iterations=int(summary.get("total_iterations", 0)),
+                        duration_ms=int(summary.get("total_duration_ms", 0)),
+                        status=str(summary.get("status", "unknown")),
+                        document_ids=doc_ids,
+                    )
+        raise HTTPException(404, f"Trace '{trace_id}' not found")
+
+    # ------------------------------------------------------------------
+    # Model
+    # ------------------------------------------------------------------
+
+    @router.get("/model", response_model=ModelInfo)
+    def get_model() -> ModelInfo:
+        max_input: int | None = None
+        try:
+            info = litellm.get_model_info(state.model)
+            max_input = info.get("max_input_tokens")
+        except Exception:
+            pass  # Model may not be in litellm's registry
+        return ModelInfo(model=state.model, max_input_tokens=max_input)
+
+    @router.put("/model", response_model=ModelInfo)
+    def update_model(body: ModelUpdate) -> ModelInfo:
+        state.model = body.model
+        max_input: int | None = None
+        try:
+            info = litellm.get_model_info(body.model)
+            max_input = info.get("max_input_tokens")
+        except Exception:
+            pass  # Model may not be in litellm's registry
+        return ModelInfo(model=body.model, max_input_tokens=max_input)
+
+    # ------------------------------------------------------------------
+    # Context budget
+    # ------------------------------------------------------------------
+
+    @router.get("/topics/{name}/context-budget", response_model=ContextBudget)
+    def get_context_budget(name: str) -> ContextBudget:
+        base_prompt_tokens = 2000
+        history_chars = state.session.context_chars()
+        used_tokens = base_prompt_tokens + (history_chars // 4)
+
+        max_tokens = 128000
+        try:
+            info = litellm.get_model_info(state.model)
+            max_input = info.get("max_input_tokens")
+            if max_input is not None:
+                max_tokens = max_input
+        except Exception:
+            pass  # Fall back to default
+
+        percentage = (used_tokens / max_tokens) * 100
+        if percentage < 50:
+            level = "green"
+        elif percentage < 80:
+            level = "amber"
+        else:
+            level = "red"
+
+        return ContextBudget(
+            used_tokens=used_tokens,
+            max_tokens=max_tokens,
+            percentage=round(percentage, 1),
+            level=level,
+        )
 
     # ------------------------------------------------------------------
     # Global history routes
@@ -190,9 +425,13 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
 def create_api(state: CodeExplorerState) -> FastAPI:
     """Create the code explorer FastAPI application."""
     repo_router = _create_repo_router(state)
+    frontend_dist = Path(__file__).parent / "frontend" / "dist"
+    images_dir = Path(__file__).parent.parent.parent.parent.parent / "images"
     return create_app(
         state,
         title="Shesha Code Explorer",
+        static_dir=frontend_dist,
+        images_dir=images_dir,
         ws_handler=lambda ws: websocket_handler(ws, state),
         extra_routers=[repo_router],
     )

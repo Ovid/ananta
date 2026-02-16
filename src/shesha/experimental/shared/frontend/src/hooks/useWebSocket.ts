@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import type { WSMessage } from '../types'
 
-export function useWebSocket<M extends WSMessage = WSMessage>() {
+export function useWebSocket<M = WSMessage>() {
   const wsRef = useRef<WebSocket | null>(null)
   const [connected, setConnected] = useState(false)
   const listenersRef = useRef<((msg: M) => void)[]>([])

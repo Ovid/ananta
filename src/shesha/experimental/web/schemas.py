@@ -9,7 +9,7 @@ defined locally.
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import AliasChoices, BaseModel, Field
 
 # Re-export generic schemas so existing ``from web.schemas import X`` still works.
 from shesha.experimental.shared.schemas import (
@@ -60,7 +60,15 @@ class TopicInfo(BaseModel):
 
 class ExchangeSchema(BaseModel):
     """Arxiv-flavoured ExchangeSchema using ``paper_ids`` instead of the shared
-    schema's ``document_ids``."""
+    schema's ``document_ids``.
+
+    The shared session stores consulted IDs under ``document_ids``.  The
+    ``validation_alias`` lets Pydantic accept either name when constructing
+    the model (e.g. from ``session.list_exchanges()`` dicts), while
+    ``serialization_alias`` ensures the REST response uses ``paper_ids``.
+    """
+
+    model_config = {"populate_by_name": True}
 
     exchange_id: str
     question: str
@@ -70,7 +78,11 @@ class ExchangeSchema(BaseModel):
     tokens: dict[str, int]
     execution_time: float
     model: str
-    paper_ids: list[str] | None = None
+    paper_ids: list[str] | None = Field(
+        default=None,
+        validation_alias=AliasChoices("paper_ids", "document_ids"),
+        serialization_alias="paper_ids",
+    )
 
 
 class ConversationHistory(BaseModel):

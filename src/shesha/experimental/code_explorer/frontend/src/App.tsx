@@ -33,7 +33,7 @@ function repoToDocument(repo: RepoInfo): DocumentItem {
 export default function App() {
   const {
     dark, toggleTheme, connected, send, onMessage,
-    modelName, tokens, budget, phase, documentBytes,
+    modelName, tokens, budget, phase, setPhase, documentBytes,
     sidebarWidth, handleSidebarDrag,
     activeTopic, handleTopicSelect: sharedTopicSelect,
     traceView, setTraceView, handleViewTrace,
@@ -41,6 +41,7 @@ export default function App() {
   } = useAppState({
     onExtraMessage: (msg: any) => {
       if (msg.type === 'error') {
+        setPhase('Error')
         showToast(msg.message ?? 'Unknown error', 'error')
       }
     },

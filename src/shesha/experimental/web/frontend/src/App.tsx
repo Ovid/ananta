@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef, type MouseEvent } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import Header from './components/Header'
 import TopicSidebar from './components/TopicSidebar'
 import ChatArea from './components/ChatArea'
@@ -8,54 +8,41 @@ import DownloadProgress from './components/DownloadProgress'
 import CitationReport from './components/CitationReport'
 import EmailModal, { getStoredEmail, hasEmailDecision } from './components/EmailModal'
 import PaperDetail from './components/PaperDetail'
-import { AppShell, useTheme, useWebSocket, StatusBar, ToastContainer, showToast, TraceViewer } from '@shesha/shared-ui'
+import { AppShell, useAppState, StatusBar, ToastContainer, showToast, TraceViewer } from '@shesha/shared-ui'
 import { api } from './api/client'
-import type { ContextBudget, PaperInfo, PaperReport, WSMessage } from './types'
+import type { PaperInfo, PaperReport } from './types'
 
 export default function App() {
-  const { dark, toggle: toggleTheme } = useTheme()
-  const { connected, send, onMessage } = useWebSocket<WSMessage>()
+  // Citation check state — ref tracks state for use in onExtraMessage closure
+  const [citationChecking, setCitationChecking] = useState(false)
+  const citationCheckingRef = useRef(false)
+  useEffect(() => { citationCheckingRef.current = citationChecking }, [citationChecking])
+  const [citationProgress, setCitationProgress] = useState<{ current: number; total: number; phase?: string } | null>(null)
+  const [citationReport, setCitationReport] = useState<PaperReport[] | null>(null)
+  const [citationError, setCitationError] = useState<string | null>(null)
 
-  const [activeTopic, setActiveTopic] = useState<string | null>(null)
-  const [modelName, setModelName] = useState('—')
-  const [tokens, setTokens] = useState({ prompt: 0, completion: 0, total: 0 })
-  const [budget, setBudget] = useState<ContextBudget | null>(null)
-  const [phase, setPhase] = useState('Ready')
-  const [documentBytes, setDocumentBytes] = useState(0)
-  const [selectedPapers, setSelectedPapers] = useState<Set<string>>(new Set())
-  const [viewingPaper, setViewingPaper] = useState<PaperInfo | null>(null)
-  const [topicPapersList, setTopicPapersList] = useState<PaperInfo[]>([])
-  const [sidebarWidth, setSidebarWidth] = useState(224)
-  const dragging = useRef(false)
+  // activeTopicRef for use in onComplete closure (avoids stale closure over activeTopic)
+  const activeTopicRef = useRef<string | null>(null)
 
-  // Load model name from API on mount
-  useEffect(() => {
-    api.model.get().then(info => setModelName(info.model)).catch(() => {})
-  }, [])
-
-  // Listen for WebSocket messages to update status bar
-  useEffect(() => {
-    return onMessage((msg) => {
-      if (msg.type === 'status') {
-        setPhase(msg.phase)
-      } else if (msg.type === 'step') {
-        setPhase(`${msg.step_type} (iter ${msg.iteration})`)
-        if (msg.prompt_tokens !== undefined) {
-          setTokens({
-            prompt: msg.prompt_tokens,
-            completion: msg.completion_tokens ?? 0,
-            total: (msg.prompt_tokens) + (msg.completion_tokens ?? 0),
-          })
-        }
-      } else if (msg.type === 'complete') {
-        setPhase('Ready')
-        setTokens(msg.tokens)
-        if (msg.document_bytes != null) setDocumentBytes(msg.document_bytes)
-        // Refresh context budget after query completes
-        if (activeTopic) {
-          api.contextBudget(activeTopic).then(setBudget).catch(() => {})
-        }
-      } else if (msg.type === 'error') {
+  const {
+    dark, toggleTheme,
+    connected, send, onMessage,
+    modelName, tokens, budget, setBudget, phase, setPhase, documentBytes,
+    sidebarWidth, handleSidebarDrag,
+    activeTopic, handleTopicSelect: baseHandleTopicSelect,
+    traceView, setTraceView, handleViewTrace,
+    historyVersion, setHistoryVersion,
+    setTokens,
+  } = useAppState({
+    onComplete: () => {
+      if (activeTopicRef.current) {
+        api.contextBudget(activeTopicRef.current).then(setBudget).catch(() => {
+          // Context budget may not be available
+        })
+      }
+    },
+    onExtraMessage: (msg: any) => {
+      if (msg.type === 'error') {
         const errorMsg = msg.message ?? 'Unknown error'
         if (citationCheckingRef.current) {
           setCitationChecking(false)
@@ -64,28 +51,25 @@ export default function App() {
           setPhase('Error')
           showToast(errorMsg, 'error')
         }
-      } else if (msg.type === 'cancelled') {
-        setPhase('Ready')
       } else if (msg.type === 'citation_progress') {
         setCitationProgress({ current: msg.current, total: msg.total, phase: msg.phase })
       } else if (msg.type === 'citation_report') {
         setCitationChecking(false)
         setCitationReport(msg.papers)
       }
-    })
-  }, [onMessage, activeTopic])
+    },
+  })
+
+  // Keep activeTopicRef in sync with activeTopic from useAppState
+  activeTopicRef.current = activeTopic
+
+  const [selectedPapers, setSelectedPapers] = useState<Set<string>>(new Set())
+  const [viewingPaper, setViewingPaper] = useState<PaperInfo | null>(null)
+  const [topicPapersList, setTopicPapersList] = useState<PaperInfo[]>([])
 
   const [searchOpen, setSearchOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
-  const [traceView, setTraceView] = useState<{ topic: string; traceId: string } | null>(null)
 
-  // Citation check state — ref tracks state for use in WebSocket callback closure
-  const [citationChecking, setCitationChecking] = useState(false)
-  const citationCheckingRef = useRef(false)
-  useEffect(() => { citationCheckingRef.current = citationChecking }, [citationChecking])
-  const [citationProgress, setCitationProgress] = useState<{ current: number; total: number; phase?: string } | null>(null)
-  const [citationReport, setCitationReport] = useState<PaperReport[] | null>(null)
-  const [citationError, setCitationError] = useState<string | null>(null)
   const [showEmailModal, setShowEmailModal] = useState(false)
   const [pendingCitationCheck, setPendingCitationCheck] = useState(false)
 
@@ -93,15 +77,13 @@ export default function App() {
   const [downloadTaskIds, setDownloadTaskIds] = useState<string[]>([])
 
   const handleTopicSelect = useCallback((name: string) => {
-    setActiveTopic(name)
+    baseHandleTopicSelect(name)
     setViewingPaper(null)
     setSelectedPapers(new Set())
     setTopicPapersList([])
-    api.contextBudget(name).then(setBudget).catch(() => {})
-  }, [])
+  }, [baseHandleTopicSelect])
 
   // Bumped to signal components to reload data
-  const [historyVersion, setHistoryVersion] = useState(0)
   const [papersVersion, setPapersVersion] = useState(0)
 
   const handlePapersChanged = useCallback(() => {
@@ -143,12 +125,14 @@ export default function App() {
       await api.history.clear(activeTopic)
       setHistoryVersion(v => v + 1)
       setTokens({ prompt: 0, completion: 0, total: 0 })
-      api.contextBudget(activeTopic).then(setBudget).catch(() => {})
+      api.contextBudget(activeTopic).then(setBudget).catch(() => {
+        // Context budget may not be available
+      })
       showToast('Conversation cleared', 'success')
     } catch {
       showToast('Failed to clear conversation', 'error')
     }
-  }, [activeTopic])
+  }, [activeTopic, setBudget, setHistoryVersion, setTokens])
 
   const handleExport = useCallback(async () => {
     if (!activeTopic) {
@@ -234,12 +218,6 @@ export default function App() {
     }
   }, [activeTopic, selectedPapers, send, pendingCitationCheck])
 
-  const handleViewTrace = useCallback((traceId: string) => {
-    if (activeTopic) {
-      setTraceView({ topic: activeTopic, traceId })
-    }
-  }, [activeTopic])
-
   const handleDownloadStarted = useCallback((taskId: string) => {
     setDownloadTaskIds(prev => [...prev, taskId])
   }, [])
@@ -249,31 +227,8 @@ export default function App() {
     handlePapersChanged()
   }, [handlePapersChanged])
 
-  const handleSidebarDrag = useCallback((e: MouseEvent) => {
-    e.preventDefault()
-    dragging.current = true
-    const startX = e.clientX
-    const startWidth = sidebarWidth
-    const onMove = (ev: globalThis.MouseEvent) => {
-      if (!dragging.current) return
-      const newWidth = Math.min(600, Math.max(160, startWidth + ev.clientX - startX))
-      setSidebarWidth(newWidth)
-    }
-    const onUp = () => {
-      dragging.current = false
-      document.removeEventListener('mousemove', onMove)
-      document.removeEventListener('mouseup', onUp)
-      document.body.style.cursor = ''
-      document.body.style.userSelect = ''
-    }
-    document.addEventListener('mousemove', onMove)
-    document.addEventListener('mouseup', onUp)
-    document.body.style.cursor = 'col-resize'
-    document.body.style.userSelect = 'none'
-  }, [sidebarWidth])
-
   return (
-    <AppShell>
+    <AppShell connected={connected}>
       <Header
         onSearchToggle={() => setSearchOpen(s => !s)}
         onCheckCitations={handleCheckCitations}
@@ -282,13 +237,6 @@ export default function App() {
         dark={dark}
         onThemeToggle={toggleTheme}
       />
-
-      {/* Connection loss banner */}
-      {!connected && (
-        <div className="bg-amber/10 border-b border-amber text-amber text-sm px-4 py-1.5 text-center">
-          Connection lost. Reconnecting...
-        </div>
-      )}
 
       {/* Main content area */}
       <div className="flex-1 flex overflow-hidden">

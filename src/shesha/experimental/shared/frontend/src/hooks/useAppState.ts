@@ -6,6 +6,11 @@ import type { ContextBudget } from '../types/index'
 
 export interface AppStateOptions {
   onComplete?: () => void
+  /**
+   * Called for 'error' messages and any unrecognized message types.
+   * When provided, error messages are delegated here WITHOUT setting
+   * phase='Error' — the consumer must call setPhase('Error') if desired.
+   */
   onExtraMessage?: (msg: any) => void
 }
 

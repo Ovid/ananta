@@ -37,7 +37,7 @@ ResolveProjectIds = Callable[[object, str], list[str]]
 ListTraceFiles = Callable[[object, str], list[Path]]
 
 
-def _resolve_topic_or_404(state: Any, name: str) -> str:
+def resolve_topic_or_404(state: Any, name: str) -> str:
     """Resolve a topic name to project_id, or raise 404."""
     project_id = state.topic_mgr.resolve(name)
     if not project_id:
@@ -57,7 +57,7 @@ def _resolve_all_project_ids(state: Any, name: str) -> list[str]:
         if ids:
             return ids
     # Fallback: single project
-    project_id = _resolve_topic_or_404(state, name)
+    project_id = resolve_topic_or_404(state, name)
     return [project_id]
 
 
@@ -94,7 +94,20 @@ def create_shared_router(
     Parameters
     ----------
     state:
-        Application state. Must expose ``topic_mgr``, ``model``.
+        Application state.  Must expose ``model`` (str) and ``topic_mgr``
+        with the following interface:
+
+        * ``resolve(name) -> str | None`` — always required.
+        * ``list_topics()``, ``create(name)``, ``rename(old, new)``,
+          ``delete(name)`` — required when *include_topic_crud* is True
+          and *build_topic_info* is not provided (for ``list_topics``).
+        * ``resolve_all(name) -> list[str]`` — optional; used by
+          default trace resolution.  Falls back to ``resolve()`` when
+          absent.  Bypassed by *resolve_project_ids*.
+        * ``_storage._project_path(project_id) -> Path`` — used to
+          create default sessions.  Bypassed by *get_session*.
+        * ``_storage.list_traces(project_id) -> list[Path]`` — used to
+          locate trace files.  Bypassed by *list_trace_files*.
     get_session:
         Optional callback ``(state, topic_name) -> WebConversationSession``.
         When provided, overrides the default per-project session creation
@@ -129,7 +142,7 @@ def create_shared_router(
         """Get the session for a topic, using callback or default."""
         if get_session is not None:
             return get_session(state, topic_name)
-        project_id = _resolve_topic_or_404(state, topic_name)
+        project_id = resolve_topic_or_404(state, topic_name)
         project_dir = state.topic_mgr._storage._project_path(project_id)
         return WebConversationSession(project_dir)
 

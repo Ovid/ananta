@@ -258,6 +258,15 @@ describe('useAppState', () => {
     expect(result.current.traceView).toEqual({ topic: 'my-topic', traceId: 'trace-123' })
   })
 
+  it('handleViewTrace is a no-op when no active topic', async () => {
+    const { result } = await renderAppState()
+    expect(result.current.activeTopic).toBeNull()
+    act(() => {
+      result.current.handleViewTrace('trace-123')
+    })
+    expect(result.current.traceView).toBeNull()
+  })
+
   it('exposes setters for state that consumers may need to update', async () => {
     const { result } = await renderAppState()
     expect(typeof result.current.setActiveTopic).toBe('function')

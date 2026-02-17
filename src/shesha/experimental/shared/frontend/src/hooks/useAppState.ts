@@ -86,7 +86,9 @@ export function useAppState(options?: AppStateOptions) {
   }, [])
 
   const handleViewTrace = useCallback((traceId: string) => {
-    setTraceView({ topic: activeTopicRef.current ?? '', traceId })
+    const topic = activeTopicRef.current
+    if (!topic) return
+    setTraceView({ topic, traceId })
   }, [])
 
   const handleSidebarDrag = useCallback((e: MouseEvent) => {

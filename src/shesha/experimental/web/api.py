@@ -23,8 +23,8 @@ from fastapi.responses import JSONResponse
 from shesha.experimental.arxiv.download import to_parsed_document
 from shesha.experimental.shared.app_factory import create_app
 from shesha.experimental.shared.routes import (
-    _resolve_topic_or_404,
     create_shared_router,
+    resolve_topic_or_404,
 )
 from shesha.experimental.shared.schemas import TopicInfo
 from shesha.experimental.web.dependencies import AppState
@@ -53,7 +53,7 @@ def _build_arxiv_topic_info(state: AppState) -> list[TopicInfo]:
 
 def _get_arxiv_session(state: AppState, topic_name: str) -> WebConversationSession:
     """Return the arxiv-flavoured session for a topic."""
-    project_id = _resolve_topic_or_404(state, topic_name)
+    project_id = resolve_topic_or_404(state, topic_name)
     project_dir = state.topic_mgr._storage._project_path(project_id)
     return WebConversationSession(project_dir)
 
@@ -71,7 +71,7 @@ def _create_arxiv_router(state: AppState) -> APIRouter:
 
     @router.get("/api/topics/{name}/papers", response_model=list[PaperInfo])
     def list_papers(name: str) -> list[PaperInfo]:
-        project_id = _resolve_topic_or_404(state, name)
+        project_id = resolve_topic_or_404(state, name)
         doc_names = state.topic_mgr._storage.list_documents(project_id)
         papers: list[PaperInfo] = []
         for doc_name in doc_names:
@@ -144,7 +144,7 @@ def _create_arxiv_router(state: AppState) -> APIRouter:
 
     @router.delete("/api/topics/{name}/papers/{arxiv_id}")
     def remove_paper(name: str, arxiv_id: str) -> dict[str, str]:
-        project_id = _resolve_topic_or_404(state, name)
+        project_id = resolve_topic_or_404(state, name)
         state.topic_mgr._storage.delete_document(project_id, arxiv_id)
         return {"status": "removed", "arxiv_id": arxiv_id}
 

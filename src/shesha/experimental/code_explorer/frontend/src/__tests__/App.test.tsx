@@ -53,7 +53,7 @@ vi.mock('@shesha/shared-ui', async () => {
 vi.mock('../api/client', () => ({
   api: {
     model: { get: vi.fn().mockResolvedValue({ model: 'test-model' }) },
-    repos: { list: vi.fn().mockResolvedValue([]), listUncategorized: vi.fn().mockResolvedValue([]), analyze: vi.fn(), getAnalysis: vi.fn(), checkUpdates: vi.fn(), delete: vi.fn() },
+    repos: { list: vi.fn().mockResolvedValue([]), listUncategorized: vi.fn().mockResolvedValue([]), analyze: vi.fn(), getAnalysis: vi.fn(), checkUpdates: vi.fn(), applyUpdates: vi.fn(), delete: vi.fn() },
     topics: {
       list: vi.fn().mockResolvedValue([]),
       create: vi.fn(),
@@ -133,5 +133,61 @@ describe('App', () => {
     await flush()
     const root = container.firstElementChild as HTMLElement
     expect(root.className).toMatch(/overflow-hidden/)
+  })
+
+  describe('handleCheckUpdates', () => {
+    const mockRepo = {
+      project_id: 'test-repo',
+      source_url: 'https://github.com/test/repo',
+      file_count: 10,
+      analysis_status: null,
+    }
+
+    async function renderWithRepo() {
+      const { api } = await import('../api/client')
+      vi.mocked(api.repos.list).mockResolvedValue([mockRepo])
+      vi.mocked(api.repos.listUncategorized).mockResolvedValue([mockRepo])
+      vi.mocked(api.repos.getAnalysis).mockRejectedValue(new Error('none'))
+
+      render(<App />)
+      await flush()
+
+      // Click the repo label in the uncategorized section to view it
+      const label = screen.getByText('test-repo')
+      await userEvent.click(label)
+      await flush()
+
+      return api
+    }
+
+    it('calls applyUpdates and shows toast when updates are available', async () => {
+      const api = await renderWithRepo()
+      vi.mocked(api.repos.checkUpdates).mockResolvedValue({
+        status: 'updates_available',
+        files_ingested: 10,
+      })
+      vi.mocked(api.repos.applyUpdates).mockResolvedValue({
+        status: 'created',
+        files_ingested: 15,
+      })
+
+      await userEvent.click(screen.getByRole('button', { name: 'Check for Updates' }))
+      await flush()
+
+      expect(api.repos.applyUpdates).toHaveBeenCalledWith('test-repo')
+    })
+
+    it('shows up-to-date toast and skips applyUpdates when unchanged', async () => {
+      const api = await renderWithRepo()
+      vi.mocked(api.repos.checkUpdates).mockResolvedValue({
+        status: 'unchanged',
+        files_ingested: 10,
+      })
+
+      await userEvent.click(screen.getByRole('button', { name: 'Check for Updates' }))
+      await flush()
+
+      expect(api.repos.applyUpdates).not.toHaveBeenCalled()
+    })
   })
 })

@@ -132,9 +132,10 @@ export default function App() {
   const handleCheckUpdates = useCallback(async (projectId: string) => {
     try {
       const result = await api.repos.checkUpdates(projectId)
-      if (result.status === 'updated') {
+      if (result.status === 'updates_available') {
+        const applied = await api.repos.applyUpdates(projectId)
         setReposVersion(v => v + 1)
-        showToast(`Updated: ${result.files_ingested} files ingested`, 'success')
+        showToast(`Updated: ${applied.files_ingested} files ingested`, 'success')
       } else {
         showToast('Repository is up to date', 'success')
       }

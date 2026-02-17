@@ -34,8 +34,10 @@ The shared module provides two layers of reusable infrastructure:
 | `TraceViewer`      | Expandable step timeline for query traces        |
 | `ToastContainer`   | Toast notifications                              |
 | `ConfirmDialog`    | Modal confirmation dialog                        |
+| `AppShell`         | Root layout shell with connection-loss banner     |
 | `useTheme`         | Dark/light theme hook                            |
 | `useWebSocket`     | WebSocket connection hook with reconnect         |
+| `useAppState`      | Shared state hook (theme, WS, model, tokens, sidebar, topics) |
 | `sharedApi`        | API client for shared routes (topics, traces, model, history) |
 
 ## 2. Quick Start -- Create a New Tool in 5 Steps
@@ -162,24 +164,48 @@ What it provides automatically:
 
 ### Shared routes
 
-If your topic manager follows the same interface as the arXiv explorer's
-(`.list_topics()`, `.resolve()`, `.create()`, `.rename()`, `.delete()`,
-`._storage`), you can use `create_shared_router()` to get topic CRUD, traces,
-history, model, and context budget routes for free:
+`create_shared_router()` provides topic CRUD, traces, history, model, and
+context budget routes. Both the arXiv and code explorer use it via callbacks
+to adapt the shared routes to their domain models:
 
 ```python
 from shesha.experimental.shared.routes import create_shared_router
 
 shared_router = create_shared_router(
     state,
-    include_per_topic_history=True,    # /api/topics/{name}/history
-    include_context_budget=True,       # /api/topics/{name}/context-budget
+    # Callbacks to customize behavior (all optional):
+    build_topic_info=my_topic_builder,     # list[TopicInfo] from your state
+    get_session=my_session_factory,        # session for a given topic name
+    resolve_project_ids=my_id_resolver,    # project IDs for trace aggregation
+    list_trace_files=my_trace_lister,      # trace files for a project
+    # Feature flags:
+    include_topic_crud=True,               # /api/topics CRUD routes
+    include_per_topic_history=True,        # /api/topics/{name}/history
+    include_context_budget=True,           # /api/topics/{name}/context-budget
 )
 ```
 
-If your tool's domain model differs (e.g., `paper_count` vs `document_count`),
-define your own routes in a local `APIRouter` instead. The arXiv explorer
-takes this approach.
+**Callbacks:** When omitted, the shared router uses sensible defaults that
+call `state.topic_mgr` methods directly. Provide callbacks when your topic
+manager has a different interface or when you need custom mapping:
+
+```python
+# Example: code explorer maps topics to repo lists
+def _build_code_topic_info(state: CodeExplorerState) -> list[TopicInfo]:
+    return [
+        TopicInfo(name=n, document_count=len(state.topic_mgr.list_repos(n)),
+                  size="", project_id=f"topic:{n}")
+        for n in state.topic_mgr.list_topics()
+    ]
+
+# Example: code explorer uses a global session (not per-topic)
+def _get_global_session(state, topic_name: str):
+    return state.session
+```
+
+**Feature flags:** Use `include_topic_crud=False` when your tool has
+different topic semantics (the code explorer manages topics via its own
+repo router). The arXiv explorer uses the defaults for all flags.
 
 ### Extra routers
 
@@ -270,23 +296,53 @@ Your frontend's `package.json` references the shared UI as a local dependency:
 }
 ```
 
-### Importing shared components
+### App shell and state management
 
-Import from `@shesha/shared-ui` and adapt as needed:
+`AppShell` provides the root layout and connection-loss banner. `useAppState`
+extracts all common state management (theme, WebSocket, model loading, tokens,
+sidebar drag, topic selection, trace viewing) into a single hook:
 
 ```tsx
-import {
-  Header,
-  TopicSidebar,
-  ChatArea,
-  StatusBar,
-  TraceViewer,
-  ToastContainer,
-  ConfirmDialog,
-  useTheme,
-  useWebSocket,
-  sharedApi,
-} from '@shesha/shared-ui'
+import { AppShell, useAppState, StatusBar, TraceViewer, ToastContainer } from '@shesha/shared-ui'
+
+export default function App() {
+  const {
+    dark, toggleTheme, connected, send, onMessage,
+    modelName, tokens, budget, setBudget, phase, setPhase, documentBytes,
+    sidebarWidth, handleSidebarDrag,
+    activeTopic, handleTopicSelect: baseHandleTopicSelect,
+    traceView, setTraceView, handleViewTrace,
+    historyVersion, setHistoryVersion, setTokens,
+  } = useAppState({
+    onComplete: () => { /* refresh budget, etc. */ },
+    onExtraMessage: (msg) => {
+      // Handle tool-specific WS messages (e.g., citation progress).
+      // Error messages are delegated here exclusively when provided —
+      // call setPhase('Error') yourself if desired.
+      if (msg.type === 'error') {
+        setPhase('Error')
+        showToast(msg.message ?? 'Unknown error', 'error')
+      }
+    },
+  })
+
+  return (
+    <AppShell connected={connected}>
+      {/* Your tool's UI */}
+      <StatusBar topicName={activeTopic} modelName={modelName} tokens={tokens}
+        budget={budget} phase={phase} documentBytes={documentBytes} />
+    </AppShell>
+  )
+}
+```
+
+### Importing shared components
+
+Import components from `@shesha/shared-ui` and adapt as needed:
+
+```tsx
+import { Header, TopicSidebar, ChatArea, ChatMessage, StatusBar,
+  TraceViewer, ToastContainer, ConfirmDialog } from '@shesha/shared-ui'
 ```
 
 The shared components accept props for domain-specific customization. For

@@ -71,6 +71,15 @@ class CodeExplorerTopicManager:
     def rename(self, old_name: str, new_name: str) -> None:
         """Rename a topic's display name (directory stays the same)."""
         meta, meta_path = self._resolve(old_name)
+        if new_name != old_name:
+            existing_names: set[str] = set()
+            for d in self._iter_topic_dirs():
+                m = self._read_meta(d)
+                if m is not None and m["name"] != old_name:
+                    existing_names.add(m["name"])
+            if new_name in existing_names:
+                msg = f"Topic '{new_name}' already exists"
+                raise ValueError(msg)
         meta["name"] = new_name
         meta_path.write_text(json.dumps(meta, indent=2))
 
@@ -80,11 +89,17 @@ class CodeExplorerTopicManager:
         shutil.rmtree(meta_path.parent)
 
     def list_topics(self) -> list[str]:
-        """Return display names of all topics, sorted alphabetically."""
+        """Return display names of all topics, sorted alphabetically.
+
+        If multiple directories have the same display name (a legacy data
+        issue), only the first directory is included.
+        """
+        seen: set[str] = set()
         names: list[str] = []
         for topic_dir in self._iter_topic_dirs():
             meta = self._read_meta(topic_dir)
-            if meta is not None:
+            if meta is not None and meta["name"] not in seen:
+                seen.add(meta["name"])
                 names.append(meta["name"])
         return sorted(names)
 

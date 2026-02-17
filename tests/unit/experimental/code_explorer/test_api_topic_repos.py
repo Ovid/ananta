@@ -264,3 +264,36 @@ class TestListTopicsUniqueIds:
         # All project_ids must be non-empty and unique
         assert all(pid for pid in ids), f"Empty project_id found: {ids}"
         assert len(set(ids)) == len(ids), f"Duplicate project_ids: {ids}"
+
+
+# ---- PATCH /api/topics/{name} (rename) ----
+
+
+class TestRenameTopic:
+    def test_rename_topic(
+        self,
+        client: TestClient,
+        topic_mgr: CodeExplorerTopicManager,
+    ) -> None:
+        """PATCH /api/topics/{name} renames a topic."""
+        topic_mgr.create("Old")
+        resp = client.patch("/api/topics/Old", json={"new_name": "New"})
+        assert resp.status_code == 200
+        assert resp.json()["name"] == "New"
+        assert "New" in topic_mgr.list_topics()
+
+    def test_rename_nonexistent_returns_404(self, client: TestClient) -> None:
+        """PATCH /api/topics/{name} returns 404 when topic doesn't exist."""
+        resp = client.patch("/api/topics/Ghost", json={"new_name": "New"})
+        assert resp.status_code == 404
+
+    def test_rename_to_existing_name_returns_409(
+        self,
+        client: TestClient,
+        topic_mgr: CodeExplorerTopicManager,
+    ) -> None:
+        """PATCH /api/topics/{name} returns 409 when new name conflicts."""
+        topic_mgr.create("Alpha")
+        topic_mgr.create("Beta")
+        resp = client.patch("/api/topics/Alpha", json={"new_name": "Beta"})
+        assert resp.status_code == 409

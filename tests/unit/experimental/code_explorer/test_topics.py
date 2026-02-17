@@ -335,3 +335,39 @@ class TestRenameTopic:
         mgr.rename("Original", "Renamed")
         dirs_after = {d.name for d in tmp_path.iterdir() if d.is_dir()}
         assert dirs_before == dirs_after
+
+    def test_rename_to_existing_display_name_raises(self, tmp_path: Path) -> None:
+        """Renaming a topic to a name already used by another topic raises."""
+        mgr = CodeExplorerTopicManager(tmp_path)
+        mgr.create("Alpha")
+        mgr.create("Beta")
+        with pytest.raises(ValueError, match="already exists"):
+            mgr.rename("Alpha", "Beta")
+
+    def test_rename_to_same_name_is_noop(self, tmp_path: Path) -> None:
+        """Renaming a topic to its own current name does not raise."""
+        mgr = CodeExplorerTopicManager(tmp_path)
+        mgr.create("Alpha")
+        mgr.rename("Alpha", "Alpha")
+        assert mgr.list_topics() == ["Alpha"]
+
+
+class TestListTopicsNoDuplicates:
+    """list_topics must never return duplicate display names."""
+
+    def test_no_duplicate_display_names(self, tmp_path: Path) -> None:
+        """Even if two directories have the same display name, list_topics deduplicates."""
+        mgr = CodeExplorerTopicManager(tmp_path)
+        # Simulate the bug: create two dirs with same display name
+        import json
+
+        (tmp_path / "dir-a").mkdir()
+        (tmp_path / "dir-a" / "topic.json").write_text(
+            json.dumps({"name": "RLMs", "repos": ["repo-1"]})
+        )
+        (tmp_path / "dir-b").mkdir()
+        (tmp_path / "dir-b" / "topic.json").write_text(
+            json.dumps({"name": "RLMs", "repos": ["repo-2"]})
+        )
+        topics = mgr.list_topics()
+        assert topics == ["RLMs"]

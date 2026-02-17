@@ -216,7 +216,8 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
         try:
             state.topic_mgr.rename(name, body.new_name)
         except ValueError as e:
-            raise HTTPException(404, str(e)) from e
+            status = 409 if "already exists" in str(e) else 404
+            raise HTTPException(status, str(e)) from e
         return {"name": body.new_name}
 
     @router.delete("/topics/{name}")

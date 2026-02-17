@@ -75,9 +75,9 @@ describe('RepoDetail', () => {
     expect(screen.getByText(/42 files/)).toBeInTheDocument()
   })
 
-  it('renders "missing" analysis status badge', () => {
+  it('renders "not analyzed" badge when analysis_status is missing', () => {
     renderDetail({ repo: { ...baseRepo, analysis_status: 'missing' } })
-    const badge = screen.getByText('missing')
+    const badge = screen.getByText('not analyzed')
     expect(badge.className).toMatch(/red/)
   })
 

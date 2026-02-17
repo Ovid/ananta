@@ -21,7 +21,8 @@ function statusBadgeClass(status: string | null): string {
 }
 
 function statusLabel(status: string | null): string {
-  return status ?? 'missing'
+  if (!status || status === 'missing') return 'not analyzed'
+  return status
 }
 
 export default function RepoDetail({

@@ -110,7 +110,8 @@ class ArxivSearcher:
             start: Offset for pagination (0-based).
         """
         parts = []
-        if query:
+        # Treat "*" as "no keyword filter" — arxiv rejects literal all:*
+        if query and query.strip() != "*":
             parts.append(f"all:{query}")
         if author:
             parts.append(f"au:{author}")
@@ -123,7 +124,9 @@ class ArxivSearcher:
             date_from = start_date.strftime("%Y%m%d0000")
             date_to = now.strftime("%Y%m%d2359")
             parts.append(f"submittedDate:[{date_from}+TO+{date_to}]")
-        full_query = " AND ".join(parts) if parts else "all:*"
+        if not parts:
+            raise ValueError("At least one search criteria is required")
+        full_query = " AND ".join(parts)
 
         sort_criterion = {
             "relevance": arxiv.SortCriterion.Relevance,

@@ -22,6 +22,7 @@ import uuid
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
+import arxiv
 import litellm
 from fastapi import APIRouter, FastAPI, HTTPException, WebSocket
 from fastapi.responses import JSONResponse, PlainTextResponse
@@ -218,9 +219,12 @@ def _create_arxiv_router(state: AppState) -> APIRouter:
         sort_by: str = "relevance",
         start: int = 0,
     ) -> list[SearchResult]:
-        results = state.searcher.search(
-            q, author=author, category=category, sort_by=sort_by, start=start
-        )
+        try:
+            results = state.searcher.search(
+                q, author=author, category=category, sort_by=sort_by, start=start
+            )
+        except (arxiv.HTTPError, ValueError) as exc:
+            raise HTTPException(502, f"arXiv API error: {exc}") from exc
         # Build a mapping of arxiv_id -> list of topic names
         topic_docs: dict[str, list[str]] = {}
         for topic in state.topic_mgr.list_topics():

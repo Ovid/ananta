@@ -1,5 +1,8 @@
 """Code explorer WebSocket handler.
 
+Delegates generic query/cancel dispatch to the shared WebSocket handler and
+provides a custom query handler for cross-project queries.
+
 Unlike the arxiv explorer (which maps topic -> single project, with
 document_ids being document names within that project), the code explorer
 treats ``document_ids`` as **project_ids** -- each maps to a whole repo.
@@ -13,9 +16,10 @@ import logging
 import threading
 from typing import Any
 
-from fastapi import WebSocket, WebSocketDisconnect
+from fastapi import WebSocket
 
 from shesha.experimental.code_explorer.dependencies import CodeExplorerState
+from shesha.experimental.shared.websockets import websocket_handler as shared_ws_handler
 from shesha.models import ParsedDocument
 from shesha.rlm.trace import StepType, TokenUsage
 
@@ -23,40 +27,18 @@ logger = logging.getLogger(__name__)
 
 
 async def websocket_handler(ws: WebSocket, state: CodeExplorerState) -> None:
-    """Handle WebSocket connections for the code explorer."""
-    await ws.accept()
-    cancel_event: threading.Event | None = None
-    query_task: asyncio.Task[None] | None = None
+    """Handle WebSocket connections for the code explorer.
 
-    try:
-        while True:
-            data = await ws.receive_json()
-            msg_type = data.get("type")
-
-            if msg_type == "cancel":
-                if cancel_event is not None:
-                    cancel_event.set()
-                await ws.send_json({"type": "cancelled"})
-            elif msg_type == "query":
-                if cancel_event is not None:
-                    cancel_event.set()
-                cancel_event = threading.Event()
-                query_task = asyncio.create_task(_handle_query(ws, data, state, cancel_event))
-            else:
-                await ws.send_json(
-                    {"type": "error", "message": f"Unknown message type: {msg_type}"}
-                )
-    except WebSocketDisconnect:
-        if cancel_event is not None:
-            cancel_event.set()
-        if query_task is not None and not query_task.done():
-            query_task.cancel()
+    Wraps the shared handler with a custom query handler that supports
+    cross-project queries (document_ids are project_ids).
+    """
+    await shared_ws_handler(ws, state, query_handler=_handle_query)
 
 
 async def _handle_query(
     ws: WebSocket,
     data: dict[str, Any],
-    state: CodeExplorerState,
+    state: Any,
     cancel_event: threading.Event,
 ) -> None:
     """Execute a cross-project query."""

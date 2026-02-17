@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import threading
 from collections.abc import Callable
 from unittest.mock import MagicMock, patch
 
@@ -46,6 +48,7 @@ def _make_app(
     extra_handlers: dict[str, Callable[..., object]] | None = None,
     build_context: Callable[..., str] | None = None,
     session_factory: Callable[..., object] | None = None,
+    query_handler: Callable[..., object] | None = None,
 ) -> FastAPI:
     """Create a minimal FastAPI app wired to the shared websocket_handler."""
     app = FastAPI()
@@ -59,6 +62,8 @@ def _make_app(
             kwargs["build_context"] = build_context
         if session_factory is not None:
             kwargs["session_factory"] = session_factory
+        if query_handler is not None:
+            kwargs["query_handler"] = query_handler
         await websocket_handler(ws, state, **kwargs)  # type: ignore[arg-type]
 
     return app
@@ -341,3 +346,81 @@ def test_ws_session_factory_is_used(mock_state: MagicMock) -> None:
     custom_factory.assert_called_once()
     # And the session it returned should have been used for add_exchange
     custom_session.add_exchange.assert_called_once()
+
+
+def test_ws_query_handler_callback_is_called(mock_state: MagicMock) -> None:
+    """When query_handler is provided, it is called instead of the default handler."""
+    received_data: list[dict[str, object]] = []
+
+    async def custom_query_handler(
+        ws: WebSocket,
+        data: dict[str, object],
+        state: object,
+        cancel_event: threading.Event,
+    ) -> None:
+        received_data.append(data)
+        await ws.send_json({"type": "complete", "answer": "custom handler"})
+
+    app = _make_app(mock_state, query_handler=custom_query_handler)
+    test_client = TestClient(app)
+
+    with test_client.websocket_connect("/ws") as ws:
+        ws.send_json({"type": "query", "question": "What?"})
+        msg = ws.receive_json()
+
+    assert msg["type"] == "complete"
+    assert msg["answer"] == "custom handler"
+    assert len(received_data) == 1
+    assert received_data[0]["question"] == "What?"
+
+
+def test_ws_new_query_cancels_previous_task(mock_state: MagicMock) -> None:
+    """Sending a second query cancels and awaits the first before starting it."""
+    # Gate to block the first query until we've sent the second
+    gate = threading.Event()
+    handler_calls: list[str] = []
+
+    async def slow_query_handler(
+        ws: WebSocket,
+        data: dict[str, object],
+        state: object,
+        cancel_event: threading.Event,
+    ) -> None:
+        label = str(data.get("label", ""))
+        handler_calls.append(f"start:{label}")
+        loop = asyncio.get_running_loop()
+        try:
+            # Block until gate is opened (simulates long-running query)
+            await loop.run_in_executor(None, gate.wait)
+            handler_calls.append(f"complete:{label}")
+            await ws.send_json({"type": "complete", "answer": label})
+        except asyncio.CancelledError:
+            handler_calls.append(f"cancelled:{label}")
+            raise
+
+    app = _make_app(mock_state, query_handler=slow_query_handler)
+    test_client = TestClient(app)
+
+    with test_client.websocket_connect("/ws") as ws:
+        # Send first query — handler will block on gate
+        ws.send_json({"type": "query", "label": "first", "question": "Q1"})
+        # Send second query — should cancel the first
+        ws.send_json({"type": "query", "label": "second", "question": "Q2"})
+        # Open the gate so the second query can complete
+        gate.set()
+        # Collect messages until we get complete
+        messages = []
+        while True:
+            msg = ws.receive_json()
+            messages.append(msg)
+            if msg["type"] in ("complete", "error"):
+                break
+
+    # The first handler should have been cancelled
+    assert "cancelled:first" in handler_calls
+    # The second should have completed
+    assert "complete:second" in handler_calls
+    # Only one complete message from the second query
+    completes = [m for m in messages if m["type"] == "complete"]
+    assert len(completes) == 1
+    assert completes[0]["answer"] == "second"

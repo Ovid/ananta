@@ -2,16 +2,17 @@
 
 Provides a reusable WebSocket handler that dispatches ``query`` and
 ``cancel`` messages.  Apps can extend it by passing *extra_handlers*
-(e.g. for citation checking) and a *build_context* callback (e.g. for
-citation instructions or cross-repo context).
+(e.g. for citation checking), a *build_context* callback, or a fully
+custom *query_handler* (e.g. for cross-project queries).
 """
 
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Coroutine
 from typing import Any
 
 from fastapi import WebSocket, WebSocketDisconnect
@@ -35,11 +36,19 @@ BuildContext = Callable[[list[str], Any, list[ParsedDocument]], str]
 # Signature: def factory(project_dir: Path) -> WebConversationSession
 SessionFactory = Callable[..., WebConversationSession]
 
+# Type alias for the query handler callback.
+# Signature: async def handler(ws, data, state, cancel_event) -> None
+QueryHandler = Callable[
+    [WebSocket, dict[str, object], Any, threading.Event],
+    Coroutine[Any, Any, None],
+]
+
 
 async def websocket_handler(
     websocket: WebSocket,
     state: Any,
     *,
+    query_handler: QueryHandler | None = None,
     extra_handlers: dict[str, ExtraHandler] | None = None,
     build_context: BuildContext | None = None,
     session_factory: SessionFactory | None = None,
@@ -52,6 +61,10 @@ async def websocket_handler(
         The FastAPI WebSocket connection.
     state:
         Application state (must expose ``topic_mgr``, ``shesha``, ``model``).
+    query_handler:
+        Optional async callback ``(ws, data, state, cancel_event) -> None``
+        that executes a query.  When not provided, the built-in topic-based
+        handler is used (configured via *build_context* / *session_factory*).
     extra_handlers:
         Mapping of message type -> async handler for app-specific messages.
     build_context:
@@ -62,6 +75,25 @@ async def websocket_handler(
         Defaults to the shared ``WebConversationSession``.  The arXiv app
         passes its own subclass so history uses ``_conversation.json``.
     """
+    if query_handler is not None:
+        actual_handler = query_handler
+    else:
+
+        async def actual_handler(
+            ws: WebSocket,
+            data: dict[str, object],
+            st: Any,
+            cancel_event: threading.Event,
+        ) -> None:
+            await _handle_query(
+                ws,
+                data,
+                st,
+                cancel_event,
+                build_context=build_context,
+                session_factory=session_factory,
+            )
+
     await websocket.accept()
     cancel_event: threading.Event | None = None
     query_task: asyncio.Task[None] | None = None
@@ -77,19 +109,16 @@ async def websocket_handler(
                 await websocket.send_json({"type": "cancelled"})
 
             elif msg_type == "query":
-                # Cancel any in-flight query before starting a new one
+                # Cancel and await any in-flight query before starting a new one
                 if cancel_event is not None:
                     cancel_event.set()
+                if query_task is not None and not query_task.done():
+                    query_task.cancel()
+                    with contextlib.suppress(asyncio.CancelledError):
+                        await query_task
                 cancel_event = threading.Event()
                 query_task = asyncio.create_task(
-                    _handle_query(
-                        websocket,
-                        data,
-                        state,
-                        cancel_event,
-                        build_context=build_context,
-                        session_factory=session_factory,
-                    )
+                    actual_handler(websocket, data, state, cancel_event)
                 )
 
             elif extra_handlers and msg_type in extra_handlers:

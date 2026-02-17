@@ -21,6 +21,9 @@ export const api = {
 
   repos: {
     list: () => request<RepoInfo[]>('/repos'),
+    listUncategorized: () => request<RepoInfo[]>('/repos/uncategorized'),
+    listForTopic: (topic: string) =>
+      request<RepoInfo[]>(`/topics/${encodeURIComponent(topic)}/repos`),
     add: (data: { url: string; topic?: string }) =>
       request<{ project_id: string; status: string; files_ingested: number }>('/repos', {
         method: 'POST',

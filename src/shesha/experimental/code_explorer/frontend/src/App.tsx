@@ -65,14 +65,17 @@ export default function App() {
     })
   }, [])
 
-  // Load all repos (for uncategorized section and general repo data)
+  // Load all repos (for general repo data) and uncategorized repos separately
   useEffect(() => {
     api.repos.list().then(repos => {
       setAllRepos(repos)
-      // All repos shown as uncategorized for now (topics are organizational)
-      setUncategorizedRepos(repos.map(repoToDocument))
     }).catch(() => {
       // Repos API may not be available yet
+    })
+    api.repos.listUncategorized().then(repos => {
+      setUncategorizedRepos(repos.map(repoToDocument))
+    }).catch(() => {
+      // Uncategorized API may not be available yet
     })
   }, [reposVersion])
 
@@ -104,20 +107,23 @@ export default function App() {
   }, [onMessage])
 
   const handleTopicSelect = useCallback((name: string) => {
+    // Only reset selection when switching to a different topic;
+    // re-clicking the same topic just dismisses the detail view.
+    if (name !== activeTopic) {
+      setSelectedRepos(new Set())
+    }
     setActiveTopic(name)
     setViewingRepo(null)
     setViewingAnalysis(null)
-    setSelectedRepos(new Set())
     if (name) {
       api.contextBudget(name).then(setBudget).catch(() => {
         // Context budget may not be available for this topic
       })
     }
-  }, [])
+  }, [activeTopic])
 
-  const loadDocuments = useCallback(async (_topicName: string): Promise<DocumentItem[]> => {
-    // Code explorer shows all repos under every topic (topics are organizational)
-    const repos = await api.repos.list()
+  const loadDocuments = useCallback(async (topicName: string): Promise<DocumentItem[]> => {
+    const repos = await api.repos.listForTopic(topicName)
     return repos.map(repoToDocument)
   }, [])
 
@@ -297,7 +303,7 @@ export default function App() {
             <button
               onClick={() => setShowAddRepo(true)}
               title="Add repository"
-              className="text-text-dim hover:text-accent transition-colors text-sm leading-none px-1"
+              className="text-[10px] text-text-dim hover:text-accent border border-border hover:border-accent/50 rounded px-1.5 py-0.5 transition-colors"
             >
               + Repo
             </button>

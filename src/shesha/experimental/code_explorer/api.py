@@ -17,7 +17,7 @@ import litellm
 from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.responses import PlainTextResponse
 
-from shesha.exceptions import ProjectNotFoundError
+from shesha.exceptions import ProjectNotFoundError, RepoIngestError
 from shesha.experimental.code_explorer.dependencies import CodeExplorerState
 from shesha.experimental.code_explorer.schemas import (
     AnalysisResponse,
@@ -78,27 +78,35 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
     # apply-updates can call the stored apply_updates() method.
     pending_updates: dict[str, RepoProjectResult] = {}
 
+    def _build_repo_info(pid: str) -> RepoInfo:
+        """Build a RepoInfo for a project_id."""
+        info = state.shesha.get_project_info(pid)
+        # TODO: Replace with a public Shesha API method when available
+        doc_count = len(state.shesha._storage.list_documents(pid))
+        return RepoInfo(
+            project_id=pid,
+            source_url=info.source_url or "",
+            file_count=doc_count,
+            analysis_status=info.analysis_status,
+        )
+
     @router.get("/repos")
     def list_repos() -> list[RepoInfo]:
         project_ids = state.shesha.list_projects()
-        result: list[RepoInfo] = []
-        for pid in project_ids:
-            info = state.shesha.get_project_info(pid)
-            # TODO: Replace with a public Shesha API method when available
-            doc_count = len(state.shesha._storage.list_documents(pid))
-            result.append(
-                RepoInfo(
-                    project_id=pid,
-                    source_url=info.source_url or "",
-                    file_count=doc_count,
-                    analysis_status=info.analysis_status,
-                )
-            )
-        return result
+        return [_build_repo_info(pid) for pid in project_ids]
+
+    @router.get("/repos/uncategorized")
+    def list_uncategorized_repos() -> list[RepoInfo]:
+        all_ids = state.shesha.list_projects()
+        uncategorized = state.topic_mgr.list_uncategorized_repos(all_ids)
+        return [_build_repo_info(pid) for pid in uncategorized]
 
     @router.post("/repos")
     def add_repo(body: RepoAdd) -> dict[str, object]:
-        repo_result = state.shesha.create_project_from_repo(body.url)
+        try:
+            repo_result = state.shesha.create_project_from_repo(body.url)
+        except RepoIngestError as exc:
+            raise HTTPException(422, detail=str(exc)) from exc
         project_id = repo_result.project.project_id
 
         if body.topic:
@@ -114,17 +122,9 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
     @router.get("/repos/{project_id}")
     def get_repo(project_id: str) -> RepoInfo:
         try:
-            info = state.shesha.get_project_info(project_id)
+            return _build_repo_info(project_id)
         except ProjectNotFoundError:
             raise HTTPException(404, f"Project '{project_id}' not found")
-        # TODO: Replace with a public Shesha API method when available
-        doc_count = len(state.shesha._storage.list_documents(project_id))
-        return RepoInfo(
-            project_id=project_id,
-            source_url=info.source_url or "",
-            file_count=doc_count,
-            analysis_status=info.analysis_status,
-        )
 
     @router.delete("/repos/{project_id}")
     def delete_repo(project_id: str) -> dict[str, str]:
@@ -201,7 +201,7 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
                 name=n,
                 document_count=len(state.topic_mgr.list_repos(n)),
                 size="",
-                project_id="",
+                project_id=f"topic:{n}",
             )
             for n in names
         ]
@@ -230,6 +230,14 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
     # ------------------------------------------------------------------
     # Topic-repo reference routes
     # ------------------------------------------------------------------
+
+    @router.get("/topics/{name}/repos")
+    def list_topic_repos(name: str) -> list[RepoInfo]:
+        try:
+            repo_ids = state.topic_mgr.list_repos(name)
+        except ValueError:
+            raise HTTPException(404, f"Topic '{name}' not found")
+        return [_build_repo_info(pid) for pid in repo_ids]
 
     @router.post("/topics/{name}/repos/{project_id}")
     def add_repo_to_topic(name: str, project_id: str) -> dict[str, str]:

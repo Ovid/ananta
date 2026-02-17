@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from shesha.experimental.code_explorer.api import create_api
 from shesha.experimental.code_explorer.dependencies import CodeExplorerState
 from shesha.experimental.code_explorer.topics import CodeExplorerTopicManager
+from shesha.models import ProjectInfo
 
 
 @pytest.fixture
@@ -164,3 +165,102 @@ class TestRemoveRepoFromTopic:
 
         resp = client.delete("/api/topics/Frontend/repos/owner-myrepo")
         assert resp.status_code == 404
+
+
+# ---- GET /api/topics/{name}/repos ----
+
+
+class TestListTopicRepos:
+    def test_list_repos_in_topic(
+        self,
+        client: TestClient,
+        mock_shesha: MagicMock,
+        topic_mgr: CodeExplorerTopicManager,
+    ) -> None:
+        """GET /api/topics/{name}/repos returns RepoInfo for repos in topic."""
+        topic_mgr.create("RLMs")
+        topic_mgr.add_repo("RLMs", "owner-myrepo")
+
+        mock_shesha.get_project_info.return_value = ProjectInfo(
+            project_id="owner-myrepo",
+            source_url="https://github.com/owner/myrepo",
+            is_local=False,
+            source_exists=True,
+            analysis_status="current",
+        )
+        mock_shesha._storage.list_documents.return_value = ["a.py", "b.py"]
+
+        resp = client.get("/api/topics/RLMs/repos")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+        assert data[0]["project_id"] == "owner-myrepo"
+        assert data[0]["file_count"] == 2
+
+    def test_list_repos_empty_topic(
+        self,
+        client: TestClient,
+        topic_mgr: CodeExplorerTopicManager,
+    ) -> None:
+        """GET /api/topics/{name}/repos returns empty list for topic with no repos."""
+        topic_mgr.create("Empty")
+
+        resp = client.get("/api/topics/Empty/repos")
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    def test_list_repos_topic_not_found(self, client: TestClient) -> None:
+        """GET /api/topics/{name}/repos returns 404 for missing topic."""
+        resp = client.get("/api/topics/NonExistent/repos")
+        assert resp.status_code == 404
+
+    def test_excludes_repos_not_in_topic(
+        self,
+        client: TestClient,
+        mock_shesha: MagicMock,
+        topic_mgr: CodeExplorerTopicManager,
+    ) -> None:
+        """GET /api/topics/{name}/repos only returns repos in that specific topic."""
+        topic_mgr.create("RLMs")
+        topic_mgr.create("Other")
+        topic_mgr.add_repo("RLMs", "repo-a")
+        topic_mgr.add_repo("Other", "repo-b")
+
+        mock_shesha.get_project_info.return_value = ProjectInfo(
+            project_id="repo-a",
+            source_url="https://github.com/x/a",
+            is_local=False,
+            source_exists=True,
+            analysis_status="current",
+        )
+        mock_shesha._storage.list_documents.return_value = ["f1"]
+
+        resp = client.get("/api/topics/RLMs/repos")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+        assert data[0]["project_id"] == "repo-a"
+
+
+# ---- GET /api/topics (project_id uniqueness) ----
+
+
+class TestListTopicsUniqueIds:
+    def test_topics_have_unique_project_ids(
+        self,
+        client: TestClient,
+        topic_mgr: CodeExplorerTopicManager,
+    ) -> None:
+        """GET /api/topics returns unique project_id for each topic (React key)."""
+        topic_mgr.create("RLMs")
+        topic_mgr.create("Frontend")
+
+        resp = client.get("/api/topics")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 2
+
+        ids = [t["project_id"] for t in data]
+        # All project_ids must be non-empty and unique
+        assert all(pid for pid in ids), f"Empty project_id found: {ids}"
+        assert len(set(ids)) == len(ids), f"Duplicate project_ids: {ids}"

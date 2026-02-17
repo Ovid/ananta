@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from shesha.exceptions import ProjectNotFoundError
+from shesha.exceptions import ProjectNotFoundError, RepoIngestError
 from shesha.experimental.code_explorer.api import create_api
 from shesha.experimental.code_explorer.dependencies import CodeExplorerState
 from shesha.experimental.code_explorer.topics import CodeExplorerTopicManager
@@ -114,6 +114,71 @@ class TestListRepos:
         assert data[1]["file_count"] == 2
 
 
+# ---- GET /api/repos/uncategorized ----
+
+
+class TestListUncategorizedRepos:
+    def test_all_uncategorized(self, client: TestClient, mock_shesha: MagicMock) -> None:
+        """GET /api/repos/uncategorized returns all repos when none are in topics."""
+        mock_shesha.list_projects.return_value = ["repo-a"]
+        mock_shesha.get_project_info.return_value = ProjectInfo(
+            project_id="repo-a",
+            source_url="https://github.com/x/a",
+            is_local=False,
+            source_exists=True,
+            analysis_status="missing",
+        )
+        mock_shesha._storage.list_documents.return_value = ["f1"]
+
+        resp = client.get("/api/repos/uncategorized")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+        assert data[0]["project_id"] == "repo-a"
+
+    def test_excludes_categorized_repos(
+        self,
+        client: TestClient,
+        mock_shesha: MagicMock,
+        topic_mgr: CodeExplorerTopicManager,
+    ) -> None:
+        """GET /api/repos/uncategorized excludes repos that are in any topic."""
+        topic_mgr.create("RLMs")
+        topic_mgr.add_repo("RLMs", "repo-a")
+
+        mock_shesha.list_projects.return_value = ["repo-a", "repo-b"]
+        mock_shesha.get_project_info.return_value = ProjectInfo(
+            project_id="repo-b",
+            source_url="https://github.com/x/b",
+            is_local=False,
+            source_exists=True,
+            analysis_status="missing",
+        )
+        mock_shesha._storage.list_documents.return_value = ["f1"]
+
+        resp = client.get("/api/repos/uncategorized")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+        assert data[0]["project_id"] == "repo-b"
+
+    def test_empty_when_all_categorized(
+        self,
+        client: TestClient,
+        mock_shesha: MagicMock,
+        topic_mgr: CodeExplorerTopicManager,
+    ) -> None:
+        """GET /api/repos/uncategorized returns empty list when all repos are in topics."""
+        topic_mgr.create("RLMs")
+        topic_mgr.add_repo("RLMs", "repo-a")
+
+        mock_shesha.list_projects.return_value = ["repo-a"]
+
+        resp = client.get("/api/repos/uncategorized")
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+
 # ---- POST /api/repos ----
 
 
@@ -181,6 +246,20 @@ class TestAddRepo:
         assert resp.status_code == 200
         data = resp.json()
         assert data["status"] == "unchanged"
+
+    def test_add_repo_clone_error_returns_422(
+        self, client: TestClient, mock_shesha: MagicMock
+    ) -> None:
+        """POST /api/repos returns 422 when clone fails (e.g. directory exists)."""
+        mock_shesha.create_project_from_repo.side_effect = RepoIngestError(
+            "https://github.com/owner/myrepo",
+            RuntimeError("destination path already exists"),
+        )
+
+        resp = client.post("/api/repos", json={"url": "https://github.com/owner/myrepo"})
+        assert resp.status_code == 422
+        data = resp.json()
+        assert "detail" in data
 
 
 # ---- GET /api/repos/{id} ----

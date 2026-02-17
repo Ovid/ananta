@@ -20,11 +20,11 @@ class FakeTopicInfo:
     """Lightweight stand-in for the domain TopicInfo dataclass.
 
     Matches the attributes accessed by ``create_shared_router``:
-    ``name``, ``paper_count``, ``formatted_size``, ``project_id``.
+    ``name``, ``document_count``, ``formatted_size``, ``project_id``.
     """
 
     name: str
-    paper_count: int
+    document_count: int
     formatted_size: str
     project_id: str
 
@@ -89,7 +89,7 @@ def test_list_topics(client: TestClient, mock_state: MagicMock) -> None:
     mock_state.topic_mgr.list_topics.return_value = [
         FakeTopicInfo(
             name="Abiogenesis",
-            paper_count=5,
+            document_count=5,
             formatted_size="1.0 MB",
             project_id="2025-01-15-abiogenesis",
         ),

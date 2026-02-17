@@ -8,6 +8,7 @@ optional per-topic history/export and context-budget routes.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +29,11 @@ from shesha.experimental.shared.schemas import (
     TraceStepSchema,
 )
 from shesha.experimental.shared.session import WebConversationSession
+
+# Type aliases for callbacks
+GetSession = Callable[[object, str], WebConversationSession]
+BuildTopicInfo = Callable[[object], list[TopicInfo]]
+ResolveProjectIds = Callable[[object, str], list[str]]
 
 
 def _resolve_topic_or_404(state: Any, name: str) -> str:
@@ -73,6 +79,11 @@ def _parse_trace_file(trace_file: Path) -> dict[str, object]:
 
 def create_shared_router(
     state: Any,
+    *,
+    get_session: GetSession | None = None,
+    build_topic_info: BuildTopicInfo | None = None,
+    resolve_project_ids: ResolveProjectIds | None = None,
+    include_topic_crud: bool = True,
     include_per_topic_history: bool = True,
     include_context_budget: bool = True,
 ) -> APIRouter:
@@ -82,6 +93,20 @@ def create_shared_router(
     ----------
     state:
         Application state. Must expose ``topic_mgr``, ``model``.
+    get_session:
+        Optional callback ``(state, topic_name) -> WebConversationSession``.
+        When provided, overrides the default per-project session creation
+        for history, export, and context-budget routes.
+    build_topic_info:
+        Optional callback ``(state) -> list[TopicInfo]``.
+        When provided, overrides the default topic listing logic.
+    resolve_project_ids:
+        Optional callback ``(state, topic_name) -> list[str]``.
+        When provided, overrides the default project ID resolution
+        for trace routes.
+    include_topic_crud:
+        When ``True`` (default), register topic CRUD routes (list, create,
+        rename, delete).
     include_per_topic_history:
         When ``True`` (default), register per-topic history, clear-history,
         and export routes.
@@ -90,50 +115,70 @@ def create_shared_router(
     """
     router = APIRouter()
 
+    # --- Internal helpers ---
+
+    def _get_session_for_topic(topic_name: str) -> WebConversationSession:
+        """Get the session for a topic, using callback or default."""
+        if get_session is not None:
+            return get_session(state, topic_name)
+        project_id = _resolve_topic_or_404(state, topic_name)
+        project_dir = state.topic_mgr._storage._project_path(project_id)
+        return WebConversationSession(project_dir)
+
+    def _get_project_ids(name: str) -> list[str]:
+        """Resolve project IDs for a topic, using callback or default."""
+        if resolve_project_ids is not None:
+            return resolve_project_ids(state, name)
+        return _resolve_all_project_ids(state, name)
+
     # --- Topics ---
 
-    @router.get("/api/topics", response_model=list[TopicInfo])
-    def list_topics() -> list[TopicInfo]:
-        topics = state.topic_mgr.list_topics()
-        return [
-            TopicInfo(
-                name=t.name,
-                document_count=t.paper_count,
-                size=t.formatted_size,
-                project_id=t.project_id,
-            )
-            for t in topics
-        ]
+    if include_topic_crud:
 
-    @router.post("/api/topics", status_code=201)
-    def create_topic(body: TopicCreate) -> dict[str, str]:
-        existing = state.topic_mgr.resolve(body.name)
-        if existing:
-            raise HTTPException(409, f"Topic '{body.name}' already exists")
-        project_id = state.topic_mgr.create(body.name)
-        return {"name": body.name, "project_id": project_id}
+        @router.get("/api/topics", response_model=list[TopicInfo])
+        def list_topics() -> list[TopicInfo]:
+            if build_topic_info is not None:
+                return build_topic_info(state)
+            topics = state.topic_mgr.list_topics()
+            return [
+                TopicInfo(
+                    name=t.name,
+                    document_count=t.document_count,
+                    size=t.formatted_size,
+                    project_id=t.project_id,
+                )
+                for t in topics
+            ]
 
-    @router.patch("/api/topics/{name}")
-    def rename_topic(name: str, body: TopicRename) -> dict[str, str]:
-        try:
-            state.topic_mgr.rename(name, body.new_name)
-        except ValueError as e:
-            raise HTTPException(404, str(e)) from e
-        return {"name": body.new_name}
+        @router.post("/api/topics", status_code=201)
+        def create_topic(body: TopicCreate) -> dict[str, str]:
+            existing = state.topic_mgr.resolve(body.name)
+            if existing:
+                raise HTTPException(409, f"Topic '{body.name}' already exists")
+            project_id = state.topic_mgr.create(body.name)
+            return {"name": body.name, "project_id": project_id}
 
-    @router.delete("/api/topics/{name}")
-    def delete_topic(name: str) -> dict[str, str]:
-        try:
-            state.topic_mgr.delete(name)
-        except ValueError as e:
-            raise HTTPException(404, str(e)) from e
-        return {"status": "deleted", "name": name}
+        @router.patch("/api/topics/{name}")
+        def rename_topic(name: str, body: TopicRename) -> dict[str, str]:
+            try:
+                state.topic_mgr.rename(name, body.new_name)
+            except ValueError as e:
+                raise HTTPException(404, str(e)) from e
+            return {"name": body.new_name}
+
+        @router.delete("/api/topics/{name}")
+        def delete_topic(name: str) -> dict[str, str]:
+            try:
+                state.topic_mgr.delete(name)
+            except ValueError as e:
+                raise HTTPException(404, str(e)) from e
+            return {"status": "deleted", "name": name}
 
     # --- Traces ---
 
     @router.get("/api/topics/{name}/traces", response_model=list[TraceListItem])
     def list_traces(name: str) -> list[TraceListItem]:
-        project_ids = _resolve_all_project_ids(state, name)
+        project_ids = _get_project_ids(name)
         items: list[TraceListItem] = []
         for project_id in project_ids:
             trace_files = state.topic_mgr._storage.list_traces(project_id)
@@ -162,7 +207,7 @@ def create_shared_router(
 
     @router.get("/api/topics/{name}/traces/{trace_id:path}", response_model=TraceFull)
     def get_trace(name: str, trace_id: str) -> TraceFull:
-        project_ids = _resolve_all_project_ids(state, name)
+        project_ids = _get_project_ids(name)
         for project_id in project_ids:
             trace_files = state.topic_mgr._storage.list_traces(project_id)
             for tf in trace_files:
@@ -209,24 +254,18 @@ def create_shared_router(
 
         @router.get("/api/topics/{name}/history", response_model=ConversationHistory)
         def get_history(name: str) -> ConversationHistory:
-            project_id = _resolve_topic_or_404(state, name)
-            project_dir = state.topic_mgr._storage._project_path(project_id)
-            session = WebConversationSession(project_dir)
+            session = _get_session_for_topic(name)
             return ConversationHistory(exchanges=session.list_exchanges())  # type: ignore[arg-type]
 
         @router.delete("/api/topics/{name}/history")
         def clear_history(name: str) -> dict[str, str]:
-            project_id = _resolve_topic_or_404(state, name)
-            project_dir = state.topic_mgr._storage._project_path(project_id)
-            session = WebConversationSession(project_dir)
+            session = _get_session_for_topic(name)
             session.clear()
             return {"status": "cleared"}
 
         @router.get("/api/topics/{name}/export", response_class=PlainTextResponse)
         def export_transcript(name: str) -> PlainTextResponse:
-            project_id = _resolve_topic_or_404(state, name)
-            project_dir = state.topic_mgr._storage._project_path(project_id)
-            session = WebConversationSession(project_dir)
+            session = _get_session_for_topic(name)
             content = session.format_transcript()
             return PlainTextResponse(content=content, media_type="text/markdown")
 
@@ -259,16 +298,13 @@ def create_shared_router(
 
         @router.get("/api/topics/{name}/context-budget", response_model=ContextBudget)
         def get_context_budget(name: str) -> ContextBudget:
-            project_id = _resolve_topic_or_404(state, name)
-            project_dir = state.topic_mgr._storage._project_path(project_id)
-
             # Documents go to the Docker sandbox, not the LLM context.
             # The LLM context contains: system prompt (~2k tokens) +
             # conversation history prefix + iterative code/output messages.
             # We estimate: base overhead + history chars.
             base_prompt_tokens = 2000  # system prompt + context metadata
 
-            session = WebConversationSession(project_dir)
+            session = _get_session_for_topic(name)
             history_chars = session.context_chars()
 
             # ~4 chars per token heuristic

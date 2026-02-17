@@ -2,122 +2,70 @@
 
 Uses the shared app factory for boilerplate (lifespan, CORS, ``.well-known``
 catch-all, WebSocket endpoint, static file mounting) and registers
-arxiv-specific routes (topics, papers, search) plus generic routes (traces,
-history, model, context-budget) on a local router.
+arxiv-specific routes (papers, search) on a local router.
 
-The shared ``create_shared_router()`` is *not* used directly because the arxiv
-explorer has several incompatibilities: history is stored in
-``_conversation.json`` (not ``conversation.json``), and the topic manager
-does not expose ``resolve_all()``.  These routes are therefore kept here with
-identical logic to the shared versions.
+Generic routes (topic CRUD, traces, history/export, model, context-budget)
+are provided by the shared ``create_shared_router()`` via callbacks that
+adapt the arxiv ``AppState`` to the generic interface.
 """
 
 from __future__ import annotations
 
-import json
 import threading
 import uuid
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 import arxiv
-import litellm
 from fastapi import APIRouter, FastAPI, HTTPException, WebSocket
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import JSONResponse
 
 from shesha.experimental.arxiv.download import to_parsed_document
 from shesha.experimental.shared.app_factory import create_app
+from shesha.experimental.shared.routes import (
+    _resolve_topic_or_404,
+    create_shared_router,
+)
+from shesha.experimental.shared.schemas import TopicInfo
 from shesha.experimental.web.dependencies import AppState
 from shesha.experimental.web.schemas import (
-    ContextBudget,
-    ConversationHistory,
-    ModelInfo,
-    ModelUpdate,
     PaperAdd,
     PaperInfo,
     SearchResult,
-    TopicCreate,
-    TopicInfo,
-    TopicRename,
-    TraceFull,
-    TraceListItem,
-    TraceStepSchema,
 )
 from shesha.experimental.web.session import WebConversationSession
 from shesha.experimental.web.websockets import websocket_handler
 
 
-def _resolve_topic_or_404(state: AppState, name: str) -> str:
-    """Resolve a topic name to project_id, or raise 404."""
-    project_id = state.topic_mgr.resolve(name)
-    if not project_id:
-        raise HTTPException(404, f"Topic '{name}' not found")
-    return project_id
+def _build_arxiv_topic_info(state: AppState) -> list[TopicInfo]:
+    """Build topic listing for arxiv explorer (paper count per topic)."""
+    topics = state.topic_mgr.list_topics()
+    return [
+        TopicInfo(
+            name=t.name,
+            document_count=t.paper_count,
+            size=t.formatted_size,
+            project_id=t.project_id,
+        )
+        for t in topics
+    ]
 
 
-def _parse_trace_file(trace_file: Path) -> dict[str, object]:
-    """Parse a JSONL trace file into header, steps, and summary."""
-    header: dict[str, object] = {}
-    steps: list[dict[str, object]] = []
-    summary: dict[str, object] = {}
-    for line in trace_file.read_text().strip().splitlines():
-        record = json.loads(line)
-        rtype = record.get("type")
-        if rtype == "header":
-            header = record
-        elif rtype == "step":
-            steps.append(record)
-        elif rtype == "summary":
-            summary = record
-    return {"header": header, "steps": steps, "summary": summary}
+def _get_arxiv_session(state: AppState, topic_name: str) -> WebConversationSession:
+    """Return the arxiv-flavoured session for a topic."""
+    project_id = _resolve_topic_or_404(state, topic_name)
+    project_dir = state.topic_mgr._storage._project_path(project_id)
+    return WebConversationSession(project_dir)
 
 
 def _create_arxiv_router(state: AppState) -> APIRouter:
     """Build the arxiv-specific API router.
 
-    Contains topic CRUD, paper management, search, traces, history/export,
-    model management, and context-budget routes.
+    Contains paper management and search routes.  Topic CRUD, traces,
+    history/export, model management, and context-budget routes are
+    provided by the shared router.
     """
     router = APIRouter()
-
-    # --- Topics ---
-
-    @router.get("/api/topics", response_model=list[TopicInfo])
-    def list_topics() -> list[TopicInfo]:
-        topics = state.topic_mgr.list_topics()
-        return [
-            TopicInfo(
-                name=t.name,
-                document_count=t.paper_count,
-                size=t.formatted_size,
-                project_id=t.project_id,
-            )
-            for t in topics
-        ]
-
-    @router.post("/api/topics", status_code=201)
-    def create_topic(body: TopicCreate) -> dict[str, str]:
-        existing = state.topic_mgr.resolve(body.name)
-        if existing:
-            raise HTTPException(409, f"Topic '{body.name}' already exists")
-        project_id = state.topic_mgr.create(body.name)
-        return {"name": body.name, "project_id": project_id}
-
-    @router.patch("/api/topics/{name}")
-    def rename_topic(name: str, body: TopicRename) -> dict[str, str]:
-        try:
-            state.topic_mgr.rename(name, body.new_name)
-        except ValueError as e:
-            raise HTTPException(404, str(e)) from e
-        return {"name": body.new_name}
-
-    @router.delete("/api/topics/{name}")
-    def delete_topic(name: str) -> dict[str, str]:
-        try:
-            state.topic_mgr.delete(name)
-        except ValueError as e:
-            raise HTTPException(404, str(e)) from e
-        return {"status": "deleted", "name": name}
 
     # --- Papers ---
 
@@ -279,170 +227,6 @@ def _create_arxiv_router(state: AppState) -> APIRouter:
 
         return results
 
-    # --- Traces ---
-
-    @router.get("/api/topics/{name}/traces", response_model=list[TraceListItem])
-    def list_traces(name: str) -> list[TraceListItem]:
-        project_id = _resolve_topic_or_404(state, name)
-        trace_files = state.topic_mgr._storage.list_traces(project_id)
-        items: list[TraceListItem] = []
-        for tf in trace_files:
-            parsed = _parse_trace_file(tf)
-            header = parsed["header"]
-            summary = parsed["summary"]
-            assert isinstance(header, dict)
-            assert isinstance(summary, dict)
-            total_tokens_raw = summary.get("total_tokens", {})
-            assert isinstance(total_tokens_raw, dict)
-            total_tokens = sum(total_tokens_raw.values())
-            # Use filename stem as trace_id — matches what ws.py stores
-            items.append(
-                TraceListItem(
-                    trace_id=tf.stem,
-                    question=str(header.get("question", "")),
-                    timestamp=str(header.get("timestamp", "")),
-                    status=str(summary.get("status", "unknown")),
-                    total_tokens=total_tokens,
-                    duration_ms=int(summary.get("total_duration_ms", 0)),
-                )
-            )
-        return items
-
-    @router.get("/api/topics/{name}/traces/{trace_id:path}", response_model=TraceFull)
-    def get_trace(name: str, trace_id: str) -> TraceFull:
-        project_id = _resolve_topic_or_404(state, name)
-        trace_files = state.topic_mgr._storage.list_traces(project_id)
-        for tf in trace_files:
-            # Match on filename stem (what ws.py stores) or header UUID
-            parsed = _parse_trace_file(tf)
-            header = parsed["header"]
-            assert isinstance(header, dict)
-            if tf.stem == trace_id or header.get("trace_id") == trace_id:
-                summary = parsed["summary"]
-                steps_raw = parsed["steps"]
-                assert isinstance(summary, dict)
-                assert isinstance(steps_raw, list)
-                total_tokens_raw = summary.get("total_tokens", {})
-                assert isinstance(total_tokens_raw, dict)
-                steps = [
-                    TraceStepSchema(
-                        step_type=str(s.get("step_type", "")),
-                        iteration=int(s.get("iteration", 0)),
-                        content=str(s.get("content", "")),
-                        timestamp=str(s.get("timestamp", "")),
-                        tokens_used=s.get("tokens_used"),
-                        duration_ms=s.get("duration_ms"),
-                    )
-                    for s in steps_raw
-                ]
-                doc_ids_raw = header.get("document_ids", [])
-                doc_ids = list(doc_ids_raw) if isinstance(doc_ids_raw, list) else []
-                return TraceFull(
-                    trace_id=trace_id,
-                    question=str(header.get("question", "")),
-                    model=str(header.get("model", "")),
-                    timestamp=str(header.get("timestamp", "")),
-                    steps=steps,
-                    total_tokens=total_tokens_raw,
-                    total_iterations=int(summary.get("total_iterations", 0)),
-                    duration_ms=int(summary.get("total_duration_ms", 0)),
-                    status=str(summary.get("status", "unknown")),
-                    document_ids=doc_ids,
-                )
-        raise HTTPException(404, f"Trace '{trace_id}' not found")
-
-    # --- History & Export ---
-
-    @router.get("/api/topics/{name}/history", response_model=ConversationHistory)
-    def get_history(name: str) -> ConversationHistory:
-        project_id = _resolve_topic_or_404(state, name)
-        project_dir = state.topic_mgr._storage._project_path(project_id)
-        session = WebConversationSession(project_dir)
-        return ConversationHistory(exchanges=session.list_exchanges())  # type: ignore[arg-type]
-
-    @router.delete("/api/topics/{name}/history")
-    def clear_history(name: str) -> dict[str, str]:
-        project_id = _resolve_topic_or_404(state, name)
-        project_dir = state.topic_mgr._storage._project_path(project_id)
-        session = WebConversationSession(project_dir)
-        session.clear()
-        return {"status": "cleared"}
-
-    @router.get("/api/topics/{name}/export", response_class=PlainTextResponse)
-    def export_transcript(name: str) -> PlainTextResponse:
-        project_id = _resolve_topic_or_404(state, name)
-        project_dir = state.topic_mgr._storage._project_path(project_id)
-        session = WebConversationSession(project_dir)
-        content = session.format_transcript()
-        return PlainTextResponse(content=content, media_type="text/markdown")
-
-    # --- Model ---
-
-    @router.get("/api/model", response_model=ModelInfo)
-    def get_model() -> ModelInfo:
-        max_input: int | None = None
-        try:
-            info = litellm.get_model_info(state.model)
-            max_input = info.get("max_input_tokens")
-        except Exception:
-            pass  # Model may not be in litellm's registry
-        return ModelInfo(model=state.model, max_input_tokens=max_input)
-
-    @router.put("/api/model", response_model=ModelInfo)
-    def update_model(body: ModelUpdate) -> ModelInfo:
-        state.model = body.model
-        max_input: int | None = None
-        try:
-            info = litellm.get_model_info(body.model)
-            max_input = info.get("max_input_tokens")
-        except Exception:
-            pass  # Model may not be in litellm's registry
-        return ModelInfo(model=body.model, max_input_tokens=max_input)
-
-    # --- Context Budget ---
-
-    @router.get("/api/topics/{name}/context-budget", response_model=ContextBudget)
-    def get_context_budget(name: str) -> ContextBudget:
-        project_id = _resolve_topic_or_404(state, name)
-        project_dir = state.topic_mgr._storage._project_path(project_id)
-
-        # Documents go to the Docker sandbox, not the LLM context.
-        # The LLM context contains: system prompt (~2k tokens) +
-        # conversation history prefix + iterative code/output messages.
-        # We estimate: base overhead + history chars.
-        base_prompt_tokens = 2000  # system prompt + context metadata
-
-        session = WebConversationSession(project_dir)
-        history_chars = session.context_chars()
-
-        # ~4 chars per token heuristic
-        used_tokens = base_prompt_tokens + (history_chars // 4)
-
-        # Get max tokens from litellm
-        max_tokens = 128000  # reasonable default
-        try:
-            info = litellm.get_model_info(state.model)
-            max_input = info.get("max_input_tokens")
-            if max_input is not None:
-                max_tokens = max_input
-        except Exception:
-            pass  # Fall back to default
-
-        percentage = (used_tokens / max_tokens) * 100
-        if percentage < 50:
-            level = "green"
-        elif percentage < 80:
-            level = "amber"
-        else:
-            level = "red"
-
-        return ContextBudget(
-            used_tokens=used_tokens,
-            max_tokens=max_tokens,
-            percentage=round(percentage, 1),
-            level=level,
-        )
-
     return router
 
 
@@ -466,9 +250,20 @@ def create_api(state: AppState) -> FastAPI:
     container pool), CORS middleware, ``.well-known`` catch-all, optional
     WebSocket endpoint, and static file mounting.
 
-    Arxiv-specific routes are registered via a local ``APIRouter`` passed
-    as an extra router to the factory.
+    Arxiv-specific routes (papers, search) are registered via a local
+    ``APIRouter``.  Generic routes (topic CRUD, traces, history/export,
+    model, context-budget) come from the shared router via callbacks.
     """
+    arxiv_router = _create_arxiv_router(state)
+    shared_router = create_shared_router(
+        state,
+        get_session=lambda s, name: _get_arxiv_session(state, name),
+        build_topic_info=lambda s: _build_arxiv_topic_info(state),
+        include_topic_crud=True,
+        include_per_topic_history=True,
+        include_context_budget=True,
+    )
+
     # Wrap shesha.stop() to also close the arxiv searcher on shutdown.
     original_stop = state.shesha.stop
 
@@ -487,5 +282,5 @@ def create_api(state: AppState) -> FastAPI:
         static_dir=frontend_dist,
         images_dir=images_dir,
         ws_handler=_make_ws_handler(state),
-        extra_routers=[_create_arxiv_router(state)],
+        extra_routers=[arxiv_router, shared_router],
     )

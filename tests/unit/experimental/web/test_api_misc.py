@@ -145,8 +145,8 @@ def test_context_budget(client: TestClient, mock_state: MagicMock, tmp_path: Pat
     # Empty session
     WebConversationSession(tmp_path)
 
-    # Mock max_input_tokens via litellm
-    with patch("shesha.experimental.web.api.litellm") as mock_litellm:
+    # Mock max_input_tokens via litellm (route now lives in shared router)
+    with patch("shesha.experimental.shared.routes.litellm") as mock_litellm:
         mock_litellm.get_model_info.return_value = {"max_input_tokens": 100000}
         resp = client.get("/api/topics/test-topic/context-budget")
 

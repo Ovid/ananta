@@ -71,6 +71,15 @@ describe('Header (shared)', () => {
     expect(buttons).toHaveLength(1)
   })
 
+  it('aligns title text elements by baseline', () => {
+    render(
+      <Header appName="My App" isDark={false} onToggleTheme={() => {}} />
+    )
+    const shesha = screen.getByRole('link', { name: 'Shesha' })
+    const titleGroup = shesha.parentElement!
+    expect(titleGroup.className).toMatch(/items-baseline/)
+  })
+
   it('does not have title attributes on buttons (to avoid double tooltips)', () => {
     render(
       <Header appName="My App" isDark={false} onToggleTheme={() => {}}>

@@ -19,16 +19,16 @@ export default function Header({
   return (
     <header className="h-13 border-b border-border bg-surface-1 flex items-center px-4 shrink-0">
       {/* Logo + Title */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-baseline gap-2">
         {logoError ? (
-          <div className="w-8 h-8 rounded bg-accent flex items-center justify-center text-surface-0 font-bold text-sm">
+          <div className="w-8 h-8 rounded bg-accent flex items-center justify-center text-surface-0 font-bold text-sm self-center">
             S
           </div>
         ) : (
           <img
             src="/static/shesha.png"
             alt="Shesha"
-            className="w-8 h-8"
+            className="w-8 h-8 self-center"
             onError={() => setLogoError(true)}
           />
         )}

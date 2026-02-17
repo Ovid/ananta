@@ -2,9 +2,9 @@ import type { ReactNode } from 'react'
 import { useCallback } from 'react'
 
 import { ChatArea as SharedChatArea } from '@shesha/shared-ui'
-import type { Exchange as SharedExchange, WSMessage as SharedWSMessage } from '@shesha/shared-ui'
+import type { Exchange, WSMessage as SharedWSMessage } from '@shesha/shared-ui'
 import { api } from '../api/client'
-import type { Exchange, PaperInfo, WSMessage } from '../types'
+import type { PaperInfo, WSMessage } from '../types'
 
 const CITATION_RE = /\[@arxiv:([^\]]+)\]/g
 const ARXIV_ID_RE = /(?:[\w.-]+\/\d{7}|\d{4}\.\d{4,5})(?:v\d+)?/g
@@ -77,39 +77,18 @@ interface ChatAreaProps {
 }
 
 export default function ChatArea({ topicName, connected, wsSend, wsOnMessage, onViewTrace, onClearHistory, historyVersion, selectedPapers, topicPapers, onPaperClick }: ChatAreaProps) {
-  // Translate arxiv-specific paper_ids to shared document_ids in history
-  const loadHistory = useCallback(async (topic: string): Promise<SharedExchange[]> => {
+  const loadHistory = useCallback(async (topic: string): Promise<Exchange[]> => {
     const data = await api.history.get(topic)
-    return data.exchanges.map((ex: Exchange) => ({
-      exchange_id: ex.exchange_id,
-      question: ex.question,
-      answer: ex.answer,
-      trace_id: ex.trace_id,
-      timestamp: ex.timestamp,
-      tokens: ex.tokens,
-      execution_time: ex.execution_time,
-      model: ex.model,
-      document_ids: ex.paper_ids,
-    }))
+    return data.exchanges
   }, [])
 
   // Adapt wsOnMessage to filter through shared WSMessage types.
-  // The arxiv WebSocket sends paper_ids on complete, but the shared component
-  // only cares about the base message types (status, step, complete, error, cancelled).
+  // Citation-specific messages (citation_progress, citation_report) are not forwarded.
   const sharedWsOnMessage = useCallback(
     (fn: (msg: SharedWSMessage) => void) => {
       return wsOnMessage((msg: WSMessage) => {
-        if (msg.type === 'status' || msg.type === 'step' || msg.type === 'error' || msg.type === 'cancelled') {
+        if (msg.type === 'status' || msg.type === 'step' || msg.type === 'complete' || msg.type === 'error' || msg.type === 'cancelled') {
           fn(msg)
-        } else if (msg.type === 'complete') {
-          fn({
-            type: 'complete',
-            answer: msg.answer,
-            trace_id: msg.trace_id,
-            tokens: msg.tokens,
-            duration_ms: msg.duration_ms,
-            document_ids: msg.paper_ids,
-          })
         }
         // citation_progress and citation_report are arxiv-specific; not forwarded
       })
@@ -127,7 +106,7 @@ export default function ChatArea({ topicName, connected, wsSend, wsOnMessage, on
 
   // Build consulted papers footer per exchange
   const renderAnswerFooter = useCallback(
-    (exchange: SharedExchange): ReactNode => {
+    (exchange: Exchange): ReactNode => {
       const consultedPapers = (exchange.document_ids ?? [])
         .map(id => topicPapers?.find(p => p.arxiv_id === id))
         .filter((p): p is PaperInfo => p != null)

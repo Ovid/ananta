@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react'
 
 import { ChatMessage as SharedChatMessage } from '@shesha/shared-ui'
-import type { Exchange as SharedExchange } from '@shesha/shared-ui'
 import type { Exchange, PaperInfo } from '../types'
 
 const CITATION_RE = /\[@arxiv:([^\]]+)\]/g
@@ -74,8 +73,8 @@ export default function ChatMessage({ exchange, onViewTrace, topicPapers, onPape
     <>{renderAnswerWithCitations(answer, topicPapers, onPaperClick)}</>
   )
 
-  // Resolve paper_ids to PaperInfo objects for the consulted papers footer
-  const consultedPapers = (exchange.paper_ids ?? [])
+  // Resolve document_ids to PaperInfo objects for the consulted papers footer
+  const consultedPapers = (exchange.document_ids ?? [])
     .map(id => topicPapers?.find(p => p.arxiv_id === id))
     .filter((p): p is PaperInfo => p != null)
 
@@ -97,22 +96,9 @@ export default function ChatMessage({ exchange, onViewTrace, topicPapers, onPape
     </div>
   ) : undefined
 
-  // Translate arxiv Exchange (paper_ids) to shared Exchange (document_ids)
-  const sharedExchange: SharedExchange = {
-    exchange_id: exchange.exchange_id,
-    question: exchange.question,
-    answer: exchange.answer,
-    trace_id: exchange.trace_id,
-    timestamp: exchange.timestamp,
-    tokens: exchange.tokens,
-    execution_time: exchange.execution_time,
-    model: exchange.model,
-    document_ids: exchange.paper_ids,
-  }
-
   return (
     <SharedChatMessage
-      exchange={sharedExchange}
+      exchange={exchange}
       onViewTrace={onViewTrace}
       renderAnswer={renderAnswer}
       answerFooter={answerFooter}

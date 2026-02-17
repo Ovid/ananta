@@ -1,9 +1,7 @@
 """WebSocket handlers for query execution and citation checking.
 
 Delegates generic query/cancel dispatch to the shared WebSocket handler and
-registers arxiv-specific citation checking as an extra handler.  A thin
-adapter translates the arxiv frontend's ``paper_ids`` field to the shared
-handler's ``document_ids`` and back.
+registers arxiv-specific citation checking as an extra handler.
 """
 
 from __future__ import annotations
@@ -44,48 +42,6 @@ from shesha.experimental.web.session import WebConversationSession
 from shesha.models import ParsedDocument
 
 logger = logging.getLogger(__name__)
-
-
-# ---------------------------------------------------------------------------
-# paper_ids <-> document_ids adapter
-# ---------------------------------------------------------------------------
-
-
-class _PaperIdAdapter:
-    """Wraps a WebSocket to translate ``paper_ids`` <-> ``document_ids``.
-
-    The arxiv frontend uses ``paper_ids`` in its messages, but the shared
-    handler expects ``document_ids``.  This adapter intercepts
-    :meth:`receive_json` to rename incoming ``paper_ids`` to
-    ``document_ids``, and :meth:`send_json` to rename outgoing
-    ``document_ids`` back to ``paper_ids``.
-
-    All other WebSocket methods are forwarded unchanged.
-    """
-
-    def __init__(self, ws: WebSocket) -> None:
-        self._ws = ws
-
-    async def receive_json(self, **kwargs: Any) -> Any:
-        data = await self._ws.receive_json(**kwargs)
-        # Only translate for ``query`` messages; other message types
-        # (e.g. ``check_citations``) use ``paper_ids`` natively.
-        if isinstance(data, dict) and data.get("type") == "query" and "paper_ids" in data:
-            data["document_ids"] = data.pop("paper_ids")
-        return data
-
-    async def send_json(self, data: Any, **kwargs: Any) -> None:
-        # Translate ``document_ids`` back to ``paper_ids`` for the arxiv
-        # frontend (e.g. in ``complete`` messages).
-        if isinstance(data, dict) and "document_ids" in data:
-            data = {k: v for k, v in data.items() if k != "document_ids"} | {
-                "paper_ids": data["document_ids"]
-            }
-        await self._ws.send_json(data, **kwargs)
-
-    # Forward everything else to the underlying WebSocket.
-    def __getattr__(self, name: str) -> Any:
-        return getattr(self._ws, name)
 
 
 # ---------------------------------------------------------------------------
@@ -240,7 +196,7 @@ def _check_single_paper(
             full_text = doc.content
             citations.extend(extract_citations_from_text(full_text))
         except Exception:
-            full_text = ""
+            full_text = ""  # Document may have been removed; proceed with empty text
 
     llm_phrases = detect_llm_phrases(full_text)
     total_citations = len(citations)
@@ -282,15 +238,9 @@ def _check_single_paper(
 
 
 async def websocket_handler(ws: WebSocket, state: AppState) -> None:
-    """Handle WebSocket connections for queries and citation checks.
-
-    Wraps the shared handler with an adapter that translates the arxiv
-    frontend's ``paper_ids`` field to ``document_ids`` and back, and
-    registers citation checking as an extra handler.
-    """
-    adapted_ws = _PaperIdAdapter(ws)
+    """Handle WebSocket connections for queries and citation checks."""
     await shared_ws_handler(
-        adapted_ws,  # type: ignore[arg-type]
+        ws,
         state,
         extra_handlers={"check_citations": _handle_check_citations},
         build_context=_build_arxiv_context,

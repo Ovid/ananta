@@ -47,7 +47,8 @@ node_modules/
 shesha_data/
 
 # OOLONG benchmark run artifacts
-oolong/last-run.log
-oolong/oolong_results.csv
-oolong/oolong_scaling.png
+/logs/
+oolong/*.log
+oolong/*.csv
+oolong/*.png
 oolong/trec_coarse.parquet

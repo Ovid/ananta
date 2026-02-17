@@ -2050,12 +2050,12 @@ class TestFindFinalAnswerInText:
     """Tests for find_final_answer detecting bare FINAL/FINAL_VAR in response text."""
 
     def test_find_final_answer_bare_final(self):
-        """Detects bare FINAL("answer") outside code blocks."""
+        """Detects bare FINAL("answer") outside code blocks, strips quotes."""
         from shesha.rlm.engine import find_final_answer
 
         text = 'FINAL("human being")'
         result = find_final_answer(text)
-        assert result == ("final", '"human being"')
+        assert result == ("final", "human being")
 
     def test_find_final_answer_bare_final_var(self):
         """Detects bare FINAL_VAR(var_name) outside code blocks."""
@@ -2082,12 +2082,12 @@ class TestFindFinalAnswerInText:
         assert result is None
 
     def test_find_final_answer_with_leading_whitespace(self):
-        """FINAL at start of line with whitespace is detected."""
+        """FINAL at start of line with whitespace is detected, strips quotes."""
         from shesha.rlm.engine import find_final_answer
 
         text = '  FINAL("the answer")'
         result = find_final_answer(text)
-        assert result == ("final", '"the answer"')
+        assert result == ("final", "the answer")
 
     def test_find_final_answer_strips_quotes_from_var(self):
         """FINAL_VAR with quoted variable name strips quotes."""
@@ -2134,11 +2134,11 @@ class TestFindFinalAnswerInText:
         assert result == ("final", "42")
 
     def test_find_final_answer_single_quoted_content(self):
-        """FINAL('single quoted') is detected (reference RLM compat)."""
+        """FINAL('single quoted') strips quotes (reference RLM compat)."""
         from shesha.rlm.engine import find_final_answer
 
         result = find_final_answer("FINAL('hello world')")
-        assert result == ("final", "'hello world'")
+        assert result == ("final", "hello world")
 
     def test_find_final_answer_nested_parentheses(self):
         """FINAL with nested parens uses greedy match (reference RLM compat)."""
@@ -2198,12 +2198,26 @@ class TestFindFinalAnswerInText:
         result = find_final_answer("FINAL(result)")
         assert result == ("final_var", "result")
 
-    def test_find_final_answer_quoted_string_stays_literal(self):
-        """FINAL("some text") with quotes stays as a literal string."""
+    def test_find_final_answer_strips_surrounding_double_quotes(self):
+        """FINAL("text") strips surrounding double quotes."""
         from shesha.rlm.engine import find_final_answer
 
-        result = find_final_answer('FINAL("final_answer")')
-        assert result == ("final", '"final_answer"')
+        result = find_final_answer('FINAL("The answer is 42")')
+        assert result == ("final", "The answer is 42")
+
+    def test_find_final_answer_strips_surrounding_single_quotes(self):
+        """FINAL('text') strips surrounding single quotes."""
+        from shesha.rlm.engine import find_final_answer
+
+        result = find_final_answer("FINAL('The answer is 42')")
+        assert result == ("final", "The answer is 42")
+
+    def test_find_final_answer_unescapes_newlines_in_quoted_string(self):
+        r"""FINAL("line1\nline2") unescapes \n to real newlines."""
+        from shesha.rlm.engine import find_final_answer
+
+        result = find_final_answer(r'FINAL("line1\nline2")')
+        assert result == ("final", "line1\nline2")
 
     def test_find_final_answer_number_stays_literal(self):
         """FINAL(42) with a number stays as a literal (not a valid identifier)."""
@@ -2350,7 +2364,7 @@ class TestFindFinalAnswerInText:
             question="What is the answer?",
         )
 
-        assert result.answer == '"The real answer"'
+        assert result.answer == "The real answer"
         assert mock_llm.complete.call_count == 2
 
     @patch("shesha.rlm.engine.ContainerExecutor")
@@ -2431,7 +2445,7 @@ class TestFindFinalAnswerInText:
             question="What is the report?",
         )
 
-        assert result.answer == '"Actual report content"'
+        assert result.answer == "Actual report content"
         assert mock_llm.complete.call_count == 2
 
     @patch("shesha.rlm.engine.ContainerExecutor")
@@ -2573,7 +2587,7 @@ class TestFindFinalAnswerInText:
             question="What?",
         )
 
-        assert result.answer == '"the answer is 42"'
+        assert result.answer == "the answer is 42"
         # Only 1 LLM call needed
         assert mock_llm.complete.call_count == 1
 

@@ -1,37 +1,34 @@
 import { render, screen, act } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
 
-vi.mock('../../api/client', () => ({
-  api: {
-    traces: {
-      get: vi.fn().mockResolvedValue({
-        trace_id: 't-1',
-        question: 'A '.repeat(500),
-        model: 'test-model',
-        status: 'success',
-        total_iterations: 3,
-        duration_ms: 5000,
-        total_tokens: { prompt: 100, completion: 50 },
-        document_ids: [],
-        steps: [
-          { step_type: 'code_generated', iteration: 1, content: 'print("hi")', tokens_used: 10 },
-        ],
-      }),
-    },
-  },
-}))
+vi.mock('@shesha/shared-ui', async () => {
+  const actual = await vi.importActual<typeof import('@shesha/shared-ui')>('@shesha/shared-ui')
+  return { ...actual, showToast: vi.fn() }
+})
 
-vi.mock('../Toast', () => ({
-  showToast: vi.fn(),
-  default: () => null,
-}))
+import { TraceViewer } from '@shesha/shared-ui'
 
-import TraceViewer from '../TraceViewer'
+const mockTrace = {
+  trace_id: 't-1',
+  question: 'A '.repeat(500),
+  model: 'test-model',
+  status: 'success',
+  timestamp: '2025-01-01T00:00:00Z',
+  total_iterations: 3,
+  duration_ms: 5000,
+  total_tokens: { prompt: 100, completion: 50 },
+  document_ids: [],
+  steps: [
+    { step_type: 'code_generated', iteration: 1, content: 'print("hi")', tokens_used: 10, timestamp: '2025-01-01T00:00:01Z' },
+  ],
+}
 
 describe('TraceViewer scrollability', () => {
   it('wraps trace content in a scrollable container', async () => {
+    const fetchTrace = vi.fn().mockResolvedValue(mockTrace)
+
     await act(async () => {
-      render(<TraceViewer topicName="test" traceId="t-1" onClose={vi.fn()} />)
+      render(<TraceViewer topicName="test" traceId="t-1" onClose={vi.fn()} fetchTrace={fetchTrace} />)
     })
 
     // Wait for trace to load

@@ -1,5 +1,6 @@
 """RLM engine - the core REPL+LLM loop."""
 
+import ast
 import copy
 import json
 import keyword
@@ -69,6 +70,26 @@ def _is_python_identifier(s: str) -> bool:
     return s.isidentifier() and not keyword.iskeyword(s)
 
 
+def _strip_string_quotes(content: str) -> str:
+    """Strip surrounding quotes from a FINAL() argument if it looks like a Python string.
+
+    When the model writes bare-text ``FINAL("some answer\\nwith newlines")``,
+    the regex captures the quotes and literal ``\\n`` as-is.  This helper
+    detects that pattern and evaluates the content as a Python string literal
+    to recover the actual text with proper newlines and no wrapping quotes.
+    """
+    if (content.startswith('"') and content.endswith('"')) or (
+        content.startswith("'") and content.endswith("'")
+    ):
+        try:
+            evaluated = ast.literal_eval(content)
+            if isinstance(evaluated, str):
+                return evaluated
+        except (ValueError, SyntaxError):
+            pass  # Malformed string — return as-is
+    return content
+
+
 def find_final_answer(text: str) -> tuple[str, str] | None:
     """Find bare FINAL(...) or FINAL_VAR(...) in response text outside code blocks.
 
@@ -128,12 +149,12 @@ def find_final_answer(text: str) -> tuple[str, str] | None:
         #
         # Examples:
         #   FINAL(final_answer) → ("final_var", "final_answer")  # variable ref
-        #   FINAL("the answer")  → ("final", '"the answer"')     # literal
+        #   FINAL("the answer")  → ("final", "the answer")       # quotes stripped
         #   FINAL(42)            → ("final", "42")                # literal
         #   FINAL(x + y)         → ("final", "x + y")            # literal
         if _is_python_identifier(content):
             return ("final_var", content)
-        return ("final", content)
+        return ("final", _strip_string_quotes(content))
 
     return None
 

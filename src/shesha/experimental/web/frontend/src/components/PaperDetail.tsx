@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
 import type { PaperInfo } from '../types'
-import ConfirmDialog from './ConfirmDialog'
+import { ConfirmDialog } from '@shesha/shared-ui'
 
 function escapeHtml(text: string): string {
   return text

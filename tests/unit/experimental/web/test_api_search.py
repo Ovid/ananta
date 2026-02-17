@@ -188,3 +188,18 @@ def test_search_local_reports_all_topics(client: TestClient, mock_state: MagicMo
     data = resp.json()
     assert len(data) == 1
     assert sorted(data[0]["in_topics"]) == ["AI", "Chess", "Games"]
+
+
+def test_search_arxiv_returns_502_on_upstream_error(
+    client: TestClient, mock_state: MagicMock
+) -> None:
+    """arxiv API errors should return 502, not crash with 500."""
+    import arxiv
+
+    mock_state.searcher.search.side_effect = arxiv.HTTPError(
+        "https://export.arxiv.org/api/query?...", 3, 500
+    )
+
+    resp = client.get("/api/search?q=test")
+    assert resp.status_code == 502
+    assert "arXiv API" in resp.json()["detail"]

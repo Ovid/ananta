@@ -9,15 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Code Explorer web application for exploring git repositories via RLM
+- Shared web infrastructure module (`shesha.experimental.shared`) for building experimental tools
+- Developer guide for extending the web tool ecosystem (`docs/extending-web-tools.md`)
+- **Code Explorer CLI entry point** — `shesha-code` command launches the code explorer web server with `--port`, `--data-dir`, `--model`, and `--no-browser` options
+- **Code Explorer module skeleton** — new `shesha.experimental.code_explorer` module with `CodeExplorerTopicManager` for lightweight repo grouping, `CodeExplorerState` dataclass and `create_app_state()` factory, and `__main__.py` CLI entry point stub
+- **Code Explorer WebSocket handler** — cross-project query handler that loads documents from multiple repos, merges per-project analysis as context, and records consulted project_ids in the global session
 - **Multi-source citation verification** — citations are now verified against CrossRef, OpenAlex, and Semantic Scholar in addition to arXiv, dramatically reducing false "unresolved" results for non-arXiv sources
 - **Fuzzy title matching** — Jaccard similarity with LLM fallback for ambiguous cases (0.50-0.85 range) reduces false positives from title changes between paper versions
 - **Topical relevance checking** — LLM-based batch check flags citations that exist but are clearly unrelated to the citing paper
 - **Source badges** — citation report shows where each citation was verified (arXiv, CrossRef, OpenAlex, S2)
 - **Email modal for polite-pool access** — optional email stored in browser localStorage gives faster API access to CrossRef and OpenAlex
 - **Inline paper citations** — LLM responses in arXiv Explorer now cite papers by arxiv ID with clickable links that open the paper detail view
+- **Shared ChatArea and ChatMessage components** — extracted parameterized versions to shared-ui package with `selectedDocuments`/`document_ids` naming, optional `renderAnswer` and `renderAnswerFooter` props for domain-specific customization
+- **Shared TopicSidebar component** — extracted parameterized TopicSidebar to shared-ui package with `loadDocuments`/`DocumentItem` abstraction, cross-topic selection scoping (All/None buttons only affect current topic), optional uncategorized docs section, and configurable add button
 
 ### Changed
 
+- arXiv Explorer refactored to use shared web infrastructure module
 - "unresolved" citations now labeled "not found in databases" to clarify external sources were tried
 - LLM-tell phrases displayed in purple (was amber) for better visual distinction
 - Papers default to selected when clicking a topic name

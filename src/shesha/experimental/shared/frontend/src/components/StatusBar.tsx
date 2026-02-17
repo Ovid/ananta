@@ -7,6 +7,13 @@ interface StatusBarProps {
   budget: ContextBudget | null
   phase: string
   onModelClick: () => void
+  documentBytes?: number
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 const budgetColors: Record<string, string> = {
@@ -30,6 +37,7 @@ export default function StatusBar({
   budget,
   phase,
   onModelClick,
+  documentBytes,
 }: StatusBarProps) {
   const budgetColor = budget ? budgetColors[budget.level] || 'text-text-dim' : 'text-text-dim'
   const dotColor = phaseColors[phase] || 'bg-text-dim'
@@ -37,7 +45,7 @@ export default function StatusBar({
   return (
     <footer className="h-7 border-t border-border bg-surface-1 flex items-center px-4 text-[11px] text-text-dim font-mono shrink-0">
       <span className="mr-4">
-        Project: <span className="text-text-secondary">{topicName || '—'}</span>
+        Project: <span className="text-text-secondary">{topicName || '\u2014'}</span>
       </span>
       <span className="mr-4">
         Model:{' '}
@@ -55,6 +63,11 @@ export default function StatusBar({
       {budget && (
         <span className={`mr-4 ${budgetColor}`}>
           Context: {budget.percentage.toFixed(0)}%
+        </span>
+      )}
+      {documentBytes != null && documentBytes > 0 && (
+        <span className="mr-4">
+          Docs: <span className="text-text-secondary">{formatBytes(documentBytes)}</span>
         </span>
       )}
       <div className="flex-1" />

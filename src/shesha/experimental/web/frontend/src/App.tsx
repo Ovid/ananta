@@ -1,30 +1,27 @@
 import { useState, useCallback, useEffect, useRef, type MouseEvent } from 'react'
 import Header from './components/Header'
-import StatusBar from './components/StatusBar'
-import ToastContainer, { showToast } from './components/Toast'
 import TopicSidebar from './components/TopicSidebar'
 import ChatArea from './components/ChatArea'
 import SearchPanel from './components/SearchPanel'
-import TraceViewer from './components/TraceViewer'
 import HelpPanel from './components/HelpPanel'
 import DownloadProgress from './components/DownloadProgress'
 import CitationReport from './components/CitationReport'
 import EmailModal, { getStoredEmail, hasEmailDecision } from './components/EmailModal'
 import PaperDetail from './components/PaperDetail'
-import { useTheme } from './hooks/useTheme'
-import { useWebSocket } from './hooks/useWebSocket'
+import { AppShell, useTheme, useWebSocket, StatusBar, ToastContainer, showToast, TraceViewer } from '@shesha/shared-ui'
 import { api } from './api/client'
-import type { ContextBudget, PaperInfo, PaperReport } from './types'
+import type { ContextBudget, PaperInfo, PaperReport, WSMessage } from './types'
 
 export default function App() {
   const { dark, toggle: toggleTheme } = useTheme()
-  const { connected, send, onMessage } = useWebSocket()
+  const { connected, send, onMessage } = useWebSocket<WSMessage>()
 
   const [activeTopic, setActiveTopic] = useState<string | null>(null)
   const [modelName, setModelName] = useState('—')
   const [tokens, setTokens] = useState({ prompt: 0, completion: 0, total: 0 })
   const [budget, setBudget] = useState<ContextBudget | null>(null)
   const [phase, setPhase] = useState('Ready')
+  const [documentBytes, setDocumentBytes] = useState(0)
   const [selectedPapers, setSelectedPapers] = useState<Set<string>>(new Set())
   const [viewingPaper, setViewingPaper] = useState<PaperInfo | null>(null)
   const [topicPapersList, setTopicPapersList] = useState<PaperInfo[]>([])
@@ -53,6 +50,7 @@ export default function App() {
       } else if (msg.type === 'complete') {
         setPhase('Ready')
         setTokens(msg.tokens)
+        if (msg.document_bytes != null) setDocumentBytes(msg.document_bytes)
         // Refresh context budget after query completes
         if (activeTopic) {
           api.contextBudget(activeTopic).then(setBudget).catch(() => {})
@@ -275,7 +273,7 @@ export default function App() {
   }, [sidebarWidth])
 
   return (
-    <div className="h-screen flex flex-col bg-surface-0 text-text-primary font-sans">
+    <AppShell>
       <Header
         onSearchToggle={() => setSearchOpen(s => !s)}
         onCheckCitations={handleCheckCitations}
@@ -352,6 +350,7 @@ export default function App() {
         budget={budget}
         phase={phase}
         onModelClick={() => {}}
+        documentBytes={documentBytes}
       />
 
       {/* Overlays */}
@@ -360,6 +359,7 @@ export default function App() {
           topicName={traceView.topic}
           traceId={traceView.traceId}
           onClose={() => setTraceView(null)}
+          fetchTrace={api.traces.get}
         />
       )}
 
@@ -387,6 +387,6 @@ export default function App() {
       />
 
       <ToastContainer />
-    </div>
+    </AppShell>
   )
 }

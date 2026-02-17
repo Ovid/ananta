@@ -7,6 +7,8 @@ from datetime import UTC, datetime
 from threading import RLock
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 
 def _mock_arxiv_result(
     arxiv_id: str = "2501.12345",
@@ -211,6 +213,36 @@ class TestArxivSearcher:
         searcher.search("quantum")
         search_call = mock_arxiv.Search.call_args
         assert search_call.kwargs.get("sort_by") == mock_arxiv.SortCriterion.Relevance
+
+    @patch("shesha.experimental.arxiv.search.arxiv")
+    def test_search_wildcard_query_with_author_omits_all_prefix(
+        self, mock_arxiv: MagicMock
+    ) -> None:
+        """query='*' with author should produce 'au:X', not 'all:* AND au:X'."""
+        from shesha.experimental.arxiv.search import ArxivSearcher
+
+        mock_client = MagicMock()
+        mock_arxiv.Client.return_value = mock_client
+        mock_client.results.return_value = iter([])
+
+        searcher = ArxivSearcher()
+        searcher.search("*", author="Nicolas Gisin")
+        search_call = mock_arxiv.Search.call_args
+        query = search_call.kwargs.get("query", search_call.args[0] if search_call.args else "")
+        assert "all:*" not in query
+        assert "au:Nicolas Gisin" in query
+
+    @patch("shesha.experimental.arxiv.search.arxiv")
+    def test_search_wildcard_query_alone_raises(self, mock_arxiv: MagicMock) -> None:
+        """query='*' with no other filters should raise ValueError."""
+        from shesha.experimental.arxiv.search import ArxivSearcher
+
+        mock_client = MagicMock()
+        mock_arxiv.Client.return_value = mock_client
+
+        searcher = ArxivSearcher()
+        with pytest.raises(ValueError, match="search criteria"):
+            searcher.search("*")
 
     def test_extract_arxiv_id_from_entry_id(self) -> None:
         # Late import: module under test

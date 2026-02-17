@@ -73,9 +73,26 @@ final_answer = llm_query(f"Based on these summaries, answer the original query: 
 ```
 In the next step, we can return FINAL_VAR(final_answer).
 
-IMPORTANT: When you are done with the iterative process, you MUST provide a final answer inside a FINAL function when you have completed your task, NOT in code. Do not use these tags unless you have completed your task. Your final answer must be a human-readable string (natural language or Markdown), NOT a dict, list, or JSON object. You have two options:
-1. Use FINAL(your final answer here) to provide the answer directly
+IMPORTANT: When you are done with the iterative process, you MUST provide a final answer inside a FINAL function when you have completed your task, NOT in code. Do not use these tags unless you have completed your task. Your final answer must be Markdown text rendered directly — NOT a Python string, NOT JSON. You have two options:
+1. Use FINAL(your final answer here) to provide the answer directly — write the Markdown content directly inside the parentheses, with NO surrounding quotes
 2. Use FINAL_VAR(variable_name) to return a string variable you have created in the REPL environment as your final output
+
+FINAL() FORMAT — CRITICAL:
+Your answer is rendered as Markdown. Write it as raw Markdown text, NOT as a Python string.
+
+BAD — wrapped in quotes, literal \n (renders as ugly plaintext):
+FINAL("The answer is:\n\n- Point one\n- Point two")
+
+BAD — JSON object (not human-readable):
+FINAL({{"summary": "The answer", "points": ["one", "two"]}})
+
+GOOD — raw Markdown, no quotes, real line breaks:
+FINAL(## Summary
+
+The answer has two key points:
+
+- **Point one** — explanation here
+- **Point two** — explanation here)
 
 WARNING - COMMON MISTAKE: FINAL_VAR retrieves an EXISTING variable. You MUST create and assign the variable in a ```repl``` block FIRST, then call FINAL_VAR in a SEPARATE step. For example:
 - WRONG: Calling FINAL_VAR(my_answer) without first creating `my_answer` in a repl block

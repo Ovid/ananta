@@ -11,6 +11,10 @@ from fastapi import WebSocketDisconnect
 
 from shesha.experimental.web.websockets import websocket_handler
 
+# The web handler now delegates to the shared handler, so we patch the
+# shared module's _handle_query.
+_HANDLE_QUERY_PATCH = "shesha.experimental.shared.websockets._handle_query"
+
 
 class TestCancelDuringQuery:
     """Cancel messages must be processed while a query is in-flight."""
@@ -20,7 +24,9 @@ class TestCancelDuringQuery:
         """A cancel message sent while a query runs should be acknowledged promptly."""
         query_started = asyncio.Event()
 
-        async def blocking_query(ws: Any, state: Any, data: Any, cancel_event: Any) -> None:
+        async def blocking_query(
+            ws: Any, data: Any, state: Any, cancel_event: Any, **kwargs: Any
+        ) -> None:
             """Simulate a long-running query that yields to the event loop."""
             query_started.set()
             await asyncio.sleep(10)
@@ -47,7 +53,7 @@ class TestCancelDuringQuery:
         state = MagicMock()
 
         with patch(
-            "shesha.experimental.web.websockets._handle_query",
+            _HANDLE_QUERY_PATCH,
             side_effect=blocking_query,
         ):
             await asyncio.wait_for(websocket_handler(ws, state), timeout=3.0)
@@ -65,7 +71,9 @@ class TestCancelDuringQuery:
         query_started = asyncio.Event()
         captured_cancel_event: list[Any] = []
 
-        async def blocking_query(ws: Any, state: Any, data: Any, cancel_event: Any) -> None:
+        async def blocking_query(
+            ws: Any, data: Any, state: Any, cancel_event: Any, **kwargs: Any
+        ) -> None:
             captured_cancel_event.append(cancel_event)
             query_started.set()
             # Block until cancelled or timeout
@@ -94,7 +102,7 @@ class TestCancelDuringQuery:
         state = MagicMock()
 
         with patch(
-            "shesha.experimental.web.websockets._handle_query",
+            _HANDLE_QUERY_PATCH,
             side_effect=blocking_query,
         ):
             await asyncio.wait_for(websocket_handler(ws, state), timeout=5.0)
@@ -110,7 +118,9 @@ class TestCancelDuringQuery:
 
         second_query_started = asyncio.Event()
 
-        async def blocking_query(ws: Any, state: Any, data: Any, cancel_event: Any) -> None:
+        async def blocking_query(
+            ws: Any, data: Any, state: Any, cancel_event: Any, **kwargs: Any
+        ) -> None:
             captured_events.append(cancel_event)
             if len(captured_events) == 1:
                 first_query_started.set()
@@ -148,7 +158,7 @@ class TestCancelDuringQuery:
         state = MagicMock()
 
         with patch(
-            "shesha.experimental.web.websockets._handle_query",
+            _HANDLE_QUERY_PATCH,
             side_effect=blocking_query,
         ):
             await asyncio.wait_for(websocket_handler(ws, state), timeout=5.0)

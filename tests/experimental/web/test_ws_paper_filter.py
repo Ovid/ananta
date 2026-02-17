@@ -1,4 +1,10 @@
-"""Tests for paper_ids filtering in WebSocket query handler."""
+"""Tests for document_ids filtering in WebSocket query handler.
+
+These tests exercise the shared ``_handle_query`` directly with
+``document_ids`` (the generic field name).  The arxiv WebSocket adapter
+translates ``paper_ids`` -> ``document_ids`` at the boundary; that
+translation is covered by the unit-level WebSocket tests.
+"""
 
 from __future__ import annotations
 
@@ -9,8 +15,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from shesha.exceptions import DocumentNotFoundError
-from shesha.experimental.web.websockets import _handle_query
+from shesha.experimental.shared.websockets import _handle_query
 from shesha.models import ParsedDocument
+
+_SESSION_PATCH = "shesha.experimental.shared.websockets.WebConversationSession"
 
 
 def _make_doc(name: str) -> ParsedDocument:
@@ -71,27 +79,27 @@ def _make_ws() -> AsyncMock:
     return ws
 
 
-class TestPaperIdsFilterLoadsSelectedDocs:
-    """When paper_ids is provided, only those docs should be loaded."""
+class TestDocumentIdsFilterLoadsSelectedDocs:
+    """When document_ids is provided, only those docs should be loaded."""
 
     @pytest.mark.asyncio
-    async def test_paper_ids_calls_get_document_for_each(self) -> None:
-        """When paper_ids is provided, get_document is called for each paper_id."""
+    async def test_document_ids_calls_get_document_for_each(self) -> None:
+        """When document_ids is provided, get_document is called for each id."""
         state = _make_state(["paper-a", "paper-b", "paper-c"])
         ws = _make_ws()
 
         data: dict[str, object] = {
             "topic": "chess",
             "question": "What is chess?",
-            "paper_ids": ["paper-a", "paper-c"],
+            "document_ids": ["paper-a", "paper-c"],
         }
 
-        with patch("shesha.experimental.web.websockets.WebConversationSession") as mock_session_cls:
+        with patch(_SESSION_PATCH) as mock_session_cls:
             mock_session_cls.return_value.format_history_prefix.return_value = ""
-            await _handle_query(ws, state, data, threading.Event())
+            await _handle_query(ws, data, state, threading.Event())
 
         storage = state.topic_mgr._storage
-        # get_document should be called for each paper_id
+        # get_document should be called for each document_id
         storage.get_document.assert_any_call("proj-123", "paper-a")
         storage.get_document.assert_any_call("proj-123", "paper-c")
         assert storage.get_document.call_count == 2
@@ -100,7 +108,7 @@ class TestPaperIdsFilterLoadsSelectedDocs:
         storage.load_all_documents.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_paper_ids_passes_filtered_docs_to_engine(self) -> None:
+    async def test_document_ids_passes_filtered_docs_to_engine(self) -> None:
         """Filtered docs are passed to the RLM engine query."""
         state = _make_state(["paper-a", "paper-b", "paper-c"])
         ws = _make_ws()
@@ -108,12 +116,12 @@ class TestPaperIdsFilterLoadsSelectedDocs:
         data: dict[str, object] = {
             "topic": "chess",
             "question": "What is chess?",
-            "paper_ids": ["paper-b"],
+            "document_ids": ["paper-b"],
         }
 
-        with patch("shesha.experimental.web.websockets.WebConversationSession") as mock_session_cls:
+        with patch(_SESSION_PATCH) as mock_session_cls:
             mock_session_cls.return_value.format_history_prefix.return_value = ""
-            await _handle_query(ws, state, data, threading.Event())
+            await _handle_query(ws, data, state, threading.Event())
 
         project = state.shesha.get_project.return_value
         engine = project._rlm_engine
@@ -128,18 +136,18 @@ class TestPaperIdsFilterLoadsSelectedDocs:
         )
 
     @pytest.mark.asyncio
-    async def test_empty_paper_ids_sends_error(self) -> None:
-        """When paper_ids is an empty list, send an error — no implicit 'all'."""
+    async def test_empty_document_ids_sends_error(self) -> None:
+        """When document_ids is an empty list, send an error -- no implicit 'all'."""
         state = _make_state(["paper-a", "paper-b"])
         ws = _make_ws()
 
         data: dict[str, object] = {
             "topic": "chess",
             "question": "What is chess?",
-            "paper_ids": [],
+            "document_ids": [],
         }
 
-        await _handle_query(ws, state, data, threading.Event())
+        await _handle_query(ws, data, state, threading.Event())
 
         storage = state.topic_mgr._storage
         storage.load_all_documents.assert_not_called()
@@ -154,12 +162,12 @@ class TestPaperIdsFilterLoadsSelectedDocs:
         assert "select" in error_calls[0].args[0]["message"].lower()
 
 
-class TestNoPaperIdsSendsError:
-    """When paper_ids is absent, send error instead of querying all."""
+class TestNoDocumentIdsSendsError:
+    """When document_ids is absent, send error instead of querying all."""
 
     @pytest.mark.asyncio
-    async def test_no_paper_ids_sends_error(self) -> None:
-        """When paper_ids is absent, send an error — no implicit 'all'."""
+    async def test_no_document_ids_sends_error(self) -> None:
+        """When document_ids is absent, send an error -- no implicit 'all'."""
         state = _make_state(["paper-a", "paper-b"])
         ws = _make_ws()
 
@@ -168,7 +176,7 @@ class TestNoPaperIdsSendsError:
             "question": "What is chess?",
         }
 
-        await _handle_query(ws, state, data, threading.Event())
+        await _handle_query(ws, data, state, threading.Event())
 
         storage = state.topic_mgr._storage
         storage.load_all_documents.assert_not_called()
@@ -183,24 +191,24 @@ class TestNoPaperIdsSendsError:
         assert "select" in error_calls[0].args[0]["message"].lower()
 
 
-class TestCompleteMessageIncludesPaperIds:
-    """The complete WS message should include paper_ids."""
+class TestCompleteMessageIncludesDocumentIds:
+    """The complete WS message should include document_ids."""
 
     @pytest.mark.asyncio
-    async def test_complete_message_contains_paper_ids(self) -> None:
-        """Complete message includes paper_ids list from loaded docs."""
+    async def test_complete_message_contains_document_ids(self) -> None:
+        """Complete message includes document_ids list from loaded docs."""
         state = _make_state(["paper-a", "paper-b", "paper-c"])
         ws = _make_ws()
 
         data: dict[str, object] = {
             "topic": "chess",
             "question": "What is chess?",
-            "paper_ids": ["paper-a", "paper-c"],
+            "document_ids": ["paper-a", "paper-c"],
         }
 
-        with patch("shesha.experimental.web.websockets.WebConversationSession") as mock_session_cls:
+        with patch(_SESSION_PATCH) as mock_session_cls:
             mock_session_cls.return_value.format_history_prefix.return_value = ""
-            await _handle_query(ws, state, data, threading.Event())
+            await _handle_query(ws, data, state, threading.Event())
 
         complete_calls = [
             c
@@ -209,36 +217,36 @@ class TestCompleteMessageIncludesPaperIds:
         ]
         assert len(complete_calls) == 1
         complete_msg = complete_calls[0].args[0]
-        assert complete_msg["paper_ids"] == ["paper-a", "paper-c"]
+        assert complete_msg["document_ids"] == ["paper-a", "paper-c"]
 
     @pytest.mark.asyncio
-    async def test_session_add_exchange_receives_paper_ids(self) -> None:
-        """session.add_exchange is called with paper_ids."""
+    async def test_session_add_exchange_receives_document_ids(self) -> None:
+        """session.add_exchange is called with document_ids."""
         state = _make_state(["paper-a", "paper-b"])
         ws = _make_ws()
 
         data: dict[str, object] = {
             "topic": "chess",
             "question": "What is chess?",
-            "paper_ids": ["paper-a"],
+            "document_ids": ["paper-a"],
         }
 
-        with patch("shesha.experimental.web.websockets.WebConversationSession") as mock_session_cls:
+        with patch(_SESSION_PATCH) as mock_session_cls:
             mock_session = mock_session_cls.return_value
             mock_session.format_history_prefix.return_value = ""
-            await _handle_query(ws, state, data, threading.Event())
+            await _handle_query(ws, data, state, threading.Event())
 
         mock_session.add_exchange.assert_called_once()
         call_kwargs = mock_session.add_exchange.call_args.kwargs
-        assert call_kwargs["paper_ids"] == ["paper-a"]
+        assert call_kwargs["document_ids"] == ["paper-a"]
 
 
-class TestPaperIdsAllInvalid:
-    """When paper_ids are provided but none are valid, send error."""
+class TestDocumentIdsAllInvalid:
+    """When document_ids are provided but none are valid, send error."""
 
     @pytest.mark.asyncio
-    async def test_all_invalid_paper_ids_sends_error(self) -> None:
-        """When all paper_ids refer to nonexistent docs, send an error."""
+    async def test_all_invalid_document_ids_sends_error(self) -> None:
+        """When all document_ids refer to nonexistent docs, send an error."""
         state = _make_state(["paper-a", "paper-b"])
         ws = _make_ws()
 
@@ -249,21 +257,18 @@ class TestPaperIdsAllInvalid:
         data: dict[str, object] = {
             "topic": "chess",
             "question": "What is chess?",
-            "paper_ids": ["nonexistent"],
+            "document_ids": ["nonexistent"],
         }
 
-        with patch("shesha.experimental.web.websockets.WebConversationSession") as mock_session_cls:
+        with patch(_SESSION_PATCH) as mock_session_cls:
             mock_session_cls.return_value.format_history_prefix.return_value = ""
-            await _handle_query(ws, state, data, threading.Event())
+            await _handle_query(ws, data, state, threading.Event())
 
-        # Should have sent an error about no valid papers
+        # Should have sent an error about no valid documents
         error_calls = [
             c
             for c in ws.send_json.call_args_list
             if isinstance(c.args[0], dict) and c.args[0].get("type") == "error"
         ]
         assert len(error_calls) == 1
-        assert (
-            "no valid" in error_calls[0].args[0]["message"].lower()
-            or "no papers" in error_calls[0].args[0]["message"].lower()
-        )
+        assert "no valid" in error_calls[0].args[0]["message"].lower()

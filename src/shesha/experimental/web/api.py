@@ -1,21 +1,34 @@
-"""FastAPI application for Shesha web interface."""
+"""FastAPI application for Shesha arXiv web interface.
+
+Uses the shared app factory for boilerplate (lifespan, CORS, ``.well-known``
+catch-all, WebSocket endpoint, static file mounting) and registers
+arxiv-specific routes (topics with ``paper_count``, papers, search) plus
+generic routes (traces, history, model, context-budget) on a local router.
+
+The shared ``create_shared_router()`` is *not* used directly because the arxiv
+explorer has several incompatibilities: the topic listing returns
+``paper_count`` (not ``document_count``), history is stored in
+``_conversation.json`` (not ``conversation.json``), and the topic manager
+does not expose ``resolve_all()``.  These routes are therefore kept here with
+identical logic to the shared versions but arxiv-flavoured field names and
+session handling.
+"""
 
 from __future__ import annotations
 
 import json
 import threading
 import uuid
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 
+import arxiv
 import litellm
-from fastapi import FastAPI, HTTPException, WebSocket
+from fastapi import APIRouter, FastAPI, HTTPException, WebSocket
 from fastapi.responses import JSONResponse, PlainTextResponse
-from fastapi.staticfiles import StaticFiles
-from starlette.responses import Response
 
 from shesha.experimental.arxiv.download import to_parsed_document
+from shesha.experimental.shared.app_factory import create_app
 from shesha.experimental.web.dependencies import AppState
 from shesha.experimental.web.schemas import (
     ContextBudget,
@@ -44,19 +57,34 @@ def _resolve_topic_or_404(state: AppState, name: str) -> str:
     return project_id
 
 
-def create_api(state: AppState) -> FastAPI:
-    """Create and configure the FastAPI app."""
+def _parse_trace_file(trace_file: Path) -> dict[str, object]:
+    """Parse a JSONL trace file into header, steps, and summary."""
+    header: dict[str, object] = {}
+    steps: list[dict[str, object]] = []
+    summary: dict[str, object] = {}
+    for line in trace_file.read_text().strip().splitlines():
+        record = json.loads(line)
+        rtype = record.get("type")
+        if rtype == "header":
+            header = record
+        elif rtype == "step":
+            steps.append(record)
+        elif rtype == "summary":
+            summary = record
+    return {"header": header, "steps": steps, "summary": summary}
 
-    @asynccontextmanager
-    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        yield
-        state.searcher.close()
 
-    app = FastAPI(title="Shesha arXiv Explorer", version="0.1.0", lifespan=lifespan)
+def _create_arxiv_router(state: AppState) -> APIRouter:
+    """Build the arxiv-specific API router.
+
+    Contains topic CRUD (with ``paper_count``), paper management, search,
+    traces, history/export, model management, and context-budget routes.
+    """
+    router = APIRouter()
 
     # --- Topics ---
 
-    @app.get("/api/topics", response_model=list[TopicInfo])
+    @router.get("/api/topics", response_model=list[TopicInfo])
     def list_topics() -> list[TopicInfo]:
         topics = state.topic_mgr.list_topics()
         return [
@@ -69,7 +97,7 @@ def create_api(state: AppState) -> FastAPI:
             for t in topics
         ]
 
-    @app.post("/api/topics", status_code=201)
+    @router.post("/api/topics", status_code=201)
     def create_topic(body: TopicCreate) -> dict[str, str]:
         existing = state.topic_mgr.resolve(body.name)
         if existing:
@@ -77,7 +105,7 @@ def create_api(state: AppState) -> FastAPI:
         project_id = state.topic_mgr.create(body.name)
         return {"name": body.name, "project_id": project_id}
 
-    @app.patch("/api/topics/{name}")
+    @router.patch("/api/topics/{name}")
     def rename_topic(name: str, body: TopicRename) -> dict[str, str]:
         try:
             state.topic_mgr.rename(name, body.new_name)
@@ -85,7 +113,7 @@ def create_api(state: AppState) -> FastAPI:
             raise HTTPException(404, str(e)) from e
         return {"name": body.new_name}
 
-    @app.delete("/api/topics/{name}")
+    @router.delete("/api/topics/{name}")
     def delete_topic(name: str) -> dict[str, str]:
         try:
             state.topic_mgr.delete(name)
@@ -95,7 +123,7 @@ def create_api(state: AppState) -> FastAPI:
 
     # --- Papers ---
 
-    @app.get("/api/topics/{name}/papers", response_model=list[PaperInfo])
+    @router.get("/api/topics/{name}/papers", response_model=list[PaperInfo])
     def list_papers(name: str) -> list[PaperInfo]:
         project_id = _resolve_topic_or_404(state, name)
         doc_names = state.topic_mgr._storage.list_documents(project_id)
@@ -117,7 +145,7 @@ def create_api(state: AppState) -> FastAPI:
                 )
         return papers
 
-    @app.post("/api/papers/add", response_model=None)
+    @router.post("/api/papers/add", response_model=None)
     def add_paper(body: PaperAdd) -> dict[str, object] | JSONResponse:
         # Resolve all topic names to project IDs first
         topic_projects: list[tuple[str, str]] = []
@@ -141,6 +169,9 @@ def create_api(state: AppState) -> FastAPI:
         }
 
         def _download() -> None:
+            # Import here to avoid circular import at module level — the
+            # download module imports from the cache module which may
+            # trigger lazy initialization.
             from shesha.experimental.arxiv.download import download_paper
 
             task = state.download_tasks[task_id]
@@ -165,13 +196,13 @@ def create_api(state: AppState) -> FastAPI:
 
         return JSONResponse(status_code=202, content={"task_id": task_id})
 
-    @app.delete("/api/topics/{name}/papers/{arxiv_id}")
+    @router.delete("/api/topics/{name}/papers/{arxiv_id}")
     def remove_paper(name: str, arxiv_id: str) -> dict[str, str]:
         project_id = _resolve_topic_or_404(state, name)
         state.topic_mgr._storage.delete_document(project_id, arxiv_id)
         return {"status": "removed", "arxiv_id": arxiv_id}
 
-    @app.get("/api/papers/tasks/{task_id}")
+    @router.get("/api/papers/tasks/{task_id}")
     def download_task_status(task_id: str) -> dict[str, object]:
         if task_id not in state.download_tasks:
             raise HTTPException(404, "Task not found")
@@ -180,7 +211,7 @@ def create_api(state: AppState) -> FastAPI:
 
     # --- Search ---
 
-    @app.get("/api/search", response_model=list[SearchResult])
+    @router.get("/api/search", response_model=list[SearchResult])
     def search_arxiv(
         q: str,
         author: str | None = None,
@@ -188,9 +219,12 @@ def create_api(state: AppState) -> FastAPI:
         sort_by: str = "relevance",
         start: int = 0,
     ) -> list[SearchResult]:
-        results = state.searcher.search(
-            q, author=author, category=category, sort_by=sort_by, start=start
-        )
+        try:
+            results = state.searcher.search(
+                q, author=author, category=category, sort_by=sort_by, start=start
+            )
+        except (arxiv.HTTPError, ValueError) as exc:
+            raise HTTPException(502, f"arXiv API error: {exc}") from exc
         # Build a mapping of arxiv_id -> list of topic names
         topic_docs: dict[str, list[str]] = {}
         for topic in state.topic_mgr.list_topics():
@@ -212,7 +246,7 @@ def create_api(state: AppState) -> FastAPI:
             for r in results
         ]
 
-    @app.get("/api/papers/search", response_model=list[SearchResult])
+    @router.get("/api/papers/search", response_model=list[SearchResult])
     def search_local(q: str) -> list[SearchResult]:
         q_lower = q.lower()
 
@@ -249,23 +283,7 @@ def create_api(state: AppState) -> FastAPI:
 
     # --- Traces ---
 
-    def _parse_trace_file(trace_file: Path) -> dict[str, object]:
-        """Parse a JSONL trace file into header, steps, and summary."""
-        header: dict[str, object] = {}
-        steps: list[dict[str, object]] = []
-        summary: dict[str, object] = {}
-        for line in trace_file.read_text().strip().splitlines():
-            record = json.loads(line)
-            rtype = record.get("type")
-            if rtype == "header":
-                header = record
-            elif rtype == "step":
-                steps.append(record)
-            elif rtype == "summary":
-                summary = record
-        return {"header": header, "steps": steps, "summary": summary}
-
-    @app.get("/api/topics/{name}/traces", response_model=list[TraceListItem])
+    @router.get("/api/topics/{name}/traces", response_model=list[TraceListItem])
     def list_traces(name: str) -> list[TraceListItem]:
         project_id = _resolve_topic_or_404(state, name)
         trace_files = state.topic_mgr._storage.list_traces(project_id)
@@ -292,7 +310,7 @@ def create_api(state: AppState) -> FastAPI:
             )
         return items
 
-    @app.get("/api/topics/{name}/traces/{trace_id:path}", response_model=TraceFull)
+    @router.get("/api/topics/{name}/traces/{trace_id:path}", response_model=TraceFull)
     def get_trace(name: str, trace_id: str) -> TraceFull:
         project_id = _resolve_topic_or_404(state, name)
         trace_files = state.topic_mgr._storage.list_traces(project_id)
@@ -337,14 +355,14 @@ def create_api(state: AppState) -> FastAPI:
 
     # --- History & Export ---
 
-    @app.get("/api/topics/{name}/history", response_model=ConversationHistory)
+    @router.get("/api/topics/{name}/history", response_model=ConversationHistory)
     def get_history(name: str) -> ConversationHistory:
         project_id = _resolve_topic_or_404(state, name)
         project_dir = state.topic_mgr._storage._project_path(project_id)
         session = WebConversationSession(project_dir)
         return ConversationHistory(exchanges=session.list_exchanges())  # type: ignore[arg-type]
 
-    @app.delete("/api/topics/{name}/history")
+    @router.delete("/api/topics/{name}/history")
     def clear_history(name: str) -> dict[str, str]:
         project_id = _resolve_topic_or_404(state, name)
         project_dir = state.topic_mgr._storage._project_path(project_id)
@@ -352,7 +370,7 @@ def create_api(state: AppState) -> FastAPI:
         session.clear()
         return {"status": "cleared"}
 
-    @app.get("/api/topics/{name}/export", response_class=PlainTextResponse)
+    @router.get("/api/topics/{name}/export", response_class=PlainTextResponse)
     def export_transcript(name: str) -> PlainTextResponse:
         project_id = _resolve_topic_or_404(state, name)
         project_dir = state.topic_mgr._storage._project_path(project_id)
@@ -362,7 +380,7 @@ def create_api(state: AppState) -> FastAPI:
 
     # --- Model ---
 
-    @app.get("/api/model", response_model=ModelInfo)
+    @router.get("/api/model", response_model=ModelInfo)
     def get_model() -> ModelInfo:
         max_input: int | None = None
         try:
@@ -372,7 +390,7 @@ def create_api(state: AppState) -> FastAPI:
             pass  # Model may not be in litellm's registry
         return ModelInfo(model=state.model, max_input_tokens=max_input)
 
-    @app.put("/api/model", response_model=ModelInfo)
+    @router.put("/api/model", response_model=ModelInfo)
     def update_model(body: ModelUpdate) -> ModelInfo:
         state.model = body.model
         max_input: int | None = None
@@ -385,7 +403,7 @@ def create_api(state: AppState) -> FastAPI:
 
     # --- Context Budget ---
 
-    @app.get("/api/topics/{name}/context-budget", response_model=ContextBudget)
+    @router.get("/api/topics/{name}/context-budget", response_model=ContextBudget)
     def get_context_budget(name: str) -> ContextBudget:
         project_id = _resolve_topic_or_404(state, name)
         project_dir = state.topic_mgr._storage._project_path(project_id)
@@ -427,26 +445,49 @@ def create_api(state: AppState) -> FastAPI:
             level=level,
         )
 
-    # Suppress Chrome DevTools probing
-    @app.get("/.well-known/{path:path}", include_in_schema=False)
-    def well_known(path: str) -> Response:
-        return Response(status_code=204)
+    return router
 
-    # --- WebSocket ---
 
-    @app.websocket("/api/ws")
-    async def ws_endpoint(ws: WebSocket) -> None:
+def _make_ws_handler(state: AppState) -> Callable[[WebSocket], Awaitable[None]]:
+    """Create a WebSocket handler bound to *state*.
+
+    Returns an ``async (WebSocket) -> None`` callable suitable for the
+    shared app factory's ``ws_handler`` parameter.
+    """
+
+    async def _handler(ws: WebSocket) -> None:
         await websocket_handler(ws, state)
 
-    # --- Static files ---
-    # Serve logo from images directory
+    return _handler
+
+
+def create_api(state: AppState) -> FastAPI:
+    """Create and configure the FastAPI app using the shared factory.
+
+    The shared ``create_app()`` provides: lifespan (starts/stops Shesha
+    container pool), CORS middleware, ``.well-known`` catch-all, optional
+    WebSocket endpoint, and static file mounting.
+
+    Arxiv-specific routes are registered via a local ``APIRouter`` passed
+    as an extra router to the factory.
+    """
+    # Wrap shesha.stop() to also close the arxiv searcher on shutdown.
+    original_stop = state.shesha.stop
+
+    def _stop_with_searcher() -> None:
+        original_stop()
+        state.searcher.close()
+
+    state.shesha.stop = _stop_with_searcher  # type: ignore[method-assign]
+
     images_dir = Path(__file__).parent.parent.parent.parent.parent / "images"
-    if images_dir.exists():
-        app.mount("/static", StaticFiles(directory=str(images_dir)))
-
-    # Serve built frontend (must be last — catches all unmatched routes)
     frontend_dist = Path(__file__).parent / "frontend" / "dist"
-    if frontend_dist.exists():
-        app.mount("/", StaticFiles(directory=str(frontend_dist), html=True))
 
-    return app
+    return create_app(
+        state,
+        title="Shesha arXiv Explorer",
+        static_dir=frontend_dist,
+        images_dir=images_dir,
+        ws_handler=_make_ws_handler(state),
+        extra_routers=[_create_arxiv_router(state)],
+    )

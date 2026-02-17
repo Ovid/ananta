@@ -14,12 +14,13 @@ vi.mock('../../api/client', () => ({
 }))
 
 // Mock Toast to capture calls
-vi.mock('../Toast', () => ({
-  showToast: vi.fn(),
-}))
+vi.mock('@shesha/shared-ui', async () => {
+  const actual = await vi.importActual<typeof import('@shesha/shared-ui')>('@shesha/shared-ui')
+  return { ...actual, showToast: vi.fn() }
+})
 
 import { api } from '../../api/client'
-import { showToast } from '../Toast'
+import { showToast } from '@shesha/shared-ui'
 
 const makeResult = (id: string, title: string, inTopics: string[] = []) => ({
   arxiv_id: id,

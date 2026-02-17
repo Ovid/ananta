@@ -228,9 +228,7 @@ class TestArxivSearcher:
         searcher = ArxivSearcher()
         searcher.search("*", author="Nicolas Gisin")
         search_call = mock_arxiv.Search.call_args
-        query = search_call.kwargs.get(
-            "query", search_call.args[0] if search_call.args else ""
-        )
+        query = search_call.kwargs.get("query", search_call.args[0] if search_call.args else "")
         assert "all:*" not in query
         assert "au:Nicolas Gisin" in query
 

@@ -130,9 +130,7 @@ async def _handle_query(
     try:
         project = state.shesha.get_project(first_project_id)
     except ProjectNotFoundError:
-        await ws.send_json(
-            {"type": "error", "message": f"Repository {first_project_id} not found"}
-        )
+        await ws.send_json({"type": "error", "message": f"Repository {first_project_id} not found"})
         await message_queue.put(None)
         await drain_task
         return

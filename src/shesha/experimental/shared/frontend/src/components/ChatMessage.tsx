@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
+import Markdown from 'react-markdown'
 
+import { mdComponents } from './mdComponents'
 import type { Exchange } from '../types'
 
 function formatTime(iso: string): string {
@@ -36,8 +38,10 @@ export default function ChatMessage({ exchange, onViewTrace, renderAnswer, answe
       {/* Assistant answer */}
       <div className="flex flex-col items-start gap-0.5">
         <div className="max-w-[70%] bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary">
-          <div className="whitespace-pre-wrap">
-            {renderAnswer ? renderAnswer(exchange.answer) : exchange.answer}
+          <div className={renderAnswer ? 'whitespace-pre-wrap' : ''}>
+            {renderAnswer
+              ? renderAnswer(exchange.answer)
+              : <Markdown components={mdComponents}>{exchange.answer}</Markdown>}
           </div>
 
           {answerFooter}

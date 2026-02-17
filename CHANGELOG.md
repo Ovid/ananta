@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Code Explorer API routes for traces, model, history, and context-budget now use shared router with callbacks
 - arXiv Explorer refactored to use shared web infrastructure module
 - "unresolved" citations now labeled "not found in databases" to clarify external sources were tried
 - LLM-tell phrases displayed in purple (was amber) for better visual distinction

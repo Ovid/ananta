@@ -197,6 +197,46 @@ class TestResolveProjectIdsCallback:
         state.topic_mgr._storage.list_traces.assert_called_once_with("custom-proj")
 
 
+class TestListTraceFilesCallback:
+    """The list_trace_files callback controls trace file retrieval."""
+
+    def test_default_uses_topic_mgr_storage(self, tmp_path: Path) -> None:
+        """Default behavior accesses state.topic_mgr._storage.list_traces()."""
+        state = _make_state(tmp_path)
+        state.topic_mgr.resolve_all = MagicMock(return_value=["p1"])
+        state.topic_mgr._storage.list_traces.return_value = []
+
+        app = _make_app(state)
+        client = TestClient(app)
+        resp = client.get("/api/topics/my-topic/traces")
+        assert resp.status_code == 200
+        state.topic_mgr._storage.list_traces.assert_called_once_with("p1")
+
+    def test_custom_callback_overrides_trace_retrieval(self, tmp_path: Path) -> None:
+        """Custom list_trace_files callback bypasses topic_mgr._storage."""
+        state = _make_state(tmp_path)
+        custom_storage = MagicMock()
+        custom_storage.list_traces.return_value = []
+
+        def custom_list_traces(s: object, project_id: str) -> list[Path]:
+            return custom_storage.list_traces(project_id)
+
+        def custom_resolve(s: object, name: str) -> list[str]:
+            return ["my-proj"]
+
+        app = _make_app(
+            state,
+            resolve_project_ids=custom_resolve,
+            list_trace_files=custom_list_traces,
+        )
+        client = TestClient(app)
+        resp = client.get("/api/topics/my-topic/traces")
+        assert resp.status_code == 200
+        custom_storage.list_traces.assert_called_once_with("my-proj")
+        # The default state.topic_mgr._storage should NOT be called
+        state.topic_mgr._storage.list_traces.assert_not_called()
+
+
 class TestIncludeTopicCrud:
     """The include_topic_crud flag controls topic CRUD route registration."""
 
@@ -213,3 +253,52 @@ class TestIncludeTopicCrud:
         client = TestClient(app)
         resp = client.get("/api/topics")
         assert resp.status_code in (404, 405)
+
+
+class TestCodeExplorerCallbacks:
+    """Code explorer uses global session and custom topic listing."""
+
+    def test_global_session_used_for_history(self, tmp_path: Path) -> None:
+        state = _make_state(tmp_path)
+        state.topic_mgr.resolve.return_value = "proj-1"
+
+        global_session = WebConversationSession(tmp_path)
+        global_session.add_exchange(
+            question="global q",
+            answer="global a",
+            trace_id=None,
+            tokens={"prompt": 1, "completion": 1, "total": 2},
+            execution_time=0.1,
+            model="test",
+        )
+
+        def get_global_session(s: object, topic_name: str) -> WebConversationSession:
+            return global_session
+
+        app = _make_app(state, get_session=get_global_session)
+        client = TestClient(app)
+        resp = client.get("/api/topics/any-topic/history")
+        assert resp.status_code == 200
+        assert len(resp.json()["exchanges"]) == 1
+        assert resp.json()["exchanges"][0]["question"] == "global q"
+
+    def test_custom_topic_listing(self, tmp_path: Path) -> None:
+        state = _make_state(tmp_path)
+
+        def build_code_topics(s: object) -> list[TopicInfo]:
+            return [
+                TopicInfo(
+                    name="my-topic",
+                    document_count=2,
+                    size="",
+                    project_id="topic:my-topic",
+                )
+            ]
+
+        app = _make_app(state, build_topic_info=build_code_topics)
+        client = TestClient(app)
+        resp = client.get("/api/topics")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data[0]["document_count"] == 2
+        assert data[0]["project_id"] == "topic:my-topic"

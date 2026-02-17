@@ -34,6 +34,7 @@ from shesha.experimental.shared.session import WebConversationSession
 GetSession = Callable[[object, str], WebConversationSession]
 BuildTopicInfo = Callable[[object], list[TopicInfo]]
 ResolveProjectIds = Callable[[object, str], list[str]]
+ListTraceFiles = Callable[[object, str], list[Path]]
 
 
 def _resolve_topic_or_404(state: Any, name: str) -> str:
@@ -83,6 +84,7 @@ def create_shared_router(
     get_session: GetSession | None = None,
     build_topic_info: BuildTopicInfo | None = None,
     resolve_project_ids: ResolveProjectIds | None = None,
+    list_trace_files: ListTraceFiles | None = None,
     include_topic_crud: bool = True,
     include_per_topic_history: bool = True,
     include_context_budget: bool = True,
@@ -104,6 +106,12 @@ def create_shared_router(
         Optional callback ``(state, topic_name) -> list[str]``.
         When provided, overrides the default project ID resolution
         for trace routes.
+    list_trace_files:
+        Optional callback ``(state, project_id) -> list[Path]``.
+        When provided, overrides the default
+        ``state.topic_mgr._storage.list_traces(project_id)`` call
+        for trace routes.  Useful when trace files are stored in a
+        different storage backend (e.g. ``state.shesha._storage``).
     include_topic_crud:
         When ``True`` (default), register topic CRUD routes (list, create,
         rename, delete).
@@ -130,6 +138,12 @@ def create_shared_router(
         if resolve_project_ids is not None:
             return resolve_project_ids(state, name)
         return _resolve_all_project_ids(state, name)
+
+    def _get_trace_files(project_id: str) -> list[Path]:
+        """Get trace files for a project, using callback or default."""
+        if list_trace_files is not None:
+            return list_trace_files(state, project_id)
+        return state.topic_mgr._storage.list_traces(project_id)  # type: ignore[no-any-return]
 
     # --- Topics ---
 
@@ -181,7 +195,7 @@ def create_shared_router(
         project_ids = _get_project_ids(name)
         items: list[TraceListItem] = []
         for project_id in project_ids:
-            trace_files = state.topic_mgr._storage.list_traces(project_id)
+            trace_files = _get_trace_files(project_id)
             for tf in trace_files:
                 parsed = _parse_trace_file(tf)
                 header = parsed["header"]
@@ -209,7 +223,7 @@ def create_shared_router(
     def get_trace(name: str, trace_id: str) -> TraceFull:
         project_ids = _get_project_ids(name)
         for project_id in project_ids:
-            trace_files = state.topic_mgr._storage.list_traces(project_id)
+            trace_files = _get_trace_files(project_id)
             for tf in trace_files:
                 parsed = _parse_trace_file(tf)
                 header = parsed["header"]

@@ -8,7 +8,7 @@ import DownloadProgress from './components/DownloadProgress'
 import CitationReport from './components/CitationReport'
 import EmailModal, { getStoredEmail, hasEmailDecision } from './components/EmailModal'
 import PaperDetail from './components/PaperDetail'
-import { useTheme, useWebSocket, StatusBar, ToastContainer, showToast, TraceViewer } from '@shesha/shared-ui'
+import { AppShell, useTheme, useWebSocket, StatusBar, ToastContainer, showToast, TraceViewer } from '@shesha/shared-ui'
 import { api } from './api/client'
 import type { ContextBudget, PaperInfo, PaperReport, WSMessage } from './types'
 
@@ -273,7 +273,7 @@ export default function App() {
   }, [sidebarWidth])
 
   return (
-    <div className="h-screen flex flex-col bg-surface-0 text-text-primary font-sans">
+    <AppShell>
       <Header
         onSearchToggle={() => setSearchOpen(s => !s)}
         onCheckCitations={handleCheckCitations}
@@ -387,6 +387,6 @@ export default function App() {
       />
 
       <ToastContainer />
-    </div>
+    </AppShell>
   )
 }

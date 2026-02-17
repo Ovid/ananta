@@ -5,6 +5,7 @@ export { useWebSocket } from './hooks/useWebSocket'
 export { useTheme } from './hooks/useTheme'
 
 // Components
+export { default as AppShell } from './components/AppShell'
 export { default as ConfirmDialog } from './components/ConfirmDialog'
 export { default as StatusBar } from './components/StatusBar'
 export { default as ToastContainer, showToast } from './components/Toast'

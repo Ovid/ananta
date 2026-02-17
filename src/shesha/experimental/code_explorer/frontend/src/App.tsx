@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef, type MouseEvent } from 'react'
 
 import {
+  AppShell,
   Header,
   TopicSidebar,
   ChatArea,
@@ -262,7 +263,7 @@ export default function App() {
   }, [sidebarWidth])
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-surface-0 text-text-primary font-sans">
+    <AppShell>
       <Header appName="Code Explorer" isDark={dark} onToggleTheme={toggleTheme}>
         <button
           onClick={handleExport}
@@ -378,6 +379,6 @@ export default function App() {
       )}
 
       <ToastContainer />
-    </div>
+    </AppShell>
   )
 }

@@ -198,27 +198,31 @@ def create_shared_router(
     get_session: GetSession | None = None,
     build_topic_info: BuildTopicInfo | None = None,
     resolve_project_ids: ResolveProjectIds | None = None,
+    include_topic_crud: bool = True,
     include_per_topic_history: bool = True,
     include_context_budget: bool = True,
 ) -> APIRouter:
 ```
 
-Inside `list_topics()`:
+Wrap topic CRUD registration in `if include_topic_crud:` (same pattern as
+`include_per_topic_history`). Inside `list_topics()`:
 ```python
-@router.get("/api/topics", response_model=list[TopicInfo])
-def list_topics() -> list[TopicInfo]:
-    if build_topic_info is not None:
-        return build_topic_info(state)
-    topics = state.topic_mgr.list_topics()
-    return [
-        TopicInfo(
-            name=t.name,
-            document_count=t.document_count,
-            size=t.formatted_size,
-            project_id=t.project_id,
-        )
-        for t in topics
-    ]
+if include_topic_crud:
+    @router.get("/api/topics", response_model=list[TopicInfo])
+    def list_topics() -> list[TopicInfo]:
+        if build_topic_info is not None:
+            return build_topic_info(state)
+        topics = state.topic_mgr.list_topics()
+        return [
+            TopicInfo(
+                name=t.name,
+                document_count=t.document_count,
+                size=t.formatted_size,
+                project_id=t.project_id,
+            )
+            for t in topics
+        ]
+    # ... also create_topic, rename_topic, delete_topic inside the same block
 ```
 
 For history/export/context-budget — extract session resolution into a helper:
@@ -572,16 +576,21 @@ def create_api(state: CodeExplorerState) -> FastAPI:
     repo_router = _create_repo_router(state)
     shared_router = create_shared_router(
         state,
-        build_topic_info=lambda s: _build_code_topic_info(state),
         get_session=lambda s, name: _get_global_session(state, name),
         resolve_project_ids=lambda s, name: _resolve_code_project_ids(state, name),
-        include_per_topic_history=True,
+        include_topic_crud=False,
+        include_per_topic_history=False,
         include_context_budget=True,
     )
     # ... create_app with extra_routers=[repo_router, shared_router]
 ```
 
-Note: The topic CRUD routes (create/rename/delete) stay in the repo router because the code-explorer topic manager has a different interface (no `resolve()`, uses `create()` idempotently). The global history routes (`/api/history`, `/api/export`) also stay in the repo router.
+Note: `include_topic_crud=False` because the code-explorer topic manager has
+a different interface (no `resolve()`, uses `create()` idempotently).
+`include_per_topic_history=False` because code-explorer's per-topic history
+routes delegate to the global session and are already on the repo router.
+The global history routes (`/api/history`, `/api/export`) also stay in the
+repo router. The shared router provides: traces, model, and context budget.
 
 **Step 4: Run full test suite**
 
@@ -1249,18 +1258,30 @@ git commit -m "refactor: arxiv-explorer App.tsx uses useAppState hook"
 
 ---
 
-### Task 9: Update arxiv frontend types and API client
+### Task 9: Update arxiv frontend types, API client, components, and WebSocket adapter
 
-Now that the backend returns `document_count` instead of `paper_count` and `document_ids` instead of `paper_ids`, update the frontend types and API client.
+Now that the backend returns `document_count` instead of `paper_count` and
+`document_ids` instead of `paper_ids`, update ALL frontend files that reference
+the old field names, and simplify the backend `_PaperIdAdapter`.
 
 **Files:**
 - Modify: `src/shesha/experimental/web/frontend/src/types/index.ts`
 - Modify: `src/shesha/experimental/web/frontend/src/api/client.ts`
-- Modify: `src/shesha/experimental/web/frontend/src/components/TopicSidebar.tsx` (if it references `paper_count`)
+- Modify: `src/shesha/experimental/web/frontend/src/components/TopicSidebar.tsx`
+- Modify: `src/shesha/experimental/web/frontend/src/components/ChatArea.tsx`
+- Modify: `src/shesha/experimental/web/frontend/src/components/ChatMessage.tsx`
+- Modify: `src/shesha/experimental/web/frontend/src/App.tsx` (verify `check_citations` messages)
+- Modify: `src/shesha/experimental/web/frontend/src/components/__tests__/TopicSidebar.test.tsx`
+- Modify: `src/shesha/experimental/web/frontend/src/components/__tests__/ChatMessage.test.tsx`
+- Modify: `src/shesha/experimental/web/websockets.py` (simplify `_PaperIdAdapter`)
 
 **Step 1: Update types**
 
-Remove the `TopicInfo` override that uses `paper_count`. Use the shared `TopicInfo` directly. Remove the `Exchange` override that uses `paper_ids`. Use the shared `Exchange` directly. Keep arxiv-specific `WSMessage` extension for citation messages only (the `complete` message no longer needs `paper_ids` → it uses shared `document_ids`).
+Remove the `TopicInfo` override that uses `paper_count`. Use the shared
+`TopicInfo` directly. Remove the `Exchange` override that uses `paper_ids`.
+Use the shared `Exchange` directly. Keep arxiv-specific `WSMessage` extension
+for citation messages only (the `complete` message no longer needs `paper_ids`
+— it uses shared `document_ids`).
 
 ```typescript
 // Re-export shared types directly — no more overrides
@@ -1269,7 +1290,9 @@ export type { TopicInfo, Exchange, TraceStep, TraceListItem, TraceFull, ContextB
 
 **Step 2: Update API client**
 
-Remove the `topics.list` override (shared `TopicInfo` with `document_count` now matches). Remove the `history.get` override (shared `Exchange` with `document_ids` now matches).
+Remove the `topics.list` override (shared `TopicInfo` with `document_count`
+now matches). Remove the `history.get` override (shared `Exchange` with
+`document_ids` now matches).
 
 ```typescript
 export const api = {
@@ -1282,18 +1305,55 @@ export const api = {
 
 **Step 3: Update TopicSidebar wrapper**
 
-If the component displays `paper_count`, change to read `document_count` from `TopicInfo` and display it as "N papers" in the UI.
+Change `paper_count` references to `document_count`. The UI can still display
+"N papers" — the field name is internal.
 
-**Step 4: Run tests**
+**Step 4: Update ChatArea and ChatMessage**
+
+Change all `paper_ids` references to `document_ids` in:
+- `components/ChatArea.tsx` — `ex.paper_ids` → `ex.document_ids`,
+  `msg.paper_ids` → `msg.document_ids`, update comments
+- `components/ChatMessage.tsx` — `exchange.paper_ids` → `exchange.document_ids`
+
+**Step 5: Verify App.tsx `check_citations` messages**
+
+The `check_citations` WebSocket messages in `App.tsx` send `paper_ids` as a
+**domain-specific field** for citation checking (not the same concept as
+`document_ids` for query documents). These MUST stay as `paper_ids` — they
+are arxiv-specific and are not subject to the generic field name
+standardization.
+
+**Step 6: Update test files**
+
+- `components/__tests__/TopicSidebar.test.tsx` — `paper_count` → `document_count`
+- `components/__tests__/ChatMessage.test.tsx` — `paper_ids` → `document_ids`
+
+**Step 7: Simplify `_PaperIdAdapter` in `web/websockets.py`**
+
+The `_PaperIdAdapter` previously translated `paper_ids` ↔ `document_ids`
+on query messages. Now that both frontend and backend use `document_ids`
+natively for queries, the adapter no longer needs to translate query messages.
+
+Remove the `_PaperIdAdapter` class entirely. The `check_citations` message
+already uses `paper_ids` natively (domain-specific) and bypasses the adapter's
+translation logic, so removing the adapter has no effect on citation checking.
+
+Update `websocket_handler()` in `web/websockets.py` to pass the raw
+WebSocket directly to the shared handler instead of wrapping it in the adapter.
+
+**Step 8: Run tests**
 
 Run: `cd src/shesha/experimental/web/frontend && npx vitest run`
 Expected: All PASS.
 
-**Step 5: Commit**
+Run: `pytest tests/experimental/web/ -v`
+Expected: All PASS.
+
+**Step 9: Commit**
 
 ```bash
-git add src/shesha/experimental/web/frontend/src/types/index.ts src/shesha/experimental/web/frontend/src/api/client.ts src/shesha/experimental/web/frontend/src/components/TopicSidebar.tsx
-git commit -m "refactor: arxiv frontend uses standardized field names"
+git add src/shesha/experimental/web/frontend/src/ src/shesha/experimental/web/websockets.py
+git commit -m "refactor: arxiv frontend and WS adapter use standardized field names"
 ```
 
 ---

@@ -87,6 +87,10 @@ use shared version since we standardize on `document_count`).
 - Arxiv `ExchangeSchema` drops `paper_ids` alias; uses `document_ids` directly.
 - The arxiv frontend `TopicSidebar` wrapper can display "papers" in the UI
   while the API uses `document_count`.
+- The `_PaperIdAdapter` in `web/websockets.py` is removed — with both
+  frontend and backend standardized on `document_ids`, the adapter's
+  translation is no longer needed. The `check_citations` WS message keeps
+  `paper_ids` as a domain-specific field (not subject to standardization).
 
 ## Frontend Design
 
@@ -108,7 +112,6 @@ export function useAppState(options?: {
   traceView, setTraceView, handleViewTrace,
   historyVersion, setHistoryVersion,
   activeTopic, setActiveTopic, handleTopicSelect,
-  handleExport,
 }
 ```
 
@@ -118,6 +121,10 @@ the context budget. Code-explorer doesn't need it.
 **`onExtraMessage`** -- Called for WebSocket messages not handled by the shared
 handler (status/step/complete/error/cancelled). Arxiv uses this for
 `citation_progress` and `citation_report` messages.
+
+Note: `handleExport` stays domain-specific in each tool's `App.tsx` because
+code-explorer export is global (no topic param) while arxiv export is
+per-topic.
 
 ### Connection-loss banner
 

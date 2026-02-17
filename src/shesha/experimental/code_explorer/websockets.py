@@ -18,6 +18,7 @@ from typing import Any
 
 from fastapi import WebSocket
 
+from shesha.exceptions import ProjectNotFoundError
 from shesha.experimental.code_explorer.dependencies import CodeExplorerState
 from shesha.experimental.shared.websockets import websocket_handler as shared_ws_handler
 from shesha.models import ParsedDocument
@@ -76,7 +77,11 @@ async def _handle_query(
     # Build context from per-project analysis
     context_parts: list[str] = []
     for project_id in document_ids:
-        analysis = state.shesha.get_analysis(str(project_id))
+        try:
+            analysis = state.shesha.get_analysis(str(project_id))
+        except ProjectNotFoundError:
+            logger.warning("Project %s not found, skipping analysis", project_id)
+            continue
         if analysis is not None:
             context_parts.append(f"--- Analysis for {project_id} ---\n{analysis.overview}")
 
@@ -122,7 +127,15 @@ async def _handle_query(
 
     # Pick the first project's RLM engine (they share the same engine)
     first_project_id = str(document_ids[0])
-    project = state.shesha.get_project(first_project_id)
+    try:
+        project = state.shesha.get_project(first_project_id)
+    except ProjectNotFoundError:
+        await ws.send_json(
+            {"type": "error", "message": f"Repository {first_project_id} not found"}
+        )
+        await message_queue.put(None)
+        await drain_task
+        return
     rlm_engine = project._rlm_engine
     if rlm_engine is None:
         await ws.send_json({"type": "error", "message": "Query engine not configured"})

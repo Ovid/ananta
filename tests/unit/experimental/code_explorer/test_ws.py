@@ -8,6 +8,7 @@ import pytest
 from fastapi import FastAPI, WebSocket
 from fastapi.testclient import TestClient
 
+from shesha.exceptions import ProjectNotFoundError
 from shesha.experimental.code_explorer.websockets import websocket_handler
 from shesha.models import ParsedDocument
 from shesha.rlm.trace import TokenUsage, Trace
@@ -394,3 +395,75 @@ class TestNoDocsFoundInProjects:
 
         assert msg["type"] == "error"
         assert "document" in msg["message"].lower() or "no" in msg["message"].lower()
+
+
+class TestStaleProjectId:
+    """Stale project IDs should fail gracefully, not crash the handler."""
+
+    def test_get_analysis_skips_stale_project(self, mock_state: MagicMock) -> None:
+        """get_analysis raising ProjectNotFoundError should be skipped."""
+        mock_result = MagicMock()
+        mock_result.answer = "still works"
+        mock_result.token_usage = TokenUsage(prompt_tokens=10, completion_tokens=5)
+        mock_result.execution_time = 0.5
+        mock_result.trace = Trace(steps=[])
+
+        mock_project = MagicMock()
+        mock_project._rlm_engine.query.return_value = mock_result
+
+        mock_state.shesha._storage.list_documents.return_value = ["main.py"]
+        mock_state.shesha._storage.get_document.side_effect = lambda pid, name: _make_doc(name)
+        mock_state.shesha._storage.list_traces.return_value = []
+        mock_state.shesha.get_project.return_value = mock_project
+        mock_state.shesha.get_analysis.side_effect = ProjectNotFoundError("stale-repo")
+
+        app = _make_app(mock_state)
+        test_client = TestClient(app)
+
+        with test_client.websocket_connect("/ws") as ws:
+            ws.send_json(
+                {
+                    "type": "query",
+                    "question": "What?",
+                    "document_ids": ["stale-repo"],
+                }
+            )
+            messages = []
+            while True:
+                msg = ws.receive_json()
+                messages.append(msg)
+                if msg["type"] in ("complete", "error"):
+                    break
+
+        complete = [m for m in messages if m["type"] == "complete"]
+        assert len(complete) == 1
+        assert complete[0]["answer"] == "still works"
+
+    def test_get_project_stale_sends_error(self, mock_state: MagicMock) -> None:
+        """get_project raising ProjectNotFoundError should send error message."""
+        mock_state.shesha._storage.list_documents.return_value = ["main.py"]
+        mock_state.shesha._storage.get_document.side_effect = lambda pid, name: _make_doc(name)
+        mock_state.shesha.get_analysis.return_value = None
+        mock_state.shesha.get_project.side_effect = ProjectNotFoundError("gone-repo")
+
+        app = _make_app(mock_state)
+        test_client = TestClient(app)
+
+        with test_client.websocket_connect("/ws") as ws:
+            ws.send_json(
+                {
+                    "type": "query",
+                    "question": "What?",
+                    "document_ids": ["gone-repo"],
+                }
+            )
+            messages = []
+            while True:
+                msg = ws.receive_json()
+                messages.append(msg)
+                if msg["type"] in ("complete", "error"):
+                    break
+
+        errors = [m for m in messages if m["type"] == "error"]
+        assert len(errors) == 1
+        assert "not found" in errors[0]["message"].lower() or "gone-repo" in errors[0]["message"]

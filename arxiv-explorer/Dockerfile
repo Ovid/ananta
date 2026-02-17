@@ -18,7 +18,7 @@ COPY src/shesha/experimental/web/frontend/package.json ./
 # Rewrite the local dependency path for the Docker build context
 RUN sed -i 's|file:../../shared/frontend|file:/shared-ui|' package.json
 
-RUN npm install --install-links
+RUN npm install --omit=dev --install-links
 COPY src/shesha/experimental/web/frontend/ ./
 RUN npm run build
 

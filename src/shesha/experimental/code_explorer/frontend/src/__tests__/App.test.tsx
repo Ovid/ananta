@@ -16,16 +16,37 @@ beforeAll(() => {
   Element.prototype.scrollTo = vi.fn()
 })
 
+const defaultAppState = {
+  dark: true,
+  toggleTheme: vi.fn(),
+  connected: true,
+  send: vi.fn(),
+  onMessage: vi.fn(() => vi.fn()),
+  modelName: 'test-model',
+  tokens: { prompt: 0, completion: 0, total: 0 },
+  budget: null,
+  setBudget: vi.fn(),
+  phase: 'Ready',
+  setPhase: vi.fn(),
+  documentBytes: 0,
+  sidebarWidth: 224,
+  handleSidebarDrag: vi.fn(),
+  activeTopic: null,
+  setActiveTopic: vi.fn(),
+  handleTopicSelect: vi.fn(),
+  traceView: null,
+  setTraceView: vi.fn(),
+  handleViewTrace: vi.fn(),
+  historyVersion: 0,
+  setHistoryVersion: vi.fn(),
+  setTokens: vi.fn(),
+}
+
 vi.mock('@shesha/shared-ui', async () => {
   const actual = await vi.importActual('@shesha/shared-ui')
   return {
     ...actual,
-    useTheme: () => ({ dark: true, toggle: vi.fn() }),
-    useWebSocket: () => ({
-      connected: true,
-      send: vi.fn(),
-      onMessage: vi.fn(() => vi.fn()),
-    }),
+    useAppState: () => ({ ...defaultAppState }),
   }
 })
 
@@ -83,21 +104,19 @@ describe('App', () => {
   })
 
   it('renders connection lost banner when disconnected', async () => {
-    // Override useWebSocket to return connected=false
     const sharedUi = await import('@shesha/shared-ui')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const useWebSocketSpy = vi.spyOn(sharedUi as any, 'useWebSocket')
-    useWebSocketSpy.mockReturnValue({
+    const spy = vi.spyOn(sharedUi as any, 'useAppState')
+    spy.mockReturnValue({
+      ...defaultAppState,
       connected: false,
-      send: vi.fn(),
-      onMessage: vi.fn(() => vi.fn()),
     })
 
     render(<App />)
     await flush()
     expect(screen.getByText('Connection lost. Reconnecting...')).toBeInTheDocument()
 
-    useWebSocketSpy.mockRestore()
+    spy.mockRestore()
   })
 
   it('renders StatusBar', async () => {

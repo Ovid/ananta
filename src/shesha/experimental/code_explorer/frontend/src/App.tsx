@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef, type MouseEvent } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 
 import {
   AppShell,
@@ -9,8 +9,7 @@ import {
   TraceViewer,
   ToastContainer,
   showToast,
-  useTheme,
-  useWebSocket,
+  useAppState,
 } from '@shesha/shared-ui'
 import { api } from './api/client'
 import AddRepoModal from './components/AddRepoModal'
@@ -18,8 +17,6 @@ import RepoDetail from './components/RepoDetail'
 import type {
   RepoInfo,
   RepoAnalysis,
-  ContextBudget,
-  WSMessage,
   DocumentItem,
   Exchange,
   TopicInfo,
@@ -34,15 +31,21 @@ function repoToDocument(repo: RepoInfo): DocumentItem {
 }
 
 export default function App() {
-  const { dark, toggle: toggleTheme } = useTheme()
-  const { connected, send, onMessage } = useWebSocket<WSMessage>()
+  const {
+    dark, toggleTheme, connected, send, onMessage,
+    modelName, tokens, budget, phase, documentBytes,
+    sidebarWidth, handleSidebarDrag,
+    activeTopic, handleTopicSelect: sharedTopicSelect,
+    traceView, setTraceView, handleViewTrace,
+    historyVersion, setHistoryVersion, setTokens,
+  } = useAppState({
+    onExtraMessage: (msg: any) => {
+      if (msg.type === 'error') {
+        showToast(msg.message ?? 'Unknown error', 'error')
+      }
+    },
+  })
 
-  const [activeTopic, setActiveTopic] = useState<string | null>(null)
-  const [modelName, setModelName] = useState('\u2014')
-  const [tokens, setTokens] = useState({ prompt: 0, completion: 0, total: 0 })
-  const [budget, setBudget] = useState<ContextBudget | null>(null)
-  const [phase, setPhase] = useState('Ready')
-  const [documentBytes, setDocumentBytes] = useState(0)
   const [selectedRepos, setSelectedRepos] = useState<Set<string>>(new Set())
   const [viewingRepo, setViewingRepo] = useState<RepoInfo | null>(null)
   const [viewingAnalysis, setViewingAnalysis] = useState<RepoAnalysis | null>(null)
@@ -50,21 +53,10 @@ export default function App() {
   const [topicNames, setTopicNames] = useState<string[]>([])
   const [allRepos, setAllRepos] = useState<RepoInfo[]>([])
   const [uncategorizedRepos, setUncategorizedRepos] = useState<DocumentItem[]>([])
-  const [sidebarWidth, setSidebarWidth] = useState(224)
-  const [historyVersion, setHistoryVersion] = useState(0)
   const [reposVersion, setReposVersion] = useState(0)
-  const [traceView, setTraceView] = useState<{ topic: string; traceId: string } | null>(null)
 
-  const dragging = useRef(false)
   const allReposRef = useRef<RepoInfo[]>([])
   allReposRef.current = allRepos
-
-  // Load model name on mount
-  useEffect(() => {
-    api.model.get().then(info => setModelName(info.model)).catch(() => {
-      // Model API may not be available yet
-    })
-  }, [])
 
   // Load all repos (for general repo data) and uncategorized repos separately
   useEffect(() => {
@@ -80,48 +72,14 @@ export default function App() {
     })
   }, [reposVersion])
 
-  // Listen for WebSocket messages to update status bar
-  useEffect(() => {
-    return onMessage((msg) => {
-      if (msg.type === 'status') {
-        setPhase(msg.phase)
-      } else if (msg.type === 'step') {
-        setPhase(`${msg.step_type} (iter ${msg.iteration})`)
-        if (msg.prompt_tokens !== undefined) {
-          setTokens({
-            prompt: msg.prompt_tokens,
-            completion: msg.completion_tokens ?? 0,
-            total: msg.prompt_tokens + (msg.completion_tokens ?? 0),
-          })
-        }
-      } else if (msg.type === 'complete') {
-        setPhase('Ready')
-        setTokens(msg.tokens)
-        if (msg.document_bytes != null) setDocumentBytes(msg.document_bytes)
-      } else if (msg.type === 'error') {
-        setPhase('Error')
-        showToast(msg.message ?? 'Unknown error', 'error')
-      } else if (msg.type === 'cancelled') {
-        setPhase('Ready')
-      }
-    })
-  }, [onMessage])
-
   const handleTopicSelect = useCallback((name: string) => {
-    // Only reset selection when switching to a different topic;
-    // re-clicking the same topic just dismisses the detail view.
     if (name !== activeTopic) {
       setSelectedRepos(new Set())
     }
-    setActiveTopic(name)
+    sharedTopicSelect(name)
     setViewingRepo(null)
     setViewingAnalysis(null)
-    if (name) {
-      api.contextBudget(name).then(setBudget).catch(() => {
-        // Context budget may not be available for this topic
-      })
-    }
-  }, [activeTopic])
+  }, [activeTopic, sharedTopicSelect])
 
   const loadDocuments = useCallback(async (topicName: string): Promise<DocumentItem[]> => {
     const repos = await api.repos.listForTopic(topicName)
@@ -216,12 +174,7 @@ export default function App() {
     } catch {
       showToast('Failed to clear conversation', 'error')
     }
-  }, [])
-
-  const handleViewTrace = useCallback((traceId: string) => {
-    // Use activeTopic or a fallback for trace viewing
-    setTraceView({ topic: activeTopic ?? '', traceId })
-  }, [activeTopic])
+  }, [setHistoryVersion, setTokens])
 
   const handleExport = useCallback(async () => {
     try {
@@ -239,31 +192,8 @@ export default function App() {
     }
   }, [])
 
-  const handleSidebarDrag = useCallback((e: MouseEvent) => {
-    e.preventDefault()
-    dragging.current = true
-    const startX = e.clientX
-    const startWidth = sidebarWidth
-    const onMove = (ev: globalThis.MouseEvent) => {
-      if (!dragging.current) return
-      const newWidth = Math.min(600, Math.max(160, startWidth + ev.clientX - startX))
-      setSidebarWidth(newWidth)
-    }
-    const onUp = () => {
-      dragging.current = false
-      document.removeEventListener('mousemove', onMove)
-      document.removeEventListener('mouseup', onUp)
-      document.body.style.cursor = ''
-      document.body.style.userSelect = ''
-    }
-    document.addEventListener('mousemove', onMove)
-    document.addEventListener('mouseup', onUp)
-    document.body.style.cursor = 'col-resize'
-    document.body.style.userSelect = 'none'
-  }, [sidebarWidth])
-
   return (
-    <AppShell>
+    <AppShell connected={connected}>
       <Header appName="Code Explorer" isDark={dark} onToggleTheme={toggleTheme}>
         <button
           onClick={handleExport}
@@ -276,13 +206,6 @@ export default function App() {
           </svg>
         </button>
       </Header>
-
-      {/* Connection loss banner */}
-      {!connected && (
-        <div className="bg-amber/10 border-b border-amber text-amber text-sm px-4 py-1.5 text-center">
-          Connection lost. Reconnecting...
-        </div>
-      )}
 
       {/* Main content area */}
       <div className="flex-1 flex overflow-hidden">

@@ -133,7 +133,7 @@ describe('useAppState', () => {
     expect(onExtraMessage).toHaveBeenCalledWith({ type: 'citation_progress', current: 1, total: 3 })
   })
 
-  it('delegates error to onExtraMessage when provided', async () => {
+  it('delegates error to onExtraMessage without setting phase', async () => {
     let messageHandler: (msg: any) => void = () => {}
     mockOnMessage.mockImplementation((fn: any) => {
       messageHandler = fn
@@ -141,11 +141,12 @@ describe('useAppState', () => {
     })
 
     const onExtraMessage = vi.fn()
-    await renderAppState({ onExtraMessage })
+    const { result } = await renderAppState({ onExtraMessage })
     act(() => {
       messageHandler({ type: 'error', message: 'Something failed' })
     })
     expect(onExtraMessage).toHaveBeenCalledWith({ type: 'error', message: 'Something failed' })
+    expect(result.current.phase).toBe('Ready')
   })
 
   it('sets phase to Error when no onExtraMessage for error', async () => {

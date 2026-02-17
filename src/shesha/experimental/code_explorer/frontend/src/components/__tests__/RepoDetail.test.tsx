@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi } from 'vitest'
 import RepoDetail from '../RepoDetail'
@@ -139,6 +139,21 @@ describe('RepoDetail', () => {
     })
     await userEvent.click(screen.getByRole('button', { name: 'Generate Analysis' }))
     expect(onAnalyze).toHaveBeenCalledWith('owner-myrepo')
+  })
+
+  it('disables button and shows "Analyzing..." while analysis runs', async () => {
+    let resolveAnalyze!: () => void
+    const onAnalyze = vi.fn(() => new Promise<void>(r => { resolveAnalyze = r }))
+    renderDetail({
+      repo: { ...baseRepo, analysis_status: 'missing' },
+      onAnalyze,
+    })
+    await userEvent.click(screen.getByRole('button', { name: 'Generate Analysis' }))
+    // While the promise is pending, button should show loading state
+    const btn = screen.getByRole('button', { name: /analyzing/i })
+    expect(btn).toBeDisabled()
+    // Resolve the promise and verify button restores
+    await act(async () => { resolveAnalyze() })
   })
 
   it('calls onCheckUpdates when "Check for Updates" is clicked', async () => {

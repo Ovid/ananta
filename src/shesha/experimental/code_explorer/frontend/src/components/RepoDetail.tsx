@@ -1,10 +1,11 @@
+import { useState } from 'react'
 import type { RepoInfo, RepoAnalysis } from '../types'
 
 interface RepoDetailProps {
   repo: RepoInfo
   analysis: RepoAnalysis | null
   onClose: () => void
-  onAnalyze: (projectId: string) => void
+  onAnalyze: (projectId: string) => Promise<void> | void
   onCheckUpdates: (projectId: string) => void
   onRemove: (projectId: string) => void
 }
@@ -33,9 +34,19 @@ export default function RepoDetail({
   onCheckUpdates,
   onRemove,
 }: RepoDetailProps) {
+  const [analyzing, setAnalyzing] = useState(false)
   const status = repo.analysis_status
   const showGenerate = !status || status === 'missing'
   const showRegenerate = status === 'stale'
+
+  const handleAnalyze = async () => {
+    setAnalyzing(true)
+    try {
+      await onAnalyze(repo.project_id)
+    } finally {
+      setAnalyzing(false)
+    }
+  }
 
   return (
     <div className="flex-1 flex flex-col min-w-0 min-h-0">
@@ -75,20 +86,21 @@ export default function RepoDetail({
 
         {/* Action buttons */}
         <div className="flex items-center gap-3 mt-4">
-          {showGenerate && (
+          {(showGenerate || showRegenerate || analyzing) && (
             <button
-              onClick={() => onAnalyze(repo.project_id)}
-              className="px-3 py-1.5 text-xs bg-accent text-surface-0 rounded font-medium hover:bg-accent/90 transition-colors"
+              onClick={handleAnalyze}
+              disabled={analyzing}
+              className={`px-3 py-1.5 text-xs rounded font-medium transition-colors ${
+                analyzing
+                  ? 'bg-accent/50 text-surface-0 cursor-wait'
+                  : 'bg-accent text-surface-0 hover:bg-accent/90'
+              }`}
             >
-              Generate Analysis
-            </button>
-          )}
-          {showRegenerate && (
-            <button
-              onClick={() => onAnalyze(repo.project_id)}
-              className="px-3 py-1.5 text-xs bg-accent text-surface-0 rounded font-medium hover:bg-accent/90 transition-colors"
-            >
-              Regenerate Analysis
+              {analyzing
+                ? 'Analyzing\u2026'
+                : showRegenerate
+                  ? 'Regenerate Analysis'
+                  : 'Generate Analysis'}
             </button>
           )}
           <button

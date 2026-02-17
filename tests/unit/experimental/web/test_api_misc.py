@@ -46,13 +46,13 @@ def test_get_history(client: TestClient, mock_state: MagicMock, tmp_path: Path) 
     assert data["exchanges"][0]["question"] == "What is life?"
 
 
-def test_get_history_preserves_paper_ids(
+def test_get_history_preserves_document_ids(
     client: TestClient, mock_state: MagicMock, tmp_path: Path
 ) -> None:
     """Session stores consulted IDs under ``document_ids`` (shared naming).
 
-    The arxiv history endpoint must map them to ``paper_ids`` so the
-    frontend can display consulted papers.
+    The arxiv history endpoint now uses the shared schema which keeps
+    ``document_ids`` as-is.
     """
     mock_state.topic_mgr.resolve.return_value = "proj-id"
     mock_state.topic_mgr._storage._project_path.return_value = tmp_path
@@ -71,7 +71,7 @@ def test_get_history_preserves_paper_ids(
     resp = client.get("/api/topics/test-topic/history")
     assert resp.status_code == 200
     exchange = resp.json()["exchanges"][0]
-    assert exchange["paper_ids"] == ["2005.09008v1", "2401.12345"]
+    assert exchange["document_ids"] == ["2005.09008v1", "2401.12345"]
 
 
 def test_clear_history(client: TestClient, mock_state: MagicMock, tmp_path: Path) -> None:

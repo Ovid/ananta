@@ -2,16 +2,14 @@
 
 Uses the shared app factory for boilerplate (lifespan, CORS, ``.well-known``
 catch-all, WebSocket endpoint, static file mounting) and registers
-arxiv-specific routes (topics with ``paper_count``, papers, search) plus
-generic routes (traces, history, model, context-budget) on a local router.
+arxiv-specific routes (topics, papers, search) plus generic routes (traces,
+history, model, context-budget) on a local router.
 
 The shared ``create_shared_router()`` is *not* used directly because the arxiv
-explorer has several incompatibilities: the topic listing returns
-``paper_count`` (not ``document_count``), history is stored in
+explorer has several incompatibilities: history is stored in
 ``_conversation.json`` (not ``conversation.json``), and the topic manager
 does not expose ``resolve_all()``.  These routes are therefore kept here with
-identical logic to the shared versions but arxiv-flavoured field names and
-session handling.
+identical logic to the shared versions.
 """
 
 from __future__ import annotations
@@ -77,8 +75,8 @@ def _parse_trace_file(trace_file: Path) -> dict[str, object]:
 def _create_arxiv_router(state: AppState) -> APIRouter:
     """Build the arxiv-specific API router.
 
-    Contains topic CRUD (with ``paper_count``), paper management, search,
-    traces, history/export, model management, and context-budget routes.
+    Contains topic CRUD, paper management, search, traces, history/export,
+    model management, and context-budget routes.
     """
     router = APIRouter()
 
@@ -90,7 +88,7 @@ def _create_arxiv_router(state: AppState) -> APIRouter:
         return [
             TopicInfo(
                 name=t.name,
-                paper_count=t.paper_count,
+                document_count=t.paper_count,
                 size=t.formatted_size,
                 project_id=t.project_id,
             )

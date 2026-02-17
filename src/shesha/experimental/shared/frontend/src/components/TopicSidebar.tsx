@@ -216,9 +216,8 @@ export default function TopicSidebar({
     <aside className="border-r border-border bg-surface-1 flex flex-col shrink-0" style={style}>
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-        <span className="text-xs text-text-dim font-semibold uppercase tracking-wider">Topics</span>
         <div className="flex items-center gap-1">
-          {addButton}
+          <span className="text-xs text-text-dim font-semibold uppercase tracking-wider">Topics</span>
           <button
             onClick={() => { setCreating(true); setNewName('') }}
             className="text-text-dim hover:text-accent transition-colors text-lg leading-none"
@@ -227,6 +226,7 @@ export default function TopicSidebar({
             +
           </button>
         </div>
+        {addButton}
       </div>
 
       {/* Topic list */}

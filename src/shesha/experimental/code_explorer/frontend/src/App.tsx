@@ -262,7 +262,7 @@ export default function App() {
   }, [sidebarWidth])
 
   return (
-    <div className="h-screen flex flex-col bg-surface-0 text-text-primary font-sans">
+    <div className="h-screen flex flex-col overflow-hidden bg-surface-0 text-text-primary font-sans">
       <Header appName="Code Explorer" isDark={dark} onToggleTheme={toggleTheme}>
         <button
           onClick={handleExport}

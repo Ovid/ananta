@@ -32,7 +32,7 @@ vi.mock('@shesha/shared-ui', async () => {
 vi.mock('../api/client', () => ({
   api: {
     model: { get: vi.fn().mockResolvedValue({ model: 'test-model' }) },
-    repos: { list: vi.fn().mockResolvedValue([]), analyze: vi.fn(), getAnalysis: vi.fn(), checkUpdates: vi.fn(), delete: vi.fn() },
+    repos: { list: vi.fn().mockResolvedValue([]), listUncategorized: vi.fn().mockResolvedValue([]), analyze: vi.fn(), getAnalysis: vi.fn(), checkUpdates: vi.fn(), delete: vi.fn() },
     topics: {
       list: vi.fn().mockResolvedValue([]),
       create: vi.fn(),
@@ -107,5 +107,12 @@ describe('App', () => {
     const footer = document.querySelector('footer')
     expect(footer).toBeInTheDocument()
     expect(within(footer!).getByText('Ready')).toBeInTheDocument()
+  })
+
+  it('root container prevents horizontal overflow', async () => {
+    const { container } = render(<App />)
+    await flush()
+    const root = container.firstElementChild as HTMLElement
+    expect(root.className).toMatch(/overflow-hidden/)
   })
 })

@@ -391,6 +391,25 @@ describe('TopicSidebar (shared)', () => {
     expect(removeDocFromTopic).toHaveBeenCalledWith('doc-1', 'chess')
   })
 
+  it('renders doc menu on uncategorized docs with only "Add to..." (no remove)', async () => {
+    const addDocToTopic = vi.fn().mockResolvedValue(undefined)
+    const uncatDocs: DocumentItem[] = [
+      { id: 'uncat-1', label: 'Orphan Doc' },
+    ]
+    const props = defaultProps({
+      uncategorizedDocs: uncatDocs,
+      addDocToTopic,
+    })
+    render(<TopicSidebar {...props} />)
+
+    await screen.findByText('chess') // wait for topics to load
+    const menuBtn = screen.getByTitle('Document actions')
+    await userEvent.click(menuBtn)
+
+    expect(screen.getByText('Add to\u2026')).toBeInTheDocument()
+    expect(screen.queryByText(/Remove from/)).not.toBeInTheDocument()
+  })
+
   it('shows viewing highlight on the document with viewingDocumentId', async () => {
     const props = defaultProps({
       activeTopic: 'chess',

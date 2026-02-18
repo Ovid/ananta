@@ -364,6 +364,32 @@ class TestContainerExecutor:
         mock_client.close.assert_called_once()
 
     @patch("shesha.sandbox.executor.docker")
+    def test_executor_closes_urllib3_pools_on_stop(self, mock_docker: MagicMock):
+        """Executor closes urllib3 connection pools before closing DockerClient.
+
+        requests.Session.close() calls PoolManager.clear() which drops pool
+        references without calling pool.close().  Orphaned HTTPResponse objects
+        then trigger ValueError during interpreter shutdown.  Explicitly closing
+        each pool first prevents this.
+        """
+        mock_pool = MagicMock()
+        mock_adapter = MagicMock()
+        mock_adapter.poolmanager.pools.lock = MagicMock()
+        mock_adapter.poolmanager.pools._container = {"key": mock_pool}
+
+        mock_client = MagicMock()
+        mock_client.api.adapters = {"https://": mock_adapter}
+        mock_docker.from_env.return_value = mock_client
+        mock_container = MagicMock()
+        mock_client.containers.run.return_value = mock_container
+
+        executor = ContainerExecutor(image="shesha-sandbox")
+        executor.start()
+        executor.stop()
+
+        mock_pool.close.assert_called_once()
+
+    @patch("shesha.sandbox.executor.docker")
     def test_start_raises_clear_error_when_docker_not_running(self, mock_docker: MagicMock):
         """Executor provides clear error message when Docker daemon is not running.
 

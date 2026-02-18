@@ -121,11 +121,33 @@ class ContainerExecutor:
                 pass  # Container may already be removed
             self._container = None
         if self._client:
+            self._close_urllib3_pools()
             try:
                 self._client.close()
             except Exception:
                 pass  # Client may already be closed or daemon unavailable
             self._client = None
+
+    def _close_urllib3_pools(self) -> None:
+        """Close urllib3 connection pools inside the Docker client's session.
+
+        ``requests.Session.close()`` calls ``PoolManager.clear()`` which
+        drops pool references without calling ``pool.close()``.  Orphaned
+        ``http.client.HTTPResponse`` objects then trigger ``ValueError``
+        during interpreter shutdown when their finalizer flushes an
+        already-closed socket.  Closing each pool explicitly avoids this.
+        """
+        try:
+            for adapter in self._client.api.adapters.values():  # type: ignore[union-attr]
+                pool_manager = getattr(adapter, "poolmanager", None)
+                if pool_manager is None:
+                    continue
+                with pool_manager.pools.lock:
+                    pools = list(pool_manager.pools._container.values())
+                for pool in pools:
+                    pool.close()
+        except Exception:
+            pass  # Best-effort cleanup; don't mask real errors
 
     def setup_context(self, context: list[str]) -> None:
         """Initialize the context variable in the container."""

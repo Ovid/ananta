@@ -24,6 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Shared ChatArea and ChatMessage components** — extracted parameterized versions to shared-ui package with `selectedDocuments`/`document_ids` naming, optional `renderAnswer` and `renderAnswerFooter` props for domain-specific customization
 - **Shared TopicSidebar component** — extracted parameterized TopicSidebar to shared-ui package with `loadDocuments`/`DocumentItem` abstraction, cross-topic selection scoping (All/None buttons only affect current topic), optional uncategorized docs section, and configurable add button
 - **Repo-to-topic context menu** — document rows in the Code Explorer sidebar now have an ellipsis menu to add repos to topics or remove them, enabling multi-topic assignment without re-adding
+- **Boundary marker rendering** — UNTRUSTED_CONTENT boundary markers that leak into RLM answers are now displayed as labeled blockquotes instead of raw tokens
+- **RLM context metadata** — document names are now included in context metadata so the RLM can reference files by name
+- **FallbackTextParser file headers** — non-code documents now include `=== FILE: name ===` headers matching CodeParser format, helping the RLM identify document boundaries
 
 ### Changed
 

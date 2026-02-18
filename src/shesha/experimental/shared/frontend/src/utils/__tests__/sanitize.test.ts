@@ -62,4 +62,14 @@ describe('stripBoundaryMarkers', () => {
     expect(result).toContain('> Content')
     expect(result).not.toContain('UNTRUSTED_CONTENT')
   })
+
+  it('leaves orphan BEGIN marker untouched when no END is present', () => {
+    const input = `Text ${BOUNDARY}_BEGIN\nContent without end`
+    expect(stripBoundaryMarkers(input)).toBe(input)
+  })
+
+  it('leaves orphan END marker untouched when no BEGIN is present', () => {
+    const input = `Content without begin\n${BOUNDARY}_END rest`
+    expect(stripBoundaryMarkers(input)).toBe(input)
+  })
 })

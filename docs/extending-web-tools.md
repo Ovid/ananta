@@ -303,7 +303,7 @@ extracts all common state management (theme, WebSocket, model loading, tokens,
 sidebar drag, topic selection, trace viewing) into a single hook:
 
 ```tsx
-import { AppShell, useAppState, StatusBar, TraceViewer, ToastContainer } from '@shesha/shared-ui'
+import { AppShell, useAppState, StatusBar, TraceViewer, ToastContainer, showToast } from '@shesha/shared-ui'
 
 export default function App() {
   const {

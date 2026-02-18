@@ -328,6 +328,23 @@ describe('TopicSidebar (shared)', () => {
     expect(menuButtons.length).toBeGreaterThanOrEqual(2) // 2 chess docs
   })
 
+  it('shows "Add to..." submenu with available topics when doc menu is clicked', async () => {
+    const addDocToTopic = vi.fn()
+    const props = defaultProps({
+      activeTopic: 'chess',
+      loadDocuments: vi.fn().mockResolvedValue(chessDocs),
+      addDocToTopic,
+    })
+    render(<TopicSidebar {...props} />)
+
+    await screen.findByText('Chess Strategies')
+    const menuButtons = screen.getAllByTitle('Document actions')
+    await userEvent.click(menuButtons[0])
+
+    // Should show "Add to..." menu item
+    expect(screen.getByText('Add to\u2026')).toBeInTheDocument()
+  })
+
   it('shows viewing highlight on the document with viewingDocumentId', async () => {
     const props = defaultProps({
       activeTopic: 'chess',

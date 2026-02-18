@@ -1,5 +1,5 @@
 const BOUNDARY_RE =
-  /UNTRUSTED_CONTENT_[0-9a-f]{32}_BEGIN\n?([\s\S]*?)\n?UNTRUSTED_CONTENT_[0-9a-f]{32}_END/g
+  /UNTRUSTED_CONTENT_([0-9a-f]{32})_BEGIN\n?([\s\S]*?)\n?UNTRUSTED_CONTENT_\1_END/g
 
 /**
  * Replace UNTRUSTED_CONTENT boundary markers with markdown blockquotes.
@@ -9,7 +9,7 @@ const BOUNDARY_RE =
  * This converts them to labeled blockquotes for display.
  */
 export function stripBoundaryMarkers(text: string): string {
-  return text.replace(BOUNDARY_RE, (_match, content: string) => {
+  return text.replace(BOUNDARY_RE, (_match, _hex: string, content: string) => {
     const lines = content.split('\n')
     const quoted = lines.map(line => (line === '' ? '>' : `> ${line}`))
     return `> **Quoted content**\n>\n${quoted.join('\n')}`

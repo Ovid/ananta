@@ -72,4 +72,11 @@ describe('stripBoundaryMarkers', () => {
     const input = `Content without begin\n${BOUNDARY}_END rest`
     expect(stripBoundaryMarkers(input)).toBe(input)
   })
+
+  it('does not match when BEGIN and END hex values differ', () => {
+    const hex1 = 'a'.repeat(32)
+    const hex2 = 'b'.repeat(32)
+    const input = `UNTRUSTED_CONTENT_${hex1}_BEGIN\nContent\nUNTRUSTED_CONTENT_${hex2}_END`
+    expect(stripBoundaryMarkers(input)).toBe(input)
+  })
 })

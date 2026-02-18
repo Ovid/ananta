@@ -173,7 +173,7 @@ export default function TopicSidebar({
             })
             if (eligible.length === 0) return null
             return (
-              <div className="relative">
+              <>
                 <button
                   className="block w-full text-left px-3 py-1.5 hover:bg-surface-1 text-text-secondary"
                   onClick={e => {
@@ -183,29 +183,25 @@ export default function TopicSidebar({
                 >
                   Add to&hellip;
                 </button>
-                {docSubmenuOpen && (
-                  <div className="absolute left-full top-0 z-30 bg-surface-2 border border-border rounded shadow-lg text-xs min-w-[120px]">
-                    {eligible.map(t => (
-                      <button
-                        key={t.name}
-                        className="block w-full text-left px-3 py-1.5 hover:bg-surface-1 text-text-secondary"
-                        onClick={async e => {
-                          e.stopPropagation()
-                          try {
-                            await addDocToTopic(doc.id, t.name)
-                            showToast(`Added to ${t.name}`, 'success')
-                          } catch {
-                            showToast(`Failed to add to ${t.name}`, 'error')
-                          }
-                          setDocMenuOpen(null)
-                        }}
-                      >
-                        {t.name}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+                {docSubmenuOpen && eligible.map(t => (
+                  <button
+                    key={t.name}
+                    className="block w-full text-left px-3 py-1.5 hover:bg-surface-1 text-text-secondary pl-6"
+                    onClick={async e => {
+                      e.stopPropagation()
+                      try {
+                        await addDocToTopic(doc.id, t.name)
+                        showToast(`Added to ${t.name}`, 'success')
+                      } catch {
+                        showToast(`Failed to add to ${t.name}`, 'error')
+                      }
+                      setDocMenuOpen(null)
+                    }}
+                  >
+                    {t.name}
+                  </button>
+                ))}
+              </>
             )
           })()}
           {removeDocFromTopic && topicName && (

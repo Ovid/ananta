@@ -161,6 +161,16 @@ export default function App() {
     }
   }, [])
 
+  const handleAddDocToTopic = useCallback(async (docId: string, topicName: string) => {
+    await api.topicRepos.add(topicName, docId)
+    setReposVersion(v => v + 1)
+  }, [])
+
+  const handleRemoveDocFromTopic = useCallback(async (docId: string, topicName: string) => {
+    await api.topicRepos.remove(topicName, docId)
+    setReposVersion(v => v + 1)
+  }, [])
+
   // Global history (ignores topic param since code explorer history is global)
   const loadHistory = useCallback(async (_topic: string): Promise<Exchange[]> => {
     const data = await api.history.get()
@@ -234,6 +244,8 @@ export default function App() {
               + Repo
             </button>
           }
+          addDocToTopic={handleAddDocToTopic}
+          removeDocFromTopic={handleRemoveDocFromTopic}
           uncategorizedDocs={uncategorizedRepos}
           viewingDocumentId={viewingRepo?.project_id}
           style={{ width: sidebarWidth }}

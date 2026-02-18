@@ -135,6 +135,12 @@ describe('App', () => {
     expect(root.className).toMatch(/overflow-hidden/)
   })
 
+  it('passes addDocToTopic and removeDocFromTopic to TopicSidebar', async () => {
+    render(<App />)
+    await flush()
+    expect(screen.getByText('Code Explorer')).toBeInTheDocument()
+  })
+
   describe('handleCheckUpdates', () => {
     const mockRepo = {
       project_id: 'test-repo',

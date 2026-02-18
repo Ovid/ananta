@@ -302,6 +302,32 @@ describe('TopicSidebar (shared)', () => {
     expect(aside.style.width).toBe('300px')
   })
 
+  it('does not render doc menu button when addDocToTopic is not provided', async () => {
+    const props = defaultProps({
+      activeTopic: 'chess',
+      loadDocuments: vi.fn().mockResolvedValue(chessDocs),
+    })
+    render(<TopicSidebar {...props} />)
+
+    await screen.findByText('Chess Strategies')
+    // No ellipsis menu buttons should exist on document rows
+    expect(screen.queryAllByTitle('Document actions')).toHaveLength(0)
+  })
+
+  it('renders doc menu button when addDocToTopic is provided', async () => {
+    const props = defaultProps({
+      activeTopic: 'chess',
+      loadDocuments: vi.fn().mockResolvedValue(chessDocs),
+      addDocToTopic: vi.fn(),
+    })
+    render(<TopicSidebar {...props} />)
+
+    await screen.findByText('Chess Strategies')
+    // Each doc row should have an ellipsis menu button
+    const menuButtons = screen.getAllByTitle('Document actions')
+    expect(menuButtons.length).toBeGreaterThanOrEqual(2) // 2 chess docs
+  })
+
   it('shows viewing highlight on the document with viewingDocumentId', async () => {
     const props = defaultProps({
       activeTopic: 'chess',

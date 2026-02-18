@@ -18,6 +18,8 @@ export interface TopicSidebarProps {
   createTopic: (name: string) => Promise<void>
   renameTopic: (oldName: string, newName: string) => Promise<void>
   deleteTopic: (name: string) => Promise<void>
+  addDocToTopic?: (docId: string, topicName: string) => Promise<void>
+  removeDocFromTopic?: (docId: string, topicName: string) => Promise<void>
   addButton?: ReactNode
   uncategorizedDocs?: DocumentItem[]
   viewingDocumentId?: string | null
@@ -38,6 +40,8 @@ export default function TopicSidebar({
   createTopic,
   renameTopic,
   deleteTopic,
+  addDocToTopic,
+  removeDocFromTopic,
   addButton,
   uncategorizedDocs,
   viewingDocumentId,
@@ -174,7 +178,7 @@ export default function TopicSidebar({
       {docs.map(doc => (
         <div
           key={doc.id}
-          className={`flex items-center gap-1 px-3 pl-7 py-1 text-xs cursor-pointer ${
+          className={`group flex items-center gap-1 px-3 pl-7 py-1 text-xs cursor-pointer ${
             viewingDocumentId === doc.id
               ? 'bg-accent-dim text-accent'
               : 'text-text-secondary hover:bg-surface-2'
@@ -207,6 +211,15 @@ export default function TopicSidebar({
           >
             {doc.label}
           </span>
+          {addDocToTopic && (
+            <button
+              title="Document actions"
+              onClick={e => e.stopPropagation()}
+              className="ml-auto opacity-0 group-hover:opacity-100 text-text-dim hover:text-text-secondary transition-opacity text-xs px-1"
+            >
+              &hellip;
+            </button>
+          )}
         </div>
       ))}
     </div>
@@ -346,7 +359,7 @@ export default function TopicSidebar({
             {uncategorizedDocs.map(doc => (
               <div
                 key={doc.id}
-                className={`flex items-center gap-1 px-3 pl-7 py-1 text-xs cursor-pointer ${
+                className={`group flex items-center gap-1 px-3 pl-7 py-1 text-xs cursor-pointer ${
                   viewingDocumentId === doc.id
                     ? 'bg-accent-dim text-accent'
                     : 'text-text-secondary hover:bg-surface-2'
@@ -378,6 +391,15 @@ export default function TopicSidebar({
                 >
                   {doc.label}
                 </span>
+                {addDocToTopic && (
+                  <button
+                    title="Document actions"
+                    onClick={e => e.stopPropagation()}
+                    className="ml-auto opacity-0 group-hover:opacity-100 text-text-dim hover:text-text-secondary transition-opacity text-xs px-1"
+                  >
+                    &hellip;
+                  </button>
+                )}
               </div>
             ))}
           </div>

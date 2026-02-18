@@ -341,8 +341,9 @@ describe('TopicSidebar (shared)', () => {
     const menuButtons = screen.getAllByTitle('Document actions')
     await userEvent.click(menuButtons[0])
 
-    // Should show "Add to..." menu item
+    // Should show "Add to..." menu item but not "Remove from" (removeDocFromTopic not provided)
     expect(screen.getByText('Add to\u2026')).toBeInTheDocument()
+    expect(screen.queryByText(/Remove from/)).not.toBeInTheDocument()
   })
 
   it('calls addDocToTopic when a topic is selected from submenu', async () => {

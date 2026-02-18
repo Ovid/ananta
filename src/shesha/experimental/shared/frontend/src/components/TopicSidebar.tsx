@@ -166,25 +166,26 @@ export default function TopicSidebar({
       )}
       {docMenuOpen === doc.id && (
         <div className="absolute right-0 top-full z-20 bg-surface-2 border border-border rounded shadow-lg text-xs min-w-[140px]">
-          {addDocToTopic && topics.length > 0 && (
-            <div className="relative">
-              <button
-                className="block w-full text-left px-3 py-1.5 hover:bg-surface-1 text-text-secondary"
-                onClick={e => {
-                  e.stopPropagation()
-                  setDocSubmenuOpen(!docSubmenuOpen)
-                }}
-              >
-                Add to&hellip;
-              </button>
-              {docSubmenuOpen && (
-                <div className="absolute left-full top-0 z-30 bg-surface-2 border border-border rounded shadow-lg text-xs min-w-[120px]">
-                  {topics
-                    .filter(t => {
-                      const loaded = topicDocs[t.name]
-                      return !loaded || !loaded.some(d => d.id === doc.id)
-                    })
-                    .map(t => (
+          {addDocToTopic && (() => {
+            const eligible = topics.filter(t => {
+              const loaded = topicDocs[t.name]
+              return !loaded || !loaded.some(d => d.id === doc.id)
+            })
+            if (eligible.length === 0) return null
+            return (
+              <div className="relative">
+                <button
+                  className="block w-full text-left px-3 py-1.5 hover:bg-surface-1 text-text-secondary"
+                  onClick={e => {
+                    e.stopPropagation()
+                    setDocSubmenuOpen(!docSubmenuOpen)
+                  }}
+                >
+                  Add to&hellip;
+                </button>
+                {docSubmenuOpen && (
+                  <div className="absolute left-full top-0 z-30 bg-surface-2 border border-border rounded shadow-lg text-xs min-w-[120px]">
+                    {eligible.map(t => (
                       <button
                         key={t.name}
                         className="block w-full text-left px-3 py-1.5 hover:bg-surface-1 text-text-secondary"
@@ -202,10 +203,11 @@ export default function TopicSidebar({
                         {t.name}
                       </button>
                     ))}
-                </div>
-              )}
-            </div>
-          )}
+                  </div>
+                )}
+              </div>
+            )
+          })()}
           {removeDocFromTopic && topicName && (
             <button
               className="block w-full text-left px-3 py-1.5 hover:bg-surface-1 text-red"

@@ -163,6 +163,19 @@ describe('RepoDetail', () => {
     expect(onCheckUpdates).toHaveBeenCalledWith('owner-myrepo')
   })
 
+  it('disables button and shows "Checking…" while update check runs', async () => {
+    let resolveCheck!: () => void
+    const onCheckUpdates = vi.fn(() => new Promise<void>(r => { resolveCheck = r }))
+    renderDetail({ onCheckUpdates })
+    await userEvent.click(screen.getByRole('button', { name: 'Check for Updates' }))
+    // While the promise is pending, button should show loading state
+    const btn = screen.getByRole('button', { name: /checking/i })
+    expect(btn).toBeDisabled()
+    // Resolve the promise and verify button restores
+    await act(async () => { resolveCheck() })
+    expect(screen.getByRole('button', { name: 'Check for Updates' })).toBeEnabled()
+  })
+
   it('calls onRemove when "Remove" is clicked', async () => {
     const onRemove = vi.fn()
     renderDetail({ onRemove })

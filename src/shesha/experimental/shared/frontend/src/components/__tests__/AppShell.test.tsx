@@ -36,4 +36,19 @@ describe('AppShell', () => {
     expect(root.className).toMatch(/text-text-primary/)
     expect(root.className).toMatch(/font-sans/)
   })
+
+  it('shows connection lost banner when connected is false', () => {
+    render(<AppShell connected={false}>Content</AppShell>)
+    expect(screen.getByText(/Connection lost/)).toBeTruthy()
+  })
+
+  it('hides connection lost banner when connected is true', () => {
+    render(<AppShell connected={true}>Content</AppShell>)
+    expect(screen.queryByText(/Connection lost/)).toBeNull()
+  })
+
+  it('hides connection lost banner by default', () => {
+    render(<AppShell>Content</AppShell>)
+    expect(screen.queryByText(/Connection lost/)).toBeNull()
+  })
 })

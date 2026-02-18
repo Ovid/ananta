@@ -20,7 +20,7 @@ PROMPT_SCHEMAS: dict[str, PromptSchema] = {
     ),
     "context_metadata.md": PromptSchema(
         required={"context_type", "context_total_length", "context_lengths"},
-        optional=set(),
+        optional={"doc_names"},
     ),
     "subcall.md": PromptSchema(
         required={"instruction", "content"},

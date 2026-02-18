@@ -1,7 +1,7 @@
 import { useCallback, useRef, type CSSProperties } from 'react'
 
 import { TopicSidebar as SharedTopicSidebar } from '@shesha/shared-ui'
-import type { TopicInfo as SharedTopicInfo, DocumentItem } from '@shesha/shared-ui'
+import type { TopicInfo, DocumentItem } from '@shesha/shared-ui'
 import { api } from '../api/client'
 import type { PaperInfo } from '../types'
 
@@ -39,14 +39,8 @@ export default function TopicSidebar({
   // in onDocumentClick and onDocumentsLoaded callbacks.
   const paperMapRef = useRef<Map<string, PaperInfo>>(new Map())
 
-  const loadTopics = useCallback(async (): Promise<SharedTopicInfo[]> => {
-    const topics = await api.topics.list()
-    return topics.map(t => ({
-      name: t.name,
-      document_count: t.paper_count,
-      size: t.size,
-      project_id: t.project_id,
-    }))
+  const loadTopics = useCallback(async (): Promise<TopicInfo[]> => {
+    return api.topics.list()
   }, [])
 
   const loadDocuments = useCallback(async (topicName: string): Promise<DocumentItem[]> => {

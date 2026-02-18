@@ -20,11 +20,11 @@ def test_topic_create():
 def test_topic_info():
     t = TopicInfo(
         name="Abiogenesis",
-        paper_count=5,
+        document_count=5,
         size="2.3 MB",
         project_id="2026-02-12-abiogenesis",
     )
-    assert t.paper_count == 5
+    assert t.document_count == 5
 
 
 def test_paper_add_multi_topic():

@@ -469,6 +469,7 @@ class RLMEngine:
             context_type=context_type,
             context_total_length=total_chars,
             context_lengths=context_lengths,
+            doc_names=doc_names,
         )
 
         # Set up incremental trace writer

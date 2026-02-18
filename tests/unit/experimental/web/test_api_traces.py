@@ -15,6 +15,9 @@ def mock_state() -> MagicMock:
     state = MagicMock()
     state.model = "test-model"
     state.download_tasks = {}
+    # The arxiv TopicManager does not have resolve_all; delete it so the
+    # shared router's _resolve_all_project_ids falls back to resolve().
+    del state.topic_mgr.resolve_all
     return state
 
 

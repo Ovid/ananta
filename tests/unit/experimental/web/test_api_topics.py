@@ -48,7 +48,7 @@ def test_list_topics(client: TestClient, mock_state: MagicMock) -> None:
     data = resp.json()
     assert len(data) == 1
     assert data[0]["name"] == "Abiogenesis"
-    assert data[0]["paper_count"] == 5
+    assert data[0]["document_count"] == 5
 
 
 def test_create_topic(client: TestClient, mock_state: MagicMock) -> None:

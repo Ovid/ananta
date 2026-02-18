@@ -24,7 +24,7 @@ const baseExchange: Exchange = {
   execution_time: 5.0,
   trace_id: 'trace-1',
   model: 'test-model',
-  paper_ids: ['2005.09008v1'],
+  document_ids: ['2005.09008v1'],
 }
 
 describe('ChatMessage citation rendering', () => {
@@ -101,7 +101,7 @@ describe('ChatMessage citation rendering', () => {
     const exchange: Exchange = {
       ...baseExchange,
       answer: 'Compare [@arxiv:2005.09008v1] with [@arxiv:2401.12345].',
-      paper_ids: ['2005.09008v1', '2401.12345'],
+      document_ids: ['2005.09008v1', '2401.12345'],
     }
     render(
       <ChatMessage
@@ -130,7 +130,7 @@ describe('ChatMessage citation rendering', () => {
     const exchange: Exchange = {
       ...baseExchange,
       answer: 'See [@arxiv:2005.09008v1; @arxiv:2401.12345] for details.',
-      paper_ids: ['2005.09008v1', '2401.12345'],
+      document_ids: ['2005.09008v1', '2401.12345'],
     }
     render(
       <ChatMessage
@@ -158,7 +158,7 @@ describe('ChatMessage citation rendering', () => {
     const exchange: Exchange = {
       ...baseExchange,
       answer: 'See [@arxiv:astro-ph/0601001v1] for details.',
-      paper_ids: ['astro-ph/0601001v1'],
+      document_ids: ['astro-ph/0601001v1'],
     }
     render(
       <ChatMessage

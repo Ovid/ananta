@@ -104,9 +104,39 @@ class TestFallbackParse:
 
         doc = parser.parse(text_file, include_line_numbers=True)
 
-        assert "1 |" in doc.content
-        assert "2 |" in doc.content
-        assert "3 |" in doc.content
+        assert "1| #!/bin/bash" in doc.content
+        assert "2| echo hello" in doc.content
+        assert "3| exit 0" in doc.content
+
+    def test_parse_includes_file_header_with_line_numbers(self, tmp_path: Path) -> None:
+        """parse prepends === FILE: path === header when include_line_numbers is True."""
+        parser = FallbackTextParser()
+        text_file = tmp_path / "readme.md"
+        text_file.write_text("# Hello\nWorld")
+
+        doc = parser.parse(text_file, include_line_numbers=True, file_path="docs/readme.md")
+
+        assert doc.content.startswith("=== FILE: docs/readme.md ===\n")
+
+    def test_parse_file_header_uses_basename_without_file_path(self, tmp_path: Path) -> None:
+        """parse uses path.name for header when file_path is not provided."""
+        parser = FallbackTextParser()
+        text_file = tmp_path / "config.yml"
+        text_file.write_text("key: value")
+
+        doc = parser.parse(text_file, include_line_numbers=True)
+
+        assert doc.content.startswith("=== FILE: config.yml ===\n")
+
+    def test_parse_no_file_header_without_line_numbers(self, tmp_path: Path) -> None:
+        """parse does not add file header when include_line_numbers is False."""
+        parser = FallbackTextParser()
+        text_file = tmp_path / "readme.md"
+        text_file.write_text("# Hello")
+
+        doc = parser.parse(text_file)
+
+        assert not doc.content.startswith("=== FILE:")
 
     def test_parse_respects_file_path_override(self, tmp_path: Path) -> None:
         """parse uses file_path parameter for document name."""

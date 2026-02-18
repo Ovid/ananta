@@ -1,32 +1,14 @@
 import type {
-  TopicInfo as SharedTopicInfo,
-  TraceStep,
-  TraceListItem,
-  TraceFull,
-  Exchange as SharedExchange,
-  ContextBudget,
-  ModelInfo,
   WSMessage as SharedWSMessage,
 } from '@shesha/shared-ui'
 
-// Re-export shared types that are used as-is in the arxiv frontend.
-export type { TraceStep, TraceListItem, TraceFull, ContextBudget, ModelInfo }
+// Re-export shared types directly — no more overrides
+export type { TopicInfo, TraceStep, TraceListItem, TraceFull, ContextBudget, ModelInfo, Exchange } from '@shesha/shared-ui'
 
-// Arxiv-specific: TopicInfo uses paper_count (alias for document_count).
-export interface TopicInfo extends Omit<SharedTopicInfo, 'document_count'> {
-  paper_count: number
-}
-
-// Arxiv-specific: Exchange uses paper_ids (alias for document_ids).
-export interface Exchange extends Omit<SharedExchange, 'document_ids'> {
-  paper_ids?: string[]
-}
-
-// Arxiv-specific: WSMessage extends shared with paper_ids on complete
-// and adds citation-related message types.
+// Arxiv WSMessage extends shared with citation-related message types.
+// The shared 'complete' message already includes document_ids.
 export type WSMessage =
-  | Exclude<SharedWSMessage, { type: 'complete' }>
-  | { type: 'complete'; answer: string; trace_id: string | null; tokens: { prompt: number; completion: number; total: number }; duration_ms: number; paper_ids?: string[]; document_bytes?: number }
+  | SharedWSMessage
   | { type: 'citation_progress'; current: number; total: number; phase?: string }
   | { type: 'citation_report'; papers: PaperReport[] }
 

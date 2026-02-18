@@ -1,18 +1,8 @@
 import { request, sharedApi } from '@shesha/shared-ui'
-import type { TopicInfo, PaperInfo, SearchResult, Exchange } from '../types'
+import type { PaperInfo, SearchResult } from '../types'
 
 export const api = {
   ...sharedApi,
-  // Override topics.list to return arxiv TopicInfo (with paper_count instead of document_count)
-  topics: {
-    ...sharedApi.topics,
-    list: () => request<TopicInfo[]>('/topics'),
-  },
-  // Override history.get to return arxiv Exchange (with paper_ids instead of document_ids)
-  history: {
-    ...sharedApi.history,
-    get: (topic: string) => request<{ exchanges: Exchange[] }>(`/topics/${encodeURIComponent(topic)}/history`),
-  },
   // Arxiv-specific: paper management
   papers: {
     list: (topic: string) => request<PaperInfo[]>(`/topics/${encodeURIComponent(topic)}/papers`),

@@ -18,6 +18,8 @@ export interface TopicSidebarProps {
   createTopic: (name: string) => Promise<void>
   renameTopic: (oldName: string, newName: string) => Promise<void>
   deleteTopic: (name: string) => Promise<void>
+  addDocToTopic?: (docId: string, topicName: string) => Promise<void>
+  removeDocFromTopic?: (docId: string, topicName: string) => Promise<void>
   addButton?: ReactNode
   uncategorizedDocs?: DocumentItem[]
   viewingDocumentId?: string | null
@@ -38,6 +40,8 @@ export default function TopicSidebar({
   createTopic,
   renameTopic,
   deleteTopic,
+  addDocToTopic,
+  removeDocFromTopic,
   addButton,
   uncategorizedDocs,
   viewingDocumentId,
@@ -52,6 +56,8 @@ export default function TopicSidebar({
   const [expandedTopic, setExpandedTopic] = useState<string | null>(null)
   const [topicDocs, setTopicDocs] = useState<Record<string, DocumentItem[]>>({})
   const [deletingTopic, setDeletingTopic] = useState<string | null>(null)
+  const [docMenuOpen, setDocMenuOpen] = useState<string | null>(null)
+  const [docSubmenuOpen, setDocSubmenuOpen] = useState(false)
 
   const refreshTopics = async () => {
     try {
@@ -143,6 +149,83 @@ export default function TopicSidebar({
     }
   }
 
+  const renderDocMenu = (doc: DocumentItem, topicName: string | null) => (
+    <>
+      {addDocToTopic && (
+        <button
+          title="Document actions"
+          onClick={e => {
+            e.stopPropagation()
+            setDocMenuOpen(docMenuOpen === doc.id ? null : doc.id)
+            setDocSubmenuOpen(false)
+          }}
+          className="ml-auto opacity-0 group-hover:opacity-100 text-text-dim hover:text-text-secondary transition-opacity text-xs px-1"
+        >
+          &hellip;
+        </button>
+      )}
+      {docMenuOpen === doc.id && (
+        <div className="absolute right-0 top-full z-20 bg-surface-2 border border-border rounded shadow-lg text-xs min-w-[140px]">
+          {addDocToTopic && (() => {
+            const eligible = topics.filter(t => {
+              const loaded = topicDocs[t.name]
+              return !loaded || !loaded.some(d => d.id === doc.id)
+            })
+            if (eligible.length === 0) return null
+            return (
+              <>
+                <button
+                  className="block w-full text-left px-3 py-1.5 hover:bg-surface-1 text-text-secondary"
+                  onClick={e => {
+                    e.stopPropagation()
+                    setDocSubmenuOpen(!docSubmenuOpen)
+                  }}
+                >
+                  Add to&hellip;
+                </button>
+                {docSubmenuOpen && eligible.map(t => (
+                  <button
+                    key={t.name}
+                    className="block w-full text-left px-3 py-1.5 hover:bg-surface-1 text-text-secondary pl-6"
+                    onClick={async e => {
+                      e.stopPropagation()
+                      try {
+                        await addDocToTopic(doc.id, t.name)
+                        showToast(`Added to ${t.name}`, 'success')
+                      } catch {
+                        showToast(`Failed to add to ${t.name}`, 'error')
+                      }
+                      setDocMenuOpen(null)
+                    }}
+                  >
+                    {t.name}
+                  </button>
+                ))}
+              </>
+            )
+          })()}
+          {removeDocFromTopic && topicName && (
+            <button
+              className="block w-full text-left px-3 py-1.5 hover:bg-surface-1 text-red"
+              onClick={async e => {
+                e.stopPropagation()
+                try {
+                  await removeDocFromTopic(doc.id, topicName)
+                  showToast(`Removed from ${topicName}`, 'success')
+                } catch {
+                  showToast(`Failed to remove from ${topicName}`, 'error')
+                }
+                setDocMenuOpen(null)
+              }}
+            >
+              Remove from {topicName}
+            </button>
+          )}
+        </div>
+      )}
+    </>
+  )
+
   const renderDocList = (docs: DocumentItem[], topicName: string) => (
     <div className="bg-surface-0/50">
       <div className="flex items-center gap-2 px-3 pl-7 py-1 text-[10px] text-text-dim">
@@ -174,7 +257,7 @@ export default function TopicSidebar({
       {docs.map(doc => (
         <div
           key={doc.id}
-          className={`flex items-center gap-1 px-3 pl-7 py-1 text-xs cursor-pointer ${
+          className={`group relative flex items-center gap-1 px-3 pl-7 py-1 text-xs cursor-pointer ${
             viewingDocumentId === doc.id
               ? 'bg-accent-dim text-accent'
               : 'text-text-secondary hover:bg-surface-2'
@@ -207,6 +290,7 @@ export default function TopicSidebar({
           >
             {doc.label}
           </span>
+          {renderDocMenu(doc, topicName)}
         </div>
       ))}
     </div>
@@ -346,7 +430,7 @@ export default function TopicSidebar({
             {uncategorizedDocs.map(doc => (
               <div
                 key={doc.id}
-                className={`flex items-center gap-1 px-3 pl-7 py-1 text-xs cursor-pointer ${
+                className={`group relative flex items-center gap-1 px-3 pl-7 py-1 text-xs cursor-pointer ${
                   viewingDocumentId === doc.id
                     ? 'bg-accent-dim text-accent'
                     : 'text-text-secondary hover:bg-surface-2'
@@ -378,6 +462,7 @@ export default function TopicSidebar({
                 >
                   {doc.label}
                 </span>
+                {renderDocMenu(doc, null)}
               </div>
             ))}
           </div>

@@ -7,7 +7,7 @@ vi.mock('../../api/client', () => ({
   api: {
     topics: {
       list: vi.fn().mockResolvedValue([
-        { name: 'chess', paper_count: 2, size: '1.0 MB', project_id: 'p1' },
+        { name: 'chess', document_count: 2, size: '1.0 MB', project_id: 'p1' },
       ]),
       create: vi.fn(),
       rename: vi.fn(),

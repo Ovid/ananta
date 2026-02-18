@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import TopicSidebar from '../TopicSidebar'
@@ -300,6 +300,115 @@ describe('TopicSidebar (shared)', () => {
     await screen.findByText('chess')
     const aside = container.querySelector('aside')!
     expect(aside.style.width).toBe('300px')
+  })
+
+  it('does not render doc menu button when addDocToTopic is not provided', async () => {
+    const props = defaultProps({
+      activeTopic: 'chess',
+      loadDocuments: vi.fn().mockResolvedValue(chessDocs),
+    })
+    render(<TopicSidebar {...props} />)
+
+    await screen.findByText('Chess Strategies')
+    // No ellipsis menu buttons should exist on document rows
+    expect(screen.queryAllByTitle('Document actions')).toHaveLength(0)
+  })
+
+  it('renders doc menu button when addDocToTopic is provided', async () => {
+    const props = defaultProps({
+      activeTopic: 'chess',
+      loadDocuments: vi.fn().mockResolvedValue(chessDocs),
+      addDocToTopic: vi.fn(),
+    })
+    render(<TopicSidebar {...props} />)
+
+    await screen.findByText('Chess Strategies')
+    // Each doc row should have an ellipsis menu button
+    const menuButtons = screen.getAllByTitle('Document actions')
+    expect(menuButtons.length).toBeGreaterThanOrEqual(2) // 2 chess docs
+  })
+
+  it('shows "Add to..." submenu with available topics when doc menu is clicked', async () => {
+    const addDocToTopic = vi.fn()
+    const props = defaultProps({
+      activeTopic: 'chess',
+      loadDocuments: vi.fn().mockResolvedValue(chessDocs),
+      addDocToTopic,
+    })
+    render(<TopicSidebar {...props} />)
+
+    await screen.findByText('Chess Strategies')
+    const menuButtons = screen.getAllByTitle('Document actions')
+    await userEvent.click(menuButtons[0])
+
+    // Should show "Add to..." menu item but not "Remove from" (removeDocFromTopic not provided)
+    expect(screen.getByText('Add to\u2026')).toBeInTheDocument()
+    expect(screen.queryByText(/Remove from/)).not.toBeInTheDocument()
+  })
+
+  it('calls addDocToTopic when a topic is selected from submenu', async () => {
+    const addDocToTopic = vi.fn().mockResolvedValue(undefined)
+    const loadDocuments = vi.fn()
+      .mockImplementation((name: string) =>
+        Promise.resolve(name === 'chess' ? chessDocs : [])
+      )
+    const props = defaultProps({
+      activeTopic: 'chess',
+      loadDocuments,
+      addDocToTopic,
+    })
+    render(<TopicSidebar {...props} />)
+
+    await screen.findByText('Chess Strategies')
+    const menuButtons = screen.getAllByTitle('Document actions')
+    await userEvent.click(menuButtons[0])
+    await userEvent.click(screen.getByText('Add to\u2026'))
+    // "math" appears both in sidebar topic list and in submenu; pick the submenu button
+    const mathButtons = screen.getAllByRole('button', { name: 'math' })
+    await userEvent.click(mathButtons[0])
+
+    await waitFor(() => {
+      expect(addDocToTopic).toHaveBeenCalledWith('doc-1', 'math')
+    })
+  })
+
+  it('shows "Remove from [topic]" for docs inside a topic and calls removeDocFromTopic', async () => {
+    const removeDocFromTopic = vi.fn().mockResolvedValue(undefined)
+    const props = defaultProps({
+      activeTopic: 'chess',
+      loadDocuments: vi.fn().mockResolvedValue(chessDocs),
+      addDocToTopic: vi.fn(),
+      removeDocFromTopic,
+    })
+    render(<TopicSidebar {...props} />)
+
+    await screen.findByText('Chess Strategies')
+    const menuButtons = screen.getAllByTitle('Document actions')
+    await userEvent.click(menuButtons[0])
+
+    const removeBtn = screen.getByText('Remove from chess')
+    await userEvent.click(removeBtn)
+
+    expect(removeDocFromTopic).toHaveBeenCalledWith('doc-1', 'chess')
+  })
+
+  it('renders doc menu on uncategorized docs with only "Add to..." (no remove)', async () => {
+    const addDocToTopic = vi.fn().mockResolvedValue(undefined)
+    const uncatDocs: DocumentItem[] = [
+      { id: 'uncat-1', label: 'Orphan Doc' },
+    ]
+    const props = defaultProps({
+      uncategorizedDocs: uncatDocs,
+      addDocToTopic,
+    })
+    render(<TopicSidebar {...props} />)
+
+    await screen.findByText('chess') // wait for topics to load
+    const menuBtn = screen.getByTitle('Document actions')
+    await userEvent.click(menuBtn)
+
+    expect(screen.getByText('Add to\u2026')).toBeInTheDocument()
+    expect(screen.queryByText(/Remove from/)).not.toBeInTheDocument()
   })
 
   it('shows viewing highlight on the document with viewingDocumentId', async () => {

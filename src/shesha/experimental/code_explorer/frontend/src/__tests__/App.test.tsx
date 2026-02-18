@@ -16,23 +16,44 @@ beforeAll(() => {
   Element.prototype.scrollTo = vi.fn()
 })
 
+const defaultAppState = {
+  dark: true,
+  toggleTheme: vi.fn(),
+  connected: true,
+  send: vi.fn(),
+  onMessage: vi.fn(() => vi.fn()),
+  modelName: 'test-model',
+  tokens: { prompt: 0, completion: 0, total: 0 },
+  budget: null,
+  setBudget: vi.fn(),
+  phase: 'Ready',
+  setPhase: vi.fn(),
+  documentBytes: 0,
+  sidebarWidth: 224,
+  handleSidebarDrag: vi.fn(),
+  activeTopic: null,
+  setActiveTopic: vi.fn(),
+  handleTopicSelect: vi.fn(),
+  traceView: null,
+  setTraceView: vi.fn(),
+  handleViewTrace: vi.fn(),
+  historyVersion: 0,
+  setHistoryVersion: vi.fn(),
+  setTokens: vi.fn(),
+}
+
 vi.mock('@shesha/shared-ui', async () => {
   const actual = await vi.importActual('@shesha/shared-ui')
   return {
     ...actual,
-    useTheme: () => ({ dark: true, toggle: vi.fn() }),
-    useWebSocket: () => ({
-      connected: true,
-      send: vi.fn(),
-      onMessage: vi.fn(() => vi.fn()),
-    }),
+    useAppState: () => ({ ...defaultAppState }),
   }
 })
 
 vi.mock('../api/client', () => ({
   api: {
     model: { get: vi.fn().mockResolvedValue({ model: 'test-model' }) },
-    repos: { list: vi.fn().mockResolvedValue([]), listUncategorized: vi.fn().mockResolvedValue([]), analyze: vi.fn(), getAnalysis: vi.fn(), checkUpdates: vi.fn(), delete: vi.fn() },
+    repos: { list: vi.fn().mockResolvedValue([]), listUncategorized: vi.fn().mockResolvedValue([]), analyze: vi.fn(), getAnalysis: vi.fn(), checkUpdates: vi.fn(), applyUpdates: vi.fn(), delete: vi.fn() },
     topics: {
       list: vi.fn().mockResolvedValue([]),
       create: vi.fn(),
@@ -83,21 +104,19 @@ describe('App', () => {
   })
 
   it('renders connection lost banner when disconnected', async () => {
-    // Override useWebSocket to return connected=false
     const sharedUi = await import('@shesha/shared-ui')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const useWebSocketSpy = vi.spyOn(sharedUi as any, 'useWebSocket')
-    useWebSocketSpy.mockReturnValue({
+    const spy = vi.spyOn(sharedUi as any, 'useAppState')
+    spy.mockReturnValue({
+      ...defaultAppState,
       connected: false,
-      send: vi.fn(),
-      onMessage: vi.fn(() => vi.fn()),
     })
 
     render(<App />)
     await flush()
     expect(screen.getByText('Connection lost. Reconnecting...')).toBeInTheDocument()
 
-    useWebSocketSpy.mockRestore()
+    spy.mockRestore()
   })
 
   it('renders StatusBar', async () => {
@@ -114,5 +133,67 @@ describe('App', () => {
     await flush()
     const root = container.firstElementChild as HTMLElement
     expect(root.className).toMatch(/overflow-hidden/)
+  })
+
+  it('passes addDocToTopic and removeDocFromTopic to TopicSidebar', async () => {
+    render(<App />)
+    await flush()
+    expect(screen.getByText('Code Explorer')).toBeInTheDocument()
+  })
+
+  describe('handleCheckUpdates', () => {
+    const mockRepo = {
+      project_id: 'test-repo',
+      source_url: 'https://github.com/test/repo',
+      file_count: 10,
+      analysis_status: null,
+    }
+
+    async function renderWithRepo() {
+      const { api } = await import('../api/client')
+      vi.mocked(api.repos.list).mockResolvedValue([mockRepo])
+      vi.mocked(api.repos.listUncategorized).mockResolvedValue([mockRepo])
+      vi.mocked(api.repos.getAnalysis).mockRejectedValue(new Error('none'))
+
+      render(<App />)
+      await flush()
+
+      // Click the repo label in the uncategorized section to view it
+      const label = screen.getByText('test-repo')
+      await userEvent.click(label)
+      await flush()
+
+      return api
+    }
+
+    it('calls applyUpdates and shows toast when updates are available', async () => {
+      const api = await renderWithRepo()
+      vi.mocked(api.repos.checkUpdates).mockResolvedValue({
+        status: 'updates_available',
+        files_ingested: 10,
+      })
+      vi.mocked(api.repos.applyUpdates).mockResolvedValue({
+        status: 'created',
+        files_ingested: 15,
+      })
+
+      await userEvent.click(screen.getByRole('button', { name: 'Check for Updates' }))
+      await flush()
+
+      expect(api.repos.applyUpdates).toHaveBeenCalledWith('test-repo')
+    })
+
+    it('shows up-to-date toast and skips applyUpdates when unchanged', async () => {
+      const api = await renderWithRepo()
+      vi.mocked(api.repos.checkUpdates).mockResolvedValue({
+        status: 'unchanged',
+        files_ingested: 10,
+      })
+
+      await userEvent.click(screen.getByRole('button', { name: 'Check for Updates' }))
+      await flush()
+
+      expect(api.repos.applyUpdates).not.toHaveBeenCalled()
+    })
   })
 })

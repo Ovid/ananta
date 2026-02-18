@@ -58,7 +58,7 @@ def test_ws_query_returns_complete(client: TestClient, mock_state: MagicMock) ->
         mock_sess_cls.return_value = mock_session
 
         with client.websocket_connect("/api/ws") as ws:
-            msg = {"type": "query", "topic": "test", "question": "What?", "paper_ids": ["doc1"]}
+            msg = {"type": "query", "topic": "test", "question": "What?", "document_ids": ["doc1"]}
             ws.send_json(msg)
             messages = []
             while True:
@@ -70,7 +70,7 @@ def test_ws_query_returns_complete(client: TestClient, mock_state: MagicMock) ->
     complete = [m for m in messages if m["type"] == "complete"]
     assert len(complete) == 1
     assert complete[0]["answer"] == "The answer is 42."
-    assert complete[0]["paper_ids"] == ["doc1"]
+    assert complete[0]["document_ids"] == ["doc1"]
 
 
 def test_ws_query_no_topic(client: TestClient, mock_state: MagicMock) -> None:
@@ -107,7 +107,7 @@ def test_ws_query_engine_exception_sends_error(client: TestClient, mock_state: M
 
         with client.websocket_connect("/api/ws") as ws:
             ws.send_json(
-                {"type": "query", "topic": "test", "question": "What?", "paper_ids": ["doc1"]}
+                {"type": "query", "topic": "test", "question": "What?", "document_ids": ["doc1"]}
             )
             messages = []
             while True:

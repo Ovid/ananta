@@ -167,11 +167,7 @@ export default function TopicSidebar({
       {docMenuOpen === doc.id && (
         <div className="absolute right-0 top-full z-20 bg-surface-2 border border-border rounded shadow-lg text-xs min-w-[140px]">
           {addDocToTopic && topics.length > 0 && (
-            <div
-              className="relative"
-              onMouseEnter={() => setDocSubmenuOpen(true)}
-              onMouseLeave={() => setDocSubmenuOpen(false)}
-            >
+            <div className="relative">
               <button
                 className="block w-full text-left px-3 py-1.5 hover:bg-surface-1 text-text-secondary"
                 onClick={e => {

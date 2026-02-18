@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import TopicSidebar from '../TopicSidebar'
@@ -343,6 +343,32 @@ describe('TopicSidebar (shared)', () => {
 
     // Should show "Add to..." menu item
     expect(screen.getByText('Add to\u2026')).toBeInTheDocument()
+  })
+
+  it('calls addDocToTopic when a topic is selected from submenu', async () => {
+    const addDocToTopic = vi.fn().mockResolvedValue(undefined)
+    const loadDocuments = vi.fn()
+      .mockImplementation((name: string) =>
+        Promise.resolve(name === 'chess' ? chessDocs : [])
+      )
+    const props = defaultProps({
+      activeTopic: 'chess',
+      loadDocuments,
+      addDocToTopic,
+    })
+    render(<TopicSidebar {...props} />)
+
+    await screen.findByText('Chess Strategies')
+    const menuButtons = screen.getAllByTitle('Document actions')
+    await userEvent.click(menuButtons[0])
+    await userEvent.click(screen.getByText('Add to\u2026'))
+    // "math" appears both in sidebar topic list and in submenu; pick the submenu button
+    const mathButtons = screen.getAllByRole('button', { name: 'math' })
+    await userEvent.click(mathButtons[0])
+
+    await waitFor(() => {
+      expect(addDocToTopic).toHaveBeenCalledWith('doc-1', 'math')
+    })
   })
 
   it('shows viewing highlight on the document with viewingDocumentId', async () => {

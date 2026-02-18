@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { useCallback } from 'react'
 
-import { ChatArea as SharedChatArea } from '@shesha/shared-ui'
+import { ChatArea as SharedChatArea, stripBoundaryMarkers } from '@shesha/shared-ui'
 import type { Exchange, WSMessage as SharedWSMessage } from '@shesha/shared-ui'
 import { api } from '../api/client'
 import type { PaperInfo, WSMessage } from '../types'
@@ -99,7 +99,7 @@ export default function ChatArea({ topicName, connected, wsSend, wsOnMessage, on
   // Build citation renderer using current topicPapers context
   const renderAnswer = useCallback(
     (answer: string): ReactNode => (
-      <>{renderAnswerWithCitations(answer, topicPapers, onPaperClick)}</>
+      <>{renderAnswerWithCitations(stripBoundaryMarkers(answer), topicPapers, onPaperClick)}</>
     ),
     [topicPapers, onPaperClick],
   )

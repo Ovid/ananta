@@ -23,3 +23,6 @@ export type { TopicSidebarProps } from './components/TopicSidebar'
 
 // API client
 export { request, sharedApi } from './api/client'
+
+// Utils
+export { stripBoundaryMarkers } from './utils/sanitize'

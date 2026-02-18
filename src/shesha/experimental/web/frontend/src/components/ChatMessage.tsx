@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-import { ChatMessage as SharedChatMessage } from '@shesha/shared-ui'
+import { ChatMessage as SharedChatMessage, stripBoundaryMarkers } from '@shesha/shared-ui'
 import type { Exchange, PaperInfo } from '../types'
 
 const CITATION_RE = /\[@arxiv:([^\]]+)\]/g
@@ -70,7 +70,7 @@ interface ChatMessageProps {
 export default function ChatMessage({ exchange, onViewTrace, topicPapers, onPaperClick }: ChatMessageProps) {
   // Build the citation renderer
   const renderAnswer = (answer: string): ReactNode => (
-    <>{renderAnswerWithCitations(answer, topicPapers, onPaperClick)}</>
+    <>{renderAnswerWithCitations(stripBoundaryMarkers(answer), topicPapers, onPaperClick)}</>
   )
 
   // Resolve document_ids to PaperInfo objects for the consulted papers footer

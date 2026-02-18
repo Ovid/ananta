@@ -6,7 +6,7 @@ interface RepoDetailProps {
   analysis: RepoAnalysis | null
   onClose: () => void
   onAnalyze: (projectId: string) => Promise<void> | void
-  onCheckUpdates: (projectId: string) => void
+  onCheckUpdates: (projectId: string) => Promise<void> | void
   onRemove: (projectId: string) => void
 }
 
@@ -35,6 +35,7 @@ export default function RepoDetail({
   onRemove,
 }: RepoDetailProps) {
   const [analyzing, setAnalyzing] = useState(false)
+  const [checking, setChecking] = useState(false)
   const status = repo.analysis_status
   const showGenerate = !status || status === 'missing'
   const showRegenerate = status === 'stale'
@@ -45,6 +46,15 @@ export default function RepoDetail({
       await onAnalyze(repo.project_id)
     } finally {
       setAnalyzing(false)
+    }
+  }
+
+  const handleCheckUpdates = async () => {
+    setChecking(true)
+    try {
+      await onCheckUpdates(repo.project_id)
+    } finally {
+      setChecking(false)
     }
   }
 
@@ -104,10 +114,15 @@ export default function RepoDetail({
             </button>
           )}
           <button
-            onClick={() => onCheckUpdates(repo.project_id)}
-            className="px-3 py-1.5 text-xs text-text-secondary border border-border rounded hover:text-text-primary hover:border-text-dim transition-colors"
+            onClick={handleCheckUpdates}
+            disabled={checking}
+            className={`px-3 py-1.5 text-xs border rounded transition-colors ${
+              checking
+                ? 'text-text-dim border-border cursor-wait'
+                : 'text-text-secondary border-border hover:text-text-primary hover:border-text-dim'
+            }`}
           >
-            Check for Updates
+            {checking ? 'Checking\u2026' : 'Check for Updates'}
           </button>
           <div className="flex-1" />
           <button

@@ -112,12 +112,15 @@ class PromptLoader:
         context_type: str,
         context_total_length: int,
         context_lengths: str,
+        doc_names: list[str] | None = None,
     ) -> str:
         """Render context metadata as assistant message."""
+        names_str = str(doc_names) if doc_names else "[]"
         return self._prompts["context_metadata.md"].format(
             context_type=context_type,
             context_total_length=context_total_length,
             context_lengths=context_lengths,
+            doc_names=names_str,
         )
 
     def render_subcall_prompt(self, instruction: str, content: str) -> str:

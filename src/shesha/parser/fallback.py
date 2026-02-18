@@ -60,9 +60,11 @@ class FallbackTextParser:
             content = raw.decode("utf-8", errors="replace")
 
         if include_line_numbers:
+            display_path = file_path or path.name
             lines = content.splitlines()
             width = len(str(len(lines)))
-            numbered = [f"{i + 1:>{width}} | {line}" for i, line in enumerate(lines)]
+            numbered = [f"=== FILE: {display_path} ==="]
+            numbered.extend(f"{i + 1:>{width}}| {line}" for i, line in enumerate(lines))
             content = "\n".join(numbered)
 
         # Use extension as format, or "text" if none

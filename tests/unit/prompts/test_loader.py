@@ -16,7 +16,8 @@ def valid_prompts_dir(tmp_path: Path) -> Path:
 
     (prompts_dir / "system.md").write_text("System prompt with no placeholders")
     (prompts_dir / "context_metadata.md").write_text(
-        "Context is a {context_type} with {context_total_length} chars: {context_lengths}"
+        "Context is a {context_type} with {context_total_length} chars:"
+        " {context_lengths}\nDocs: {doc_names}"
     )
     (prompts_dir / "iteration_zero.md").write_text("Safeguard: {question}")
     (prompts_dir / "iteration_continue.md").write_text("Continue: {question}")
@@ -83,10 +84,24 @@ def test_loader_render_context_metadata(valid_prompts_dir: Path):
         context_type="list",
         context_total_length=10000,
         context_lengths="[5000, 5000]",
+        doc_names=["doc_0", "doc_1"],
     )
     assert "list" in result
     assert "10000" in result
     assert "[5000, 5000]" in result
+
+
+def test_loader_render_context_metadata_includes_doc_names(valid_prompts_dir: Path):
+    """PromptLoader renders context metadata with document names."""
+    loader = PromptLoader(prompts_dir=valid_prompts_dir)
+    result = loader.render_context_metadata(
+        context_type="list",
+        context_total_length=5000,
+        context_lengths="[2500, 2500]",
+        doc_names=["README.md", "src/main.py"],
+    )
+    assert "README.md" in result
+    assert "src/main.py" in result
 
 
 def test_loader_render_iteration_zero(valid_prompts_dir: Path):

@@ -3,6 +3,7 @@ import Markdown from 'react-markdown'
 
 import { mdComponents } from './mdComponents'
 import type { Exchange } from '../types'
+import { stripBoundaryMarkers } from '../utils/sanitize'
 
 function formatTime(iso: string): string {
   const d = new Date(iso)
@@ -41,7 +42,7 @@ export default function ChatMessage({ exchange, onViewTrace, renderAnswer, answe
           <div className={renderAnswer ? 'whitespace-pre-wrap' : ''}>
             {renderAnswer
               ? renderAnswer(exchange.answer)
-              : <Markdown components={mdComponents}>{exchange.answer}</Markdown>}
+              : <Markdown components={mdComponents}>{stripBoundaryMarkers(exchange.answer)}</Markdown>}
           </div>
 
           {answerFooter}

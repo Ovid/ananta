@@ -116,6 +116,19 @@ describe('ChatMessage (shared)', () => {
     expect(screen.queryByTestId('footer')).not.toBeInTheDocument()
   })
 
+  it('strips boundary markers from answer before rendering', () => {
+    const hex = 'bd0e753b7146bd0089d21bfab2c51ded'
+    const exchange = {
+      ...baseExchange,
+      answer: `Here is the content:\nUNTRUSTED_CONTENT_${hex}_BEGIN\n# Hello World\nUNTRUSTED_CONTENT_${hex}_END`,
+    }
+    render(
+      <ChatMessage exchange={exchange} onViewTrace={vi.fn()} />
+    )
+    expect(screen.queryByText(/UNTRUSTED_CONTENT/)).not.toBeInTheDocument()
+    expect(screen.getByText('Quoted content')).toBeInTheDocument()
+  })
+
   it('renders markdown in answer by default', () => {
     const exchange = {
       ...baseExchange,

@@ -371,6 +371,26 @@ describe('TopicSidebar (shared)', () => {
     })
   })
 
+  it('shows "Remove from [topic]" for docs inside a topic and calls removeDocFromTopic', async () => {
+    const removeDocFromTopic = vi.fn().mockResolvedValue(undefined)
+    const props = defaultProps({
+      activeTopic: 'chess',
+      loadDocuments: vi.fn().mockResolvedValue(chessDocs),
+      addDocToTopic: vi.fn(),
+      removeDocFromTopic,
+    })
+    render(<TopicSidebar {...props} />)
+
+    await screen.findByText('Chess Strategies')
+    const menuButtons = screen.getAllByTitle('Document actions')
+    await userEvent.click(menuButtons[0])
+
+    const removeBtn = screen.getByText('Remove from chess')
+    await userEvent.click(removeBtn)
+
+    expect(removeDocFromTopic).toHaveBeenCalledWith('doc-1', 'chess')
+  })
+
   it('shows viewing highlight on the document with viewingDocumentId', async () => {
     const props = defaultProps({
       activeTopic: 'chess',

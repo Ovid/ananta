@@ -1,5 +1,5 @@
 import { renderHook, act, waitFor } from '@testing-library/react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { afterAll, describe, it, expect, vi, beforeEach } from 'vitest'
 
 // Mock the hooks that useAppState depends on
 const mockSend = vi.fn()
@@ -28,6 +28,8 @@ vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
 }))
 
 import { useAppState } from '../useAppState'
+
+afterAll(() => vi.unstubAllGlobals())
 
 /** Helper: render the hook and wait for the async model-fetch to settle. */
 async function renderAppState(options?: Parameters<typeof useAppState>[0]) {

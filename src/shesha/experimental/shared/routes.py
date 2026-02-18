@@ -97,7 +97,12 @@ def create_shared_router(
         Application state.  Must expose ``model`` (str) and ``topic_mgr``
         with the following interface:
 
-        * ``resolve(name) -> str | None`` — always required.
+        * ``resolve(name) -> str | None`` — required by default session
+          creation and trace resolution when *get_session* and
+          *resolve_project_ids* are not provided.  Also required when
+          *include_topic_crud* is True (used to check for duplicates
+          in the create-topic route).  Not needed when all three
+          callbacks are provided and *include_topic_crud* is False.
         * ``list_topics()``, ``create(name)``, ``rename(old, new)``,
           ``delete(name)`` — required when *include_topic_crud* is True
           and *build_topic_info* is not provided (for ``list_topics``).

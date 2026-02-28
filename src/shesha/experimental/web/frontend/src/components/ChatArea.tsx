@@ -48,6 +48,7 @@ export default function ChatArea({ topicName, connected, wsSend, wsOnMessage, on
       return (
         <Markdown
           components={components}
+          disallowedElements={['img']}
           urlTransform={(url) => url.startsWith('arxiv:') ? url : defaultUrlTransform(url)}
         >
           {preprocessCitations(stripBoundaryMarkers(answer))}

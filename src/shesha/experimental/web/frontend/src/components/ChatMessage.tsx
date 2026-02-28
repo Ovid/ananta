@@ -18,6 +18,7 @@ export default function ChatMessage({ exchange, onViewTrace, topicPapers, onPape
     return (
       <Markdown
         components={components}
+        disallowedElements={['img']}
         urlTransform={(url) => url.startsWith('arxiv:') ? url : defaultUrlTransform(url)}
       >
         {preprocessCitations(stripBoundaryMarkers(answer))}

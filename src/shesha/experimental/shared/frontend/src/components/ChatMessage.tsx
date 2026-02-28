@@ -39,7 +39,7 @@ export default function ChatMessage({ exchange, onViewTrace, renderAnswer, answe
       {/* Assistant answer */}
       <div className="flex flex-col items-start gap-0.5">
         <div className="max-w-[70%] bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary">
-          <div className={renderAnswer ? 'whitespace-pre-wrap' : ''}>
+          <div>
             {renderAnswer
               ? renderAnswer(exchange.answer)
               : <Markdown components={mdComponents}>{stripBoundaryMarkers(exchange.answer)}</Markdown>}

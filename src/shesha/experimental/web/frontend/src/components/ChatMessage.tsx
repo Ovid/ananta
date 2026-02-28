@@ -1,64 +1,9 @@
 import type { ReactNode } from 'react'
+import Markdown, { defaultUrlTransform } from 'react-markdown'
 
 import { ChatMessage as SharedChatMessage, stripBoundaryMarkers } from '@shesha/shared-ui'
+import { preprocessCitations, buildCitationComponents } from '../utils/citations'
 import type { Exchange, PaperInfo } from '../types'
-
-const CITATION_RE = /\[@arxiv:([^\]]+)\]/g
-const ARXIV_ID_RE = /(?:[\w.-]+\/\d{7}|\d{4}\.\d{4,5})(?:v\d+)?/g
-
-function renderAnswerWithCitations(
-  text: string,
-  topicPapers?: PaperInfo[],
-  onPaperClick?: (paper: PaperInfo) => void,
-): ReactNode[] {
-  const parts: ReactNode[] = []
-  let lastIndex = 0
-
-  for (const match of text.matchAll(CITATION_RE)) {
-    const rawContent = match[1]
-    const matchStart = match.index!
-
-    // Add text before this match
-    if (matchStart > lastIndex) {
-      parts.push(text.slice(lastIndex, matchStart))
-    }
-
-    // Extract all arxiv IDs from the tag (handles semicolon-separated IDs)
-    const ids = [...rawContent.matchAll(ARXIV_ID_RE)].map(m => m[0])
-
-    if (ids.length === 0) {
-      // No valid IDs found — render as literal text
-      parts.push(match[0])
-    } else {
-      for (const arxivId of ids) {
-        const paper = topicPapers?.find(p => p.arxiv_id === arxivId)
-        if (paper) {
-          parts.push(
-            <button
-              key={`cite-${matchStart}-${arxivId}`}
-              onClick={() => onPaperClick?.(paper)}
-              className="text-xs text-accent hover:underline bg-accent/5 rounded px-1 py-0.5 mx-0.5 inline"
-              title={paper.title}
-            >
-              {paper.arxiv_id}
-            </button>
-          )
-        } else {
-          parts.push(`[@arxiv:${arxivId}]`)
-        }
-      }
-    }
-
-    lastIndex = matchStart + match[0].length
-  }
-
-  // Add remaining text after last match
-  if (lastIndex < text.length) {
-    parts.push(text.slice(lastIndex))
-  }
-
-  return parts.length > 0 ? parts : [text]
-}
 
 interface ChatMessageProps {
   exchange: Exchange
@@ -68,10 +13,18 @@ interface ChatMessageProps {
 }
 
 export default function ChatMessage({ exchange, onViewTrace, topicPapers, onPaperClick }: ChatMessageProps) {
-  // Build the citation renderer
-  const renderAnswer = (answer: string): ReactNode => (
-    <>{renderAnswerWithCitations(stripBoundaryMarkers(answer), topicPapers, onPaperClick)}</>
-  )
+  const renderAnswer = (answer: string): ReactNode => {
+    const components = buildCitationComponents(topicPapers, onPaperClick)
+    return (
+      <Markdown
+        components={components}
+        disallowedElements={['img']}
+        urlTransform={(url) => url.startsWith('arxiv:') ? url : defaultUrlTransform(url)}
+      >
+        {preprocessCitations(stripBoundaryMarkers(answer))}
+      </Markdown>
+    )
+  }
 
   // Resolve document_ids to PaperInfo objects for the consulted papers footer
   const consultedPapers = (exchange.document_ids ?? [])

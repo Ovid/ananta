@@ -39,6 +39,7 @@ export function buildCitationComponents(
         if (paper) {
           return (
             <button
+              type="button"
               onClick={() => onPaperClick?.(paper)}
               className="text-xs text-accent hover:underline bg-accent/5 rounded px-1 py-0.5 mx-0.5 inline"
               title={paper.title}

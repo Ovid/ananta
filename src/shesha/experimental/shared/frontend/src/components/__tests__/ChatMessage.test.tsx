@@ -64,6 +64,14 @@ describe('ChatMessage (shared)', () => {
     expect(screen.getByText('LIFE AROSE FROM CHEMISTRY.')).toBeInTheDocument()
   })
 
+  it('does not apply whitespace-pre-wrap even when renderAnswer is provided', () => {
+    const customRenderer = (answer: string) => <span>{answer}</span>
+    render(
+      <ChatMessage exchange={baseExchange} onViewTrace={vi.fn()} renderAnswer={customRenderer} />
+    )
+    expect(document.querySelector('.whitespace-pre-wrap')).toBeNull()
+  })
+
   it('renders answer via markdown when renderAnswer is not provided', () => {
     render(
       <ChatMessage exchange={baseExchange} onViewTrace={vi.fn()} />

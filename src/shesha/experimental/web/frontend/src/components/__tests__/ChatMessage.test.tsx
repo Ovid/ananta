@@ -27,6 +27,18 @@ const baseExchange: Exchange = {
   document_ids: ['2005.09008v1'],
 }
 
+/** Helper: find the assistant answer bubble (the .bg-surface-2 div). */
+function getAnswerBubble(): HTMLElement {
+  return document.querySelector('.bg-surface-2')!
+}
+
+/** Helper: find inline citation buttons (have mx-0.5 class from buildCitationComponents). */
+function getInlineCitationButtons(): HTMLButtonElement[] {
+  const answerBubble = getAnswerBubble()
+  const buttons = answerBubble.querySelectorAll('button')
+  return Array.from(buttons).filter(b => b.classList.contains('mx-0.5')) as HTMLButtonElement[]
+}
+
 describe('ChatMessage citation rendering', () => {
   it('renders [@arxiv:ID] as a clickable button and removes the citation syntax', () => {
     const onPaperClick = vi.fn()
@@ -39,20 +51,20 @@ describe('ChatMessage citation rendering', () => {
       />
     )
 
-    // The citation syntax should NOT appear as literal text in the answer
-    const answerDiv = document.querySelector('.whitespace-pre-wrap')!
-    expect(answerDiv.textContent).not.toContain('[@arxiv:')
+    const answerBubble = getAnswerBubble()
+    // The citation syntax should NOT appear as literal text
+    expect(answerBubble.textContent).not.toContain('[@arxiv:')
 
-    // Instead, there should be an inline citation button inside the answer div
-    const inlineButtons = answerDiv.querySelectorAll('button')
-    expect(inlineButtons.length).toBe(1)
-    expect(inlineButtons[0].textContent).toContain('2005.09008v1')
+    // There should be exactly one inline citation button
+    const citationButtons = getInlineCitationButtons()
+    expect(citationButtons.length).toBe(1)
+    expect(citationButtons[0].textContent).toContain('2005.09008v1')
 
-    fireEvent.click(inlineButtons[0])
+    fireEvent.click(citationButtons[0])
     expect(onPaperClick).toHaveBeenCalledWith(basePaper)
   })
 
-  it('renders unknown arxiv ID as plain text', () => {
+  it('renders unknown arxiv ID as plain text (not a button)', () => {
     const exchange: Exchange = {
       ...baseExchange,
       answer: 'See [@arxiv:9999.99999v1] for details.',
@@ -66,16 +78,16 @@ describe('ChatMessage citation rendering', () => {
       />
     )
 
-    // Unknown ID should remain as literal citation text
-    const answerDiv = document.querySelector('.whitespace-pre-wrap')!
-    expect(answerDiv.textContent).toContain('[@arxiv:9999.99999v1]')
+    const answerBubble = getAnswerBubble()
+    // Unknown ID renders as plain text (ID without citation syntax)
+    expect(answerBubble.textContent).toContain('9999.99999v1')
 
-    // No inline citation button inside the answer div
-    const inlineButtons = answerDiv.querySelectorAll('button')
-    expect(inlineButtons.length).toBe(0)
+    // No inline citation buttons
+    const citationButtons = getInlineCitationButtons()
+    expect(citationButtons.length).toBe(0)
   })
 
-  it('renders answer without citations as plain text', () => {
+  it('renders answer without citations as text', () => {
     const exchange: Exchange = {
       ...baseExchange,
       answer: 'No citations here.',
@@ -112,13 +124,13 @@ describe('ChatMessage citation rendering', () => {
       />
     )
 
-    const answerDiv = document.querySelector('.whitespace-pre-wrap')!
-    expect(answerDiv.textContent).not.toContain('[@arxiv:')
+    const answerBubble = getAnswerBubble()
+    expect(answerBubble.textContent).not.toContain('[@arxiv:')
 
-    const inlineButtons = answerDiv.querySelectorAll('button')
-    expect(inlineButtons.length).toBe(2)
-    expect(inlineButtons[0].textContent).toContain('2005.09008v1')
-    expect(inlineButtons[1].textContent).toContain('2401.12345')
+    const citationButtons = getInlineCitationButtons()
+    expect(citationButtons.length).toBe(2)
+    expect(citationButtons[0].textContent).toContain('2005.09008v1')
+    expect(citationButtons[1].textContent).toContain('2401.12345')
   })
 
   it('renders semicolon-separated citations as individual clickable buttons', () => {
@@ -141,12 +153,10 @@ describe('ChatMessage citation rendering', () => {
       />
     )
 
-    // Both IDs should render as clickable buttons despite being in one tag
-    const answerDiv = document.querySelector('.whitespace-pre-wrap')!
-    const inlineButtons = answerDiv.querySelectorAll('button')
-    expect(inlineButtons.length).toBe(2)
-    expect(inlineButtons[0].textContent).toContain('2005.09008v1')
-    expect(inlineButtons[1].textContent).toContain('2401.12345')
+    const citationButtons = getInlineCitationButtons()
+    expect(citationButtons.length).toBe(2)
+    expect(citationButtons[0].textContent).toContain('2005.09008v1')
+    expect(citationButtons[1].textContent).toContain('2401.12345')
   })
 
   it('renders old-style arxiv IDs with slashes as clickable buttons', () => {
@@ -169,9 +179,89 @@ describe('ChatMessage citation rendering', () => {
       />
     )
 
-    const answerDiv = document.querySelector('.whitespace-pre-wrap')!
-    const inlineButtons = answerDiv.querySelectorAll('button')
-    expect(inlineButtons.length).toBe(1)
-    expect(inlineButtons[0].textContent).toContain('astro-ph/0601001v1')
+    const citationButtons = getInlineCitationButtons()
+    expect(citationButtons.length).toBe(1)
+    expect(citationButtons[0].textContent).toContain('astro-ph/0601001v1')
+  })
+})
+
+describe('ChatMessage markdown rendering', () => {
+  it('renders headings in the answer', () => {
+    const exchange: Exchange = {
+      ...baseExchange,
+      answer: '## Key Findings\n\nSome text here.',
+    }
+    render(
+      <ChatMessage
+        exchange={exchange}
+        onViewTrace={vi.fn()}
+        topicPapers={[]}
+        onPaperClick={vi.fn()}
+      />
+    )
+
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Key Findings')
+  })
+
+  it('renders bullet lists in the answer', () => {
+    const exchange: Exchange = {
+      ...baseExchange,
+      answer: '- item one\n- item two\n- item three',
+    }
+    render(
+      <ChatMessage
+        exchange={exchange}
+        onViewTrace={vi.fn()}
+        topicPapers={[]}
+        onPaperClick={vi.fn()}
+      />
+    )
+
+    expect(screen.getByRole('list')).toBeInTheDocument()
+    expect(screen.getAllByRole('listitem')).toHaveLength(3)
+  })
+
+  it('renders bold text in the answer', () => {
+    const exchange: Exchange = {
+      ...baseExchange,
+      answer: 'This is **important** text.',
+    }
+    render(
+      <ChatMessage
+        exchange={exchange}
+        onViewTrace={vi.fn()}
+        topicPapers={[]}
+        onPaperClick={vi.fn()}
+      />
+    )
+
+    const strong = document.querySelector('strong')
+    expect(strong).not.toBeNull()
+    expect(strong!.textContent).toBe('important')
+  })
+
+  it('renders markdown alongside citations', () => {
+    const exchange: Exchange = {
+      ...baseExchange,
+      answer: '## Summary\n\nKey finding from [@arxiv:2005.09008v1]:\n\n- Point one\n- Point two',
+      document_ids: ['2005.09008v1'],
+    }
+    render(
+      <ChatMessage
+        exchange={exchange}
+        onViewTrace={vi.fn()}
+        topicPapers={[basePaper]}
+        onPaperClick={vi.fn()}
+      />
+    )
+
+    // Markdown renders
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Summary')
+    expect(screen.getByRole('list')).toBeInTheDocument()
+
+    // Citation renders as button
+    const citationButtons = getInlineCitationButtons()
+    expect(citationButtons.length).toBe(1)
+    expect(citationButtons[0].textContent).toContain('2005.09008v1')
   })
 })

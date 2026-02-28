@@ -26,3 +26,4 @@ export { request, sharedApi } from './api/client'
 
 // Utils
 export { stripBoundaryMarkers } from './utils/sanitize'
+export { mdComponents } from './components/mdComponents'

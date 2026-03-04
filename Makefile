@@ -1,4 +1,4 @@
-.PHONY: install test test-frontend lint typecheck format all loc
+.PHONY: install test test-frontend lint typecheck format all loc cover
 
 install:
 	pip install -e ".[dev]"
@@ -20,6 +20,9 @@ format:
 	ruff check --fix src tests
 
 all: format lint typecheck test test-frontend
+
+cover:
+	pytest --cov=src/shesha --cov-report=term-missing --cov-report=html
 
 loc:
 	@cloc src tests arxiv-explorer examples pyproject.toml Makefile \

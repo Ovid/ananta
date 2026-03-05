@@ -41,7 +41,7 @@ export default function DocumentDetail({
       <div className="bg-surface-1 border border-border rounded-lg shadow-xl w-full max-w-md p-6 max-h-[80vh] overflow-y-auto">
         <div className="flex items-start justify-between mb-4">
           <h2 className="text-lg font-bold text-text-primary truncate pr-4">{doc.filename}</h2>
-          <button onClick={onClose} className="text-text-dim hover:text-text-primary shrink-0">&times;</button>
+          <button onClick={onClose} aria-label="Close" className="text-text-dim hover:text-text-primary shrink-0">&times;</button>
         </div>
 
         <div className="space-y-3 text-sm">

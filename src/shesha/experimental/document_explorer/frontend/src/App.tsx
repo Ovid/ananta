@@ -89,17 +89,14 @@ export default function App() {
   const topicNamesRef = useRef<string[]>([])
   topicNamesRef.current = topicNames
 
-  const handleViewDocument = useCallback((doc: DocumentItem) => {
-    const found = allDocsRef.current.find(d => d.project_id === doc.id)
-    if (!found) return
-    setViewingDoc(found)
-    // Find which topics contain this document
+  const openDocDetail = useCallback((doc: DocumentInfo) => {
+    setViewingDoc(doc)
     setViewingDocTopics([])
     Promise.all(
       topicNamesRef.current.map(async t => {
         try {
           const topicDocs = await api.documents.listForTopic(t)
-          if (topicDocs.some(d => d.project_id === found.project_id)) {
+          if (topicDocs.some(d => d.project_id === doc.project_id)) {
             return t
           }
         } catch {
@@ -111,6 +108,11 @@ export default function App() {
       setViewingDocTopics(results.filter((t): t is string => t !== null))
     })
   }, [])
+
+  const handleViewDocument = useCallback((item: DocumentItem) => {
+    const found = allDocsRef.current.find(d => d.project_id === item.id)
+    if (found) openDocDetail(found)
+  }, [openDocDetail])
 
   const handleUpload = useCallback(async (files: File[]) => {
     try {
@@ -198,18 +200,19 @@ export default function App() {
         <div className="text-[10px] text-text-dim mb-1">Sources:</div>
         <div className="flex flex-wrap gap-1">
           {consulted.map(doc => (
-            <span
+            <button
               key={doc.project_id}
-              className="text-[10px] text-accent bg-accent/5 rounded px-1.5 py-0.5"
+              onClick={() => openDocDetail(doc)}
+              className="text-[10px] text-accent hover:underline bg-accent/5 rounded px-1.5 py-0.5"
               title={doc.filename}
             >
               {doc.filename}
-            </span>
+            </button>
           ))}
         </div>
       </div>
     )
-  }, [])
+  }, [openDocDetail])
 
   return (
     <AppShell connected={connected}>

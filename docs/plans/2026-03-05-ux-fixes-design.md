@@ -28,7 +28,8 @@ Add a `useEffect` on the textarea ref that fires on every `input` change:
 - Set `style.height = Math.min(el.scrollHeight, maxHeight)` where `maxHeight = 6rem`
 - Beyond 4 lines, internal scroll activates via `overflow-y: auto`
 - Keep `rows={1}` as the minimum
-- Remove `resize-none` (controlled resize replaces it)
+- Keep `resize-none` — the manual drag handle conflicts with auto-grow (user drags,
+  next keystroke resets height); CSS `max-height` + `overflow-y: auto` handle capping
 
 No new dependencies. Standard ref + effect pattern.
 

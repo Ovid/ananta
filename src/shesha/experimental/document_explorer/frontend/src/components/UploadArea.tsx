@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, type DragEvent } from 'react'
+import { useState, useRef, useCallback, type DragEvent, type KeyboardEvent } from 'react'
 
 interface UploadAreaProps {
   onUpload: (files: File[]) => Promise<void>
@@ -28,10 +28,19 @@ export default function UploadArea({ onUpload }: UploadAreaProps) {
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label="Upload files"
       onDragOver={e => { e.preventDefault(); setDragging(true) }}
       onDragLeave={() => setDragging(false)}
       onDrop={handleDrop}
       onClick={() => inputRef.current?.click()}
+      onKeyDown={(e: KeyboardEvent<HTMLDivElement>) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          inputRef.current?.click()
+        }
+      }}
       className={`mx-2 mb-2 p-3 border border-dashed rounded-lg text-center cursor-pointer transition-colors text-xs ${
         dragging
           ? 'border-accent bg-accent-dim text-accent'

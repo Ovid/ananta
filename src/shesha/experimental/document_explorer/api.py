@@ -302,12 +302,14 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
 
     @router.post("/topics/{name}/documents/{doc_id}")
     def add_doc_to_topic(name: str, doc_id: str) -> dict[str, str]:
+        _validate_doc_id(doc_id)
         state.topic_mgr.create(name)
         state.topic_mgr.add_doc(name, doc_id)
         return {"status": "added", "topic": name, "project_id": doc_id}
 
     @router.delete("/topics/{name}/documents/{doc_id}")
     def remove_doc_from_topic(name: str, doc_id: str) -> dict[str, str]:
+        _validate_doc_id(doc_id)
         try:
             state.topic_mgr.remove_doc(name, doc_id)
         except ValueError as e:

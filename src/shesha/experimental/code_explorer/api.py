@@ -252,10 +252,10 @@ def create_api(state: CodeExplorerState) -> FastAPI:
     repo_router = _create_repo_router(state)
     shared_router = create_shared_router(
         state,
-        get_session=lambda s, name: get_topic_session(state, name),
-        build_topic_info=lambda s: _build_code_topic_info(state),
-        resolve_project_ids=lambda s, name: _resolve_code_project_ids(state, name),
-        list_trace_files=lambda s, pid: _list_code_trace_files(state, pid),
+        get_session=lambda s, name: get_topic_session(s, name),
+        build_topic_info=lambda s: _build_code_topic_info(s),
+        resolve_project_ids=lambda s, name: _resolve_code_project_ids(s, name),
+        list_trace_files=lambda s, pid: _list_code_trace_files(s, pid),
         include_topic_crud=False,
         include_per_topic_history=True,
         include_context_budget=True,

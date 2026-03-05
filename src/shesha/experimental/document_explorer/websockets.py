@@ -91,8 +91,8 @@ async def _handle_query(
                 filename = meta.get("filename", pid_str)
                 content_type = meta.get("content_type", "unknown")
                 context_parts.append(f"--- Document: {filename} (type: {content_type}) ---")
-            except Exception:
-                pass  # Metadata is optional context; skip if unreadable
+            except (OSError, json.JSONDecodeError):
+                logger.debug("Skipping unreadable metadata for %s", pid_str, exc_info=True)
 
     # Resolve the session once -- used for both history prefix and saving.
     topic_name = str(data.get("topic", ""))

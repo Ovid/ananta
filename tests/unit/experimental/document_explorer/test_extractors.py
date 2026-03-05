@@ -168,7 +168,7 @@ class TestXlsxExtraction:
         ]
         mock_wb = MagicMock()
         mock_wb.sheetnames = ["Sheet1"]
-        mock_wb.__getitem__ = lambda self, key: mock_sheet
+        mock_wb.__getitem__.return_value = mock_sheet
 
         f = tmp_path / "data.xlsx"
         f.write_bytes(b"PK fake xlsx")

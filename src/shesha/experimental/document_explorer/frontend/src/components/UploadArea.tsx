@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, type DragEvent } from 'react'
 
 interface UploadAreaProps {
   onUpload: (files: File[]) => Promise<void>
@@ -20,7 +20,7 @@ export default function UploadArea({ onUpload }: UploadAreaProps) {
     }
   }, [onUpload])
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
+  const handleDrop = useCallback((e: DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     setDragging(false)
     handleFiles(e.dataTransfer.files)

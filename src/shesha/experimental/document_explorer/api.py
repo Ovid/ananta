@@ -269,8 +269,8 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
     def list_topic_docs(name: str) -> list[DocumentInfo]:
         try:
             doc_ids = state.topic_mgr.list_docs(name)
-        except ValueError:
-            raise HTTPException(404, f"Topic '{name}' not found")
+        except ValueError as e:
+            raise HTTPException(404, f"Topic '{name}' not found") from e
         result: list[DocumentInfo] = []
         for pid in doc_ids:
             info = _build_doc_info(state.uploads_dir, pid)
@@ -288,8 +288,8 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
     def remove_doc_from_topic(name: str, doc_id: str) -> dict[str, str]:
         try:
             state.topic_mgr.remove_doc(name, doc_id)
-        except ValueError:
-            raise HTTPException(404, f"Doc '{doc_id}' not found in topic '{name}'")
+        except ValueError as e:
+            raise HTTPException(404, f"Doc '{doc_id}' not found in topic '{name}'") from e
         return {"status": "removed", "topic": name, "project_id": doc_id}
 
     return router

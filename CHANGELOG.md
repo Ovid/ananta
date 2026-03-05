@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Document Explorer** web application for uploading, organizing, and querying documents (PDF, Word, PowerPoint, Excel, RTF, plain text) via RLM
 - Code Explorer web application for exploring git repositories via RLM
 - Shared web infrastructure module (`shesha.experimental.shared`) for building experimental tools
 - Developer guide for extending the web tool ecosystem (`docs/extending-web-tools.md`)

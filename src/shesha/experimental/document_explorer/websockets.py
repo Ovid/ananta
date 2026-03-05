@@ -98,7 +98,7 @@ async def _handle_query(
     history_prefix = session.format_history_prefix()
     full_question = history_prefix + question if history_prefix else question
     if context_parts:
-        full_question += "\n\n" + "\n".join(context_parts)
+        full_question += "\n\n" + "\n\n".join(context_parts)
 
     # Use asyncio.Queue for thread-safe message passing from the query
     # thread to the async WebSocket send loop.

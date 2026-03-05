@@ -15,10 +15,12 @@ from dataclasses import asdict
 from pathlib import Path
 
 from fastapi import APIRouter, FastAPI, HTTPException
-from fastapi.responses import PlainTextResponse
 
 from shesha.exceptions import ProjectNotFoundError, RepoIngestError
-from shesha.experimental.code_explorer.dependencies import CodeExplorerState
+from shesha.experimental.code_explorer.dependencies import (
+    CodeExplorerState,
+    get_topic_session,
+)
 from shesha.experimental.code_explorer.schemas import (
     AnalysisResponse,
     RepoAdd,
@@ -31,7 +33,6 @@ from shesha.experimental.code_explorer.websockets import websocket_handler
 from shesha.experimental.shared.app_factory import create_app
 from shesha.experimental.shared.routes import create_shared_router
 from shesha.experimental.shared.schemas import TopicInfo
-from shesha.experimental.shared.session import WebConversationSession
 from shesha.models import RepoProjectResult
 
 
@@ -47,11 +48,6 @@ def _build_code_topic_info(state: CodeExplorerState) -> list[TopicInfo]:
         )
         for n in names
     ]
-
-
-def _get_global_session(state: CodeExplorerState, topic_name: str) -> WebConversationSession:
-    """Return the global session (code explorer has one session, not per-topic)."""
-    return state.session
 
 
 def _resolve_code_project_ids(state: CodeExplorerState, topic_name: str) -> list[str]:
@@ -248,26 +244,6 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
             raise HTTPException(404, f"Repo '{project_id}' not found in topic '{name}'")
         return {"status": "removed", "topic": name, "project_id": project_id}
 
-    # ------------------------------------------------------------------
-    # Global history routes
-    # ------------------------------------------------------------------
-
-    @router.get("/history")
-    def get_history() -> dict[str, list[dict[str, object]]]:
-        return {"exchanges": state.session.list_exchanges()}
-
-    @router.delete("/history")
-    def clear_history() -> dict[str, str]:
-        state.session.clear()
-        return {"status": "cleared"}
-
-    @router.get("/export", response_class=PlainTextResponse)
-    def export_transcript() -> PlainTextResponse:
-        return PlainTextResponse(
-            content=state.session.format_transcript(),
-            media_type="text/markdown",
-        )
-
     return router
 
 
@@ -276,7 +252,7 @@ def create_api(state: CodeExplorerState) -> FastAPI:
     repo_router = _create_repo_router(state)
     shared_router = create_shared_router(
         state,
-        get_session=lambda s, name: _get_global_session(state, name),
+        get_session=lambda s, name: get_topic_session(state, name),
         build_topic_info=lambda s: _build_code_topic_info(state),
         resolve_project_ids=lambda s, name: _resolve_code_project_ids(state, name),
         list_trace_files=lambda s, pid: _list_code_trace_files(state, pid),

@@ -6,7 +6,7 @@ provides a custom query handler for cross-project queries.
 Unlike the arxiv explorer (which maps topic -> single project, with
 document_ids being document names within that project), the code explorer
 treats ``document_ids`` as **project_ids** -- each maps to a whole repo.
-Queries span multiple projects and use a global session for history.
+Queries span multiple projects and use per-topic sessions for history.
 """
 
 from __future__ import annotations
@@ -19,7 +19,10 @@ from typing import Any
 from fastapi import WebSocket
 
 from shesha.exceptions import ProjectNotFoundError
-from shesha.experimental.code_explorer.dependencies import CodeExplorerState
+from shesha.experimental.code_explorer.dependencies import (
+    CodeExplorerState,
+    get_topic_session,
+)
 from shesha.experimental.shared.websockets import websocket_handler as shared_ws_handler
 from shesha.models import ParsedDocument
 from shesha.rlm.trace import StepType, TokenUsage
@@ -86,7 +89,12 @@ async def _handle_query(
             context_parts.append(f"--- Analysis for {project_id} ---\n{analysis.overview}")
 
     # Build full question with history and context
-    history_prefix = state.session.format_history_prefix()
+    topic_name = str(data.get("topic", ""))
+    if topic_name:
+        topic_session = get_topic_session(state, topic_name)
+    else:
+        topic_session = state.session
+    history_prefix = topic_session.format_history_prefix()
     full_question = history_prefix + question if history_prefix else question
     if context_parts:
         full_question += "\n\n" + "\n\n".join(context_parts)
@@ -173,8 +181,12 @@ async def _handle_query(
     consulted_ids = [str(pid) for pid in document_ids]
     document_bytes = sum(len(d.content.encode("utf-8")) for d in loaded_docs)
 
-    # Save to global session
-    state.session.add_exchange(
+    topic_name_for_save = str(data.get("topic", ""))
+    if topic_name_for_save:
+        save_session = get_topic_session(state, topic_name_for_save)
+    else:
+        save_session = state.session
+    save_session.add_exchange(
         question=question,
         answer=result.answer,
         trace_id=trace_id,

@@ -127,36 +127,42 @@ describe('api.topicRepos', () => {
   })
 })
 
-describe('api.history', () => {
-  it('get fetches GET /api/history (global, no topic param)', async () => {
+describe('api.history (per-topic)', () => {
+  it('get fetches GET /api/topics/{name}/history', async () => {
     const api = await getApi()
-    await api.history.get()
-    expect(mockFetch).toHaveBeenCalledWith('/api/history', {
+    await api.history.get('my-topic')
+    expect(mockFetch).toHaveBeenCalledWith('/api/topics/my-topic/history', {
       headers: { 'Content-Type': 'application/json' },
     })
   })
 
-  it('clear sends DELETE to /api/history (global)', async () => {
+  it('get encodes topic name', async () => {
     const api = await getApi()
-    await api.history.clear()
-    expect(mockFetch).toHaveBeenCalledWith('/api/history', {
+    await api.history.get('a topic')
+    expect(mockFetch).toHaveBeenCalledWith('/api/topics/a%20topic/history', expect.any(Object))
+  })
+
+  it('clear sends DELETE to /api/topics/{name}/history', async () => {
+    const api = await getApi()
+    await api.history.clear('my-topic')
+    expect(mockFetch).toHaveBeenCalledWith('/api/topics/my-topic/history', {
       headers: { 'Content-Type': 'application/json' },
       method: 'DELETE',
     })
   })
 })
 
-describe('api.export', () => {
-  it('fetches GET /api/export and returns text', async () => {
+describe('api.export (per-topic)', () => {
+  it('fetches GET /api/topics/{name}/export and returns text', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       text: () => Promise.resolve('exported markdown'),
     })
 
     const api = await getApi()
-    const result = await api.export()
+    const result = await api.export('my-topic')
 
-    expect(mockFetch).toHaveBeenCalledWith('/api/export')
+    expect(mockFetch).toHaveBeenCalledWith('/api/topics/my-topic/export')
     expect(result).toBe('exported markdown')
   })
 
@@ -168,7 +174,7 @@ describe('api.export', () => {
     })
 
     const api = await getApi()
-    await expect(api.export()).rejects.toThrow('Not Found')
+    await expect(api.export('my-topic')).rejects.toThrow('Not Found')
   })
 })
 

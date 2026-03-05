@@ -223,13 +223,20 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
         upload_dir = state.uploads_dir / doc_id
         if not upload_dir.exists():
             raise HTTPException(404, f"Document '{doc_id}' not found")
-        # Find the original file
-        originals = [f for f in upload_dir.iterdir() if f.name.startswith("original")]
-        if not originals:
-            raise HTTPException(404, f"Original file not found for '{doc_id}'")
         meta = _read_upload_meta(state.uploads_dir, doc_id)
         filename = meta.get("filename", "download") if meta else "download"
-        return FileResponse(originals[0], filename=filename)
+        # Derive exact path from the stored filename's extension when
+        # available; fall back to a directory scan for legacy uploads.
+        ext = Path(filename).suffix if meta else ""
+        original_path = upload_dir / f"original{ext}" if ext else None
+        if original_path is None or not original_path.exists():
+            originals = sorted(
+                f for f in upload_dir.iterdir() if f.name.startswith("original")
+            )
+            if not originals:
+                raise HTTPException(404, f"Original file not found for '{doc_id}'")
+            original_path = originals[0]
+        return FileResponse(original_path, filename=filename)
 
     # ------------------------------------------------------------------
     # Topic CRUD

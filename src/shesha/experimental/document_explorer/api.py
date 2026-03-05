@@ -230,9 +230,7 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
         ext = Path(filename).suffix if meta else ""
         original_path = upload_dir / f"original{ext}" if ext else None
         if original_path is None or not original_path.exists():
-            originals = sorted(
-                f for f in upload_dir.iterdir() if f.name.startswith("original")
-            )
+            originals = sorted(f for f in upload_dir.iterdir() if f.name.startswith("original"))
             if not originals:
                 raise HTTPException(404, f"Original file not found for '{doc_id}'")
             original_path = originals[0]

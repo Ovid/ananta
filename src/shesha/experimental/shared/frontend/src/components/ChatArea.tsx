@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef, useCallback, type KeyboardEvent, type ReactNode } from 'react'
+import Markdown from 'react-markdown'
 
 import { showToast } from './Toast'
 import ChatMessage from './ChatMessage'
+import { mdComponents } from './mdComponents'
 import type { Exchange, WSMessage } from '../types'
 
 interface ChatAreaProps {
@@ -47,6 +49,15 @@ export default function ChatArea({
     return localStorage.getItem('shesha-welcome-dismissed') !== 'true'
   })
   const scrollRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Auto-resize textarea on input change
+  useEffect(() => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = el.scrollHeight + 'px'
+  }, [input])
 
   // Load history when topic changes
   useEffect(() => {
@@ -165,7 +176,7 @@ export default function ChatArea({
           <div className="flex flex-col gap-3 py-3">
             <div className="flex flex-col items-end gap-0.5">
               <div className="max-w-[70%] bg-accent/10 border border-accent/20 rounded-lg px-3 py-2 text-sm text-text-primary">
-                {pendingQuestion}
+                <Markdown components={mdComponents}>{pendingQuestion}</Markdown>
               </div>
               <span className="text-[10px] text-text-dim mr-1">{pendingSentAt}</span>
             </div>
@@ -191,6 +202,7 @@ export default function ChatArea({
       <div className="border-t border-border bg-surface-1 px-4 py-3">
         <div className="flex gap-2">
           <textarea
+            ref={textareaRef}
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -201,7 +213,8 @@ export default function ChatArea({
               : placeholder
             }
             rows={1}
-            className="flex-1 bg-surface-2 border border-border rounded px-3 py-2 text-sm text-text-primary resize-none focus:outline-none focus:border-accent disabled:opacity-50"
+            style={{ maxHeight: '6rem' }}
+            className="flex-1 bg-surface-2 border border-border rounded px-3 py-2 text-sm text-text-primary resize-none overflow-y-auto focus:outline-none focus:border-accent disabled:opacity-50"
           />
           {thinking ? (
             <button

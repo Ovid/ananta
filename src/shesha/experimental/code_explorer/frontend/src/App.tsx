@@ -171,38 +171,39 @@ export default function App() {
     setReposVersion(v => v + 1)
   }, [])
 
-  // Global history (ignores topic param since code explorer history is global)
-  const loadHistory = useCallback(async (_topic: string): Promise<Exchange[]> => {
-    const data = await api.history.get()
+  const loadHistory = useCallback(async (topic: string): Promise<Exchange[]> => {
+    const data = await api.history.get(topic)
     return data.exchanges
   }, [])
 
   const handleClearHistory = useCallback(async () => {
+    if (!activeTopic) return
     try {
-      await api.history.clear()
+      await api.history.clear(activeTopic)
       setHistoryVersion(v => v + 1)
       setTokens({ prompt: 0, completion: 0, total: 0 })
       showToast('Conversation cleared', 'success')
     } catch {
       showToast('Failed to clear conversation', 'error')
     }
-  }, [setHistoryVersion, setTokens])
+  }, [activeTopic, setHistoryVersion, setTokens])
 
   const handleExport = useCallback(async () => {
+    if (!activeTopic) return
     try {
-      const content = await api.export()
+      const content = await api.export(activeTopic)
       const blob = new Blob([content], { type: 'text/markdown' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = 'code-explorer-transcript.md'
+      a.download = `${activeTopic}-transcript.md`
       a.click()
       URL.revokeObjectURL(url)
       showToast('Transcript exported', 'success')
     } catch {
       showToast('Failed to export transcript', 'error')
     }
-  }, [])
+  }, [activeTopic])
 
   return (
     <AppShell connected={connected}>

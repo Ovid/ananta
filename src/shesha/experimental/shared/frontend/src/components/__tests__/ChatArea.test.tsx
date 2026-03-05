@@ -259,3 +259,37 @@ describe('ChatArea (shared) - renderAnswer passthrough', () => {
     expect(screen.getByTestId('exchange-footer')).toBeInTheDocument()
   })
 })
+
+describe('ChatArea (shared) - auto-growing textarea', () => {
+  const baseProps = {
+    topicName: 'chess',
+    connected: true,
+    wsSend: vi.fn(),
+    wsOnMessage: vi.fn().mockReturnValue(() => {}),
+    onViewTrace: vi.fn(),
+    onClearHistory: vi.fn(),
+    historyVersion: 0,
+    selectedDocuments: new Set(['doc-1']),
+    loadHistory: vi.fn().mockResolvedValue([]),
+  }
+
+  it('textarea has max-height set to 6rem', async () => {
+    await act(async () => {
+      render(<ChatArea {...baseProps} />)
+    })
+    const textarea = screen.getByPlaceholderText('Ask a question...')
+    expect(textarea).toHaveStyle({ maxHeight: '6rem' })
+  })
+
+  it('textarea resets value after sending', async () => {
+    const user = userEvent.setup()
+    await act(async () => {
+      render(<ChatArea {...baseProps} />)
+    })
+    const textarea = screen.getByPlaceholderText('Ask a question...')
+    await user.type(textarea, 'Hello world')
+    expect(textarea).toHaveValue('Hello world')
+    await user.click(screen.getByText('Send'))
+    expect(textarea).toHaveValue('')
+  })
+})

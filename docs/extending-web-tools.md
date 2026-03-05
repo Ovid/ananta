@@ -198,9 +198,10 @@ def _build_code_topic_info(state: CodeExplorerState) -> list[TopicInfo]:
         for n in state.topic_mgr.list_topics()
     ]
 
-# Example: code explorer uses a global session (not per-topic)
-def _get_global_session(state, topic_name: str):
-    return state.session
+# Example: code explorer uses per-topic sessions stored in topic dirs
+def _get_topic_session(state, topic_name: str):
+    _meta, meta_path = state.topic_mgr._resolve(topic_name)
+    return WebConversationSession(meta_path.parent)
 ```
 
 **Feature flags:** Use `include_topic_crud=False` when your tool has

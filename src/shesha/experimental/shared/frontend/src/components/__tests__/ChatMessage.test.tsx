@@ -151,3 +151,43 @@ describe('ChatMessage (shared)', () => {
     expect(items).toHaveLength(2)
   })
 })
+
+describe('ChatMessage (shared) - user question markdown', () => {
+  it('renders markdown formatting in user questions', () => {
+    const exchange = {
+      ...baseExchange,
+      question: '## My Heading\n\n- item one\n- item two',
+    }
+    render(
+      <ChatMessage exchange={exchange} onViewTrace={vi.fn()} />
+    )
+    const heading = screen.getByRole('heading', { level: 2 })
+    expect(heading).toHaveTextContent('My Heading')
+    const items = screen.getAllByRole('listitem')
+    expect(items.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('renders code blocks in user questions', () => {
+    const exchange = {
+      ...baseExchange,
+      question: 'Check this:\n\n```python\nprint("hello")\n```',
+    }
+    render(
+      <ChatMessage exchange={exchange} onViewTrace={vi.fn()} />
+    )
+    expect(screen.getByText('print("hello")')).toBeInTheDocument()
+  })
+
+  it('does not apply stripBoundaryMarkers to user questions', () => {
+    const hex = 'bd0e753b7146bd0089d21bfab2c51ded'
+    const exchange = {
+      ...baseExchange,
+      question: `UNTRUSTED_CONTENT_${hex}_BEGIN\nsome text\nUNTRUSTED_CONTENT_${hex}_END`,
+    }
+    render(
+      <ChatMessage exchange={exchange} onViewTrace={vi.fn()} />
+    )
+    // Boundary markers in questions should NOT be stripped (they only come from assistant)
+    expect(screen.queryByText('Quoted content')).not.toBeInTheDocument()
+  })
+})

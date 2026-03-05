@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Chat input area now auto-grows up to 4 lines as you type
+- User messages in chat are now rendered as markdown (headers, code blocks, lists)
+- Code explorer conversation history is now per-topic instead of global
+
 ### Added
 
 - Code Explorer web application for exploring git repositories via RLM

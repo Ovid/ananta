@@ -1,23 +1,9 @@
 import { request, sharedApi } from '@shesha/shared-ui'
 
 import type { RepoInfo, RepoAnalysis, UpdateStatus } from '../types'
-import type { Exchange } from '@shesha/shared-ui'
 
 export const api = {
   ...sharedApi,
-
-  // Override history to be global (no topic parameter)
-  history: {
-    get: () => request<{ exchanges: Exchange[] }>('/history'),
-    clear: () => request<{ status: string }>('/history', { method: 'DELETE' }),
-  },
-
-  // Override export to be global
-  export: async () => {
-    const resp = await fetch('/api/export')
-    if (!resp.ok) throw new Error(resp.statusText)
-    return resp.text()
-  },
 
   repos: {
     list: () => request<RepoInfo[]>('/repos'),

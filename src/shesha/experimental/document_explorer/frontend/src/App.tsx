@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, type ReactNode } from 'react'
 
 import {
   AppShell,
@@ -182,6 +182,34 @@ export default function App() {
     }
   }, [activeTopic])
 
+  const renderAnswerFooter = useCallback((exchange: Exchange): ReactNode => {
+    const ids = exchange.document_ids
+    if (!ids || ids.length === 0) return undefined
+
+    const consulted = ids
+      .map(pid => allDocsRef.current.find(d => d.project_id === pid))
+      .filter((d): d is DocumentInfo => d != null)
+
+    if (consulted.length === 0) return undefined
+
+    return (
+      <div className="mt-2 pt-2 border-t border-border">
+        <div className="text-[10px] text-text-dim mb-1">Sources:</div>
+        <div className="flex flex-wrap gap-1">
+          {consulted.map(doc => (
+            <span
+              key={doc.project_id}
+              className="text-[10px] text-accent bg-accent/5 rounded px-1.5 py-0.5"
+              title={doc.filename}
+            >
+              {doc.filename}
+            </span>
+          ))}
+        </div>
+      </div>
+    )
+  }, [])
+
   return (
     <AppShell connected={connected}>
       <Header appName="Document Explorer" isDark={dark} onToggleTheme={toggleTheme}>
@@ -238,6 +266,7 @@ export default function App() {
             emptySelectionMessage="Upload documents and select them in the sidebar first..."
             placeholder="Ask a question about the selected documents..."
             loadHistory={loadHistory}
+            renderAnswerFooter={renderAnswerFooter}
           />
         </div>
       </div>

@@ -38,9 +38,9 @@ export default function DocumentDetail({
 
   return (
     <div ref={backdropRef} className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={handleBackdropClick}>
-      <div className="bg-surface-1 border border-border rounded-lg shadow-xl w-full max-w-md p-6 max-h-[80vh] overflow-y-auto">
+      <div role="dialog" aria-modal="true" aria-labelledby="doc-detail-title" className="bg-surface-1 border border-border rounded-lg shadow-xl w-full max-w-md p-6 max-h-[80vh] overflow-y-auto">
         <div className="flex items-start justify-between mb-4">
-          <h2 className="text-lg font-bold text-text-primary truncate pr-4">{doc.filename}</h2>
+          <h2 id="doc-detail-title" className="text-lg font-bold text-text-primary truncate pr-4">{doc.filename}</h2>
           <button onClick={onClose} aria-label="Close" className="text-text-dim hover:text-text-primary shrink-0">&times;</button>
         </div>
 

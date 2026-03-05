@@ -86,27 +86,10 @@ export default function App() {
     setSelectedDocs(new Set(docs.map(d => d.id)))
   }, [])
 
-  const topicNamesRef = useRef<string[]>([])
-  topicNamesRef.current = topicNames
-
   const openDocDetail = useCallback((doc: DocumentInfo) => {
     setViewingDoc(doc)
     setViewingDocTopics([])
-    Promise.all(
-      topicNamesRef.current.map(async t => {
-        try {
-          const topicDocs = await api.documents.listForTopic(t)
-          if (topicDocs.some(d => d.project_id === doc.project_id)) {
-            return t
-          }
-        } catch {
-          // Topic may not exist
-        }
-        return null
-      })
-    ).then(results => {
-      setViewingDocTopics(results.filter((t): t is string => t !== null))
-    })
+    api.documents.topics(doc.project_id).then(setViewingDocTopics)
   }, [])
 
   const handleViewDocument = useCallback((item: DocumentItem) => {

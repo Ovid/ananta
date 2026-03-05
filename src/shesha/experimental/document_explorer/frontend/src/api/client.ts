@@ -12,6 +12,8 @@ export const api = {
     get: (id: string) => request<DocumentInfo>(`/documents/${encodeURIComponent(id)}`),
     delete: (id: string) =>
       request<{ status: string }>(`/documents/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    topics: (id: string) =>
+      request<string[]>(`/documents/${encodeURIComponent(id)}/topics`),
     upload: (files: File[], topic?: string) => {
       const formData = new FormData()
       for (const file of files) formData.append('files', file)

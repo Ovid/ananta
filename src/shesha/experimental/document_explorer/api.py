@@ -218,6 +218,11 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
             raise HTTPException(404, f"Document '{doc_id}' not found")
         return info
 
+    @router.get("/documents/{doc_id}/topics")
+    def get_document_topics(doc_id: str) -> list[str]:
+        _validate_doc_id(doc_id)
+        return state.topic_mgr.find_topics_for_doc(doc_id)
+
     @router.delete("/documents/{doc_id}")
     def delete_document(doc_id: str) -> dict[str, str]:
         _validate_doc_id(doc_id)

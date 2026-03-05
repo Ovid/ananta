@@ -93,9 +93,7 @@ class TestPerTopicHistory:
         resp_b = client.get("/api/topics/Beta/history")
         assert len(resp_b.json()["exchanges"]) == 1
 
-    def test_global_history_routes_removed(
-        self, client: TestClient
-    ) -> None:
+    def test_global_history_routes_removed(self, client: TestClient) -> None:
         """The old global /api/history endpoint should no longer exist."""
         resp = client.get("/api/history")
         assert resp.status_code == 404

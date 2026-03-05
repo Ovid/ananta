@@ -28,7 +28,7 @@ export default function Header({
           <img
             src="/static/shesha.png"
             alt="Shesha"
-            className="w-8 h-8 self-center"
+            className="w-8 h-8 self-center rounded-md"
             onError={() => setLogoError(true)}
           />
         )}

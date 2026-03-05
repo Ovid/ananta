@@ -47,6 +47,15 @@ export default function ChatArea({
     return localStorage.getItem('shesha-welcome-dismissed') !== 'true'
   })
   const scrollRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Auto-resize textarea on input change
+  useEffect(() => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = Math.min(el.scrollHeight, el.offsetHeight || el.scrollHeight) + 'px'
+  }, [input])
 
   // Load history when topic changes
   useEffect(() => {
@@ -191,6 +200,7 @@ export default function ChatArea({
       <div className="border-t border-border bg-surface-1 px-4 py-3">
         <div className="flex gap-2">
           <textarea
+            ref={textareaRef}
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -201,7 +211,8 @@ export default function ChatArea({
               : placeholder
             }
             rows={1}
-            className="flex-1 bg-surface-2 border border-border rounded px-3 py-2 text-sm text-text-primary resize-none focus:outline-none focus:border-accent disabled:opacity-50"
+            style={{ maxHeight: '6rem' }}
+            className="flex-1 bg-surface-2 border border-border rounded px-3 py-2 text-sm text-text-primary resize-none overflow-y-auto focus:outline-none focus:border-accent disabled:opacity-50"
           />
           {thinking ? (
             <button

@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef, useCallback, type KeyboardEvent, type ReactNode } from 'react'
+import Markdown from 'react-markdown'
 
 import { showToast } from './Toast'
 import ChatMessage from './ChatMessage'
+import { mdComponents } from './mdComponents'
 import type { Exchange, WSMessage } from '../types'
 
 interface ChatAreaProps {
@@ -174,7 +176,7 @@ export default function ChatArea({
           <div className="flex flex-col gap-3 py-3">
             <div className="flex flex-col items-end gap-0.5">
               <div className="max-w-[70%] bg-accent/10 border border-accent/20 rounded-lg px-3 py-2 text-sm text-text-primary">
-                {pendingQuestion}
+                <Markdown components={mdComponents}>{pendingQuestion}</Markdown>
               </div>
               <span className="text-[10px] text-text-dim mr-1">{pendingSentAt}</span>
             </div>

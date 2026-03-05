@@ -31,7 +31,7 @@ export default function ChatMessage({ exchange, onViewTrace, renderAnswer, answe
       {/* User question */}
       <div className="flex flex-col items-end gap-0.5">
         <div className="max-w-[70%] bg-accent/10 border border-accent/20 rounded-lg px-3 py-2 text-sm text-text-primary">
-          {exchange.question}
+          <Markdown components={mdComponents}>{exchange.question}</Markdown>
         </div>
         <span className="text-[10px] text-text-dim mr-1">{questionTime}</span>
       </div>

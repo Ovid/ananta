@@ -56,7 +56,7 @@ export default function ChatArea({
     const el = textareaRef.current
     if (!el) return
     el.style.height = 'auto'
-    el.style.height = Math.min(el.scrollHeight, el.offsetHeight || el.scrollHeight) + 'px'
+    el.style.height = el.scrollHeight + 'px'
   }, [input])
 
   // Load history when topic changes

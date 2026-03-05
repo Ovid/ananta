@@ -24,8 +24,7 @@ class CodeExplorerState:
 
 def get_topic_session(state: CodeExplorerState, topic_name: str) -> WebConversationSession:
     """Return a per-topic session stored in the topic's directory."""
-    _meta, meta_path = state.topic_mgr._resolve(topic_name)
-    topic_dir = meta_path.parent
+    topic_dir = state.topic_mgr.get_topic_dir(topic_name)
     return WebConversationSession(topic_dir)
 
 

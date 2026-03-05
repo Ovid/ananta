@@ -170,6 +170,14 @@ class CodeExplorerTopicManager:
                 repos.remove(project_id)
                 meta_path.write_text(json.dumps(meta, indent=2))
 
+    def get_topic_dir(self, name: str) -> Path:
+        """Return the directory for the topic with *name*.
+
+        Raises ``ValueError`` if the topic does not exist.
+        """
+        _meta, meta_path = self._resolve(name)
+        return meta_path.parent
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------

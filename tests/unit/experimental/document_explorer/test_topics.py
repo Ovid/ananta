@@ -168,6 +168,21 @@ class TestRemoveDocFromAll:
         assert mgr.list_docs("B") == ["other"]
 
 
+class TestGetTopicDir:
+    def test_returns_topic_directory(self, tmp_path: Path) -> None:
+        mgr = DocumentTopicManager(tmp_path)
+        mgr.create("Reports")
+        topic_dir = mgr.get_topic_dir("Reports")
+        assert topic_dir.is_dir()
+        meta = json.loads((topic_dir / "topic.json").read_text())
+        assert meta["name"] == "Reports"
+
+    def test_nonexistent_topic_raises(self, tmp_path: Path) -> None:
+        mgr = DocumentTopicManager(tmp_path)
+        with pytest.raises(ValueError, match="Topic not found"):
+            mgr.get_topic_dir("Nonexistent")
+
+
 class TestRenameTopic:
     def test_rename_topic(self, tmp_path: Path) -> None:
         mgr = DocumentTopicManager(tmp_path)

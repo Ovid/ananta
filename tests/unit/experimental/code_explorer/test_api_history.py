@@ -1,4 +1,9 @@
-"""Tests for code explorer global history API routes."""
+"""Tests for code explorer per-topic history API routes.
+
+These tests verify the per-topic history, clear, and export endpoints work
+through the shared router.  The global /api/history and /api/export routes
+were removed in favour of per-topic endpoints.
+"""
 
 from __future__ import annotations
 
@@ -9,7 +14,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from shesha.experimental.code_explorer.api import create_api
-from shesha.experimental.code_explorer.dependencies import CodeExplorerState
+from shesha.experimental.code_explorer.dependencies import (
+    CodeExplorerState,
+    get_topic_session,
+)
 from shesha.experimental.code_explorer.topics import CodeExplorerTopicManager
 from shesha.experimental.shared.session import WebConversationSession
 
@@ -21,13 +29,16 @@ def mock_shesha() -> MagicMock:
     shesha.list_projects.return_value = []
     shesha._storage = MagicMock()
     shesha._storage.list_documents.return_value = []
+    shesha._storage.list_traces.return_value = []
     return shesha
 
 
 @pytest.fixture
 def topic_mgr(tmp_path: Path) -> CodeExplorerTopicManager:
     """Create a real CodeExplorerTopicManager backed by tmp_path."""
-    return CodeExplorerTopicManager(tmp_path / "topics")
+    mgr = CodeExplorerTopicManager(tmp_path / "topics")
+    mgr.create("TestTopic")
+    return mgr
 
 
 @pytest.fixture
@@ -72,25 +83,24 @@ def _add_sample_exchange(session: WebConversationSession, q: str, a: str) -> Non
     )
 
 
-# ---- GET /api/history ----
+# ---- GET /api/topics/{name}/history ----
 
 
 class TestGetHistory:
     def test_empty_history(self, client: TestClient) -> None:
-        """GET /api/history returns empty exchanges list when no history."""
-        resp = client.get("/api/history")
+        """GET /api/topics/{name}/history returns empty exchanges list."""
+        resp = client.get("/api/topics/TestTopic/history")
         assert resp.status_code == 200
         data = resp.json()
         assert data == {"exchanges": []}
 
-    def test_history_with_exchanges(
-        self, client: TestClient, session: WebConversationSession
-    ) -> None:
-        """GET /api/history returns exchanges after adding some."""
-        _add_sample_exchange(session, "What is Python?", "A programming language.")
-        _add_sample_exchange(session, "What is Rust?", "A systems language.")
+    def test_history_with_exchanges(self, client: TestClient, state: CodeExplorerState) -> None:
+        """GET /api/topics/{name}/history returns exchanges after adding some."""
+        topic_session = get_topic_session(state, "TestTopic")
+        _add_sample_exchange(topic_session, "What is Python?", "A programming language.")
+        _add_sample_exchange(topic_session, "What is Rust?", "A systems language.")
 
-        resp = client.get("/api/history")
+        resp = client.get("/api/topics/TestTopic/history")
         assert resp.status_code == 200
         data = resp.json()
         exchanges = data["exchanges"]
@@ -101,50 +111,50 @@ class TestGetHistory:
         assert exchanges[1]["answer"] == "A systems language."
 
 
-# ---- DELETE /api/history ----
+# ---- DELETE /api/topics/{name}/history ----
 
 
 class TestClearHistory:
-    def test_clear_history(self, client: TestClient, session: WebConversationSession) -> None:
-        """DELETE /api/history clears all exchanges."""
-        _add_sample_exchange(session, "Hello", "World")
-        assert len(session.list_exchanges()) == 1
+    def test_clear_history(self, client: TestClient, state: CodeExplorerState) -> None:
+        """DELETE /api/topics/{name}/history clears all exchanges."""
+        topic_session = get_topic_session(state, "TestTopic")
+        _add_sample_exchange(topic_session, "Hello", "World")
+        assert len(topic_session.list_exchanges()) == 1
 
-        resp = client.delete("/api/history")
+        resp = client.delete("/api/topics/TestTopic/history")
         assert resp.status_code == 200
         assert resp.json() == {"status": "cleared"}
 
         # Verify cleared via GET
-        resp = client.get("/api/history")
+        resp = client.get("/api/topics/TestTopic/history")
         assert resp.status_code == 200
         assert resp.json() == {"exchanges": []}
 
     def test_clear_empty_history(self, client: TestClient) -> None:
-        """DELETE /api/history on empty history succeeds."""
-        resp = client.delete("/api/history")
+        """DELETE /api/topics/{name}/history on empty history succeeds."""
+        resp = client.delete("/api/topics/TestTopic/history")
         assert resp.status_code == 200
         assert resp.json() == {"status": "cleared"}
 
 
-# ---- GET /api/export ----
+# ---- GET /api/topics/{name}/export ----
 
 
 class TestExportTranscript:
     def test_export_empty(self, client: TestClient) -> None:
-        """GET /api/export returns markdown text even when empty."""
-        resp = client.get("/api/export")
+        """GET /api/topics/{name}/export returns markdown text even when empty."""
+        resp = client.get("/api/topics/TestTopic/export")
         assert resp.status_code == 200
         assert resp.headers["content-type"].startswith("text/markdown")
         assert "# Conversation Transcript" in resp.text
 
-    def test_export_with_exchanges(
-        self, client: TestClient, session: WebConversationSession
-    ) -> None:
-        """GET /api/export returns markdown containing the exchanges."""
-        _add_sample_exchange(session, "What is Python?", "A programming language.")
-        _add_sample_exchange(session, "What is Rust?", "A systems language.")
+    def test_export_with_exchanges(self, client: TestClient, state: CodeExplorerState) -> None:
+        """GET /api/topics/{name}/export returns markdown containing the exchanges."""
+        topic_session = get_topic_session(state, "TestTopic")
+        _add_sample_exchange(topic_session, "What is Python?", "A programming language.")
+        _add_sample_exchange(topic_session, "What is Rust?", "A systems language.")
 
-        resp = client.get("/api/export")
+        resp = client.get("/api/topics/TestTopic/export")
         assert resp.status_code == 200
         assert resp.headers["content-type"].startswith("text/markdown")
         text = resp.text
@@ -153,3 +163,25 @@ class TestExportTranscript:
         assert "A programming language." in text
         assert "What is Rust?" in text
         assert "A systems language." in text
+
+
+# ---- Global routes removed ----
+
+
+class TestGlobalRoutesRemoved:
+    def test_global_history_get_returns_404(self, client: TestClient) -> None:
+        """GET /api/history should no longer exist."""
+        resp = client.get("/api/history")
+        assert resp.status_code == 404
+
+    def test_global_history_delete_returns_error(self, client: TestClient) -> None:
+        """DELETE /api/history should no longer exist."""
+        resp = client.delete("/api/history")
+        # 404 when no SPA catch-all, 405 when the SPA static mount
+        # intercepts the path but rejects non-GET methods.
+        assert resp.status_code in (404, 405)
+
+    def test_global_export_returns_404(self, client: TestClient) -> None:
+        """GET /api/export should no longer exist."""
+        resp = client.get("/api/export")
+        assert resp.status_code == 404

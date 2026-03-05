@@ -68,7 +68,11 @@ async def _handle_query(
                 doc = storage.get_document(project_id_str, doc_name)
                 loaded_docs.append(doc)
         except Exception:
-            logger.warning("Could not load documents from project %s", project_id_str)
+            logger.warning(
+                "Could not load documents from project %s",
+                project_id_str,
+                exc_info=True,
+            )
 
     if not loaded_docs:
         await ws.send_json({"type": "error", "message": "No documents found in selected items"})

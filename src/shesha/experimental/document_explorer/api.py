@@ -34,7 +34,6 @@ from shesha.experimental.shared.routes import create_shared_router
 from shesha.experimental.shared.schemas import TopicInfo
 from shesha.models import ParsedDocument
 
-
 _SAFE_ID_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
 
 

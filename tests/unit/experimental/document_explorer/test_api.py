@@ -148,6 +148,17 @@ class TestUploadDocument:
         pid = resp.json()[0]["project_id"]
         assert pid in topic_mgr.list_docs("Research")
 
+    def test_upload_unsupported_type_returns_422_with_detail(
+        self,
+        client: TestClient,
+    ) -> None:
+        resp = client.post(
+            "/api/documents/upload",
+            files=[("files", ("photo.png", b"\x89PNG", "image/png"))],
+        )
+        assert resp.status_code == 422
+        assert ".png" in resp.json()["detail"]
+
 
 class TestDeleteDocument:
     def test_delete_removes_from_topics(

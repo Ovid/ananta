@@ -117,8 +117,9 @@ export default function App() {
       await api.documents.upload(files, activeTopic || undefined)
       setDocsVersion(v => v + 1)
       showToast(`${files.length} file${files.length > 1 ? 's' : ''} uploaded`, 'success')
-    } catch {
-      showToast('Failed to upload files', 'error')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to upload files'
+      showToast(msg, 'error')
     }
   }, [activeTopic])
 

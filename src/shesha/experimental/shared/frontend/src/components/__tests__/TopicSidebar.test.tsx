@@ -444,6 +444,40 @@ describe('TopicSidebar (shared)', () => {
     expect(screen.getByText('View')).toBeInTheDocument()
   })
 
+  it('excludes topic from "Add to..." when a doc with the same label already exists there', async () => {
+    // "chess" topic already has "Chess Strategies" (doc-1)
+    // An uncategorized doc with a different id but the same label should NOT be eligible for chess
+    const addDocToTopic = vi.fn().mockResolvedValue(undefined)
+    const uncatDocs: DocumentItem[] = [
+      { id: 'doc-99', label: 'Chess Strategies' },
+    ]
+    const props = defaultProps({
+      activeTopic: 'chess',
+      loadDocuments: vi.fn().mockResolvedValue(chessDocs),
+      uncategorizedDocs: uncatDocs,
+      addDocToTopic,
+    })
+    render(<TopicSidebar {...props} />)
+
+    // Wait for chess topic docs to load
+    await screen.findByText('Opening Theory')
+    // Find the uncategorized doc's menu button
+    const uncatSection = screen.getByText('Uncategorized').closest('div')!.parentElement!
+    const menuBtn = within(uncatSection as HTMLElement).getByTitle('Document actions')
+    await userEvent.click(menuBtn)
+
+    // "Add to..." shows (math is still eligible — docs not loaded)
+    await userEvent.click(screen.getByText('Add to\u2026'))
+
+    // "math" should appear as eligible, but "chess" should NOT (same-label doc already there)
+    const submenuButtons = screen.getAllByRole('button').filter(
+      b => b.textContent === 'math' || b.textContent === 'chess'
+    )
+    const labels = submenuButtons.map(b => b.textContent)
+    expect(labels).toContain('math')
+    expect(labels).not.toContain('chess')
+  })
+
   it('shows viewing highlight on the document with viewingDocumentId', async () => {
     const props = defaultProps({
       activeTopic: 'chess',

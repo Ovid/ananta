@@ -179,7 +179,7 @@ export default function TopicSidebar({
           {addDocToTopic && (() => {
             const eligible = topics.filter(t => {
               const loaded = topicDocs[t.name]
-              return !loaded || !loaded.some(d => d.id === doc.id)
+              return !loaded || !loaded.some(d => d.id === doc.id || d.label === doc.label)
             })
             if (eligible.length === 0) return null
             return (

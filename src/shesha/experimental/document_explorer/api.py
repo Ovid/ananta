@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import shutil
 from datetime import UTC, datetime
 from pathlib import Path
@@ -32,6 +33,15 @@ from shesha.experimental.shared.app_factory import create_app
 from shesha.experimental.shared.routes import create_shared_router
 from shesha.experimental.shared.schemas import TopicInfo
 from shesha.models import ParsedDocument
+
+
+_SAFE_ID_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
+
+
+def _validate_doc_id(doc_id: str) -> None:
+    """Raise 400 if *doc_id* contains path-traversal characters."""
+    if not _SAFE_ID_RE.match(doc_id):
+        raise HTTPException(400, f"Invalid document id: {doc_id!r}")
 
 
 def _make_project_id(filename: str) -> str:
@@ -202,6 +212,7 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
 
     @router.get("/documents/{doc_id}")
     def get_document(doc_id: str) -> DocumentInfo:
+        _validate_doc_id(doc_id)
         info = _build_doc_info(state.uploads_dir, doc_id)
         if info is None:
             raise HTTPException(404, f"Document '{doc_id}' not found")
@@ -209,6 +220,7 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
 
     @router.delete("/documents/{doc_id}")
     def delete_document(doc_id: str) -> dict[str, str]:
+        _validate_doc_id(doc_id)
         state.topic_mgr.remove_doc_from_all(doc_id)
         # Remove upload files
         upload_dir = state.uploads_dir / doc_id
@@ -220,6 +232,7 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
 
     @router.get("/documents/{doc_id}/download")
     def download_document(doc_id: str) -> FileResponse:
+        _validate_doc_id(doc_id)
         upload_dir = state.uploads_dir / doc_id
         if not upload_dir.exists():
             raise HTTPException(404, f"Document '{doc_id}' not found")

@@ -411,6 +411,39 @@ describe('TopicSidebar (shared)', () => {
     expect(screen.queryByText(/Remove from/)).not.toBeInTheDocument()
   })
 
+  it('shows "View" option in doc menu that calls onDocumentClick', async () => {
+    const props = defaultProps({
+      activeTopic: 'chess',
+      loadDocuments: vi.fn().mockResolvedValue(chessDocs),
+      addDocToTopic: vi.fn(),
+    })
+    render(<TopicSidebar {...props} />)
+
+    await screen.findByText('Chess Strategies')
+    const menuButtons = screen.getAllByTitle('Document actions')
+    await userEvent.click(menuButtons[0])
+
+    const viewBtn = screen.getByText('View')
+    await userEvent.click(viewBtn)
+
+    expect(props.onDocumentClick).toHaveBeenCalledWith(chessDocs[0])
+  })
+
+  it('shows "View" option for uncategorized doc even when no topics exist', async () => {
+    const props = defaultProps({
+      loadTopics: vi.fn().mockResolvedValue([]),
+      uncategorizedDocs: [{ id: 'uncat-1', label: 'Orphan Doc' }],
+      addDocToTopic: vi.fn(),
+    })
+    render(<TopicSidebar {...props} />)
+
+    await screen.findByText('Orphan Doc')
+    const menuBtn = screen.getByTitle('Document actions')
+    await userEvent.click(menuBtn)
+
+    expect(screen.getByText('View')).toBeInTheDocument()
+  })
+
   it('shows viewing highlight on the document with viewingDocumentId', async () => {
     const props = defaultProps({
       activeTopic: 'chess',

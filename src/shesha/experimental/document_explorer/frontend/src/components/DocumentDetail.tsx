@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type MouseEvent } from 'react'
 import type { DocumentInfo } from '../types'
 
 interface DocumentDetailProps {
@@ -30,7 +30,7 @@ export default function DocumentDetail({
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [onClose])
 
-  const handleBackdropClick = (e: React.MouseEvent) => {
+  const handleBackdropClick = (e: MouseEvent<HTMLDivElement>) => {
     if (e.target === backdropRef.current) onClose()
   }
 

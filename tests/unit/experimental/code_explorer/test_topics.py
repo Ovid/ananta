@@ -88,6 +88,15 @@ class TestCreateAndListTopics:
         with pytest.raises(ValueError, match="different display name"):
             mgr.create("research")
 
+    def test_create_recovers_corrupt_topic_json(self, tmp_path: Path) -> None:
+        """Creating a topic whose topic.json is corrupt re-writes the file."""
+        mgr = CodeExplorerTopicManager(tmp_path)
+        mgr.create("Frontend")
+        topic_dir = mgr.get_topic_dir("Frontend")
+        (topic_dir / "topic.json").write_text("corrupted")
+        mgr.create("Frontend")
+        assert "Frontend" in mgr.list_topics()
+
 
 class TestAddAndListRepos:
     """Tests for adding repos to topics and listing them."""

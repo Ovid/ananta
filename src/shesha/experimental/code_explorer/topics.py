@@ -8,11 +8,14 @@ topic removes the references but not the repos themselves.
 from __future__ import annotations
 
 import json
+import logging
 import re
 import shutil
 import unicodedata
 from pathlib import Path
 from typing import TypedDict
+
+logger = logging.getLogger(__name__)
 
 TOPIC_META_FILE = "topic.json"
 
@@ -76,14 +79,18 @@ class CodeExplorerTopicManager:
 
         if meta_path.exists():
             existing = self._read_meta(topic_dir)
-            if existing is not None and existing["name"] != name:
+            if existing is None:
+                # Corrupt topic.json — re-write it to recover
+                logger.warning("Repairing corrupt topic.json in %s", topic_dir)
+            elif existing["name"] != name:
                 msg = (
                     f"A topic with a different display name already uses "
                     f"slug '{slug}': existing {existing['name']!r} vs "
                     f"requested {name!r}"
                 )
                 raise ValueError(msg)
-            return  # already exists with same name
+            else:
+                return  # already exists with same name
 
         topic_dir.mkdir(parents=True, exist_ok=True)
         meta: _TopicMeta = {"name": name, "repos": []}

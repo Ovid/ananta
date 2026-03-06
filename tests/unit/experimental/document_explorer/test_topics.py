@@ -145,6 +145,16 @@ class TestCreateAndListTopics:
         with pytest.raises(ValueError, match="different display name"):
             mgr.create("research")
 
+    def test_create_recovers_corrupt_topic_json(self, tmp_path: Path) -> None:
+        mgr = DocumentTopicManager(tmp_path)
+        mgr.create("Research")
+        # Corrupt the topic.json
+        topic_dir = mgr.get_topic_dir("Research")
+        (topic_dir / "topic.json").write_text("not valid json")
+        # Re-creating should repair the file
+        mgr.create("Research")
+        assert "Research" in mgr.list_topics()
+
 
 class TestAddAndListDocs:
     def test_add_doc_to_topic(self, tmp_path: Path) -> None:

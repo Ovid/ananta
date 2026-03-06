@@ -108,15 +108,18 @@ def _extract_pptx(path: Path) -> str:
 
 def _extract_xlsx(path: Path) -> str:
     wb = load_workbook(path, read_only=True, data_only=True)
-    parts: list[str] = []
-    for sheet_name in wb.sheetnames:
-        sheet = wb[sheet_name]
-        rows: list[str] = []
-        for row in sheet.iter_rows():
-            cells = [str(cell.value) if cell.value is not None else "" for cell in row]
-            rows.append("\t".join(cells))
-        parts.append(f"--- {sheet_name} ---\n" + "\n".join(rows))
-    return "\n\n".join(parts)
+    try:
+        parts: list[str] = []
+        for sheet_name in wb.sheetnames:
+            sheet = wb[sheet_name]
+            rows: list[str] = []
+            for row in sheet.iter_rows():
+                cells = [str(cell.value) if cell.value is not None else "" for cell in row]
+                rows.append("\t".join(cells))
+            parts.append(f"--- {sheet_name} ---\n" + "\n".join(rows))
+        return "\n\n".join(parts)
+    finally:
+        wb.close()
 
 
 def _extract_rtf(path: Path) -> str:
@@ -135,5 +138,8 @@ def get_page_count(path: Path) -> int | None:
         return len(prs.slides)
     if ext == ".xlsx":
         wb = load_workbook(path, read_only=True)
-        return len(wb.sheetnames)
+        try:
+            return len(wb.sheetnames)
+        finally:
+            wb.close()
     return None

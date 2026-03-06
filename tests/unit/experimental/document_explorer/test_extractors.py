@@ -180,6 +180,22 @@ class TestXlsxExtraction:
         assert "Sheet1" in result
         assert "A1" in result
 
+    def test_xlsx_workbook_is_closed(self, tmp_path: Path) -> None:
+        mock_sheet = MagicMock()
+        mock_sheet.iter_rows.return_value = []
+        mock_wb = MagicMock()
+        mock_wb.sheetnames = ["Sheet1"]
+        mock_wb.__getitem__.return_value = mock_sheet
+
+        f = tmp_path / "data.xlsx"
+        f.write_bytes(b"PK fake xlsx")
+
+        with patch("shesha.experimental.document_explorer.extractors.load_workbook") as mock_load:
+            mock_load.return_value = mock_wb
+            extract_text(f)
+
+        mock_wb.close.assert_called_once()
+
 
 class TestRtfExtraction:
     """Tests for RTF extraction."""
@@ -232,6 +248,19 @@ class TestGetPageCount:
         with patch("shesha.experimental.document_explorer.extractors.load_workbook") as mock_load:
             mock_load.return_value = mock_wb
             assert get_page_count(f) == 3
+
+    def test_xlsx_page_count_closes_workbook(self, tmp_path: Path) -> None:
+        mock_wb = MagicMock()
+        mock_wb.sheetnames = ["Sheet1"]
+
+        f = tmp_path / "data.xlsx"
+        f.write_bytes(b"PK fake xlsx")
+
+        with patch("shesha.experimental.document_explorer.extractors.load_workbook") as mock_load:
+            mock_load.return_value = mock_wb
+            get_page_count(f)
+
+        mock_wb.close.assert_called_once()
 
     def test_plain_text_returns_none(self, tmp_path: Path) -> None:
         f = tmp_path / "notes.txt"

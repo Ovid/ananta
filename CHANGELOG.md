@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Refactored arxiv-explorer help panel to use shared HelpPanel component
 - Launcher scripts (`code-explorer.sh`, `arxiv-explorer.sh`, `document-explorer.sh`) now
   validate all prerequisites and print a single actionable error report instead of failing
   on the first missing dependency. `SHESHA_MODEL` is now required. Shared logic extracted
@@ -19,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Help panel** (`?` button) for Code Explorer and Document Explorer with customized quick-start guides, FAQs, and keyboard shortcuts
 - **Document Explorer** web application for uploading, organizing, and querying documents (PDF, Word, PowerPoint, Excel, RTF, plain text) via RLM
 - Code Explorer web application for exploring git repositories via RLM
 - Shared web infrastructure module (`shesha.experimental.shared`) for building experimental tools

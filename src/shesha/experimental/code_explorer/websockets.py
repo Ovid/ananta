@@ -156,7 +156,9 @@ async def _handle_query(
             first_project_id = pid_str
             break
     if rlm_engine is None or first_project_id is None:
-        await ws.send_json({"type": "error", "message": "No valid project found for selected repositories"})
+        await ws.send_json(
+            {"type": "error", "message": "No valid project found for selected repositories"}
+        )
         await message_queue.put(None)
         await drain_task
         return

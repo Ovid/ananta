@@ -314,15 +314,15 @@ export default function App() {
         <HelpPanel
           onClose={() => setHelpOpen(false)}
           quickStart={[
-            'Create a topic using the <strong>+</strong> button in the sidebar',
-            'Click the <strong>Search</strong> icon to find papers on arXiv',
-            'Select papers and click <strong>Add</strong> to add them to your topic',
+            <>Create a topic using the <strong>+</strong> button in the sidebar</>,
+            <>Click the <strong>Search</strong> icon to find papers on arXiv</>,
+            <>Select papers and click <strong>Add</strong> to add them to your topic</>,
             'Ask questions about your papers in the chat area',
-            'Click <strong>View trace</strong> on any answer to see how the LLM arrived at it',
+            <>Click <strong>View trace</strong> on any answer to see how the LLM arrived at it</>,
           ]}
           faq={[
             { q: 'How do I add papers to multiple topics?', a: 'Use the search panel\u2019s topic picker when adding papers. Each paper can belong to multiple topics.' },
-            { q: 'What does the context budget indicator mean?', a: 'It estimates how much of the model\u2019s context window is used by your documents and conversation history. Green (&lt;50%), amber (&lt;80%), red (\u226580%).' },
+            { q: 'What does the context budget indicator mean?', a: <>It estimates how much of the model{'\u2019'}s context window is used by your documents and conversation history. Green ({'<'}50%), amber ({'<'}80%), red ({'\u2265'}80%).</> },
             { q: 'Why do queries take so long?', a: 'Shesha uses a recursive approach: the LLM writes code to explore your documents, runs it, examines the output, and repeats. This takes multiple iterations.' },
             { q: 'Can I cancel a running query?', a: 'Yes, press Escape or click the cancel button while a query is running.' },
             { q: 'What is the citation check?', a: 'It verifies that claims in the LLM\u2019s answer are supported by the source documents. Results show which citations are verified, unverified, or missing.' },

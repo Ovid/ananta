@@ -7,11 +7,11 @@ const defaultProps = {
   onClose: vi.fn(),
   quickStart: [
     'Step one',
-    'Step <strong>two</strong>',
+    <>Step <strong>two</strong></>,
   ],
   faq: [
     { q: 'Question one?', a: 'Answer one.' },
-    { q: 'Question two?', a: 'Answer <strong>two</strong>.' },
+    { q: 'Question two?', a: <>Answer <strong>two</strong>.</> },
   ],
   shortcuts: [
     { label: 'Send message', key: 'Enter' },

@@ -1,7 +1,9 @@
+import type { ReactNode } from 'react'
+
 interface HelpPanelProps {
   onClose: () => void
-  quickStart: string[]
-  faq: { q: string; a: string }[]
+  quickStart: ReactNode[]
+  faq: { q: ReactNode; a: ReactNode }[]
   shortcuts: { label: string; key: string }[]
 }
 
@@ -20,7 +22,7 @@ export default function HelpPanel({ onClose, quickStart, faq, shortcuts }: HelpP
           <h3 className="font-semibold text-text-primary mb-2">Quick Start</h3>
           <ol className="list-decimal list-inside space-y-1 text-text-secondary">
             {quickStart.map((step, i) => (
-              <li key={i} dangerouslySetInnerHTML={{ __html: step }} />
+              <li key={i}>{step}</li>
             ))}
           </ol>
         </section>
@@ -31,8 +33,8 @@ export default function HelpPanel({ onClose, quickStart, faq, shortcuts }: HelpP
           <div className="space-y-3">
             {faq.map((item, i) => (
               <div key={i}>
-                <p className="text-text-primary font-medium" dangerouslySetInnerHTML={{ __html: item.q }} />
-                <p className="text-text-dim" dangerouslySetInnerHTML={{ __html: item.a }} />
+                <p className="text-text-primary font-medium">{item.q}</p>
+                <p className="text-text-dim">{item.a}</p>
               </div>
             ))}
           </div>

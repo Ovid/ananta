@@ -296,17 +296,17 @@ export default function App() {
         <HelpPanel
           onClose={() => setHelpOpen(false)}
           quickStart={[
-            'Create a topic using the <strong>+</strong> button in the sidebar',
-            'Click <strong>Upload</strong> and drag-and-drop or select files',
+            <>Create a topic using the <strong>+</strong> button in the sidebar</>,
+            <>Click <strong>Upload</strong> and drag-and-drop or select files</>,
             'Organize documents into topics using the context menu',
             'Select documents using the checkboxes, then ask questions in the chat',
-            'Click <strong>View trace</strong> on any answer to see how the LLM explored your documents',
+            <>Click <strong>View trace</strong> on any answer to see how the LLM explored your documents</>,
           ]}
           faq={[
             { q: 'What file types can I upload?', a: 'PDF, Word (.docx), Excel (.xlsx), PowerPoint (.pptx), RTF, and any plain-text file \u2014 including Markdown, CSV, HTML, config files, and source code.' },
             { q: 'What are the \u201cSources\u201d shown below answers?', a: 'They list which documents the LLM consulted to produce the answer. Click a source tag to view that document\u2019s details.' },
             { q: 'Can a document belong to multiple topics?', a: 'Yes. Open the document detail view to see which topics it belongs to and add or remove it from others.' },
-            { q: 'What does the context budget indicator mean?', a: 'It estimates how much of the model\u2019s context window is used by your documents and conversation. Green (&lt;50%), amber (&lt;80%), red (\u226580%).' },
+            { q: 'What does the context budget indicator mean?', a: <>It estimates how much of the model{'\u2019'}s context window is used by your documents and conversation. Green ({'<'}50%), amber ({'<'}80%), red ({'\u2265'}80%).</> },
             { q: 'Why do queries take so long?', a: 'Shesha uses a recursive approach: the LLM writes code to explore your documents, runs it, examines the output, and repeats. This takes multiple iterations.' },
           ]}
           shortcuts={[

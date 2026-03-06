@@ -322,17 +322,17 @@ export default function App() {
         <HelpPanel
           onClose={() => setHelpOpen(false)}
           quickStart={[
-            'Create a topic using the <strong>+</strong> button in the sidebar',
-            'Click <strong>+ Repo</strong> and paste a GitHub URL',
+            <>Create a topic using the <strong>+</strong> button in the sidebar</>,
+            <>Click <strong>+ Repo</strong> and paste a GitHub URL</>,
             'Wait for the analysis to complete \u2014 you can check status in the sidebar',
             'Select repositories using the checkboxes, then ask questions in the chat',
-            'Click <strong>View trace</strong> on any answer to see how the LLM explored the code',
+            <>Click <strong>View trace</strong> on any answer to see how the LLM explored the code</>,
           ]}
           faq={[
-            { q: 'What does the analysis status mean?', a: '<strong>Current</strong> means the analysis reflects the latest commit. <strong>Stale</strong> means new commits exist \u2014 click \u201cCheck for Updates\u201d to refresh. <strong>Missing</strong> means no analysis yet \u2014 click \u201cGenerate Analysis.\u201d' },
+            { q: 'What does the analysis status mean?', a: <><strong>Current</strong> means the analysis reflects the latest commit. <strong>Stale</strong> means new commits exist {'\u2014'} click {'\u201c'}Check for Updates{'\u201d'} to refresh. <strong>Missing</strong> means no analysis yet {'\u2014'} click {'\u201c'}Generate Analysis.{'\u201d'}</> },
             { q: 'How do I update a repository\u2019s analysis?', a: 'Open the repository detail view and click \u201cCheck for Updates.\u201d If new commits are found, the analysis is regenerated automatically.' },
             { q: 'Can a repository belong to multiple topics?', a: 'Yes. Use the context menu on a repository to add it to additional topics.' },
-            { q: 'What does the context budget indicator mean?', a: 'It estimates how much of the model\u2019s context window is used by your repositories and conversation. Green (&lt;50%), amber (&lt;80%), red (\u226580%).' },
+            { q: 'What does the context budget indicator mean?', a: <>It estimates how much of the model{'\u2019'}s context window is used by your repositories and conversation. Green ({'<'}50%), amber ({'<'}80%), red ({'\u2265'}80%).</> },
             { q: 'Why do queries take so long?', a: 'Shesha uses a recursive approach: the LLM writes code to explore your repositories, runs it, examines the output, and repeats. This takes multiple iterations.' },
           ]}
           shortcuts={[

@@ -24,14 +24,11 @@ from shesha.experimental.document_explorer.extractors import extract_text, get_p
 from shesha.experimental.document_explorer.schemas import (
     DocumentInfo,
     DocumentUploadResponse,
-    TopicCreate,
-    TopicRename,
 )
 from shesha.experimental.document_explorer.topics import _slugify
 from shesha.experimental.document_explorer.websockets import websocket_handler
 from shesha.experimental.shared.app_factory import create_app
-from shesha.experimental.shared.routes import create_shared_router
-from shesha.experimental.shared.schemas import TopicInfo
+from shesha.experimental.shared.routes import create_item_router, create_shared_router
 from shesha.models import ParsedDocument
 
 _SAFE_ID_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
@@ -79,20 +76,6 @@ def _build_doc_info(uploads_dir: Path, project_id: str) -> DocumentInfo | None:
     )
 
 
-def _build_doc_topic_info(state: DocumentExplorerState) -> list[TopicInfo]:
-    """Build topic listing for document explorer (doc count per topic)."""
-    names = state.topic_mgr.list_topics()
-    return [
-        TopicInfo(
-            name=n,
-            document_count=len(state.topic_mgr.list_docs(n)),
-            size="",
-            project_id=f"topic:{n}",
-        )
-        for n in names
-    ]
-
-
 def _resolve_doc_project_ids(
     state: DocumentExplorerState,
     topic_name: str,
@@ -102,9 +85,9 @@ def _resolve_doc_project_ids(
     Falls back to all projects if the topic has no docs or doesn't exist.
     """
     try:
-        docs = state.topic_mgr.list_docs(topic_name)
-        if docs:
-            return docs
+        items = state.topic_mgr.list_items(topic_name)
+        if items:
+            return items
     except ValueError:
         pass  # Topic doesn't exist; fall back to all projects
     return state.shesha.list_projects()
@@ -135,7 +118,7 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
     @router.get("/documents/uncategorized")
     def list_uncategorized() -> list[DocumentInfo]:
         all_ids = state.shesha.list_projects()
-        uncategorized = state.topic_mgr.list_uncategorized_docs(all_ids)
+        uncategorized = state.topic_mgr.list_uncategorized(all_ids)
         result: list[DocumentInfo] = []
         for pid in uncategorized:
             info = _build_doc_info(state.uploads_dir, pid)
@@ -205,7 +188,7 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
 
             # Add to topic (already created/validated above)
             if topic:
-                state.topic_mgr.add_doc(topic, project_id)
+                state.topic_mgr.add_item(topic, project_id)
 
             results.append(
                 DocumentUploadResponse(
@@ -227,12 +210,12 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
     @router.get("/documents/{doc_id}/topics")
     def get_document_topics(doc_id: str) -> list[str]:
         _validate_doc_id(doc_id)
-        return state.topic_mgr.find_topics_for_doc(doc_id)
+        return state.topic_mgr.find_topics_for_item(doc_id)
 
     @router.delete("/documents/{doc_id}")
     def delete_document(doc_id: str) -> dict[str, str]:
         _validate_doc_id(doc_id)
-        state.topic_mgr.remove_doc_from_all(doc_id)
+        state.topic_mgr.remove_item_from_all(doc_id)
         # Remove upload files
         upload_dir = state.uploads_dir / doc_id
         if upload_dir.exists():
@@ -260,91 +243,16 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
             original_path = originals[0]
         return FileResponse(original_path, filename=filename)
 
-    # ------------------------------------------------------------------
-    # Topic CRUD
-    # ------------------------------------------------------------------
-
-    @router.get("/topics", response_model=list[TopicInfo])
-    def list_topics() -> list[TopicInfo]:
-        return _build_doc_topic_info(state)
-
-    @router.post("/topics", status_code=201)
-    def create_topic(body: TopicCreate) -> dict[str, str]:
-        try:
-            state.topic_mgr.create(body.name)
-        except ValueError as e:
-            raise HTTPException(422, str(e)) from e
-        return {"name": body.name, "project_id": f"topic:{body.name}"}
-
-    @router.patch("/topics/{name}")
-    def rename_topic(name: str, body: TopicRename) -> dict[str, str]:
-        try:
-            state.topic_mgr.rename(name, body.new_name)
-        except ValueError as e:
-            msg = str(e)
-            if "already exists" in msg:
-                status = 409
-            elif "not found" in msg.lower():
-                status = 404
-            else:
-                status = 422
-            raise HTTPException(status, msg) from e
-        return {"name": body.new_name}
-
-    @router.delete("/topics/{name}")
-    def delete_topic(name: str) -> dict[str, str]:
-        try:
-            state.topic_mgr.delete(name)
-        except ValueError as e:
-            raise HTTPException(404, str(e)) from e
-        return {"status": "deleted", "name": name}
-
-    # ------------------------------------------------------------------
-    # Topic-document references
-    # ------------------------------------------------------------------
-
-    @router.get("/topics/{name}/documents")
-    def list_topic_docs(name: str) -> list[DocumentInfo]:
-        try:
-            doc_ids = state.topic_mgr.list_docs(name)
-        except ValueError as e:
-            raise HTTPException(404, f"Topic '{name}' not found") from e
-        result: list[DocumentInfo] = []
-        for pid in doc_ids:
-            info = _build_doc_info(state.uploads_dir, pid)
-            if info is not None:
-                result.append(info)
-        return result
-
-    @router.post("/topics/{name}/documents/{doc_id}")
-    def add_doc_to_topic(name: str, doc_id: str) -> dict[str, str]:
-        _validate_doc_id(doc_id)
-        try:
-            state.topic_mgr.create(name)
-        except ValueError as e:
-            raise HTTPException(422, str(e)) from e
-        state.topic_mgr.add_doc(name, doc_id)
-        return {"status": "added", "topic": name, "project_id": doc_id}
-
-    @router.delete("/topics/{name}/documents/{doc_id}")
-    def remove_doc_from_topic(name: str, doc_id: str) -> dict[str, str]:
-        _validate_doc_id(doc_id)
-        try:
-            state.topic_mgr.remove_doc(name, doc_id)
-        except ValueError as e:
-            raise HTTPException(404, f"Doc '{doc_id}' not found in topic '{name}'") from e
-        return {"status": "removed", "topic": name, "project_id": doc_id}
-
     return router
 
 
 def create_api(state: DocumentExplorerState) -> FastAPI:
     """Create the document explorer FastAPI application."""
     doc_router = _create_document_router(state)
+    item_router = create_item_router(state.topic_mgr)
     shared_router = create_shared_router(
         state,
         get_session=lambda s, name: get_topic_session(s, name),
-        build_topic_info=lambda s: _build_doc_topic_info(s),
         resolve_project_ids=lambda s, name: _resolve_doc_project_ids(s, name),
         list_trace_files=lambda s, pid: _list_doc_trace_files(s, pid),
         include_topic_crud=False,
@@ -359,5 +267,5 @@ def create_api(state: DocumentExplorerState) -> FastAPI:
         static_dir=frontend_dist,
         images_dir=images_dir,
         ws_handler=lambda ws: websocket_handler(ws, state),
-        extra_routers=[doc_router, shared_router],
+        extra_routers=[doc_router, item_router, shared_router],
     )

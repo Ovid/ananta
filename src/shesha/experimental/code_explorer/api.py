@@ -25,29 +25,12 @@ from shesha.experimental.code_explorer.schemas import (
     AnalysisResponse,
     RepoAdd,
     RepoInfo,
-    TopicCreate,
-    TopicRename,
     UpdateStatus,
 )
 from shesha.experimental.code_explorer.websockets import websocket_handler
 from shesha.experimental.shared.app_factory import create_app
-from shesha.experimental.shared.routes import create_shared_router
-from shesha.experimental.shared.schemas import TopicInfo
+from shesha.experimental.shared.routes import create_item_router, create_shared_router
 from shesha.models import RepoProjectResult
-
-
-def _build_code_topic_info(state: CodeExplorerState) -> list[TopicInfo]:
-    """Build topic listing for code explorer (repo count per topic)."""
-    names = state.topic_mgr.list_topics()
-    return [
-        TopicInfo(
-            name=n,
-            document_count=len(state.topic_mgr.list_repos(n)),
-            size="",
-            project_id=f"topic:{n}",
-        )
-        for n in names
-    ]
 
 
 def _resolve_code_project_ids(state: CodeExplorerState, topic_name: str) -> list[str]:
@@ -56,9 +39,9 @@ def _resolve_code_project_ids(state: CodeExplorerState, topic_name: str) -> list
     Falls back to all projects if the topic has no repos or doesn't exist.
     """
     try:
-        repos = state.topic_mgr.list_repos(topic_name)
-        if repos:
-            return repos
+        items = state.topic_mgr.list_items(topic_name)
+        if items:
+            return items
     except ValueError:
         pass  # Topic doesn't exist; fall back to all projects
     return state.shesha.list_projects()
@@ -97,7 +80,7 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
     @router.get("/repos/uncategorized")
     def list_uncategorized_repos() -> list[RepoInfo]:
         all_ids = state.shesha.list_projects()
-        uncategorized = state.topic_mgr.list_uncategorized_repos(all_ids)
+        uncategorized = state.topic_mgr.list_uncategorized(all_ids)
         return [_build_repo_info(pid) for pid in uncategorized]
 
     @router.post("/repos")
@@ -113,7 +96,7 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
                 state.topic_mgr.create(body.topic)
             except ValueError as exc:
                 raise HTTPException(422, str(exc)) from exc
-            state.topic_mgr.add_repo(body.topic, project_id)
+            state.topic_mgr.add_item(body.topic, project_id)
 
         return {
             "project_id": project_id,
@@ -134,7 +117,7 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
             state.shesha.get_project_info(project_id)
         except ProjectNotFoundError:
             raise HTTPException(404, f"Project '{project_id}' not found")
-        state.topic_mgr.remove_repo_from_all(project_id)
+        state.topic_mgr.remove_item_from_all(project_id)
         state.shesha.delete_project(project_id, cleanup_repo=True)
         return {"status": "deleted", "project_id": project_id}
 
@@ -191,81 +174,16 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
             raise HTTPException(404, f"No analysis exists for project '{project_id}'")
         return AnalysisResponse(**asdict(analysis))
 
-    # ------------------------------------------------------------------
-    # Topic CRUD
-    # ------------------------------------------------------------------
-
-    @router.get("/topics", response_model=list[TopicInfo])
-    def list_topics() -> list[TopicInfo]:
-        return _build_code_topic_info(state)
-
-    @router.post("/topics", status_code=201)
-    def create_topic(body: TopicCreate) -> dict[str, str]:
-        state.topic_mgr.create(body.name)
-        return {"name": body.name, "project_id": ""}
-
-    @router.patch("/topics/{name}")
-    def rename_topic(name: str, body: TopicRename) -> dict[str, str]:
-        try:
-            state.topic_mgr.rename(name, body.new_name)
-        except ValueError as e:
-            msg = str(e)
-            if "already exists" in msg:
-                status = 409
-            elif "not found" in msg.lower():
-                status = 404
-            else:
-                status = 422
-            raise HTTPException(status, msg) from e
-        return {"name": body.new_name}
-
-    @router.delete("/topics/{name}")
-    def delete_topic(name: str) -> dict[str, str]:
-        try:
-            state.topic_mgr.delete(name)
-        except ValueError as e:
-            raise HTTPException(404, str(e)) from e
-        return {"status": "deleted", "name": name}
-
-    # ------------------------------------------------------------------
-    # Topic-repo reference routes
-    # ------------------------------------------------------------------
-
-    @router.get("/topics/{name}/repos")
-    def list_topic_repos(name: str) -> list[RepoInfo]:
-        try:
-            repo_ids = state.topic_mgr.list_repos(name)
-        except ValueError:
-            raise HTTPException(404, f"Topic '{name}' not found")
-        return [_build_repo_info(pid) for pid in repo_ids]
-
-    @router.post("/topics/{name}/repos/{project_id}")
-    def add_repo_to_topic(name: str, project_id: str) -> dict[str, str]:
-        try:
-            state.topic_mgr.create(name)
-        except ValueError as exc:
-            raise HTTPException(422, str(exc)) from exc
-        state.topic_mgr.add_repo(name, project_id)
-        return {"status": "added", "topic": name, "project_id": project_id}
-
-    @router.delete("/topics/{name}/repos/{project_id}")
-    def remove_repo_from_topic(name: str, project_id: str) -> dict[str, str]:
-        try:
-            state.topic_mgr.remove_repo(name, project_id)
-        except ValueError:
-            raise HTTPException(404, f"Repo '{project_id}' not found in topic '{name}'")
-        return {"status": "removed", "topic": name, "project_id": project_id}
-
     return router
 
 
 def create_api(state: CodeExplorerState) -> FastAPI:
     """Create the code explorer FastAPI application."""
     repo_router = _create_repo_router(state)
+    item_router = create_item_router(state.topic_mgr)
     shared_router = create_shared_router(
         state,
         get_session=lambda s, name: get_topic_session(s, name),
-        build_topic_info=lambda s: _build_code_topic_info(s),
         resolve_project_ids=lambda s, name: _resolve_code_project_ids(s, name),
         list_trace_files=lambda s, pid: _list_code_trace_files(s, pid),
         include_topic_crud=False,
@@ -280,5 +198,5 @@ def create_api(state: CodeExplorerState) -> FastAPI:
         static_dir=frontend_dist,
         images_dir=images_dir,
         ws_handler=lambda ws: websocket_handler(ws, state),
-        extra_routers=[repo_router, shared_router],
+        extra_routers=[repo_router, item_router, shared_router],
     )

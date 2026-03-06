@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 
 from shesha.experimental.shared.routes import create_shared_router
 from shesha.experimental.shared.session import WebConversationSession
+from shesha.experimental.shared.topics import BaseTopicManager
 
 
 @dataclass
@@ -436,3 +437,113 @@ def test_get_trace_multi_project(client: TestClient, mock_state: MagicMock, tmp_
     assert resp.status_code == 200
     data = resp.json()
     assert data["trace_id"] == "2025-01-16T10-30-00-123_bbb"
+
+
+# ---------------------------------------------------------------------------
+# _topic_error_to_status
+# ---------------------------------------------------------------------------
+
+
+class TestTopicErrorToStatus:
+    def test_already_exists_returns_409(self) -> None:
+        from shesha.experimental.shared.routes import _topic_error_to_status
+
+        assert _topic_error_to_status(ValueError("Topic 'X' already exists")) == 409
+
+    def test_not_found_returns_404(self) -> None:
+        from shesha.experimental.shared.routes import _topic_error_to_status
+
+        assert _topic_error_to_status(ValueError("Topic not found: X")) == 404
+
+    def test_other_error_returns_422(self) -> None:
+        from shesha.experimental.shared.routes import _topic_error_to_status
+
+        assert _topic_error_to_status(ValueError("empty slug")) == 422
+
+
+# ---------------------------------------------------------------------------
+# create_item_router
+# ---------------------------------------------------------------------------
+
+
+class TestCreateItemRouter:
+    @pytest.fixture
+    def topic_mgr(self, tmp_path: Path) -> BaseTopicManager:
+        return BaseTopicManager(tmp_path / "topics")
+
+    @pytest.fixture
+    def client(self, topic_mgr: BaseTopicManager) -> TestClient:
+        from shesha.experimental.shared.routes import create_item_router
+
+        app = FastAPI()
+        router = create_item_router(topic_mgr)
+        app.include_router(router)
+        return TestClient(app)
+
+    def test_create_topic(self, client: TestClient) -> None:
+        resp = client.post("/api/topics", json={"name": "Research"})
+        assert resp.status_code == 201
+
+    def test_create_topic_invalid_returns_422(self, client: TestClient) -> None:
+        resp = client.post("/api/topics", json={"name": "!!!"})
+        assert resp.status_code == 422
+
+    def test_list_topics(self, client: TestClient, topic_mgr: BaseTopicManager) -> None:
+        topic_mgr.create("Alpha")
+        topic_mgr.create("Beta")
+        resp = client.get("/api/topics")
+        assert resp.status_code == 200
+        names = [t["name"] for t in resp.json()]
+        assert sorted(names) == ["Alpha", "Beta"]
+
+    def test_rename_topic(self, client: TestClient, topic_mgr: BaseTopicManager) -> None:
+        topic_mgr.create("Old")
+        resp = client.patch("/api/topics/Old", json={"new_name": "New"})
+        assert resp.status_code == 200
+        assert resp.json()["name"] == "New"
+
+    def test_rename_nonexistent_returns_404(self, client: TestClient) -> None:
+        resp = client.patch("/api/topics/Ghost", json={"new_name": "New"})
+        assert resp.status_code == 404
+
+    def test_delete_topic(self, client: TestClient, topic_mgr: BaseTopicManager) -> None:
+        topic_mgr.create("Doomed")
+        resp = client.delete("/api/topics/Doomed")
+        assert resp.status_code == 200
+        assert topic_mgr.list_topics() == []
+
+    def test_add_item_to_topic(self, client: TestClient, topic_mgr: BaseTopicManager) -> None:
+        topic_mgr.create("Research")
+        resp = client.post("/api/topics/Research/items/proj-1")
+        assert resp.status_code == 200
+        assert "proj-1" in topic_mgr.list_items("Research")
+
+    def test_add_item_auto_creates_topic(
+        self, client: TestClient, topic_mgr: BaseTopicManager
+    ) -> None:
+        resp = client.post("/api/topics/NewTopic/items/proj-1")
+        assert resp.status_code == 200
+        assert "NewTopic" in topic_mgr.list_topics()
+
+    def test_list_items_in_topic(self, client: TestClient, topic_mgr: BaseTopicManager) -> None:
+        topic_mgr.create("Research")
+        topic_mgr.add_item("Research", "proj-1")
+        resp = client.get("/api/topics/Research/items")
+        assert resp.status_code == 200
+        assert resp.json() == ["proj-1"]
+
+    def test_remove_item_from_topic(
+        self, client: TestClient, topic_mgr: BaseTopicManager
+    ) -> None:
+        topic_mgr.create("Research")
+        topic_mgr.add_item("Research", "proj-1")
+        resp = client.delete("/api/topics/Research/items/proj-1")
+        assert resp.status_code == 200
+        assert topic_mgr.list_items("Research") == []
+
+    def test_remove_nonexistent_item_returns_404(
+        self, client: TestClient, topic_mgr: BaseTopicManager
+    ) -> None:
+        topic_mgr.create("Research")
+        resp = client.delete("/api/topics/Research/items/ghost")
+        assert resp.status_code == 404

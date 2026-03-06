@@ -100,7 +100,7 @@ Route factory returns an `APIRouter` with:
 - `DELETE /topics/{name}` — delete
 - `GET /topics` — list with item counts
 - `GET /topics/{name}/items` — list items in topic
-- `POST /topics/{name}/items` — add item to topic
+- `POST /topics/{name}/items/{project_id}` — add item to topic
 - `DELETE /topics/{name}/items/{project_id}` — remove item from topic
 
 Parameterized by a dependency-injection callable that extracts `topic_mgr`

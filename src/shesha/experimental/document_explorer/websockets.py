@@ -68,6 +68,7 @@ async def _handle_query(
 
     # Load documents from all requested projects
     loaded_docs: list[ParsedDocument] = []
+    loaded_project_ids: list[str] = []
     storage = state.shesha._storage
     for project_id in document_ids:
         project_id_str = str(project_id)
@@ -76,6 +77,7 @@ async def _handle_query(
             for doc_name in doc_names:
                 doc = storage.get_document(project_id_str, doc_name)
                 loaded_docs.append(doc)
+            loaded_project_ids.append(project_id_str)
         except Exception:
             logger.warning(
                 "Could not load documents from project %s",
@@ -198,7 +200,7 @@ async def _handle_query(
     if traces:
         trace_id = traces[-1].stem
 
-    consulted_ids = [str(pid) for pid in document_ids]
+    consulted_ids = loaded_project_ids
     document_bytes = sum(len(d.content.encode("utf-8")) for d in loaded_docs)
 
     session.add_exchange(

@@ -281,8 +281,14 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
         try:
             state.topic_mgr.rename(name, body.new_name)
         except ValueError as e:
-            status = 409 if "already exists" in str(e) else 404
-            raise HTTPException(status, str(e)) from e
+            msg = str(e)
+            if "already exists" in msg:
+                status = 409
+            elif "not found" in msg.lower():
+                status = 404
+            else:
+                status = 422
+            raise HTTPException(status, msg) from e
         return {"name": body.new_name}
 
     @router.delete("/topics/{name}")

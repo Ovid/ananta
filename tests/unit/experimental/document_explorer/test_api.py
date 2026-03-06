@@ -223,6 +223,18 @@ class TestCreateTopic:
         assert "slug" in resp.json()["detail"].lower()
 
 
+class TestRenameTopic:
+    def test_rename_with_path_separator_returns_422(
+        self,
+        client: TestClient,
+        topic_mgr: DocumentTopicManager,
+    ) -> None:
+        topic_mgr.create("Safe")
+        resp = client.patch("/api/topics/Safe", json={"new_name": "foo/bar"})
+        assert resp.status_code == 422
+        assert "path separator" in resp.json()["detail"].lower()
+
+
 class TestTopicDocumentRoutes:
     def test_list_topic_documents(
         self,

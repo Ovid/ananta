@@ -3,12 +3,11 @@ import Header from './components/Header'
 import TopicSidebar from './components/TopicSidebar'
 import ChatArea from './components/ChatArea'
 import SearchPanel from './components/SearchPanel'
-import HelpPanel from './components/HelpPanel'
 import DownloadProgress from './components/DownloadProgress'
 import CitationReport from './components/CitationReport'
 import EmailModal, { getStoredEmail, hasEmailDecision } from './components/EmailModal'
 import PaperDetail from './components/PaperDetail'
-import { AppShell, useAppState, StatusBar, ToastContainer, showToast, TraceViewer } from '@shesha/shared-ui'
+import { AppShell, useAppState, StatusBar, ToastContainer, showToast, TraceViewer, HelpPanel } from '@shesha/shared-ui'
 import { api } from './api/client'
 import type { PaperInfo, PaperReport } from './types'
 
@@ -311,7 +310,31 @@ export default function App() {
         />
       )}
 
-      {helpOpen && <HelpPanel onClose={() => setHelpOpen(false)} />}
+      {helpOpen && (
+        <HelpPanel
+          onClose={() => setHelpOpen(false)}
+          quickStart={[
+            'Create a topic using the <strong>+</strong> button in the sidebar',
+            'Click the <strong>Search</strong> icon to find papers on arXiv',
+            'Select papers and click <strong>Add</strong> to add them to your topic',
+            'Ask questions about your papers in the chat area',
+            'Click <strong>View trace</strong> on any answer to see how the LLM arrived at it',
+          ]}
+          faq={[
+            { q: 'How do I add papers to multiple topics?', a: 'Use the search panel\u2019s topic picker when adding papers. Each paper can belong to multiple topics.' },
+            { q: 'What does the context budget indicator mean?', a: 'It estimates how much of the model\u2019s context window is used by your documents and conversation history. Green (&lt;50%), amber (&lt;80%), red (\u226580%).' },
+            { q: 'Why do queries take so long?', a: 'Shesha uses a recursive approach: the LLM writes code to explore your documents, runs it, examines the output, and repeats. This takes multiple iterations.' },
+            { q: 'Can I cancel a running query?', a: 'Yes, press Escape or click the cancel button while a query is running.' },
+            { q: 'What is the citation check?', a: 'It verifies that claims in the LLM\u2019s answer are supported by the source documents. Results show which citations are verified, unverified, or missing.' },
+            { q: 'How do I export my conversation?', a: 'Click the export button in the header to download a Markdown transcript of the current topic\u2019s conversation.' },
+          ]}
+          shortcuts={[
+            { label: 'Send message', key: 'Enter' },
+            { label: 'New line in input', key: 'Shift+Enter' },
+            { label: 'Cancel query', key: 'Escape' },
+          ]}
+        />
+      )}
 
       <CitationReport
         checking={citationChecking}

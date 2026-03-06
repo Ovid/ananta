@@ -18,8 +18,6 @@ from typing import Any
 
 from fastapi import WebSocket
 
-_SAFE_ID_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
-
 from shesha.exceptions import ProjectNotFoundError
 from shesha.experimental.document_explorer.dependencies import (
     DocumentExplorerState,
@@ -30,6 +28,8 @@ from shesha.models import ParsedDocument
 from shesha.rlm.trace import StepType, TokenUsage
 
 logger = logging.getLogger(__name__)
+
+_SAFE_ID_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
 
 
 async def websocket_handler(ws: WebSocket, state: DocumentExplorerState) -> None:
@@ -63,9 +63,7 @@ async def _handle_query(
     # Validate document_ids to prevent path traversal
     for doc_id in document_ids:
         if not isinstance(doc_id, str) or not _SAFE_ID_RE.match(doc_id):
-            await ws.send_json(
-                {"type": "error", "message": f"Invalid document id: {doc_id!r}"}
-            )
+            await ws.send_json({"type": "error", "message": f"Invalid document id: {doc_id!r}"})
             return
 
     # Load documents from all requested projects

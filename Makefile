@@ -25,6 +25,6 @@ cover:
 	pytest --cov=src/shesha --cov-report=term-missing --cov-report=html
 
 loc:
-	@cloc src tests arxiv-explorer examples pyproject.toml Makefile \
+	@cloc src arxiv-explorer code-explorer document-explorer examples pyproject.toml Makefile \
 		--exclude-dir=node_modules,dist \
 		--not-match-f='package-lock\.json'

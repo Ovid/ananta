@@ -57,8 +57,16 @@ class CodeExplorerTopicManager:
     # Topic CRUD
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _validate_name(name: str) -> None:
+        """Reject names that contain path separators."""
+        if "/" in name or "\\" in name:
+            msg = f"Topic name must not contain a path separator: {name!r}"
+            raise ValueError(msg)
+
     def create(self, name: str) -> None:
         """Create a new topic.  Idempotent — no error if it already exists."""
+        self._validate_name(name)
         slug = _slugify(name)
         if not slug:
             msg = f"Topic name produces an empty slug: {name!r}"
@@ -75,6 +83,7 @@ class CodeExplorerTopicManager:
 
     def rename(self, old_name: str, new_name: str) -> None:
         """Rename a topic's display name (directory stays the same)."""
+        self._validate_name(new_name)
         meta, meta_path = self._resolve(old_name)
         if new_name != old_name:
             existing_names: set[str] = set()

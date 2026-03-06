@@ -133,6 +133,12 @@ class TestCreateAndListTopics:
         with pytest.raises(ValueError, match="[Ee]mpty"):
             mgr.create(name)
 
+    @pytest.mark.parametrize("name", ["foo/bar", "a\\b", "x/y/z"])
+    def test_create_rejects_path_separators(self, tmp_path: Path, name: str) -> None:
+        mgr = DocumentTopicManager(tmp_path)
+        with pytest.raises(ValueError, match="path separator"):
+            mgr.create(name)
+
 
 class TestAddAndListDocs:
     def test_add_doc_to_topic(self, tmp_path: Path) -> None:
@@ -284,3 +290,12 @@ class TestRenameTopic:
         mgr.create("Beta")
         with pytest.raises(ValueError, match="already exists"):
             mgr.rename("Alpha", "Beta")
+
+    @pytest.mark.parametrize("new_name", ["foo/bar", "a\\b"])
+    def test_rename_rejects_path_separators(
+        self, tmp_path: Path, new_name: str
+    ) -> None:
+        mgr = DocumentTopicManager(tmp_path)
+        mgr.create("Safe")
+        with pytest.raises(ValueError, match="path separator"):
+            mgr.rename("Safe", new_name)

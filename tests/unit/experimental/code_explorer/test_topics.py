@@ -73,6 +73,13 @@ class TestCreateAndListTopics:
         with pytest.raises(ValueError, match="[Ee]mpty"):
             mgr.create(name)
 
+    @pytest.mark.parametrize("name", ["foo/bar", "a\\b", "x/y/z"])
+    def test_create_rejects_path_separators(self, tmp_path: Path, name: str) -> None:
+        """Names containing path separators are rejected."""
+        mgr = CodeExplorerTopicManager(tmp_path)
+        with pytest.raises(ValueError, match="path separator"):
+            mgr.create(name)
+
 
 class TestAddAndListRepos:
     """Tests for adding repos to topics and listing them."""
@@ -350,6 +357,16 @@ class TestRenameTopic:
         mgr.create("Alpha")
         mgr.rename("Alpha", "Alpha")
         assert mgr.list_topics() == ["Alpha"]
+
+    @pytest.mark.parametrize("new_name", ["foo/bar", "a\\b"])
+    def test_rename_rejects_path_separators(
+        self, tmp_path: Path, new_name: str
+    ) -> None:
+        """Renaming to a name with path separators is rejected."""
+        mgr = CodeExplorerTopicManager(tmp_path)
+        mgr.create("Safe")
+        with pytest.raises(ValueError, match="path separator"):
+            mgr.rename("Safe", new_name)
 
 
 class TestListTopicsNoDuplicates:

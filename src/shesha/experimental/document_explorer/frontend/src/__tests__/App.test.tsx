@@ -136,8 +136,10 @@ describe('App', () => {
   it('opens help panel when help button is clicked', async () => {
     render(<App />)
     await flush()
+    expect(screen.queryByText('Quick Start')).not.toBeInTheDocument()
     const helpBtn = screen.getByLabelText('Help')
     await userEvent.click(helpBtn)
-    expect(screen.getByText(/No topics yet/i)).toBeInTheDocument()
+    expect(screen.getByText('Quick Start')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Close help' })).toBeInTheDocument()
   })
 })

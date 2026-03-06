@@ -534,13 +534,6 @@ class TestCreateItemRouter:
         assert resp.status_code == 200
         assert "NewTopic" in topic_mgr.list_topics()
 
-    def test_list_items_in_topic(self, client: TestClient, topic_mgr: BaseTopicManager) -> None:
-        topic_mgr.create("Research")
-        topic_mgr.add_item("Research", "proj-1")
-        resp = client.get("/api/topics/Research/items")
-        assert resp.status_code == 200
-        assert resp.json() == ["proj-1"]
-
     def test_remove_item_from_topic(self, client: TestClient, topic_mgr: BaseTopicManager) -> None:
         topic_mgr.create("Research")
         topic_mgr.add_item("Research", "proj-1")

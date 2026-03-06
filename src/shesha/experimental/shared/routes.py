@@ -89,13 +89,6 @@ def create_item_router(topic_mgr: BaseTopicManager) -> APIRouter:
             raise HTTPException(_topic_error_to_status(e), str(e)) from e
         return {"status": "deleted", "name": name}
 
-    @router.get("/topics/{name}/items")
-    def list_topic_items(name: str) -> list[str]:
-        try:
-            return topic_mgr.list_items(name)
-        except ValueError as e:
-            raise HTTPException(404, f"Topic '{name}' not found") from e
-
     @router.post("/topics/{name}/items/{project_id}")
     def add_item_to_topic(name: str, project_id: str) -> dict[str, str]:
         try:

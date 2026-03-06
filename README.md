@@ -297,6 +297,26 @@ The [arXiv Explorer](arxiv-explorer/) is a web-based research tool that lets you
 
 _The screenshot above shows Shesha searching through nearly 25 MB of research papers to answer a complex question._
 
+## Document Explorer (Experimental)
+
+A web-based interface for uploading documents, organizing them into topics, and querying them with Shesha. Upload PDFs, Word documents, PowerPoint, Excel, RTF, or plain text files, group them by topic, then ask questions across your collection.
+
+```bash
+# Launch the Document Explorer (opens browser automatically)
+python -m shesha.experimental.document_explorer
+
+# Options
+python -m shesha.experimental.document_explorer --port 8003 --no-browser --model gpt-4o
+```
+
+The explorer provides:
+- **Drag-and-drop upload** with automatic text extraction
+- **Topic organization** — group related documents and query within a topic
+- **Live query streaming** via WebSocket — watch Shesha think in real time
+- **Conversation history** per topic for follow-up questions
+
+> **Note:** This is experimental and under active development.
+
 ## DeepWiki
 
 We love DeepWiki — it's an amazing tool that covers much of the same ground. But there are reasons you might prefer Shesha:
@@ -373,6 +393,8 @@ src/shesha/
 │   ├── runner.py        # Runs inside container
 │   ├── executor.py      # Host-side container management
 │   └── pool.py          # Container pool
+├── experimental/        # Experimental web UIs
+│   └── document_explorer/  # Upload & query documents
 └── rlm/                 # RLM engine
     ├── engine.py        # Core loop
     ├── prompts.py       # Hardened system prompts
@@ -416,6 +438,7 @@ Choose Shesha if you:
 - Want an interactive TUI or CLI experience
 - Need production resilience (retry, container pooling, incremental traces)
 - Want a git repository analysis tool
+- Want a web UI for uploading and querying documents
 
 ## What About RAG?
 

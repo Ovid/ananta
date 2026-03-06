@@ -9,7 +9,7 @@ export const api = {
     list: () => request<RepoInfo[]>('/repos'),
     listUncategorized: () => request<RepoInfo[]>('/repos/uncategorized'),
     listForTopic: (topic: string) =>
-      request<RepoInfo[]>(`/topics/${encodeURIComponent(topic)}/repos`),
+      request<RepoInfo[]>(`/topics/${encodeURIComponent(topic)}/items`),
     add: (data: { url: string; topic?: string }) =>
       request<{ project_id: string; status: string; files_ingested: number }>('/repos', {
         method: 'POST',
@@ -39,12 +39,12 @@ export const api = {
   topicRepos: {
     add: (topic: string, projectId: string) =>
       request<{ status: string }>(
-        `/topics/${encodeURIComponent(topic)}/repos/${encodeURIComponent(projectId)}`,
+        `/topics/${encodeURIComponent(topic)}/items/${encodeURIComponent(projectId)}`,
         { method: 'POST' },
       ),
     remove: (topic: string, projectId: string) =>
       request<{ status: string }>(
-        `/topics/${encodeURIComponent(topic)}/repos/${encodeURIComponent(projectId)}`,
+        `/topics/${encodeURIComponent(topic)}/items/${encodeURIComponent(projectId)}`,
         { method: 'DELETE' },
       ),
   },

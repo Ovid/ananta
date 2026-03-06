@@ -144,7 +144,7 @@ class TestListUncategorizedRepos:
     ) -> None:
         """GET /api/repos/uncategorized excludes repos that are in any topic."""
         topic_mgr.create("RLMs")
-        topic_mgr.add_repo("RLMs", "repo-a")
+        topic_mgr.add_item("RLMs", "repo-a")
 
         mock_shesha.list_projects.return_value = ["repo-a", "repo-b"]
         mock_shesha.get_project_info.return_value = ProjectInfo(
@@ -170,7 +170,7 @@ class TestListUncategorizedRepos:
     ) -> None:
         """GET /api/repos/uncategorized returns empty list when all repos are in topics."""
         topic_mgr.create("RLMs")
-        topic_mgr.add_repo("RLMs", "repo-a")
+        topic_mgr.add_item("RLMs", "repo-a")
 
         mock_shesha.list_projects.return_value = ["repo-a"]
 
@@ -228,7 +228,7 @@ class TestAddRepo:
 
         # Topic should have been created and repo added
         assert "Frontend" in topic_mgr.list_topics()
-        assert "owner-myrepo" in topic_mgr.list_repos("Frontend")
+        assert "owner-myrepo" in topic_mgr.list_items("Frontend")
 
     def test_add_duplicate_url_returns_existing(
         self, client: TestClient, mock_shesha: MagicMock
@@ -306,7 +306,7 @@ class TestDeleteRepo:
         """DELETE /api/repos/{id} removes from topics and deletes project."""
         # Set up a topic referencing the project
         topic_mgr.create("Backend")
-        topic_mgr.add_repo("Backend", "owner-myrepo")
+        topic_mgr.add_item("Backend", "owner-myrepo")
 
         resp = client.delete("/api/repos/owner-myrepo")
         assert resp.status_code == 200
@@ -315,7 +315,7 @@ class TestDeleteRepo:
         assert data["project_id"] == "owner-myrepo"
 
         # Should have been removed from topic
-        assert "owner-myrepo" not in topic_mgr.list_repos("Backend")
+        assert "owner-myrepo" not in topic_mgr.list_items("Backend")
 
         # Should have called shesha.delete_project
         mock_shesha.delete_project.assert_called_once_with("owner-myrepo", cleanup_repo=True)
@@ -329,14 +329,14 @@ class TestDeleteRepo:
         """DELETE removes repo references from all topics."""
         topic_mgr.create("Frontend")
         topic_mgr.create("Backend")
-        topic_mgr.add_repo("Frontend", "owner-myrepo")
-        topic_mgr.add_repo("Backend", "owner-myrepo")
+        topic_mgr.add_item("Frontend", "owner-myrepo")
+        topic_mgr.add_item("Backend", "owner-myrepo")
 
         resp = client.delete("/api/repos/owner-myrepo")
         assert resp.status_code == 200
 
-        assert "owner-myrepo" not in topic_mgr.list_repos("Frontend")
-        assert "owner-myrepo" not in topic_mgr.list_repos("Backend")
+        assert "owner-myrepo" not in topic_mgr.list_items("Frontend")
+        assert "owner-myrepo" not in topic_mgr.list_items("Backend")
 
     def test_delete_repo_not_found(self, client: TestClient, mock_shesha: MagicMock) -> None:
         """DELETE returns 404 for nonexistent project."""

@@ -29,6 +29,7 @@ from shesha.experimental.shared.schemas import (
     TraceStepSchema,
 )
 from shesha.experimental.shared.session import WebConversationSession
+from shesha.experimental.shared.topics import BaseTopicManager
 
 # Type aliases for callbacks
 GetSession = Callable[[Any, str], WebConversationSession]
@@ -47,7 +48,7 @@ def _topic_error_to_status(e: ValueError) -> int:
     return 422
 
 
-def create_item_router(topic_mgr: Any) -> APIRouter:
+def create_item_router(topic_mgr: BaseTopicManager) -> APIRouter:
     """Create an APIRouter with topic CRUD and item reference routes."""
     router = APIRouter(prefix="/api")
 

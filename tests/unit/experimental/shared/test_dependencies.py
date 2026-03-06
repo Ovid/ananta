@@ -56,9 +56,7 @@ class TestBaseExplorerState:
 
 class TestCreateAppState:
     @patch("shesha.experimental.shared.dependencies.Shesha")
-    def test_returns_base_explorer_state(
-        self, mock_shesha_cls: MagicMock, tmp_path: Path
-    ) -> None:
+    def test_returns_base_explorer_state(self, mock_shesha_cls: MagicMock, tmp_path: Path) -> None:
         state = create_app_state(
             app_name="test-explorer",
             topic_mgr_class=BaseTopicManager,
@@ -67,9 +65,7 @@ class TestCreateAppState:
         assert isinstance(state, BaseExplorerState)
 
     @patch("shesha.experimental.shared.dependencies.Shesha")
-    def test_creates_shesha_data_dir(
-        self, mock_shesha_cls: MagicMock, tmp_path: Path
-    ) -> None:
+    def test_creates_shesha_data_dir(self, mock_shesha_cls: MagicMock, tmp_path: Path) -> None:
         create_app_state(
             app_name="test-explorer",
             topic_mgr_class=BaseTopicManager,
@@ -78,9 +74,7 @@ class TestCreateAppState:
         assert (tmp_path / "shesha_data").is_dir()
 
     @patch("shesha.experimental.shared.dependencies.Shesha")
-    def test_creates_topics_dir(
-        self, mock_shesha_cls: MagicMock, tmp_path: Path
-    ) -> None:
+    def test_creates_topics_dir(self, mock_shesha_cls: MagicMock, tmp_path: Path) -> None:
         create_app_state(
             app_name="test-explorer",
             topic_mgr_class=BaseTopicManager,
@@ -89,9 +83,7 @@ class TestCreateAppState:
         assert (tmp_path / "topics").is_dir()
 
     @patch("shesha.experimental.shared.dependencies.Shesha")
-    def test_creates_extra_dirs(
-        self, mock_shesha_cls: MagicMock, tmp_path: Path
-    ) -> None:
+    def test_creates_extra_dirs(self, mock_shesha_cls: MagicMock, tmp_path: Path) -> None:
         state = create_app_state(
             app_name="test-explorer",
             topic_mgr_class=BaseTopicManager,
@@ -107,7 +99,7 @@ class TestCreateAppState:
         self, mock_home: MagicMock, mock_shesha_cls: MagicMock, tmp_path: Path
     ) -> None:
         mock_home.return_value = tmp_path
-        state = create_app_state(
+        create_app_state(
             app_name="my-explorer",
             topic_mgr_class=BaseTopicManager,
         )
@@ -116,9 +108,7 @@ class TestCreateAppState:
         assert (expected / "topics").is_dir()
 
     @patch("shesha.experimental.shared.dependencies.Shesha")
-    def test_model_override(
-        self, mock_shesha_cls: MagicMock, tmp_path: Path
-    ) -> None:
+    def test_model_override(self, mock_shesha_cls: MagicMock, tmp_path: Path) -> None:
         state = create_app_state(
             app_name="test-explorer",
             topic_mgr_class=BaseTopicManager,
@@ -128,9 +118,7 @@ class TestCreateAppState:
         assert state.model == "custom-model"
 
     @patch("shesha.experimental.shared.dependencies.Shesha")
-    def test_state_has_topic_mgr(
-        self, mock_shesha_cls: MagicMock, tmp_path: Path
-    ) -> None:
+    def test_state_has_topic_mgr(self, mock_shesha_cls: MagicMock, tmp_path: Path) -> None:
         state = create_app_state(
             app_name="test-explorer",
             topic_mgr_class=BaseTopicManager,
@@ -139,9 +127,7 @@ class TestCreateAppState:
         assert isinstance(state.topic_mgr, BaseTopicManager)
 
     @patch("shesha.experimental.shared.dependencies.Shesha")
-    def test_state_has_session(
-        self, mock_shesha_cls: MagicMock, tmp_path: Path
-    ) -> None:
+    def test_state_has_session(self, mock_shesha_cls: MagicMock, tmp_path: Path) -> None:
         state = create_app_state(
             app_name="test-explorer",
             topic_mgr_class=BaseTopicManager,

@@ -99,10 +99,10 @@ describe('api.repos', () => {
 })
 
 describe('api.topicRepos', () => {
-  it('add sends POST to /api/topics/{name}/repos/{projectId}', async () => {
+  it('add sends POST to /api/topics/{name}/items/{projectId}', async () => {
     const api = await getApi()
     await api.topicRepos.add('my-topic', 'proj-123')
-    expect(mockFetch).toHaveBeenCalledWith('/api/topics/my-topic/repos/proj-123', {
+    expect(mockFetch).toHaveBeenCalledWith('/api/topics/my-topic/items/proj-123', {
       headers: { 'Content-Type': 'application/json' },
       method: 'POST',
     })
@@ -112,15 +112,15 @@ describe('api.topicRepos', () => {
     const api = await getApi()
     await api.topicRepos.add('a topic', 'proj id')
     expect(mockFetch).toHaveBeenCalledWith(
-      '/api/topics/a%20topic/repos/proj%20id',
+      '/api/topics/a%20topic/items/proj%20id',
       expect.any(Object),
     )
   })
 
-  it('remove sends DELETE to /api/topics/{name}/repos/{projectId}', async () => {
+  it('remove sends DELETE to /api/topics/{name}/items/{projectId}', async () => {
     const api = await getApi()
     await api.topicRepos.remove('my-topic', 'proj-123')
-    expect(mockFetch).toHaveBeenCalledWith('/api/topics/my-topic/repos/proj-123', {
+    expect(mockFetch).toHaveBeenCalledWith('/api/topics/my-topic/items/proj-123', {
       headers: { 'Content-Type': 'application/json' },
       method: 'DELETE',
     })

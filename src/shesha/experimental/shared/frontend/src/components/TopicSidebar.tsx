@@ -20,6 +20,7 @@ export interface TopicSidebarProps {
   deleteTopic: (name: string) => Promise<void>
   addDocToTopic?: (docId: string, topicName: string) => Promise<void>
   removeDocFromTopic?: (docId: string, topicName: string) => Promise<void>
+  deleteDocument?: (docId: string) => Promise<void>
   addButton?: ReactNode
   uncategorizedDocs?: DocumentItem[]
   viewingDocumentId?: string | null
@@ -42,6 +43,7 @@ export default function TopicSidebar({
   deleteTopic,
   addDocToTopic,
   removeDocFromTopic,
+  deleteDocument,
   addButton,
   uncategorizedDocs,
   viewingDocumentId,
@@ -58,6 +60,7 @@ export default function TopicSidebar({
   const [deletingTopic, setDeletingTopic] = useState<string | null>(null)
   const [docMenuOpen, setDocMenuOpen] = useState<string | null>(null)
   const [docSubmenuOpen, setDocSubmenuOpen] = useState(false)
+  const [deletingDoc, setDeletingDoc] = useState<DocumentItem | null>(null)
 
   const refreshTopics = async () => {
     try {
@@ -151,7 +154,7 @@ export default function TopicSidebar({
 
   const renderDocMenu = (doc: DocumentItem, topicName: string | null) => (
     <>
-      {addDocToTopic && (
+      {(addDocToTopic || deleteDocument) && (
         <button
           title="Document actions"
           onClick={e => {
@@ -229,6 +232,18 @@ export default function TopicSidebar({
               }}
             >
               Remove from {topicName}
+            </button>
+          )}
+          {deleteDocument && (
+            <button
+              className="block w-full text-left px-3 py-1.5 hover:bg-surface-1 text-red"
+              onClick={e => {
+                e.stopPropagation()
+                setDeletingDoc(doc)
+                setDocMenuOpen(null)
+              }}
+            >
+              Delete
             </button>
           )}
         </div>
@@ -487,6 +502,25 @@ export default function TopicSidebar({
           destructive
           onConfirm={() => handleDelete(deletingTopic)}
           onCancel={() => setDeletingTopic(null)}
+        />
+      )}
+
+      {deletingDoc && deleteDocument && (
+        <ConfirmDialog
+          title="Delete document"
+          message={`Delete "${deletingDoc.label}"?`}
+          confirmLabel="Delete"
+          destructive
+          onConfirm={async () => {
+            try {
+              await deleteDocument(deletingDoc.id)
+              showToast('Document deleted', 'success')
+            } catch {
+              showToast('Failed to delete document', 'error')
+            }
+            setDeletingDoc(null)
+          }}
+          onCancel={() => setDeletingDoc(null)}
         />
       )}
     </aside>

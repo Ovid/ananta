@@ -429,6 +429,51 @@ describe('TopicSidebar (shared)', () => {
     expect(props.onDocumentClick).toHaveBeenCalledWith(chessDocs[0])
   })
 
+  it('shows "Delete" in doc menu for uncategorized doc when deleteDocument is provided', async () => {
+    const deleteDocument = vi.fn().mockResolvedValue(undefined)
+    const uncatDocs: DocumentItem[] = [
+      { id: 'uncat-1', label: 'Orphan Doc' },
+    ]
+    const props = defaultProps({
+      uncategorizedDocs: uncatDocs,
+      addDocToTopic: vi.fn(),
+      deleteDocument,
+    })
+    render(<TopicSidebar {...props} />)
+
+    await screen.findByText('chess')
+    const menuBtn = screen.getByTitle('Document actions')
+    await userEvent.click(menuBtn)
+
+    const deleteBtn = screen.getByRole('button', { name: 'Delete' })
+    await userEvent.click(deleteBtn)
+
+    // Confirm dialog should appear
+    const confirmBtn = await screen.findByRole('button', { name: 'Delete' })
+    await userEvent.click(confirmBtn)
+
+    expect(deleteDocument).toHaveBeenCalledWith('uncat-1')
+  })
+
+  it('does not show "Delete" in doc menu when deleteDocument is not provided', async () => {
+    const props = defaultProps({
+      activeTopic: 'chess',
+      loadDocuments: vi.fn().mockResolvedValue(chessDocs),
+      addDocToTopic: vi.fn(),
+    })
+    render(<TopicSidebar {...props} />)
+
+    await screen.findByText('Chess Strategies')
+    const menuButtons = screen.getAllByTitle('Document actions')
+    await userEvent.click(menuButtons[0])
+
+    expect(screen.getByText('View')).toBeInTheDocument()
+    // No "Delete" button should exist in the doc menu (only topic delete might exist)
+    const buttons = screen.getAllByRole('button')
+    const deleteInMenu = buttons.filter(b => b.textContent === 'Delete' && b.closest('.absolute'))
+    expect(deleteInMenu).toHaveLength(0)
+  })
+
   it('shows "View" option for uncategorized doc even when no topics exist', async () => {
     const props = defaultProps({
       loadTopics: vi.fn().mockResolvedValue([]),

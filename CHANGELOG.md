@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Document context menu now includes a "Delete" option with confirmation dialog (shared TopicSidebar component)
+
 ### Changed
 
 - Refactored arxiv-explorer help panel to use shared HelpPanel component

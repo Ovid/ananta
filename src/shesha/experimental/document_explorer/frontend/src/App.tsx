@@ -232,6 +232,7 @@ export default function App() {
           addButton={<UploadArea onUpload={handleUpload} />}
           addDocToTopic={handleAddDocToTopic}
           removeDocFromTopic={handleRemoveDocFromTopic}
+          deleteDocument={handleDeleteDocument}
           uncategorizedDocs={uncategorizedDocs}
           viewingDocumentId={viewingDoc?.project_id}
           style={{ width: sidebarWidth }}

@@ -20,10 +20,10 @@ export default function UploadArea({ onUpload }: UploadAreaProps) {
     }
   }, [onUpload])
 
-  const handleDrop = useCallback((e: DragEvent<HTMLDivElement>) => {
+  const handleDrop = useCallback(async (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     setDragging(false)
-    handleFiles(e.dataTransfer.files)
+    await handleFiles(e.dataTransfer.files)
   }, [handleFiles])
 
   return (
@@ -52,7 +52,7 @@ export default function UploadArea({ onUpload }: UploadAreaProps) {
         type="file"
         multiple
         className="hidden"
-        onChange={e => e.target.files && handleFiles(e.target.files)}
+        onChange={async e => { if (e.target.files) await handleFiles(e.target.files) }}
       />
       {uploading ? 'Uploading...' : 'Drop files here or click to upload'}
     </div>

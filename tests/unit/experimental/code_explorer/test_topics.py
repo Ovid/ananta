@@ -80,6 +80,14 @@ class TestCreateAndListTopics:
         with pytest.raises(ValueError, match="path separator"):
             mgr.create(name)
 
+    def test_create_slug_collision_different_name_raises(self, tmp_path: Path) -> None:
+        """Creating a topic whose slug matches an existing topic with a
+        different display name raises instead of silently succeeding."""
+        mgr = CodeExplorerTopicManager(tmp_path)
+        mgr.create("Research")
+        with pytest.raises(ValueError, match="different display name"):
+            mgr.create("research")
+
 
 class TestAddAndListRepos:
     """Tests for adding repos to topics and listing them."""

@@ -139,6 +139,12 @@ class TestCreateAndListTopics:
         with pytest.raises(ValueError, match="path separator"):
             mgr.create(name)
 
+    def test_create_slug_collision_different_name_raises(self, tmp_path: Path) -> None:
+        mgr = DocumentTopicManager(tmp_path)
+        mgr.create("Research")
+        with pytest.raises(ValueError, match="different display name"):
+            mgr.create("research")
+
 
 class TestAddAndListDocs:
     def test_add_doc_to_topic(self, tmp_path: Path) -> None:

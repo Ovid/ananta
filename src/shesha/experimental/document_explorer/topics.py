@@ -75,7 +75,15 @@ class DocumentTopicManager:
         meta_path = topic_dir / TOPIC_META_FILE
 
         if meta_path.exists():
-            return  # already exists
+            existing = self._read_meta(topic_dir)
+            if existing is not None and existing["name"] != name:
+                msg = (
+                    f"A topic with a different display name already uses "
+                    f"slug '{slug}': existing {existing['name']!r} vs "
+                    f"requested {name!r}"
+                )
+                raise ValueError(msg)
+            return  # already exists with same name
 
         topic_dir.mkdir(parents=True, exist_ok=True)
         meta: _TopicMeta = {"name": name, "docs": []}

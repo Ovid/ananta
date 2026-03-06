@@ -266,7 +266,10 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
 
     @router.post("/topics", status_code=201)
     def create_topic(body: TopicCreate) -> dict[str, str]:
-        state.topic_mgr.create(body.name)
+        try:
+            state.topic_mgr.create(body.name)
+        except ValueError as e:
+            raise HTTPException(422, str(e)) from e
         return {"name": body.name, "project_id": f"topic:{body.name}"}
 
     @router.patch("/topics/{name}")

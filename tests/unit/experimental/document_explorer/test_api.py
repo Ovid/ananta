@@ -196,6 +196,16 @@ class TestDeleteDocument:
         mock_shesha.delete_project.assert_called_once_with("doc-123")
 
 
+class TestCreateTopic:
+    def test_create_topic_with_invalid_name_returns_422(
+        self,
+        client: TestClient,
+    ) -> None:
+        resp = client.post("/api/topics", json={"name": "!!!"})
+        assert resp.status_code == 422
+        assert "slug" in resp.json()["detail"].lower()
+
+
 class TestTopicDocumentRoutes:
     def test_list_topic_documents(
         self,

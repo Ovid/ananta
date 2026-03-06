@@ -113,4 +113,15 @@ describe('Header (shared)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Help' }))
     expect(onHelpToggle).toHaveBeenCalledOnce()
   })
+
+  it('renders bug report link to GitHub issues', () => {
+    render(
+      <Header appName="My App" isDark={false} onToggleTheme={() => {}} />
+    )
+    const link = screen.getByRole('link', { name: 'Report a bug' })
+    expect(link).toHaveAttribute('href', 'https://github.com/Ovid/shesha/issues')
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+    expect(link).toHaveAttribute('data-tooltip', 'Report a bug')
+  })
 })

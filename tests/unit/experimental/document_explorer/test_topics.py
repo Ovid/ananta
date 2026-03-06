@@ -292,9 +292,7 @@ class TestRenameTopic:
             mgr.rename("Alpha", "Beta")
 
     @pytest.mark.parametrize("new_name", ["foo/bar", "a\\b"])
-    def test_rename_rejects_path_separators(
-        self, tmp_path: Path, new_name: str
-    ) -> None:
+    def test_rename_rejects_path_separators(self, tmp_path: Path, new_name: str) -> None:
         mgr = DocumentTopicManager(tmp_path)
         mgr.create("Safe")
         with pytest.raises(ValueError, match="path separator"):

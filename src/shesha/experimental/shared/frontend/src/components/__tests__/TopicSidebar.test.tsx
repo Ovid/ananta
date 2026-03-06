@@ -455,6 +455,36 @@ describe('TopicSidebar (shared)', () => {
     expect(deleteDocument).toHaveBeenCalledWith('uncat-1')
   })
 
+  it('refreshes topics after document deletion', async () => {
+    const deleteDocument = vi.fn().mockResolvedValue(undefined)
+    const uncatDocs: DocumentItem[] = [
+      { id: 'uncat-1', label: 'Orphan Doc' },
+    ]
+    const props = defaultProps({
+      uncategorizedDocs: uncatDocs,
+      addDocToTopic: vi.fn(),
+      deleteDocument,
+    })
+    render(<TopicSidebar {...props} />)
+
+    await screen.findByText('chess')
+    const menuBtn = screen.getByTitle('Document actions')
+    await userEvent.click(menuBtn)
+
+    const deleteBtn = screen.getByRole('button', { name: 'Delete' })
+    await userEvent.click(deleteBtn)
+
+    const confirmBtn = await screen.findByRole('button', { name: 'Delete' })
+    await userEvent.click(confirmBtn)
+
+    await waitFor(() => {
+      expect(deleteDocument).toHaveBeenCalledWith('uncat-1')
+    })
+    await waitFor(() => {
+      expect(props.onTopicsChange).toHaveBeenCalled()
+    })
+  })
+
   it('does not show "Delete" in doc menu when deleteDocument is not provided', async () => {
     const props = defaultProps({
       activeTopic: 'chess',

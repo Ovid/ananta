@@ -515,6 +515,9 @@ export default function TopicSidebar({
             try {
               await deleteDocument(deletingDoc.id)
               showToast('Document deleted', 'success')
+              setTopicDocs({})
+              await refreshTopics()
+              onTopicsChange()
             } catch {
               showToast('Failed to delete document', 'error')
             }

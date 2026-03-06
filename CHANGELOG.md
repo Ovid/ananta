@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Launcher scripts (`code-explorer.sh`, `arxiv-explorer.sh`, `document-explorer.sh`) now
+  validate all prerequisites and print a single actionable error report instead of failing
+  on the first missing dependency. `SHESHA_MODEL` is now required. Shared logic extracted
+  to `scripts/common.sh`.
 - Chat input area now auto-grows up to 4 lines as you type
 - User messages in chat are now rendered as markdown (headers, code blocks, lists)
 - Code explorer conversation history is now per-topic instead of global

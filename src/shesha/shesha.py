@@ -405,9 +405,14 @@ class Shesha:
 
     @staticmethod
     def _sanitize_project_id(raw: str) -> str:
-        """Replace characters outside ``[a-zA-Z0-9._-]`` with hyphens."""
+        """Replace characters outside ``[a-zA-Z0-9._-]`` with hyphens.
+
+        The result is guaranteed to match ``_SAFE_ID_RE``
+        (``^[a-zA-Z0-9][a-zA-Z0-9._-]*$``).
+        """
         sanitized = re.sub(r"[^a-zA-Z0-9._-]", "-", raw)
         sanitized = re.sub(r"-+", "-", sanitized)
+        sanitized = sanitized.lstrip("._-")
         sanitized = sanitized.strip("-")
         return sanitized or "unnamed-repo"
 

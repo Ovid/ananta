@@ -1170,6 +1170,25 @@ class TestExtractRepoName:
             f"Result {result!r} does not match _SAFE_ID_RE"
         )
 
+    @pytest.mark.parametrize(
+        "raw",
+        [".hidden", "_private", "...dots", "___underscores"],
+    )
+    def test_sanitize_strips_leading_non_alphanumeric(self, raw: str):
+        """_sanitize_project_id output must start with [a-zA-Z0-9]."""
+        result = Shesha._sanitize_project_id(raw)
+        assert re.match(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$", result), (
+            f"_sanitize_project_id({raw!r}) = {result!r} does not match _SAFE_ID_RE"
+        )
+
+    def test_local_hidden_dir_produces_safe_id(self, tmp_path: Path):
+        """Local path under a hidden directory produces a _SAFE_ID_RE-valid ID."""
+        shesha = self._make_shesha(tmp_path, is_local=True)
+        result = shesha._extract_repo_name("/home/user/.config/.repo")
+        assert re.match(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$", result), (
+            f"Result {result!r} does not match _SAFE_ID_RE"
+        )
+
     def test_fallback_for_unparseable_url(self, tmp_path: Path):
         """Unparseable URL falls back to unnamed-repo."""
         shesha = self._make_shesha(tmp_path)

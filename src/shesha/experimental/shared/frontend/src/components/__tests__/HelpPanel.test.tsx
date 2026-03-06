@@ -63,9 +63,12 @@ describe('HelpPanel', () => {
     expect(screen.getByText('Shift+Enter')).toBeInTheDocument()
   })
 
-  it('renders the experimental notice', () => {
+  it('renders the experimental notice with issues link', () => {
     render(<HelpPanel {...defaultProps} />)
     expect(screen.getByText(/experimental software/i)).toBeInTheDocument()
+    const link = screen.getByRole('link', { name: 'report issues' })
+    expect(link).toHaveAttribute('href', 'https://github.com/Ovid/shesha/issues')
+    expect(link).toHaveAttribute('target', '_blank')
   })
 
   it('calls onClose when close button is clicked', async () => {

@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import re
 import shutil
+import unicodedata
 from pathlib import Path
 from typing import TypedDict
 
@@ -24,7 +25,11 @@ class _TopicMeta(TypedDict):
 
 
 def _slugify(text: str) -> str:
-    """Convert text to a URL-safe slug."""
+    """Convert text to an ASCII-safe slug matching ``[a-zA-Z0-9._-]``."""
+    # Decompose accented characters (é → e + combining accent) then drop
+    # non-ASCII so that "résumé" becomes "resume" rather than empty string.
+    text = unicodedata.normalize("NFKD", text)
+    text = text.encode("ascii", "ignore").decode("ascii")
     text = text.lower().strip()
     # Replace punctuation that acts as word separators with spaces
     text = re.sub(r"[^\w\s-]", " ", text)

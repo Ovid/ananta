@@ -3,11 +3,56 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
 
-from shesha.experimental.document_explorer.topics import DocumentTopicManager
+from shesha.experimental.document_explorer.topics import DocumentTopicManager, _slugify
+
+_SAFE_ID_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
+
+
+class TestSlugify:
+    """_slugify output must match _SAFE_ID_RE so generated IDs are API-valid."""
+
+    @pytest.mark.parametrize(
+        "input_text,expected",
+        [
+            ("hello world", "hello-world"),
+            ("My Report", "my-report"),
+            ("file_name", "file-name"),
+            ("a--b", "a-b"),
+        ],
+    )
+    def test_basic_slugs(self, input_text: str, expected: str) -> None:
+        assert _slugify(input_text) == expected
+
+    @pytest.mark.parametrize(
+        "input_text",
+        [
+            "résumé",
+            "über",
+            "café_report",
+            "naïve-analysis",
+        ],
+    )
+    def test_unicode_slugs_match_safe_id(self, input_text: str) -> None:
+        slug = _slugify(input_text)
+        assert slug, f"_slugify({input_text!r}) returned empty string"
+        assert _SAFE_ID_RE.match(slug), (
+            f"_slugify({input_text!r}) = {slug!r} does not match _SAFE_ID_RE"
+        )
+
+    def test_pure_non_latin_returns_empty(self) -> None:
+        # Pure CJK has no ASCII decomposition; callers use fallback
+        # (e.g. _make_project_id falls back to "document")
+        assert _slugify("日本語") == ""
+
+    def test_mixed_ascii_and_cjk_keeps_ascii_part(self) -> None:
+        slug = _slugify("report-日本語-2024")
+        assert _SAFE_ID_RE.match(slug), f"{slug!r} does not match _SAFE_ID_RE"
+        assert "report" in slug
 
 
 class TestCreateAndListTopics:

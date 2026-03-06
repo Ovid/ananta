@@ -109,7 +109,10 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
         project_id = repo_result.project.project_id
 
         if body.topic:
-            state.topic_mgr.create(body.topic)
+            try:
+                state.topic_mgr.create(body.topic)
+            except ValueError as exc:
+                raise HTTPException(422, str(exc)) from exc
             state.topic_mgr.add_repo(body.topic, project_id)
 
         return {
@@ -238,7 +241,10 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
 
     @router.post("/topics/{name}/repos/{project_id}")
     def add_repo_to_topic(name: str, project_id: str) -> dict[str, str]:
-        state.topic_mgr.create(name)
+        try:
+            state.topic_mgr.create(name)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
         state.topic_mgr.add_repo(name, project_id)
         return {"status": "added", "topic": name, "project_id": project_id}
 

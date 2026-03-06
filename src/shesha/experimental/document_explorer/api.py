@@ -319,7 +319,10 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
     @router.post("/topics/{name}/documents/{doc_id}")
     def add_doc_to_topic(name: str, doc_id: str) -> dict[str, str]:
         _validate_doc_id(doc_id)
-        state.topic_mgr.create(name)
+        try:
+            state.topic_mgr.create(name)
+        except ValueError as e:
+            raise HTTPException(422, str(e)) from e
         state.topic_mgr.add_doc(name, doc_id)
         return {"status": "added", "topic": name, "project_id": doc_id}
 

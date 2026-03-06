@@ -274,6 +274,14 @@ class TestTopicDocumentRoutes:
         assert resp.status_code == 200
         assert "doc-1" in topic_mgr.list_docs("Research")
 
+    def test_add_doc_with_invalid_topic_returns_422(
+        self,
+        client: TestClient,
+    ) -> None:
+        resp = client.post("/api/topics/!!!/documents/doc-1")
+        assert resp.status_code == 422
+        assert "slug" in resp.json()["detail"].lower()
+
     def test_remove_doc_from_topic(
         self,
         client: TestClient,

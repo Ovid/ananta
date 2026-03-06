@@ -373,6 +373,48 @@ class TestAnalysisContext:
         assert "This repo implements authentication" in actual_question
 
 
+class TestDocumentIdValidation:
+    """Reject document_ids that could cause path traversal."""
+
+    @pytest.mark.parametrize(
+        "bad_id",
+        [
+            "../etc/passwd",
+            "../../secret",
+            ".hidden",
+            "foo/bar",
+            "foo\\bar",
+            "",
+            " ",
+        ],
+    )
+    def test_rejects_unsafe_document_id(self, bad_id: str, client: TestClient) -> None:
+        with client.websocket_connect("/ws") as ws:
+            ws.send_json(
+                {
+                    "type": "query",
+                    "question": "What?",
+                    "document_ids": [bad_id],
+                }
+            )
+            msg = ws.receive_json()
+        assert msg["type"] == "error"
+        assert "invalid" in msg["message"].lower()
+
+    def test_rejects_mixed_good_and_bad_ids(self, client: TestClient) -> None:
+        with client.websocket_connect("/ws") as ws:
+            ws.send_json(
+                {
+                    "type": "query",
+                    "question": "What?",
+                    "document_ids": ["good-id", "../bad"],
+                }
+            )
+            msg = ws.receive_json()
+        assert msg["type"] == "error"
+        assert "invalid" in msg["message"].lower()
+
+
 class TestNoDocsFoundInProjects:
     """Query returns error when no documents are found in any project."""
 

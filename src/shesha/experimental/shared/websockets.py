@@ -174,7 +174,7 @@ async def _handle_query(
     document_ids = data.get("document_ids")
     loaded_docs: list[ParsedDocument]
 
-    if not document_ids or not isinstance(document_ids, list) or len(document_ids) == 0:
+    if not document_ids or not isinstance(document_ids, list):
         await websocket.send_json(
             {
                 "type": "error",
@@ -332,7 +332,7 @@ async def handle_multi_project_query(
     question = str(data.get("question", ""))
     document_ids = data.get("document_ids")
 
-    if not document_ids or not isinstance(document_ids, list) or len(document_ids) == 0:
+    if not document_ids or not isinstance(document_ids, list):
         await ws.send_json(
             {"type": "error", "message": f"Please select one or more {item_noun} before querying"}
         )

@@ -3,15 +3,23 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
 
-from shesha.experimental.document_explorer.api import create_api
+from shesha.experimental.document_explorer.api import _make_project_id, create_api
 from shesha.experimental.document_explorer.dependencies import DocumentExplorerState
 from shesha.experimental.document_explorer.topics import DocumentTopicManager
+
+
+class TestMakeProjectId:
+    def test_hash_suffix_is_8_hex_chars(self) -> None:
+        pid = _make_project_id("report.pdf")
+        # Format: slug-xxxxxxxx
+        assert re.fullmatch(r"[a-z0-9]+-[a-f0-9]{8}", pid), f"unexpected format: {pid}"
 
 
 @pytest.fixture

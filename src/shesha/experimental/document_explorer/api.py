@@ -44,11 +44,11 @@ def _validate_doc_id(doc_id: str) -> None:
 
 
 def _make_project_id(filename: str) -> str:
-    """Generate project_id from filename: slugified-name-xxxx."""
+    """Generate project_id from filename: slugified-name-xxxxxxxx."""
     stem = Path(filename).stem
     slug = _slugify(stem) or "document"
     short_hash = hashlib.sha256(f"{filename}-{datetime.now(UTC).isoformat()}".encode()).hexdigest()[
-        :4
+        :8
     ]
     return f"{slug}-{short_hash}"
 

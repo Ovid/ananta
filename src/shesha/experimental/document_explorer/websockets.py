@@ -105,8 +105,7 @@ async def _handle_query(
     # the uploads directory.  Each project_id has an optional meta.json
     # written at upload time.
     context_parts: list[str] = []
-    for project_id in document_ids:
-        pid_str = str(project_id)
+    for pid_str in loaded_project_ids:
         meta_path = state.uploads_dir / pid_str / "meta.json"
         if meta_path.exists():
             try:

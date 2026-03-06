@@ -163,6 +163,23 @@ class TestUploadDocument:
         assert resp.status_code == 422
         assert "slug" in resp.json()["detail"].lower()
 
+    def test_upload_invalid_topic_does_not_create_project(
+        self,
+        client: TestClient,
+        mock_shesha: MagicMock,
+        uploads_dir: Path,
+    ) -> None:
+        """An invalid topic name must fail before creating any files or projects."""
+        resp = client.post(
+            "/api/documents/upload",
+            files=[("files", ("notes.txt", b"Notes", "text/plain"))],
+            data={"topic": "!!!"},
+        )
+        assert resp.status_code == 422
+        mock_shesha.create_project.assert_not_called()
+        # No upload directories should have been created
+        assert list(uploads_dir.iterdir()) == []
+
     def test_upload_unsupported_type_returns_422_with_detail(
         self,
         client: TestClient,

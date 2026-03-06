@@ -148,6 +148,14 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
         files: list[UploadFile],
         topic: str | None = Form(default=None),
     ) -> list[DocumentUploadResponse]:
+        # Validate topic name up-front so we fail before creating any
+        # files or projects — avoids orphaned data on invalid topics.
+        if topic:
+            try:
+                state.topic_mgr.create(topic)
+            except ValueError as exc:
+                raise HTTPException(422, str(exc)) from exc
+
         results: list[DocumentUploadResponse] = []
         for file in files:
             if not file.filename:
@@ -195,13 +203,9 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
             )
             state.shesha._storage.store_document(project_id, doc)
 
-            # Add to topic if specified
+            # Add to topic (already created/validated above)
             if topic:
-                try:
-                    state.topic_mgr.create(topic)
-                    state.topic_mgr.add_doc(topic, project_id)
-                except ValueError as exc:
-                    raise HTTPException(422, str(exc)) from exc
+                state.topic_mgr.add_doc(topic, project_id)
 
             results.append(
                 DocumentUploadResponse(

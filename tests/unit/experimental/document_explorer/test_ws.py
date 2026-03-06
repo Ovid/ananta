@@ -611,6 +611,54 @@ class TestStaleFirstProjectFallback:
         assert complete[0]["answer"] == "Fallback answer"
 
 
+class TestInvalidTopicFallsBack:
+    """Query with a nonexistent topic falls back to the global session."""
+
+    def test_nonexistent_topic_returns_error(self, tmp_path: Path) -> None:
+        from shesha.experimental.document_explorer.topics import DocumentTopicManager
+
+        mock_state = _make_state(tmp_path)
+        # Use a real TopicManager so get_topic_dir raises ValueError
+        mock_state.topic_mgr = DocumentTopicManager(tmp_path / "topics")
+
+        mock_result = MagicMock()
+        mock_result.answer = "answer"
+        mock_result.token_usage = TokenUsage(prompt_tokens=10, completion_tokens=5)
+        mock_result.execution_time = 0.5
+        mock_result.trace = Trace(steps=[])
+
+        mock_project = MagicMock()
+        mock_project._rlm_engine.query.return_value = mock_result
+
+        mock_state.shesha._storage.list_documents.return_value = ["file.txt"]
+        mock_state.shesha._storage.get_document.side_effect = lambda pid, name: _make_doc(name)
+        mock_state.shesha._storage.list_traces.return_value = []
+        mock_state.shesha.get_project.return_value = mock_project
+
+        app = _make_app(mock_state)
+        test_client = TestClient(app)
+
+        with test_client.websocket_connect("/ws") as ws:
+            ws.send_json(
+                {
+                    "type": "query",
+                    "question": "What?",
+                    "document_ids": ["doc-1"],
+                    "topic": "nonexistent-topic",
+                }
+            )
+            messages = []
+            while True:
+                msg = ws.receive_json()
+                messages.append(msg)
+                if msg["type"] in ("complete", "error"):
+                    break
+
+        errors = [m for m in messages if m["type"] == "error"]
+        assert len(errors) == 1
+        assert "topic" in errors[0]["message"].lower()
+
+
 class TestMissingMetadataSkipped:
     """When metadata is missing for a project, context is still built."""
 

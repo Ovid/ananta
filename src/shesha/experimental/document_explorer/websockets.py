@@ -118,7 +118,11 @@ async def _handle_query(
 
     # Resolve the session once -- used for both history prefix and saving.
     topic_name = str(data.get("topic", ""))
-    session = get_topic_session(state, topic_name) if topic_name else state.session
+    try:
+        session = get_topic_session(state, topic_name) if topic_name else state.session
+    except ValueError:
+        await ws.send_json({"type": "error", "message": f"Topic not found: {topic_name}"})
+        return
 
     # Build full question with history and document context
     history_prefix = session.format_history_prefix()

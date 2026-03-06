@@ -19,6 +19,8 @@ from shesha.experimental.code_explorer.dependencies import (
 )
 from shesha.experimental.shared.websockets import (
     handle_multi_project_query,
+)
+from shesha.experimental.shared.websockets import (
     websocket_handler as shared_ws_handler,
 )
 
@@ -39,9 +41,7 @@ async def _build_code_context(state: Any, project_ids: list[str]) -> str:
     return "\n\n".join(parts)
 
 
-async def _handle_query(
-    ws: WebSocket, data: dict[str, Any], state: Any, cancel_event: Any
-) -> None:
+async def _handle_query(ws: WebSocket, data: dict[str, Any], state: Any, cancel_event: Any) -> None:
     """Execute a cross-project query against code repositories."""
     await handle_multi_project_query(
         ws,

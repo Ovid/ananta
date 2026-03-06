@@ -352,9 +352,7 @@ async def handle_multi_project_query(
         try:
             doc_names = storage.list_documents(pid_str)
         except Exception:
-            logger.warning(
-                "Could not list documents for project %s", pid_str, exc_info=True
-            )
+            logger.warning("Could not list documents for project %s", pid_str, exc_info=True)
             continue
         docs_loaded = 0
         for doc_name in doc_names:

@@ -8,8 +8,10 @@ from pathlib import Path
 from shesha.experimental.document_explorer.topics import DocumentTopicManager
 from shesha.experimental.shared.dependencies import (
     BaseExplorerState,
-    create_app_state as _create_app_state,
     get_topic_session,
+)
+from shesha.experimental.shared.dependencies import (
+    create_app_state as _create_app_state,
 )
 
 

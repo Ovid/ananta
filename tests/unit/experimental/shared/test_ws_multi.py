@@ -60,9 +60,7 @@ class TestValidation:
         assert msg["type"] == "error"
 
     @pytest.mark.asyncio
-    async def test_invalid_id_sends_error(
-        self, mock_ws: AsyncMock, mock_state: MagicMock
-    ) -> None:
+    async def test_invalid_id_sends_error(self, mock_ws: AsyncMock, mock_state: MagicMock) -> None:
         data: dict[str, object] = {"question": "hi", "document_ids": ["../evil"]}
         await handle_multi_project_query(
             mock_ws,
@@ -110,9 +108,7 @@ class TestValidation:
 
 class TestNoDocsLoaded:
     @pytest.mark.asyncio
-    async def test_no_docs_sends_error(
-        self, mock_ws: AsyncMock, mock_state: MagicMock
-    ) -> None:
+    async def test_no_docs_sends_error(self, mock_ws: AsyncMock, mock_state: MagicMock) -> None:
         mock_state.shesha._storage.list_documents.return_value = []
         data: dict[str, object] = {"question": "hi", "document_ids": ["empty-proj"]}
         await handle_multi_project_query(

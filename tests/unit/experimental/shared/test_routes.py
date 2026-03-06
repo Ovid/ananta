@@ -532,9 +532,7 @@ class TestCreateItemRouter:
         assert resp.status_code == 200
         assert resp.json() == ["proj-1"]
 
-    def test_remove_item_from_topic(
-        self, client: TestClient, topic_mgr: BaseTopicManager
-    ) -> None:
+    def test_remove_item_from_topic(self, client: TestClient, topic_mgr: BaseTopicManager) -> None:
         topic_mgr.create("Research")
         topic_mgr.add_item("Research", "proj-1")
         resp = client.delete("/api/topics/Research/items/proj-1")

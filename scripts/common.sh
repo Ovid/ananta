@@ -9,11 +9,9 @@ FRONTEND_DIST="$FRONTEND_DIR/dist"
 # --- Colors ---
 RED='\033[0;31m'
 GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
 NC='\033[0m'
 
 info()  { echo -e "${GREEN}[shesha]${NC} $*"; }
-warn()  { echo -e "${YELLOW}[shesha]${NC} $*"; }
 error() { echo -e "${RED}[shesha]${NC} $*" >&2; }
 
 # --- Parse flags (strip --rebuild before passing to the explorer) ---
@@ -56,7 +54,7 @@ require_env() {
 
 check_docker_running() {
     if ! command -v docker &>/dev/null; then return; fi
-    if ! docker info &>/dev/null 2>&1; then
+    if ! docker info &>/dev/null; then
         ERRORS+=("  - Start Docker daemon (e.g. open Docker Desktop)")
     fi
 }
@@ -64,7 +62,7 @@ check_docker_running() {
 report_and_exit() {
     if [ ${#ERRORS[@]} -gt 0 ]; then
         error "Cannot start $APP_NAME. Fix the following:"
-        for e in "${ERRORS[@]}"; do echo -e "$e"; done
+        for e in "${ERRORS[@]}"; do echo -e "$e" >&2; done
         exit 1
     fi
 }
@@ -74,8 +72,9 @@ run_preflight() {
     require_command node    "https://nodejs.org/"
     require_command npm     "https://nodejs.org/"
     require_command docker  "https://www.docker.com/get-started/"
-    [ "${REQUIRES_GIT:-false}" = true ] && \
+    if [ "${REQUIRES_GIT:-false}" = true ]; then
         require_command git "https://git-scm.com/"
+    fi
     check_python_version
     require_env SHESHA_API_KEY "export SHESHA_API_KEY=<your-key>"
     require_env SHESHA_MODEL   "export SHESHA_MODEL=<model-name>"

@@ -455,6 +455,15 @@ class TestTopicErrorToStatus:
 
         assert _topic_error_to_status(ValueError("Topic not found: X")) == 404
 
+    def test_slug_collision_returns_422(self) -> None:
+        from shesha.experimental.shared.routes import _topic_error_to_status
+
+        msg = (
+            "A topic with a different display name already uses "
+            "slug 'foo': existing 'Foo' vs requested 'FOO'"
+        )
+        assert _topic_error_to_status(ValueError(msg)) == 422
+
     def test_other_error_returns_422(self) -> None:
         from shesha.experimental.shared.routes import _topic_error_to_status
 

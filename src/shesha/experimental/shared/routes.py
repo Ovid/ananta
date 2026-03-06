@@ -41,7 +41,7 @@ ListTraceFiles = Callable[[Any, str], list[Path]]
 def _topic_error_to_status(e: ValueError) -> int:
     """Map a topic manager ValueError to an HTTP status code."""
     msg = str(e)
-    if "already exists" in msg:
+    if "already exists" in msg and "slug" not in msg:
         return 409
     if "not found" in msg.lower():
         return 404

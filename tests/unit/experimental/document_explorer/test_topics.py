@@ -55,6 +55,46 @@ class TestSlugify:
         assert "report" in slug
 
 
+class TestCorruptMetaHandling:
+    """Corrupt or partially-written topic.json should not crash callers."""
+
+    def test_missing_name_key_treated_as_corrupt(self, tmp_path: Path) -> None:
+        mgr = DocumentTopicManager(tmp_path)
+        topic_dir = tmp_path / "broken"
+        topic_dir.mkdir()
+        (topic_dir / "topic.json").write_text('{"docs": ["a"]}')
+        assert mgr.list_topics() == []
+
+    def test_missing_docs_key_treated_as_corrupt(self, tmp_path: Path) -> None:
+        mgr = DocumentTopicManager(tmp_path)
+        topic_dir = tmp_path / "broken"
+        topic_dir.mkdir()
+        (topic_dir / "topic.json").write_text('{"name": "Reports"}')
+        assert mgr.list_topics() == []
+
+    def test_wrong_type_name_treated_as_corrupt(self, tmp_path: Path) -> None:
+        mgr = DocumentTopicManager(tmp_path)
+        topic_dir = tmp_path / "broken"
+        topic_dir.mkdir()
+        (topic_dir / "topic.json").write_text('{"name": 42, "docs": []}')
+        assert mgr.list_topics() == []
+
+    def test_wrong_type_docs_treated_as_corrupt(self, tmp_path: Path) -> None:
+        mgr = DocumentTopicManager(tmp_path)
+        topic_dir = tmp_path / "broken"
+        topic_dir.mkdir()
+        (topic_dir / "topic.json").write_text('{"name": "Reports", "docs": "not-a-list"}')
+        assert mgr.list_topics() == []
+
+    def test_valid_topics_unaffected_by_corrupt_sibling(self, tmp_path: Path) -> None:
+        mgr = DocumentTopicManager(tmp_path)
+        mgr.create("Good")
+        broken_dir = tmp_path / "broken"
+        broken_dir.mkdir()
+        (broken_dir / "topic.json").write_text("{bad json")
+        assert mgr.list_topics() == ["Good"]
+
+
 class TestCreateAndListTopics:
     def test_create_topic(self, tmp_path: Path) -> None:
         mgr = DocumentTopicManager(tmp_path)

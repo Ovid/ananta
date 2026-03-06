@@ -215,6 +215,13 @@ class DocumentTopicManager:
         if not meta_path.exists():
             return None
         try:
-            return json.loads(meta_path.read_text())  # type: ignore[no-any-return]
+            data = json.loads(meta_path.read_text())
         except (json.JSONDecodeError, OSError):
             return None  # Corrupt file -- treat as missing
+        if (
+            not isinstance(data, dict)
+            or not isinstance(data.get("name"), str)
+            or not isinstance(data.get("docs"), list)
+        ):
+            return None  # Missing/wrong-typed required keys
+        return data  # type: ignore[return-value]

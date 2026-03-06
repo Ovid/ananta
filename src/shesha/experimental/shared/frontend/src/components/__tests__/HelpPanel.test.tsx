@@ -48,7 +48,10 @@ describe('HelpPanel', () => {
 
   it('renders HTML in FAQ answers', () => {
     render(<HelpPanel {...defaultProps} />)
-    const strong = screen.getByText('two')
+    const faqHeading = screen.getByText('FAQ')
+    // scope to FAQ section to avoid matching quick start <strong>
+    const faqSection = faqHeading.closest('section')!
+    const strong = within(faqSection).getByText('two')
     expect(strong.tagName).toBe('STRONG')
   })
 

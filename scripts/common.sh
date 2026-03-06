@@ -40,8 +40,8 @@ check_python_version() {
     local ver major minor
     ver=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
     major=${ver%%.*}; minor=${ver##*.}
-    if [ "$major" -lt 3 ] || { [ "$major" -eq 3 ] && [ "$minor" -lt 12 ]; }; then
-        ERRORS+=("  - Upgrade Python: 3.12+ required, found $ver")
+    if [ "$major" -lt 3 ] || { [ "$major" -eq 3 ] && [ "$minor" -lt 11 ]; }; then
+        ERRORS+=("  - Upgrade Python: 3.11+ required, found $ver")
     fi
 }
 

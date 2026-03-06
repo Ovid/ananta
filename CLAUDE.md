@@ -97,6 +97,10 @@ Add entries under `[Unreleased]` using these categories:
 - **Fixed** - Bug fixes
 - **Security** - Security-related changes
 
+### git
+
+CRITICAL: git commit messages MUST be plain text. Never do things similar to `git commit -m "$(cat <<'COMMITEOF'`
+
 ### Release Workflow
 
 Version numbers are derived from git tags via `hatch-vcs`. To release:

@@ -31,10 +31,10 @@ from shesha.experimental.shared.schemas import (
 from shesha.experimental.shared.session import WebConversationSession
 
 # Type aliases for callbacks
-GetSession = Callable[[object, str], WebConversationSession]
-BuildTopicInfo = Callable[[object], list[TopicInfo]]
-ResolveProjectIds = Callable[[object, str], list[str]]
-ListTraceFiles = Callable[[object, str], list[Path]]
+GetSession = Callable[[Any, str], WebConversationSession]
+BuildTopicInfo = Callable[[Any], list[TopicInfo]]
+ResolveProjectIds = Callable[[Any, str], list[str]]
+ListTraceFiles = Callable[[Any, str], list[Path]]
 
 
 def resolve_topic_or_404(state: Any, name: str) -> str:

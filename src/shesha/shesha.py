@@ -388,15 +388,33 @@ class Shesha:
         return self._create_new_project_from_repo(url, name, resolved_token, path)
 
     def _extract_repo_name(self, url: str) -> str:
-        """Extract repository name from URL."""
+        """Extract repository name from URL.
+
+        The returned name is sanitised so it only contains characters
+        matching ``[a-zA-Z0-9._-]``, which keeps it compatible with the
+        ``_SAFE_ID_RE`` validation used in the WS handlers.
+        """
         cleaned = url.rstrip("/")
         if self._repo_ingester.is_local_path(url):
             path = Path(cleaned).expanduser().resolve()
-            return f"{path.parent.name}-{path.name}"
-        match = re.search(r"[/:]([^/]+/[^/]+?)(?:\.git)?$", cleaned)
-        if match:
-            return match.group(1).replace("/", "-")
-        return "unnamed-repo"
+            raw = f"{path.parent.name}-{path.name}"
+        else:
+            match = re.search(r"[/:]([^/]+/[^/]+?)(?:\.git)?$", cleaned)
+            raw = match.group(1).replace("/", "-") if match else "unnamed-repo"
+        return self._sanitize_project_id(raw)
+
+    @staticmethod
+    def _sanitize_project_id(raw: str) -> str:
+        """Replace characters outside ``[a-zA-Z0-9._-]`` with hyphens.
+
+        The result is guaranteed to match ``_SAFE_ID_RE``
+        (``^[a-zA-Z0-9][a-zA-Z0-9._-]*$``).
+        """
+        sanitized = re.sub(r"[^a-zA-Z0-9._-]", "-", raw)
+        sanitized = re.sub(r"-+", "-", sanitized)
+        sanitized = sanitized.lstrip("._-")
+        sanitized = sanitized.strip("-")
+        return sanitized or "unnamed-repo"
 
     def _handle_existing_project(
         self,

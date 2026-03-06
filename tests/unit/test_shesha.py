@@ -1,5 +1,6 @@
 """Tests for main Shesha class."""
 
+import re
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -1159,6 +1160,34 @@ class TestExtractRepoName:
         assert not result.startswith("-"), f"Name should not start with dash: {result}"
         assert not result.startswith("."), f"Name should not start with dot: {result}"
         assert result.endswith("myrepo")
+
+    def test_local_path_with_spaces_sanitized(self, tmp_path: Path):
+        """Local path with spaces produces a safe slug without spaces."""
+        shesha = self._make_shesha(tmp_path, is_local=True)
+        result = shesha._extract_repo_name("/home/user/my projects/my repo")
+        assert " " not in result
+        assert re.match(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$", result), (
+            f"Result {result!r} does not match _SAFE_ID_RE"
+        )
+
+    @pytest.mark.parametrize(
+        "raw",
+        [".hidden", "_private", "...dots", "___underscores"],
+    )
+    def test_sanitize_strips_leading_non_alphanumeric(self, raw: str):
+        """_sanitize_project_id output must start with [a-zA-Z0-9]."""
+        result = Shesha._sanitize_project_id(raw)
+        assert re.match(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$", result), (
+            f"_sanitize_project_id({raw!r}) = {result!r} does not match _SAFE_ID_RE"
+        )
+
+    def test_local_hidden_dir_produces_safe_id(self, tmp_path: Path):
+        """Local path under a hidden directory produces a _SAFE_ID_RE-valid ID."""
+        shesha = self._make_shesha(tmp_path, is_local=True)
+        result = shesha._extract_repo_name("/home/user/.config/.repo")
+        assert re.match(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$", result), (
+            f"Result {result!r} does not match _SAFE_ID_RE"
+        )
 
     def test_fallback_for_unparseable_url(self, tmp_path: Path):
         """Unparseable URL falls back to unnamed-repo."""

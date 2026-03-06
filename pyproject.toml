@@ -42,6 +42,10 @@ dev = [
     "uvicorn[standard]>=0.27",
     "websockets>=12.0",
     "httpx>=0.27",
+    "python-pptx>=1.0",
+    "openpyxl>=3.1",
+    "striprtf>=0.0.26",
+    "python-multipart>=0.0.9",
 ]
 arxiv = [
     "arxiv>=2.0",
@@ -58,10 +62,18 @@ web = [
     "websockets>=12.0",
     "httpx>=0.27",
 ]
+document-explorer = [
+    "shesha[web]",
+    "python-pptx>=1.0",
+    "openpyxl>=3.1",
+    "striprtf>=0.0.26",
+    "python-multipart>=0.0.9",
+]
 
 [project.scripts]
 shesha-web = "shesha.experimental.web.__main__:main"
 shesha-code = "shesha.experimental.code_explorer.__main__:main"
+shesha-document-explorer = "shesha.experimental.document_explorer.__main__:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/shesha"]
@@ -98,6 +110,14 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "uvicorn"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "openpyxl"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "striprtf.*"
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

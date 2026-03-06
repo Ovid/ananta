@@ -257,8 +257,8 @@ def create_api(state: AppState) -> FastAPI:
     arxiv_router = _create_arxiv_router(state)
     shared_router = create_shared_router(
         state,
-        get_session=lambda s, name: _get_arxiv_session(state, name),
-        build_topic_info=lambda s: _build_arxiv_topic_info(state),
+        get_session=lambda s, name: _get_arxiv_session(s, name),
+        build_topic_info=lambda s: _build_arxiv_topic_info(s),
         include_topic_crud=True,
         include_per_topic_history=True,
         include_context_budget=True,

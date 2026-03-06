@@ -109,7 +109,10 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
         project_id = repo_result.project.project_id
 
         if body.topic:
-            state.topic_mgr.create(body.topic)
+            try:
+                state.topic_mgr.create(body.topic)
+            except ValueError as exc:
+                raise HTTPException(422, str(exc)) from exc
             state.topic_mgr.add_repo(body.topic, project_id)
 
         return {
@@ -206,8 +209,14 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
         try:
             state.topic_mgr.rename(name, body.new_name)
         except ValueError as e:
-            status = 409 if "already exists" in str(e) else 404
-            raise HTTPException(status, str(e)) from e
+            msg = str(e)
+            if "already exists" in msg:
+                status = 409
+            elif "not found" in msg.lower():
+                status = 404
+            else:
+                status = 422
+            raise HTTPException(status, msg) from e
         return {"name": body.new_name}
 
     @router.delete("/topics/{name}")
@@ -232,7 +241,10 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
 
     @router.post("/topics/{name}/repos/{project_id}")
     def add_repo_to_topic(name: str, project_id: str) -> dict[str, str]:
-        state.topic_mgr.create(name)
+        try:
+            state.topic_mgr.create(name)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
         state.topic_mgr.add_repo(name, project_id)
         return {"status": "added", "topic": name, "project_id": project_id}
 
@@ -252,10 +264,10 @@ def create_api(state: CodeExplorerState) -> FastAPI:
     repo_router = _create_repo_router(state)
     shared_router = create_shared_router(
         state,
-        get_session=lambda s, name: get_topic_session(state, name),
-        build_topic_info=lambda s: _build_code_topic_info(state),
-        resolve_project_ids=lambda s, name: _resolve_code_project_ids(state, name),
-        list_trace_files=lambda s, pid: _list_code_trace_files(state, pid),
+        get_session=lambda s, name: get_topic_session(s, name),
+        build_topic_info=lambda s: _build_code_topic_info(s),
+        resolve_project_ids=lambda s, name: _resolve_code_project_ids(s, name),
+        list_trace_files=lambda s, pid: _list_code_trace_files(s, pid),
         include_topic_crud=False,
         include_per_topic_history=True,
         include_context_budget=True,

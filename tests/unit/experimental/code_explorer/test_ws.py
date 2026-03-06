@@ -285,7 +285,7 @@ class TestNoEngine:
         errors = [m for m in messages if m["type"] == "error"]
         assert len(errors) == 1
         err_msg = errors[0]["message"].lower()
-        assert "engine" in err_msg or "configured" in err_msg
+        assert "no valid project" in err_msg or "engine" in err_msg
 
 
 class TestEngineException:
@@ -371,6 +371,48 @@ class TestAnalysisContext:
         call_args = mock_project._rlm_engine.query.call_args
         actual_question = call_args.kwargs.get("question") or call_args[1].get("question", "")
         assert "This repo implements authentication" in actual_question
+
+
+class TestDocumentIdValidation:
+    """Reject document_ids that could cause path traversal."""
+
+    @pytest.mark.parametrize(
+        "bad_id",
+        [
+            "../etc/passwd",
+            "../../secret",
+            ".hidden",
+            "foo/bar",
+            "foo\\bar",
+            "",
+            " ",
+        ],
+    )
+    def test_rejects_unsafe_document_id(self, bad_id: str, client: TestClient) -> None:
+        with client.websocket_connect("/ws") as ws:
+            ws.send_json(
+                {
+                    "type": "query",
+                    "question": "What?",
+                    "document_ids": [bad_id],
+                }
+            )
+            msg = ws.receive_json()
+        assert msg["type"] == "error"
+        assert "invalid" in msg["message"].lower()
+
+    def test_rejects_mixed_good_and_bad_ids(self, client: TestClient) -> None:
+        with client.websocket_connect("/ws") as ws:
+            ws.send_json(
+                {
+                    "type": "query",
+                    "question": "What?",
+                    "document_ids": ["good-id", "../bad"],
+                }
+            )
+            msg = ws.receive_json()
+        assert msg["type"] == "error"
+        assert "invalid" in msg["message"].lower()
 
 
 class TestNoDocsFoundInProjects:
@@ -466,4 +508,52 @@ class TestStaleProjectId:
 
         errors = [m for m in messages if m["type"] == "error"]
         assert len(errors) == 1
-        assert "not found" in errors[0]["message"].lower() or "gone-repo" in errors[0]["message"]
+        assert "no valid project" in errors[0]["message"].lower()
+
+
+class TestStaleFirstProjectFallback:
+    """When first project_id is stale but later ones are valid, query succeeds."""
+
+    def test_falls_back_to_second_project(self, mock_state: MagicMock) -> None:
+        mock_result = MagicMock()
+        mock_result.answer = "Fallback answer"
+        mock_result.token_usage = TokenUsage(prompt_tokens=10, completion_tokens=5)
+        mock_result.execution_time = 0.5
+        mock_result.trace = Trace(steps=[])
+
+        mock_project = MagicMock()
+        mock_project._rlm_engine.query.return_value = mock_result
+
+        mock_state.shesha._storage.list_documents.return_value = ["file.py"]
+        mock_state.shesha._storage.get_document.side_effect = lambda pid, name: _make_doc(name)
+        mock_state.shesha._storage.list_traces.return_value = []
+        mock_state.shesha.get_analysis.return_value = None
+
+        def get_project(pid: str) -> MagicMock:
+            if pid == "stale-repo":
+                raise ProjectNotFoundError(pid)
+            return mock_project
+
+        mock_state.shesha.get_project.side_effect = get_project
+
+        app = _make_app(mock_state)
+        test_client = TestClient(app)
+
+        with test_client.websocket_connect("/ws") as ws:
+            ws.send_json(
+                {
+                    "type": "query",
+                    "question": "What?",
+                    "document_ids": ["stale-repo", "good-repo"],
+                }
+            )
+            messages = []
+            while True:
+                msg = ws.receive_json()
+                messages.append(msg)
+                if msg["type"] in ("complete", "error"):
+                    break
+
+        complete = [m for m in messages if m["type"] == "complete"]
+        assert len(complete) == 1
+        assert complete[0]["answer"] == "Fallback answer"

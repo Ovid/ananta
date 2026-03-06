@@ -8,10 +8,14 @@ topic removes the references but not the repos themselves.
 from __future__ import annotations
 
 import json
+import logging
 import re
 import shutil
+import unicodedata
 from pathlib import Path
 from typing import TypedDict
+
+logger = logging.getLogger(__name__)
 
 TOPIC_META_FILE = "topic.json"
 
@@ -24,7 +28,11 @@ class _TopicMeta(TypedDict):
 
 
 def _slugify(text: str) -> str:
-    """Convert text to a URL-safe slug."""
+    """Convert text to an ASCII-safe slug matching ``[a-zA-Z0-9._-]``."""
+    # Decompose accented characters (é → e + combining accent) then drop
+    # non-ASCII so that "résumé" becomes "resume" rather than empty string.
+    text = unicodedata.normalize("NFKD", text)
+    text = text.encode("ascii", "ignore").decode("ascii")
     text = text.lower().strip()
     # Replace punctuation that acts as word separators with spaces
     text = re.sub(r"[^\w\s-]", " ", text)
@@ -52,8 +60,16 @@ class CodeExplorerTopicManager:
     # Topic CRUD
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _validate_name(name: str) -> None:
+        """Reject names that contain path separators."""
+        if "/" in name or "\\" in name:
+            msg = f"Topic name must not contain a path separator: {name!r}"
+            raise ValueError(msg)
+
     def create(self, name: str) -> None:
         """Create a new topic.  Idempotent — no error if it already exists."""
+        self._validate_name(name)
         slug = _slugify(name)
         if not slug:
             msg = f"Topic name produces an empty slug: {name!r}"
@@ -62,7 +78,19 @@ class CodeExplorerTopicManager:
         meta_path = topic_dir / TOPIC_META_FILE
 
         if meta_path.exists():
-            return  # already exists
+            existing = self._read_meta(topic_dir)
+            if existing is None:
+                # Corrupt topic.json — re-write it to recover
+                logger.warning("Repairing corrupt topic.json in %s", topic_dir)
+            elif existing["name"] != name:
+                msg = (
+                    f"A topic with a different display name already uses "
+                    f"slug '{slug}': existing {existing['name']!r} vs "
+                    f"requested {name!r}"
+                )
+                raise ValueError(msg)
+            else:
+                return  # already exists with same name
 
         topic_dir.mkdir(parents=True, exist_ok=True)
         meta: _TopicMeta = {"name": name, "repos": []}
@@ -70,6 +98,7 @@ class CodeExplorerTopicManager:
 
     def rename(self, old_name: str, new_name: str) -> None:
         """Rename a topic's display name (directory stays the same)."""
+        self._validate_name(new_name)
         meta, meta_path = self._resolve(old_name)
         if new_name != old_name:
             existing_names: set[str] = set()
@@ -170,6 +199,14 @@ class CodeExplorerTopicManager:
                 repos.remove(project_id)
                 meta_path.write_text(json.dumps(meta, indent=2))
 
+    def get_topic_dir(self, name: str) -> Path:
+        """Return the directory for the topic with *name*.
+
+        Raises ``ValueError`` if the topic does not exist.
+        """
+        _meta, meta_path = self._resolve(name)
+        return meta_path.parent
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
@@ -202,6 +239,13 @@ class CodeExplorerTopicManager:
         if not meta_path.exists():
             return None
         try:
-            return json.loads(meta_path.read_text())  # type: ignore[no-any-return]
+            data = json.loads(meta_path.read_text())
         except (json.JSONDecodeError, OSError):
             return None  # Corrupt file — treat as missing
+        if (
+            not isinstance(data, dict)
+            or not isinstance(data.get("name"), str)
+            or not isinstance(data.get("repos"), list)
+        ):
+            return None  # Missing/wrong-typed required keys
+        return data  # type: ignore[return-value]

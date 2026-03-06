@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import threading
 from typing import Any
 
@@ -28,6 +29,8 @@ from shesha.models import ParsedDocument
 from shesha.rlm.trace import StepType, TokenUsage
 
 logger = logging.getLogger(__name__)
+
+_SAFE_ID_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
 
 
 async def websocket_handler(ws: WebSocket, state: CodeExplorerState) -> None:
@@ -57,6 +60,12 @@ async def _handle_query(
             }
         )
         return
+
+    # Validate document_ids to prevent path traversal
+    for doc_id in document_ids:
+        if not isinstance(doc_id, str) or not _SAFE_ID_RE.match(doc_id):
+            await ws.send_json({"type": "error", "message": f"Invalid project id: {doc_id!r}"})
+            return
 
     # Load documents from all requested projects
     loaded_docs: list[ParsedDocument] = []
@@ -132,18 +141,24 @@ async def _handle_query(
 
     drain_task = asyncio.create_task(drain_queue())
 
-    # Pick the first project's RLM engine (they share the same engine)
-    first_project_id = str(document_ids[0])
-    try:
-        project = state.shesha.get_project(first_project_id)
-    except ProjectNotFoundError:
-        await ws.send_json({"type": "error", "message": f"Repository {first_project_id} not found"})
-        await message_queue.put(None)
-        await drain_task
-        return
-    rlm_engine = project._rlm_engine
-    if rlm_engine is None:
-        await ws.send_json({"type": "error", "message": "Query engine not configured"})
+    # Pick the first available project's RLM engine (they share the same
+    # engine config, so any valid project will do).
+    rlm_engine = None
+    first_project_id: str | None = None
+    for pid in document_ids:
+        pid_str = str(pid)
+        try:
+            project = state.shesha.get_project(pid_str)
+        except ProjectNotFoundError:
+            continue
+        if project._rlm_engine is not None:
+            rlm_engine = project._rlm_engine
+            first_project_id = pid_str
+            break
+    if rlm_engine is None or first_project_id is None:
+        await ws.send_json(
+            {"type": "error", "message": "No valid project found for selected repositories"}
+        )
         await message_queue.put(None)
         await drain_task
         return

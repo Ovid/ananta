@@ -89,4 +89,39 @@ describe('Header (shared)', () => {
     const themeBtn = screen.getByRole('button', { name: 'Dark mode' })
     expect(themeBtn).not.toHaveAttribute('title')
   })
+
+  it('renders help button when onHelpToggle is provided', () => {
+    render(
+      <Header appName="My App" isDark={false} onToggleTheme={() => {}} onHelpToggle={() => {}} />
+    )
+    const btn = screen.getByRole('button', { name: 'Help' })
+    expect(btn).toHaveAttribute('data-tooltip', 'Help')
+  })
+
+  it('does not render help button when onHelpToggle is omitted', () => {
+    render(
+      <Header appName="My App" isDark={false} onToggleTheme={() => {}} />
+    )
+    expect(screen.queryByRole('button', { name: 'Help' })).not.toBeInTheDocument()
+  })
+
+  it('calls onHelpToggle when help button is clicked', async () => {
+    const onHelpToggle = vi.fn()
+    render(
+      <Header appName="My App" isDark={false} onToggleTheme={() => {}} onHelpToggle={onHelpToggle} />
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Help' }))
+    expect(onHelpToggle).toHaveBeenCalledOnce()
+  })
+
+  it('renders bug report link to GitHub issues', () => {
+    render(
+      <Header appName="My App" isDark={false} onToggleTheme={() => {}} />
+    )
+    const link = screen.getByRole('link', { name: 'Report a bug' })
+    expect(link).toHaveAttribute('href', 'https://github.com/Ovid/shesha/issues')
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+    expect(link).toHaveAttribute('data-tooltip', 'Report a bug')
+  })
 })

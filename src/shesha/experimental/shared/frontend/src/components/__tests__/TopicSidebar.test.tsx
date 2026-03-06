@@ -392,6 +392,20 @@ describe('TopicSidebar (shared)', () => {
     expect(removeDocFromTopic).toHaveBeenCalledWith('doc-1', 'chess')
   })
 
+  it('shows doc actions button when only removeDocFromTopic is provided', async () => {
+    const removeDocFromTopic = vi.fn().mockResolvedValue(undefined)
+    const props = defaultProps({
+      activeTopic: 'chess',
+      loadDocuments: vi.fn().mockResolvedValue(chessDocs),
+      removeDocFromTopic,
+    })
+    render(<TopicSidebar {...props} />)
+
+    await screen.findByText('Chess Strategies')
+    const menuButtons = screen.getAllByTitle('Document actions')
+    expect(menuButtons.length).toBeGreaterThan(0)
+  })
+
   it('renders doc menu on uncategorized docs with only "Add to..." (no remove)', async () => {
     const addDocToTopic = vi.fn().mockResolvedValue(undefined)
     const uncatDocs: DocumentItem[] = [
@@ -409,6 +423,148 @@ describe('TopicSidebar (shared)', () => {
 
     expect(screen.getByText('Add to\u2026')).toBeInTheDocument()
     expect(screen.queryByText(/Remove from/)).not.toBeInTheDocument()
+  })
+
+  it('shows "View" option in doc menu that calls onDocumentClick', async () => {
+    const props = defaultProps({
+      activeTopic: 'chess',
+      loadDocuments: vi.fn().mockResolvedValue(chessDocs),
+      addDocToTopic: vi.fn(),
+    })
+    render(<TopicSidebar {...props} />)
+
+    await screen.findByText('Chess Strategies')
+    const menuButtons = screen.getAllByTitle('Document actions')
+    await userEvent.click(menuButtons[0])
+
+    const viewBtn = screen.getByText('View')
+    await userEvent.click(viewBtn)
+
+    expect(props.onDocumentClick).toHaveBeenCalledWith(chessDocs[0])
+  })
+
+  it('shows "Delete" in doc menu for uncategorized doc when deleteDocument is provided', async () => {
+    const deleteDocument = vi.fn().mockResolvedValue(undefined)
+    const uncatDocs: DocumentItem[] = [
+      { id: 'uncat-1', label: 'Orphan Doc' },
+    ]
+    const props = defaultProps({
+      uncategorizedDocs: uncatDocs,
+      addDocToTopic: vi.fn(),
+      deleteDocument,
+    })
+    render(<TopicSidebar {...props} />)
+
+    await screen.findByText('chess')
+    const menuBtn = screen.getByTitle('Document actions')
+    await userEvent.click(menuBtn)
+
+    const deleteBtn = screen.getByRole('button', { name: 'Delete' })
+    await userEvent.click(deleteBtn)
+
+    // Confirm dialog should appear
+    const confirmBtn = await screen.findByRole('button', { name: 'Delete' })
+    await userEvent.click(confirmBtn)
+
+    expect(deleteDocument).toHaveBeenCalledWith('uncat-1')
+  })
+
+  it('refreshes topics after document deletion', async () => {
+    const deleteDocument = vi.fn().mockResolvedValue(undefined)
+    const uncatDocs: DocumentItem[] = [
+      { id: 'uncat-1', label: 'Orphan Doc' },
+    ]
+    const props = defaultProps({
+      uncategorizedDocs: uncatDocs,
+      addDocToTopic: vi.fn(),
+      deleteDocument,
+    })
+    render(<TopicSidebar {...props} />)
+
+    await screen.findByText('chess')
+    const menuBtn = screen.getByTitle('Document actions')
+    await userEvent.click(menuBtn)
+
+    const deleteBtn = screen.getByRole('button', { name: 'Delete' })
+    await userEvent.click(deleteBtn)
+
+    const confirmBtn = await screen.findByRole('button', { name: 'Delete' })
+    await userEvent.click(confirmBtn)
+
+    await waitFor(() => {
+      expect(deleteDocument).toHaveBeenCalledWith('uncat-1')
+    })
+    await waitFor(() => {
+      expect(props.onTopicsChange).toHaveBeenCalled()
+    })
+  })
+
+  it('does not show "Delete" in doc menu when deleteDocument is not provided', async () => {
+    const props = defaultProps({
+      activeTopic: 'chess',
+      loadDocuments: vi.fn().mockResolvedValue(chessDocs),
+      addDocToTopic: vi.fn(),
+    })
+    render(<TopicSidebar {...props} />)
+
+    await screen.findByText('Chess Strategies')
+    const menuButtons = screen.getAllByTitle('Document actions')
+    await userEvent.click(menuButtons[0])
+
+    expect(screen.getByText('View')).toBeInTheDocument()
+    // No "Delete" button should exist in the doc menu (only topic delete might exist)
+    const buttons = screen.getAllByRole('button')
+    const deleteInMenu = buttons.filter(b => b.textContent === 'Delete' && b.closest('.absolute'))
+    expect(deleteInMenu).toHaveLength(0)
+  })
+
+  it('shows "View" option for uncategorized doc even when no topics exist', async () => {
+    const props = defaultProps({
+      loadTopics: vi.fn().mockResolvedValue([]),
+      uncategorizedDocs: [{ id: 'uncat-1', label: 'Orphan Doc' }],
+      addDocToTopic: vi.fn(),
+    })
+    render(<TopicSidebar {...props} />)
+
+    await screen.findByText('Orphan Doc')
+    const menuBtn = screen.getByTitle('Document actions')
+    await userEvent.click(menuBtn)
+
+    expect(screen.getByText('View')).toBeInTheDocument()
+  })
+
+  it('excludes topic from "Add to..." when a doc with the same label already exists there', async () => {
+    // "chess" topic already has "Chess Strategies" (doc-1)
+    // An uncategorized doc with a different id but the same label should NOT be eligible for chess
+    const addDocToTopic = vi.fn().mockResolvedValue(undefined)
+    const uncatDocs: DocumentItem[] = [
+      { id: 'doc-99', label: 'Chess Strategies' },
+    ]
+    const props = defaultProps({
+      activeTopic: 'chess',
+      loadDocuments: vi.fn().mockResolvedValue(chessDocs),
+      uncategorizedDocs: uncatDocs,
+      addDocToTopic,
+    })
+    render(<TopicSidebar {...props} />)
+
+    // Wait for chess topic docs to load
+    await screen.findByText('Opening Theory')
+    // Find the uncategorized doc's menu button
+    const uncatSection = screen.getByText('Uncategorized').closest('div')!.parentElement!
+    const menuBtn = within(uncatSection as HTMLElement).getByTitle('Document actions')
+    await userEvent.click(menuBtn)
+
+    // "Add to..." shows (math is still eligible — docs not loaded)
+    await userEvent.click(screen.getByText('Add to\u2026'))
+
+    // "math" should appear as eligible, but "chess" should NOT (same-label doc already there)
+    const submenuButtons = screen.getAllByRole('button').filter(
+      b => b.textContent === 'math' || b.textContent === 'chess'
+    )
+    const labels = submenuButtons.map(b => b.textContent)
+    expect(labels).toContain('math')
+    expect(labels).not.toContain('chess')
   })
 
   it('shows viewing highlight on the document with viewingDocumentId', async () => {

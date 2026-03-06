@@ -7,14 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- Chat input area now auto-grows up to 4 lines as you type
-- User messages in chat are now rendered as markdown (headers, code blocks, lists)
-- Code explorer conversation history is now per-topic instead of global
-
 ### Added
 
+- Document context menu now includes a "Delete" option with confirmation dialog (shared TopicSidebar component)
+- **Help panel** (`?` button) for Code Explorer and Document Explorer with customized quick-start guides, FAQs, and keyboard shortcuts
+- **Document Explorer** web application for uploading, organizing, and querying documents (PDF, Word, PowerPoint, Excel, RTF, plain text) via RLM
 - Code Explorer web application for exploring git repositories via RLM
 - Shared web infrastructure module (`shesha.experimental.shared`) for building experimental tools
 - Developer guide for extending the web tool ecosystem (`docs/extending-web-tools.md`)
@@ -36,6 +33,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Refactored arxiv-explorer help panel to use shared HelpPanel component
+- Launcher scripts (`code-explorer.sh`, `arxiv-explorer.sh`, `document-explorer.sh`) now
+  validate all prerequisites and print a single actionable error report instead of failing
+  on the first missing dependency. `SHESHA_MODEL` is now required. Shared logic extracted
+  to `scripts/common.sh`.
+- Chat input area now auto-grows up to 4 lines as you type
+- User messages in chat are now rendered as markdown (headers, code blocks, lists)
+- Code explorer conversation history is now per-topic instead of global
 - Code Explorer API routes for traces, model, history, and context-budget now use shared router with callbacks
 - arXiv Explorer refactored to use shared web infrastructure module
 - "unresolved" citations now labeled "not found in databases" to clarify external sources were tried

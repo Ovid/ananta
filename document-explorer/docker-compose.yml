@@ -1,0 +1,16 @@
+services:
+  shesha-document-explorer:
+    build:
+      context: ..
+      dockerfile: document-explorer/Dockerfile
+    ports:
+      - "8003:8003"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - shesha-doc-data:/data
+    environment:
+      - SHESHA_API_KEY=${SHESHA_API_KEY:?Set SHESHA_API_KEY before running (see README.md)}
+      - SHESHA_MODEL=${SHESHA_MODEL:?Set SHESHA_MODEL before running (see README.md)}
+
+volumes:
+  shesha-doc-data:

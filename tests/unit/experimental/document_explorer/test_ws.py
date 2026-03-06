@@ -181,6 +181,98 @@ class TestSessionRecordsDocumentIds:
         assert call_kwargs["document_ids"] == ["doc-x"]
 
 
+    def test_empty_project_excluded_from_consulted_ids(self, tmp_path: Path) -> None:
+        """A project with zero documents should not appear in consulted_ids."""
+        mock_state = _make_state(tmp_path)
+        mock_result = MagicMock()
+        mock_result.answer = "The answer"
+        mock_result.token_usage = TokenUsage(prompt_tokens=10, completion_tokens=5)
+        mock_result.execution_time = 0.5
+        mock_result.trace = Trace(steps=[])
+
+        mock_project = MagicMock()
+        mock_project._rlm_engine.query.return_value = mock_result
+
+        def list_documents(pid: str) -> list[str]:
+            if pid == "empty-proj":
+                return []
+            return ["file.txt"]
+
+        mock_state.shesha._storage.list_documents.side_effect = list_documents
+        mock_state.shesha._storage.get_document.side_effect = lambda pid, name: _make_doc(name)
+        mock_state.shesha._storage.list_traces.return_value = []
+        mock_state.shesha.get_project.return_value = mock_project
+
+        app = _make_app(mock_state)
+        test_client = TestClient(app)
+
+        with test_client.websocket_connect("/ws") as ws:
+            ws.send_json(
+                {
+                    "type": "query",
+                    "question": "What?",
+                    "document_ids": ["has-docs", "empty-proj"],
+                }
+            )
+            messages = []
+            while True:
+                msg = ws.receive_json()
+                messages.append(msg)
+                if msg["type"] in ("complete", "error"):
+                    break
+
+        complete = next(m for m in messages if m["type"] == "complete")
+        assert complete["document_ids"] == ["has-docs"]
+
+    def test_partial_doc_failure_includes_project(self, tmp_path: Path) -> None:
+        """If some docs load but one raises, the project should still be consulted."""
+        mock_state = _make_state(tmp_path)
+        mock_result = MagicMock()
+        mock_result.answer = "The answer"
+        mock_result.token_usage = TokenUsage(prompt_tokens=10, completion_tokens=5)
+        mock_result.execution_time = 0.5
+        mock_result.trace = Trace(steps=[])
+
+        mock_project = MagicMock()
+        mock_project._rlm_engine.query.return_value = mock_result
+
+        mock_state.shesha._storage.list_documents.return_value = ["good.txt", "bad.txt"]
+
+        call_count = 0
+
+        def get_document(pid: str, name: str) -> ParsedDocument:
+            nonlocal call_count
+            call_count += 1
+            if name == "bad.txt":
+                raise OSError("corrupt file")
+            return _make_doc(name)
+
+        mock_state.shesha._storage.get_document.side_effect = get_document
+        mock_state.shesha._storage.list_traces.return_value = []
+        mock_state.shesha.get_project.return_value = mock_project
+
+        app = _make_app(mock_state)
+        test_client = TestClient(app)
+
+        with test_client.websocket_connect("/ws") as ws:
+            ws.send_json(
+                {
+                    "type": "query",
+                    "question": "What?",
+                    "document_ids": ["proj-1"],
+                }
+            )
+            messages = []
+            while True:
+                msg = ws.receive_json()
+                messages.append(msg)
+                if msg["type"] in ("complete", "error"):
+                    break
+
+        complete = next(m for m in messages if m["type"] == "complete")
+        assert complete["document_ids"] == ["proj-1"]
+
+
 class TestCompleteMessageFields:
     """Query returns complete message with expected fields."""
 

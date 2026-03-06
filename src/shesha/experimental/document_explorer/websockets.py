@@ -74,16 +74,28 @@ async def _handle_query(
         project_id_str = str(project_id)
         try:
             doc_names = storage.list_documents(project_id_str)
-            for doc_name in doc_names:
-                doc = storage.get_document(project_id_str, doc_name)
-                loaded_docs.append(doc)
-            loaded_project_ids.append(project_id_str)
         except Exception:
             logger.warning(
-                "Could not load documents from project %s",
+                "Could not list documents for project %s",
                 project_id_str,
                 exc_info=True,
             )
+            continue
+        docs_loaded = 0
+        for doc_name in doc_names:
+            try:
+                doc = storage.get_document(project_id_str, doc_name)
+                loaded_docs.append(doc)
+                docs_loaded += 1
+            except Exception:
+                logger.warning(
+                    "Could not load document %s from project %s",
+                    doc_name,
+                    project_id_str,
+                    exc_info=True,
+                )
+        if docs_loaded > 0:
+            loaded_project_ids.append(project_id_str)
 
     if not loaded_docs:
         await ws.send_json({"type": "error", "message": "No documents found in selected items"})

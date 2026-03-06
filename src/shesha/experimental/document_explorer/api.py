@@ -126,6 +126,19 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                 result.append(info)
         return result
 
+    @router.get("/topics/{name}/items")
+    def list_topic_items(name: str) -> list[DocumentInfo]:
+        try:
+            doc_ids = state.topic_mgr.list_items(name)
+        except ValueError as e:
+            raise HTTPException(404, f"Topic '{name}' not found") from e
+        result: list[DocumentInfo] = []
+        for pid in doc_ids:
+            info = _build_doc_info(state.uploads_dir, pid)
+            if info is not None:
+                result.append(info)
+        return result
+
     @router.post("/documents/upload")
     async def upload_documents(
         files: list[UploadFile],

@@ -83,6 +83,14 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
         uncategorized = state.topic_mgr.list_uncategorized(all_ids)
         return [_build_repo_info(pid) for pid in uncategorized]
 
+    @router.get("/topics/{name}/items")
+    def list_topic_items(name: str) -> list[RepoInfo]:
+        try:
+            repo_ids = state.topic_mgr.list_items(name)
+        except ValueError as e:
+            raise HTTPException(404, f"Topic '{name}' not found") from e
+        return [_build_repo_info(pid) for pid in repo_ids]
+
     @router.post("/repos")
     def add_repo(body: RepoAdd) -> dict[str, object]:
         try:

@@ -244,17 +244,48 @@ class TestRenameTopic:
 
 
 class TestTopicDocumentRoutes:
-    def test_list_topic_items(
+    def test_list_topic_items_returns_document_info(
+        self,
+        client: TestClient,
+        topic_mgr: DocumentTopicManager,
+        mock_shesha: MagicMock,
+        uploads_dir: Path,
+    ) -> None:
+        """GET /topics/{name}/items returns DocumentInfo objects, not bare IDs."""
+        topic_mgr.create("Research")
+        topic_mgr.add_item("Research", "report-a3f2")
+        # Create upload metadata so _build_doc_info can resolve the project ID
+        doc_dir = uploads_dir / "report-a3f2"
+        doc_dir.mkdir()
+        (doc_dir / "meta.json").write_text(
+            json.dumps(
+                {
+                    "filename": "report.pdf",
+                    "content_type": "application/pdf",
+                    "size": 1024,
+                    "upload_date": "2026-03-05T12:00:00Z",
+                    "page_count": 5,
+                }
+            )
+        )
+        resp = client.get("/api/topics/Research/items")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+        assert data[0]["project_id"] == "report-a3f2"
+        assert data[0]["filename"] == "report.pdf"
+
+    def test_list_topic_items_skips_missing_metadata(
         self,
         client: TestClient,
         topic_mgr: DocumentTopicManager,
     ) -> None:
+        """Items with no upload metadata are silently skipped."""
         topic_mgr.create("Research")
-        topic_mgr.add_item("Research", "doc-1")
+        topic_mgr.add_item("Research", "gone-doc")
         resp = client.get("/api/topics/Research/items")
         assert resp.status_code == 200
-        data = resp.json()
-        assert data == ["doc-1"]
+        assert resp.json() == []
 
     def test_add_doc_to_topic(
         self,

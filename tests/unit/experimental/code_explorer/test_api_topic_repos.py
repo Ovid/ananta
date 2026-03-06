@@ -170,19 +170,29 @@ class TestRemoveRepoFromTopic:
 
 
 class TestListTopicRepos:
-    def test_list_items_in_topic(
+    def test_list_items_returns_repo_info(
         self,
         client: TestClient,
         topic_mgr: CodeExplorerTopicManager,
+        mock_shesha: MagicMock,
     ) -> None:
-        """GET /api/topics/{name}/items returns project_id strings."""
+        """GET /api/topics/{name}/items returns RepoInfo objects, not bare IDs."""
         topic_mgr.create("RLMs")
         topic_mgr.add_item("RLMs", "owner-myrepo")
+        # Configure mock so _build_repo_info can resolve the project ID
+        proj_info = MagicMock()
+        proj_info.source_url = "https://github.com/owner/myrepo"
+        proj_info.analysis_status = "none"
+        mock_shesha.get_project_info.return_value = proj_info
+        mock_shesha._storage.list_documents.return_value = ["f1", "f2"]
 
         resp = client.get("/api/topics/RLMs/items")
         assert resp.status_code == 200
         data = resp.json()
-        assert data == ["owner-myrepo"]
+        assert len(data) == 1
+        assert data[0]["project_id"] == "owner-myrepo"
+        assert data[0]["source_url"] == "https://github.com/owner/myrepo"
+        assert data[0]["file_count"] == 2
 
     def test_list_items_empty_topic(
         self,
@@ -205,17 +215,24 @@ class TestListTopicRepos:
         self,
         client: TestClient,
         topic_mgr: CodeExplorerTopicManager,
+        mock_shesha: MagicMock,
     ) -> None:
         """GET /api/topics/{name}/items only returns items in that specific topic."""
         topic_mgr.create("RLMs")
         topic_mgr.create("Other")
         topic_mgr.add_item("RLMs", "repo-a")
         topic_mgr.add_item("Other", "repo-b")
+        proj_info = MagicMock()
+        proj_info.source_url = "https://example.com/repo-a"
+        proj_info.analysis_status = "none"
+        mock_shesha.get_project_info.return_value = proj_info
+        mock_shesha._storage.list_documents.return_value = []
 
         resp = client.get("/api/topics/RLMs/items")
         assert resp.status_code == 200
         data = resp.json()
-        assert data == ["repo-a"]
+        assert len(data) == 1
+        assert data[0]["project_id"] == "repo-a"
 
 
 # ---- GET /api/topics (project_id uniqueness) ----

@@ -23,7 +23,7 @@ abort on the first error rather than reporting everything at once.
 | Check | Applies to | Action on failure |
 |---|---|---|
 | `python3` installed | All | Report install URL |
-| Python >= 3.12 | All | Report required version |
+| Python >= 3.11 | All | Report required version |
 | `node` installed | All | Report install URL |
 | `npm` installed | All | Report install URL |
 | `docker` installed | All | Report install URL |

@@ -148,6 +148,21 @@ class TestUploadDocument:
         pid = resp.json()[0]["project_id"]
         assert pid in topic_mgr.list_docs("Research")
 
+    def test_upload_with_invalid_topic_name_returns_422(
+        self,
+        client: TestClient,
+        mock_shesha: MagicMock,
+    ) -> None:
+        mock_shesha.create_project.return_value = MagicMock()
+
+        resp = client.post(
+            "/api/documents/upload",
+            files=[("files", ("notes.txt", b"Notes", "text/plain"))],
+            data={"topic": "!!!"},  # slugifies to empty string
+        )
+        assert resp.status_code == 422
+        assert "slug" in resp.json()["detail"].lower()
+
     def test_upload_unsupported_type_returns_422_with_detail(
         self,
         client: TestClient,

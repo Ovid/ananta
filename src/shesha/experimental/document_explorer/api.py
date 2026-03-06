@@ -197,8 +197,11 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
 
             # Add to topic if specified
             if topic:
-                state.topic_mgr.create(topic)
-                state.topic_mgr.add_doc(topic, project_id)
+                try:
+                    state.topic_mgr.create(topic)
+                    state.topic_mgr.add_doc(topic, project_id)
+                except ValueError as exc:
+                    raise HTTPException(422, str(exc)) from exc
 
             results.append(
                 DocumentUploadResponse(

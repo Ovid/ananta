@@ -392,6 +392,20 @@ describe('TopicSidebar (shared)', () => {
     expect(removeDocFromTopic).toHaveBeenCalledWith('doc-1', 'chess')
   })
 
+  it('shows doc actions button when only removeDocFromTopic is provided', async () => {
+    const removeDocFromTopic = vi.fn().mockResolvedValue(undefined)
+    const props = defaultProps({
+      activeTopic: 'chess',
+      loadDocuments: vi.fn().mockResolvedValue(chessDocs),
+      removeDocFromTopic,
+    })
+    render(<TopicSidebar {...props} />)
+
+    await screen.findByText('Chess Strategies')
+    const menuButtons = screen.getAllByTitle('Document actions')
+    expect(menuButtons.length).toBeGreaterThan(0)
+  })
+
   it('renders doc menu on uncategorized docs with only "Add to..." (no remove)', async () => {
     const addDocToTopic = vi.fn().mockResolvedValue(undefined)
     const uncatDocs: DocumentItem[] = [

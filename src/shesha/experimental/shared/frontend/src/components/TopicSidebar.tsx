@@ -154,7 +154,7 @@ export default function TopicSidebar({
 
   const renderDocMenu = (doc: DocumentItem, topicName: string | null) => (
     <>
-      {(addDocToTopic || deleteDocument) && (
+      {(addDocToTopic || deleteDocument || removeDocFromTopic) && (
         <button
           title="Document actions"
           onClick={e => {

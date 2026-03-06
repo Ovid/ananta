@@ -118,11 +118,22 @@ build_frontend() {
     fi
 }
 
+stderr_filter() {
+    # Suppress Python GC "Exception ignored" traceback blocks that appear
+    # during shutdown (harmless but scary-looking to users).
+    awk '
+        /^Exception ignored/ { skip=1; next }
+        skip && /^[A-Z][a-zA-Z]*Error:/ { skip=0; next }
+        skip { next }
+        { print }
+    '
+}
+
 launch() {
     run_preflight
     setup_venv
     install_python_deps
     build_frontend
     info "Starting $APP_NAME..."
-    exec "$ENTRY_POINT" ${SHESHA_ARGS[@]+"${SHESHA_ARGS[@]}"}
+    "$ENTRY_POINT" ${SHESHA_ARGS[@]+"${SHESHA_ARGS[@]}"} 2> >(stderr_filter >&2)
 }

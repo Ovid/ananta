@@ -119,3 +119,34 @@ setup() {
     [ "$REBUILD" = false ]
     [ ${#SHESHA_ARGS[@]} -eq 2 ]
 }
+
+# --- stderr filter ---
+
+@test "stderr_filter suppresses Exception-ignored blocks" {
+    source "$COMMON"
+    input="$(cat <<'BLOCK'
+INFO:     Shutting down
+Exception ignored while finalizing file <http.client.HTTPResponse object at 0x10fef89a0>:
+Traceback (most recent call last):
+  File "/opt/homebrew/lib/python3.14/http/client.py", line 437, in close
+    super().close()
+  File "/opt/homebrew/lib/python3.14/http/client.py", line 450, in flush
+    self.fp.flush()
+ValueError: I/O operation on closed file.
+INFO:     Finished server process [66553]
+BLOCK
+)"
+    result="$(printf '%s\n' "$input" | stderr_filter)"
+    [[ "$result" == *"Shutting down"* ]]
+    [[ "$result" == *"Finished server process"* ]]
+    [[ "$result" != *"Exception ignored"* ]]
+    [[ "$result" != *"ValueError"* ]]
+    [[ "$result" != *"Traceback"* ]]
+}
+
+@test "stderr_filter preserves normal error output" {
+    source "$COMMON"
+    input="ERROR: something went wrong"
+    result="$(printf '%s\n' "$input" | stderr_filter)"
+    [[ "$result" == *"something went wrong"* ]]
+}

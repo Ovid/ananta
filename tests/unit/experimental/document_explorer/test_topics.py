@@ -62,10 +62,10 @@ class TestCorruptMetaHandling:
         mgr = DocumentTopicManager(tmp_path)
         topic_dir = tmp_path / "broken"
         topic_dir.mkdir()
-        (topic_dir / "topic.json").write_text('{"docs": ["a"]}')
+        (topic_dir / "topic.json").write_text('{"items": ["a"]}')
         assert mgr.list_topics() == []
 
-    def test_missing_docs_key_treated_as_corrupt(self, tmp_path: Path) -> None:
+    def test_missing_items_key_treated_as_corrupt(self, tmp_path: Path) -> None:
         mgr = DocumentTopicManager(tmp_path)
         topic_dir = tmp_path / "broken"
         topic_dir.mkdir()
@@ -79,11 +79,11 @@ class TestCorruptMetaHandling:
         (topic_dir / "topic.json").write_text('{"name": 42, "docs": []}')
         assert mgr.list_topics() == []
 
-    def test_wrong_type_docs_treated_as_corrupt(self, tmp_path: Path) -> None:
+    def test_wrong_type_items_treated_as_corrupt(self, tmp_path: Path) -> None:
         mgr = DocumentTopicManager(tmp_path)
         topic_dir = tmp_path / "broken"
         topic_dir.mkdir()
-        (topic_dir / "topic.json").write_text('{"name": "Reports", "docs": "not-a-list"}')
+        (topic_dir / "topic.json").write_text('{"name": "Reports", "items": "not-a-list"}')
         assert mgr.list_topics() == []
 
     def test_valid_topics_unaffected_by_corrupt_sibling(self, tmp_path: Path) -> None:
@@ -119,7 +119,7 @@ class TestCreateAndListTopics:
         assert len(dirs) == 1
         meta = json.loads((dirs[0] / "topic.json").read_text())
         assert meta["name"] == "My Docs"
-        assert meta["docs"] == []
+        assert meta["items"] == []
 
     def test_create_duplicate_is_idempotent(self, tmp_path: Path) -> None:
         mgr = DocumentTopicManager(tmp_path)
@@ -157,51 +157,51 @@ class TestCreateAndListTopics:
 
 
 class TestAddAndListDocs:
-    def test_add_doc_to_topic(self, tmp_path: Path) -> None:
+    def test_add_item_to_topic(self, tmp_path: Path) -> None:
         mgr = DocumentTopicManager(tmp_path)
         mgr.create("Reports")
-        mgr.add_doc("Reports", "quarterly-report-a3f2")
-        assert mgr.list_docs("Reports") == ["quarterly-report-a3f2"]
+        mgr.add_item("Reports", "quarterly-report-a3f2")
+        assert mgr.list_items("Reports") == ["quarterly-report-a3f2"]
 
     def test_add_multiple_docs(self, tmp_path: Path) -> None:
         mgr = DocumentTopicManager(tmp_path)
         mgr.create("Reports")
-        mgr.add_doc("Reports", "doc-1")
-        mgr.add_doc("Reports", "doc-2")
-        assert sorted(mgr.list_docs("Reports")) == ["doc-1", "doc-2"]
+        mgr.add_item("Reports", "doc-1")
+        mgr.add_item("Reports", "doc-2")
+        assert sorted(mgr.list_items("Reports")) == ["doc-1", "doc-2"]
 
-    def test_list_docs_empty_topic(self, tmp_path: Path) -> None:
+    def test_list_items_empty_topic(self, tmp_path: Path) -> None:
         mgr = DocumentTopicManager(tmp_path)
         mgr.create("Empty")
-        assert mgr.list_docs("Empty") == []
+        assert mgr.list_items("Empty") == []
 
     def test_add_duplicate_doc_is_idempotent(self, tmp_path: Path) -> None:
         mgr = DocumentTopicManager(tmp_path)
         mgr.create("Reports")
-        mgr.add_doc("Reports", "doc-1")
-        mgr.add_doc("Reports", "doc-1")
-        assert mgr.list_docs("Reports") == ["doc-1"]
+        mgr.add_item("Reports", "doc-1")
+        mgr.add_item("Reports", "doc-1")
+        assert mgr.list_items("Reports") == ["doc-1"]
 
-    def test_add_doc_to_nonexistent_topic_raises(self, tmp_path: Path) -> None:
+    def test_add_item_to_nonexistent_topic_raises(self, tmp_path: Path) -> None:
         mgr = DocumentTopicManager(tmp_path)
         with pytest.raises(ValueError, match="Topic not found"):
-            mgr.add_doc("Nonexistent", "doc-1")
+            mgr.add_item("Nonexistent", "doc-1")
 
 
 class TestRemoveDoc:
-    def test_remove_doc_from_topic(self, tmp_path: Path) -> None:
+    def test_remove_item_from_topic(self, tmp_path: Path) -> None:
         mgr = DocumentTopicManager(tmp_path)
         mgr.create("Reports")
-        mgr.add_doc("Reports", "doc-1")
-        mgr.add_doc("Reports", "doc-2")
-        mgr.remove_doc("Reports", "doc-1")
-        assert mgr.list_docs("Reports") == ["doc-2"]
+        mgr.add_item("Reports", "doc-1")
+        mgr.add_item("Reports", "doc-2")
+        mgr.remove_item("Reports", "doc-1")
+        assert mgr.list_items("Reports") == ["doc-2"]
 
     def test_remove_nonexistent_doc_raises(self, tmp_path: Path) -> None:
         mgr = DocumentTopicManager(tmp_path)
         mgr.create("Reports")
-        with pytest.raises(ValueError, match="Doc not found"):
-            mgr.remove_doc("Reports", "nonexistent")
+        with pytest.raises(ValueError, match="Item not found"):
+            mgr.remove_item("Reports", "nonexistent")
 
 
 class TestSameDocMultipleTopics:
@@ -209,38 +209,38 @@ class TestSameDocMultipleTopics:
         mgr = DocumentTopicManager(tmp_path)
         mgr.create("Reports")
         mgr.create("Research")
-        mgr.add_doc("Reports", "shared-doc")
-        mgr.add_doc("Research", "shared-doc")
-        assert "shared-doc" in mgr.list_docs("Reports")
-        assert "shared-doc" in mgr.list_docs("Research")
+        mgr.add_item("Reports", "shared-doc")
+        mgr.add_item("Research", "shared-doc")
+        assert "shared-doc" in mgr.list_items("Reports")
+        assert "shared-doc" in mgr.list_items("Research")
 
 
 class TestListAllDocs:
-    def test_list_all_docs(self, tmp_path: Path) -> None:
+    def test_list_all_items(self, tmp_path: Path) -> None:
         mgr = DocumentTopicManager(tmp_path)
         mgr.create("A")
         mgr.create("B")
-        mgr.add_doc("A", "doc-1")
-        mgr.add_doc("A", "doc-2")
-        mgr.add_doc("B", "doc-2")
-        mgr.add_doc("B", "doc-3")
-        assert sorted(mgr.list_all_docs()) == ["doc-1", "doc-2", "doc-3"]
+        mgr.add_item("A", "doc-1")
+        mgr.add_item("A", "doc-2")
+        mgr.add_item("B", "doc-2")
+        mgr.add_item("B", "doc-3")
+        assert sorted(mgr.list_all_items()) == ["doc-1", "doc-2", "doc-3"]
 
-    def test_list_all_docs_no_duplicates(self, tmp_path: Path) -> None:
+    def test_list_all_items_no_duplicates(self, tmp_path: Path) -> None:
         mgr = DocumentTopicManager(tmp_path)
         mgr.create("A")
         mgr.create("B")
-        mgr.add_doc("A", "shared")
-        mgr.add_doc("B", "shared")
-        assert mgr.list_all_docs() == ["shared"]
+        mgr.add_item("A", "shared")
+        mgr.add_item("B", "shared")
+        assert mgr.list_all_items() == ["shared"]
 
 
 class TestUncategorizedDocs:
-    def test_list_uncategorized_docs(self, tmp_path: Path) -> None:
+    def test_list_uncategorized(self, tmp_path: Path) -> None:
         mgr = DocumentTopicManager(tmp_path)
         mgr.create("A")
-        mgr.add_doc("A", "doc-1")
-        uncategorized = mgr.list_uncategorized_docs(["doc-1", "doc-2", "doc-3"])
+        mgr.add_item("A", "doc-1")
+        uncategorized = mgr.list_uncategorized(["doc-1", "doc-2", "doc-3"])
         assert sorted(uncategorized) == ["doc-2", "doc-3"]
 
 
@@ -253,26 +253,26 @@ class TestDeleteTopic:
 
 
 class TestFindTopicsForDoc:
-    def test_find_topics_for_doc(self, tmp_path: Path) -> None:
+    def test_find_topics_for_item(self, tmp_path: Path) -> None:
         mgr = DocumentTopicManager(tmp_path)
         mgr.create("A")
         mgr.create("B")
-        mgr.add_doc("A", "shared")
-        mgr.add_doc("B", "shared")
-        assert sorted(mgr.find_topics_for_doc("shared")) == ["A", "B"]
+        mgr.add_item("A", "shared")
+        mgr.add_item("B", "shared")
+        assert sorted(mgr.find_topics_for_item("shared")) == ["A", "B"]
 
 
 class TestRemoveDocFromAll:
-    def test_remove_doc_from_all(self, tmp_path: Path) -> None:
+    def test_remove_item_from_all(self, tmp_path: Path) -> None:
         mgr = DocumentTopicManager(tmp_path)
         mgr.create("A")
         mgr.create("B")
-        mgr.add_doc("A", "shared")
-        mgr.add_doc("B", "shared")
-        mgr.add_doc("B", "other")
-        mgr.remove_doc_from_all("shared")
-        assert mgr.list_docs("A") == []
-        assert mgr.list_docs("B") == ["other"]
+        mgr.add_item("A", "shared")
+        mgr.add_item("B", "shared")
+        mgr.add_item("B", "other")
+        mgr.remove_item_from_all("shared")
+        assert mgr.list_items("A") == []
+        assert mgr.list_items("B") == ["other"]
 
 
 class TestGetTopicDir:
@@ -294,11 +294,11 @@ class TestRenameTopic:
     def test_rename_topic(self, tmp_path: Path) -> None:
         mgr = DocumentTopicManager(tmp_path)
         mgr.create("Old")
-        mgr.add_doc("Old", "doc-1")
+        mgr.add_item("Old", "doc-1")
         mgr.rename("Old", "New")
         assert "New" in mgr.list_topics()
         assert "Old" not in mgr.list_topics()
-        assert mgr.list_docs("New") == ["doc-1"]
+        assert mgr.list_items("New") == ["doc-1"]
 
     def test_rename_to_existing_raises(self, tmp_path: Path) -> None:
         mgr = DocumentTopicManager(tmp_path)

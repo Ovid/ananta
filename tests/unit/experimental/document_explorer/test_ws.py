@@ -180,7 +180,6 @@ class TestSessionRecordsDocumentIds:
         call_kwargs = mock_state.session.add_exchange.call_args.kwargs
         assert call_kwargs["document_ids"] == ["doc-x"]
 
-
     def test_empty_project_excluded_from_consulted_ids(self, tmp_path: Path) -> None:
         """A project with zero documents should not appear in consulted_ids."""
         mock_state = _make_state(tmp_path)

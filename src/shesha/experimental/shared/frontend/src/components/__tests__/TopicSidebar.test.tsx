@@ -567,6 +567,32 @@ describe('TopicSidebar (shared)', () => {
     expect(labels).not.toContain('chess')
   })
 
+  it('reloads documents for expanded topic when refreshKey changes', async () => {
+    const loadDocuments = vi.fn().mockResolvedValue(chessDocs)
+    const props = defaultProps({
+      activeTopic: 'chess',
+      loadDocuments,
+    })
+    const { rerender } = render(<TopicSidebar {...props} />)
+
+    // Documents load on initial render
+    expect(await screen.findByText('Chess Strategies')).toBeInTheDocument()
+    expect(loadDocuments).toHaveBeenCalledWith('chess')
+    loadDocuments.mockClear()
+
+    // Simulate refreshKey change (e.g., after adding a doc to a topic)
+    const updatedDocs: DocumentItem[] = [
+      ...chessDocs,
+      { id: 'doc-new', label: 'New Chess Book' },
+    ]
+    loadDocuments.mockResolvedValue(updatedDocs)
+    rerender(<TopicSidebar {...props} refreshKey={1} />)
+
+    // Documents should reload and show the new doc
+    expect(await screen.findByText('New Chess Book')).toBeInTheDocument()
+    expect(loadDocuments).toHaveBeenCalledWith('chess')
+  })
+
   it('shows viewing highlight on the document with viewingDocumentId', async () => {
     const props = defaultProps({
       activeTopic: 'chess',

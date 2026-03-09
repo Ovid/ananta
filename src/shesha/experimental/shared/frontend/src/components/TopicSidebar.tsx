@@ -74,21 +74,17 @@ export default function TopicSidebar({
   useEffect(() => { refreshTopics() }, [refreshKey])  // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { setTopicDocs({}) }, [refreshKey])
 
-  // Auto-expand and load documents when active topic changes
+  // Auto-expand and load documents when active topic or data changes
   useEffect(() => {
     if (!activeTopic) return
     setExpandedTopic(activeTopic)
-    if (!topicDocs[activeTopic]) {
-      loadDocuments(activeTopic).then(docs => {
-        setTopicDocs(prev => ({ ...prev, [activeTopic]: docs }))
-        onDocumentsLoaded?.(docs)
-      }).catch(() => {
-        // Document loading failed; topic may have no documents
-      })
-    } else {
-      onDocumentsLoaded?.(topicDocs[activeTopic])
-    }
-  }, [activeTopic])  // eslint-disable-line react-hooks/exhaustive-deps
+    loadDocuments(activeTopic).then(docs => {
+      setTopicDocs(prev => ({ ...prev, [activeTopic]: docs }))
+      onDocumentsLoaded?.(docs)
+    }).catch(() => {
+      // Document loading failed; topic may have no documents
+    })
+  }, [activeTopic, refreshKey])  // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleToggleDocs = async (topicName: string, e: MouseEvent) => {
     e.stopPropagation()

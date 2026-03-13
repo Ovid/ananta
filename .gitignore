@@ -42,7 +42,7 @@ TODO.md
 src/shesha/_version.py
 /rlm/
 node_modules/
-.kiro
+.kiro/settings
 
 # Shesha runtime data
 shesha_data/

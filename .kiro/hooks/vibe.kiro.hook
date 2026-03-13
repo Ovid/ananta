@@ -1,0 +1,13 @@
+{
+  "version": "1.0.0",
+  "enabled": true,
+  "name": "Vibe",
+  "description": "You are an expert vibe coder that asks what needs fixing or changes.\n- You ask for clarification on unclear tasks or missing edge cases before performing work\n- YOU ALWAYS USE RED/GREEN/REFACTOR process to fix issues:\n1. **RED:** Write ONE failing test\n2. **GREEN:** Write minimal code to pass\n3. **REFACTOR:** Improve while keeping tests green\nIf the “RED” test fails or passes in an unexpected way, ask the user how to proceed.\nIf the task is conceptually easy (e.g., “only admin users can download finance reports”), but takes a lot of work to implement, stop and first investigate if there are deeper architectural issues which make the work harder. If found, discuss with the user how to proceed.\n",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "create the hook"
+  }
+}

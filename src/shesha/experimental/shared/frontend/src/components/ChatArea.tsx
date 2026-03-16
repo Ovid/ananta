@@ -117,10 +117,15 @@ export default function ChatArea({
 
   const hasDocuments = selectedDocuments != null && selectedDocuments.size > 0
   const canSend = !!input.trim() && !!topicName && !thinking && connected && hasDocuments
+  // More button enabled when all preconditions met (same as canSend but without requiring input text)
+  const canSendMore = !!topicName && !thinking && connected && hasDocuments
 
-  const handleSend = useCallback(() => {
-    if (!canSend || !selectedDocuments) return
-    const question = input.trim()
+  /**
+   * Sends a query message via WebSocket and updates UI state.
+   * Shared by both the Send button (user-typed question) and the More button (predefined prompt).
+   */
+  const sendQuery = useCallback((question: string) => {
+    if (!selectedDocuments) return
     const msg: Record<string, unknown> = { type: 'query', topic: topicName, question, document_ids: Array.from(selectedDocuments) }
     wsSend(msg)
     setInput('')
@@ -128,7 +133,19 @@ export default function ChatArea({
     setPendingSentAt(new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }))
     setThinking(true)
     setPhase('Starting')
-  }, [canSend, input, topicName, wsSend, selectedDocuments])
+  }, [topicName, wsSend, selectedDocuments])
+
+  /** Sends the user-typed question from the textarea. */
+  const handleSend = useCallback(() => {
+    if (!canSend) return
+    sendQuery(input.trim())
+  }, [canSend, input, sendQuery])
+
+  /** Sends the predefined deeper-analysis prompt with one click. */
+  const handleMore = useCallback(() => {
+    if (!canSendMore) return
+    sendQuery(DEEPER_ANALYSIS_PROMPT)
+  }, [canSendMore, sendQuery])
 
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -224,9 +241,11 @@ export default function ChatArea({
           />
           {!thinking && (
             <button
-              onClick={() => {}}
-              disabled={!hasDocuments || !topicName || !connected}
-              className="px-4 py-2 bg-surface-2 border border-border text-text-primary rounded text-sm font-medium hover:bg-surface-3 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              onClick={handleMore}
+              disabled={!canSendMore}
+              aria-label="Request deeper analysis"
+              aria-disabled={!canSendMore}
+              className="px-4 py-2 bg-surface-2 border border-border text-text-primary rounded text-sm font-medium hover:bg-surface-3 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             >
               More
             </button>

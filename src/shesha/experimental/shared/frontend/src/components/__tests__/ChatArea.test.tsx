@@ -331,13 +331,13 @@ describe('ChatArea (shared) - auto-growing textarea', () => {
 describe('ChatArea (shared) - More button rendering', () => {
   it('renders a button with text "More"', async () => {
     await renderChatArea()
-    expect(screen.getByRole('button', { name: /more/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /deeper analysis/i })).toBeInTheDocument()
   })
 
   it('positions More button between textarea and Send button', async () => {
     await renderChatArea()
     const textarea = screen.getByPlaceholderText('Ask a question...')
-    const moreBtn = screen.getByRole('button', { name: /more/i })
+    const moreBtn = screen.getByRole('button', { name: /deeper analysis/i })
     const sendBtn = screen.getByRole('button', { name: /send/i })
 
     // All three should share the same parent flex container
@@ -361,7 +361,218 @@ describe('ChatArea (shared) - More button rendering', () => {
     await user.click(screen.getByRole('button', { name: /send/i }))
 
     // Now in thinking state — More button should not be in the DOM
-    expect(screen.queryByRole('button', { name: /more/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /deeper analysis/i })).not.toBeInTheDocument()
+  })
+})
+
+describe('ChatArea (shared) - More button enablement', () => {
+  it('disables More button when connected=false', async () => {
+    await renderChatArea({ connected: false })
+    const moreBtn = screen.getByRole('button', { name: /deeper analysis/i })
+    expect(moreBtn).toBeDisabled()
+  })
+
+  it('disables More button when selectedDocuments is undefined', async () => {
+    await renderChatArea({ selectedDocuments: undefined })
+    const moreBtn = screen.getByRole('button', { name: /deeper analysis/i })
+    expect(moreBtn).toBeDisabled()
+  })
+
+  it('disables More button when selectedDocuments is empty Set', async () => {
+    await renderChatArea({ selectedDocuments: new Set() })
+    const moreBtn = screen.getByRole('button', { name: /deeper analysis/i })
+    expect(moreBtn).toBeDisabled()
+  })
+
+  it('disables More button when topicName is null', async () => {
+    await renderChatArea({ topicName: null })
+    // When topicName is null, the component renders a placeholder view
+    // and the More button should not be present at all
+    expect(screen.queryByRole('button', { name: /deeper analysis/i })).not.toBeInTheDocument()
+  })
+
+  it('enables More button when all conditions met (connected, has documents, has topic, not thinking)', async () => {
+    await renderChatArea({
+      connected: true,
+      selectedDocuments: new Set(['doc-1']),
+      topicName: 'test-topic',
+    })
+    const moreBtn = screen.getByRole('button', { name: /deeper analysis/i })
+    expect(moreBtn).not.toBeDisabled()
+  })
+})
+
+describe('ChatArea (shared) - More button click behavior', () => {
+  it('calls wsSend with correct message structure when More is clicked', async () => {
+    const user = userEvent.setup()
+    const wsSend = vi.fn()
+    await renderChatArea({
+      wsSend,
+      topicName: 'my-topic',
+      selectedDocuments: new Set(['doc-a', 'doc-b']),
+      connected: true,
+    })
+
+    await user.click(screen.getByRole('button', { name: /deeper analysis/i }))
+
+    expect(wsSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'query',
+        topic: 'my-topic',
+        question: DEEPER_ANALYSIS_PROMPT,
+        document_ids: expect.arrayContaining(['doc-a', 'doc-b']),
+      })
+    )
+  })
+
+  it('clears textarea content when More is clicked', async () => {
+    const user = userEvent.setup()
+    await renderChatArea()
+
+    const textarea = screen.getByPlaceholderText('Ask a question...')
+    await user.type(textarea, 'some draft text')
+    expect(textarea).toHaveValue('some draft text')
+
+    await user.click(screen.getByRole('button', { name: /deeper analysis/i }))
+
+    expect(textarea).toHaveValue('')
+  })
+
+  it('sets thinking state to true when More is clicked (Cancel button appears)', async () => {
+    const user = userEvent.setup()
+    await renderChatArea()
+
+    await user.click(screen.getByRole('button', { name: /deeper analysis/i }))
+
+    // Thinking state means Cancel button replaces Send, and More disappears
+    expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /deeper analysis/i })).not.toBeInTheDocument()
+  })
+
+  it('sets pendingQuestion to DEEPER_ANALYSIS_PROMPT when More is clicked', async () => {
+    const user = userEvent.setup()
+    await renderChatArea()
+
+    await user.click(screen.getByRole('button', { name: /deeper analysis/i }))
+
+    // The pending question text should appear in the chat area
+    // Markdown renders the text inside a <p>, so both the <p> and its parent <div> match.
+    // Use getAllByText and assert at least one match.
+    const matches = screen.getAllByText((_content, element) => {
+      return element?.textContent === DEEPER_ANALYSIS_PROMPT
+    })
+    expect(matches.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('sets pendingSentAt timestamp when More is clicked', async () => {
+    const user = userEvent.setup()
+    await renderChatArea()
+
+    const before = new Date()
+    await user.click(screen.getByRole('button', { name: /deeper analysis/i }))
+
+    // A timestamp string should appear near the pending question (format: "H:MM AM/PM")
+    const timePattern = /\d{1,2}:\d{2}\s*[AP]M/i
+    const allText = document.body.textContent ?? ''
+    expect(allText).toMatch(timePattern)
+  })
+})
+
+describe('ChatArea (shared) - More button accessibility', () => {
+  it('has correct tab order: textarea → More → Send → Clear', async () => {
+    const user = userEvent.setup()
+    await renderChatArea()
+
+    // Type text so Send button is enabled and participates in tab order
+    const textarea = screen.getByPlaceholderText('Ask a question...')
+    await user.type(textarea, 'hello')
+
+    const moreBtn = screen.getByRole('button', { name: /deeper analysis/i })
+    const sendBtn = screen.getByRole('button', { name: /send/i })
+    const clearBtn = screen.getByTitle('Clear conversation')
+
+    // Start focus on textarea, then tab through
+    textarea.focus()
+    expect(document.activeElement).toBe(textarea)
+
+    await user.tab()
+    expect(document.activeElement).toBe(moreBtn)
+
+    await user.tab()
+    expect(document.activeElement).toBe(sendBtn)
+
+    await user.tab()
+    expect(document.activeElement).toBe(clearBtn)
+  })
+
+  it('has visible focus indicator (focus ring classes)', async () => {
+    await renderChatArea()
+    const moreBtn = screen.getByRole('button', { name: /deeper analysis/i })
+
+    expect(moreBtn.className).toMatch(/focus:ring-2/)
+    expect(moreBtn.className).toMatch(/focus:ring-accent/)
+    expect(moreBtn.className).toMatch(/focus:ring-offset-2/)
+  })
+
+  it('has aria-label="Request deeper analysis"', async () => {
+    await renderChatArea()
+    const moreBtn = screen.getByRole('button', { name: /deeper analysis/i })
+
+    expect(moreBtn).toHaveAttribute('aria-label', 'Request deeper analysis')
+  })
+
+  it('has aria-disabled=false when button is enabled', async () => {
+    await renderChatArea({
+      connected: true,
+      selectedDocuments: new Set(['doc-1']),
+      topicName: 'test-topic',
+    })
+    const moreBtn = screen.getByRole('button', { name: /deeper analysis/i })
+
+    expect(moreBtn).toHaveAttribute('aria-disabled', 'false')
+  })
+
+  it('has aria-disabled=true when button is disabled', async () => {
+    await renderChatArea({ connected: false })
+    const moreBtn = screen.getByRole('button', { name: /deeper analysis/i })
+
+    expect(moreBtn).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it('activates handleMore when Enter key is pressed while focused', async () => {
+    const user = userEvent.setup()
+    const wsSend = vi.fn()
+    await renderChatArea({ wsSend })
+
+    const moreBtn = screen.getByRole('button', { name: /deeper analysis/i })
+    moreBtn.focus()
+
+    await user.keyboard('{Enter}')
+
+    expect(wsSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'query',
+        question: DEEPER_ANALYSIS_PROMPT,
+      })
+    )
+  })
+
+  it('activates handleMore when Space key is pressed while focused', async () => {
+    const user = userEvent.setup()
+    const wsSend = vi.fn()
+    await renderChatArea({ wsSend })
+
+    const moreBtn = screen.getByRole('button', { name: /deeper analysis/i })
+    moreBtn.focus()
+
+    await user.keyboard(' ')
+
+    expect(wsSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'query',
+        question: DEEPER_ANALYSIS_PROMPT,
+      })
+    )
   })
 })
 

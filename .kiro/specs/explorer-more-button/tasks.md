@@ -202,18 +202,18 @@ The feature uses TypeScript/React and integrates with the existing WebSocket-bas
   - Run test → verify it fails
   - _Requirements: 3.1, 4.3_
 
-- [ ] 8.2 GREEN: Verify property test passes
+- [x] 8.2 GREEN: Verify property test passes
   - No code changes needed
   - Run test → verify it passes
   - _Requirements: 3.1, 4.3_
 
-- [ ] 8.3 REFACTOR: Not applicable
+- [x] 8.3 REFACTOR: Not applicable
 
 ---
 
 ### Cycle 9: Property-Based Test - Textarea Clearing (OPTIONAL)
 
-- [ ] 9.1 RED: Write property test for textarea clearing
+- [x] 9.1 RED: Write property test for textarea clearing
   - **Property 3: Textarea Clearing**
   - Generate random textarea content
   - Simulate More button click
@@ -223,12 +223,12 @@ The feature uses TypeScript/React and integrates with the existing WebSocket-bas
   - Run test → verify it fails
   - _Requirements: 3.3_
 
-- [ ] 9.2 GREEN: Verify property test passes
+- [x] 9.2 GREEN: Verify property test passes
   - No code changes needed
   - Run test → verify it passes
   - _Requirements: 3.3_
 
-- [ ] 9.3 REFACTOR: Not applicable
+- [x] 9.3 REFACTOR: Not applicable
 
 ---
 
@@ -322,6 +322,7 @@ The feature uses TypeScript/React and integrates with the existing WebSocket-bas
 - Refactor steps are optional if code is already clean
 - Property tests verify implementation, not drive it (tests written after GREEN phase)
 - Integration and UX consistency tests verify inherited behavior
+- At the end of each task, commit your changes
 
 ## Success Criteria
 

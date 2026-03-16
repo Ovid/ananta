@@ -759,6 +759,70 @@ describe('ChatArea (shared) - Property 2: Message transmission', () => {
   })
 })
 
+describe('ChatArea (shared) - Property 3: Textarea clearing', () => {
+  // Feature: explorer-more-button, Property 3
+  // For any More button click, regardless of current textarea content,
+  // the textarea SHALL be empty after the click.
+  // Requirements: 3.3
+
+  const arbTextareaContent = fc.oneof(
+    fc.constant(''),
+    fc.string({ minLength: 1, maxLength: 50 }),
+    fc.constant('   '),
+    fc.constant('\t\t'),
+    fc.constant('  \t  '),
+  )
+
+  it('textarea is empty after More click for any initial content', async () => {
+    const user = userEvent.setup()
+
+    await fc.assert(
+      fc.asyncProperty(
+        arbTextareaContent,
+        async (content) => {
+          const { unmount } = await act(async () =>
+            render(
+              <ChatArea
+                topicName="test-topic"
+                connected={true}
+                wsSend={vi.fn()}
+                wsOnMessage={vi.fn().mockReturnValue(() => {})}
+                onViewTrace={vi.fn()}
+                onClearHistory={vi.fn()}
+                historyVersion={0}
+                selectedDocuments={new Set(['doc-1'])}
+                loadHistory={vi.fn().mockResolvedValue([])}
+              />
+            ),
+          )
+
+          const textarea = screen.getByPlaceholderText('Ask a question...') as HTMLTextAreaElement
+
+          // Set textarea content directly (faster than typing for property tests)
+          await act(async () => {
+            // Use fireEvent to set the value, simulating user input
+            const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+              window.HTMLTextAreaElement.prototype, 'value',
+            )!.set!
+            nativeInputValueSetter.call(textarea, content)
+            textarea.dispatchEvent(new Event('input', { bubbles: true }))
+          })
+
+          // Click the More button
+          const moreBtn = screen.getByRole('button', { name: /deeper analysis/i })
+          await user.click(moreBtn)
+
+          // Textarea must be empty after click
+          expect(textarea.value).toBe('')
+
+          unmount()
+        },
+      ),
+      { numRuns: 100 },
+    )
+  })
+})
+
 describe('ChatArea (shared) - UX consistency after More button click', () => {
   it('displays thinking indicator after More button click', async () => {
     const user = userEvent.setup()

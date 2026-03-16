@@ -980,3 +980,56 @@ describe('ChatArea (shared) - UX consistency after More button click', () => {
     expect(mockShowToast).toHaveBeenCalledWith('Analysis failed: timeout exceeded', 'error')
   })
 })
+
+describe('ChatArea (shared) - Property 5: Pending question display', () => {
+  // Feature: explorer-more-button, Property 5
+  // For any More button click, the ChatArea SHALL set the pendingQuestion state
+  // to the deeper analysis prompt text, causing it to be displayed in the chat message area.
+  // Requirements: 3.5
+
+  const arbTopicName = fc.string({ minLength: 1, maxLength: 30 })
+
+  const arbDocumentIds = fc
+    .uniqueArray(fc.string({ minLength: 1, maxLength: 12 }), { minLength: 1, maxLength: 8 })
+    .map((ids) => new Set(ids))
+
+  it('pendingQuestion equals DEEPER_ANALYSIS_PROMPT after More click for any valid state', async () => {
+    const user = userEvent.setup()
+
+    await fc.assert(
+      fc.asyncProperty(
+        arbTopicName,
+        arbDocumentIds,
+        async (topicName, selectedDocuments) => {
+          const { unmount } = await act(async () =>
+            render(
+              <ChatArea
+                topicName={topicName}
+                connected={true}
+                wsSend={vi.fn()}
+                wsOnMessage={vi.fn().mockReturnValue(() => {})}
+                onViewTrace={vi.fn()}
+                onClearHistory={vi.fn()}
+                historyVersion={0}
+                selectedDocuments={selectedDocuments}
+                loadHistory={vi.fn().mockResolvedValue([])}
+              />
+            ),
+          )
+
+          const moreBtn = screen.getByRole('button', { name: /deeper analysis/i })
+          await user.click(moreBtn)
+
+          // The pending question should be rendered in the chat area
+          // It's displayed via a Markdown component inside a div with bg-accent/10
+          const pendingEl = document.querySelector('.bg-accent\\/10')
+          expect(pendingEl).not.toBeNull()
+          expect(pendingEl!.textContent).toContain(DEEPER_ANALYSIS_PROMPT)
+
+          unmount()
+        },
+      ),
+      { numRuns: 100 },
+    )
+  })
+})

@@ -144,7 +144,12 @@ export default function ChatArea({
    */
   const sendQuery = useCallback((question: string) => {
     if (!selectedDocuments) return
-    const msg: Record<string, unknown> = { type: 'query', topic: topicName, question, document_ids: Array.from(selectedDocuments) }
+    const msg: Record<string, unknown> = {
+      type: 'query',
+      topic: topicName,
+      question,
+      document_ids: Array.from(selectedDocuments),
+    }
     wsSend(msg)
     setInput('')
     setPendingQuestion(question)

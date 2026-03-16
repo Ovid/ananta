@@ -14,10 +14,6 @@ const chessDocs: DocumentItem[] = [
   { id: 'doc-2', label: 'Opening Theory', sublabel: 'B. Writer' },
 ]
 
-const mathDocs: DocumentItem[] = [
-  { id: 'doc-3', label: 'Algebra Basics' },
-]
-
 function defaultProps(overrides: Partial<Parameters<typeof TopicSidebar>[0]> = {}) {
   return {
     activeTopic: null as string | null,
@@ -219,7 +215,6 @@ describe('TopicSidebar (shared)', () => {
 
     const topicRow = await screen.findByText('chess')
     // Hover to show menu button, then click it
-    const menuBtn = topicRow.closest('div')!.querySelector('button:last-of-type')!
     // The menu button is the ... (ellipsis) button
     const groupDiv = topicRow.closest('[class*="group"]')!
     const buttons = within(groupDiv as HTMLElement).getAllByRole('button')

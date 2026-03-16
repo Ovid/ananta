@@ -471,7 +471,6 @@ describe('ChatArea (shared) - More button click behavior', () => {
     const user = userEvent.setup()
     await renderChatArea()
 
-    const before = new Date()
     await user.click(screen.getByRole('button', { name: /deeper analysis/i }))
 
     // A timestamp string should appear near the pending question (format: "H:MM AM/PM")

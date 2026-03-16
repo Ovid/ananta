@@ -24,6 +24,11 @@ interface ChatAreaProps {
 
 export type { ChatAreaProps }
 
+/**
+ * Predefined prompt sent when the user clicks the "More" button.
+ * Asks the system to verify, enhance, and re-present its previous analysis.
+ * Referenced by Requirement 3.2 in the explorer-more-button spec.
+ */
 export const DEEPER_ANALYSIS_PROMPT =
   'Do a deeper dive to verify if your report is complete, accurate, and relevant. ' +
   'Explain any changes or additions in bullet points and then present the full report ' +
@@ -116,8 +121,21 @@ export default function ChatArea({
   }, [exchanges, thinking])
 
   const hasDocuments = selectedDocuments != null && selectedDocuments.size > 0
+
+  /** Send button requires non-empty input plus all shared preconditions. */
   const canSend = !!input.trim() && !!topicName && !thinking && connected && hasDocuments
-  // More button enabled when all preconditions met (same as canSend but without requiring input text)
+
+  /**
+   * More button enabled when all shared preconditions are met:
+   * - A topic is selected (topicName is truthy)
+   * - Not currently processing a query (!thinking)
+   * - WebSocket is connected
+   * - At least one document is selected (hasDocuments)
+   *
+   * Unlike canSend, this does NOT require text in the textarea since the
+   * More button sends the predefined DEEPER_ANALYSIS_PROMPT.
+   * See Requirements 2.1–2.5 in the explorer-more-button spec.
+   */
   const canSendMore = !!topicName && !thinking && connected && hasDocuments
 
   /**

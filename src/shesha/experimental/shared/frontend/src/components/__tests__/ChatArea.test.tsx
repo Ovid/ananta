@@ -1,7 +1,10 @@
-import { render, screen, act } from '@testing-library/react'
+import { render, screen, act, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeAll } from 'vitest'
 import fc from 'fast-check'
+
+import { showToast } from '../Toast'
+vi.mock('../Toast', () => ({ showToast: vi.fn() }))
 
 beforeAll(() => {
   const store: Record<string, string> = {}
@@ -600,5 +603,125 @@ describe('ChatArea (shared) - More button test infrastructure', () => {
   it('fast-check is available for property-based tests', () => {
     // Smoke test: generate a small batch of booleans to confirm fc works
     fc.assert(fc.property(fc.boolean(), (b) => typeof b === 'boolean'), { numRuns: 10 })
+  })
+})
+
+/**
+ * Helper that creates a wsOnMessage mock which captures the registered handler.
+ * Call `dispatch(msg)` to simulate a WebSocket message arriving from the server.
+ */
+function createWsOnMessage() {
+  let handler: ((msg: import('../../types').WSMessage) => void) | null = null
+  const wsOnMessage = vi.fn((fn: (msg: import('../../types').WSMessage) => void) => {
+    handler = fn
+    return () => { handler = null }
+  })
+  const dispatch = (msg: import('../../types').WSMessage) => {
+    if (!handler) throw new Error('wsOnMessage handler not registered')
+    handler(msg)
+  }
+  return { wsOnMessage, dispatch }
+}
+
+describe('ChatArea (shared) - UX consistency after More button click', () => {
+  it('displays thinking indicator after More button click', async () => {
+    const user = userEvent.setup()
+    await renderChatArea()
+
+    await user.click(screen.getByRole('button', { name: /deeper analysis/i }))
+
+    // The thinking indicator shows animated dots
+    const thinkingDots = document.querySelectorAll('.animate-bounce')
+    expect(thinkingDots.length).toBe(3)
+  })
+
+  it('displays phase updates from WebSocket status messages after More click', async () => {
+    const user = userEvent.setup()
+    const { wsOnMessage, dispatch } = createWsOnMessage()
+    await renderChatArea({ wsOnMessage })
+
+    await user.click(screen.getByRole('button', { name: /deeper analysis/i }))
+
+    // Initial phase is 'Starting'
+    expect(screen.getByText('Starting')).toBeInTheDocument()
+
+    // Simulate a status update from the server
+    await act(async () => {
+      dispatch({ type: 'status', phase: 'Analyzing documents', iteration: 1 })
+    })
+
+    expect(screen.getByText('Analyzing documents')).toBeInTheDocument()
+  })
+
+  it('shows Cancel button during More request processing', async () => {
+    const user = userEvent.setup()
+    const wsSend = vi.fn()
+    await renderChatArea({ wsSend })
+
+    await user.click(screen.getByRole('button', { name: /deeper analysis/i }))
+
+    // Cancel button should be present and functional
+    const cancelBtn = screen.getByRole('button', { name: /cancel/i })
+    expect(cancelBtn).toBeInTheDocument()
+
+    await user.click(cancelBtn)
+    expect(wsSend).toHaveBeenCalledWith({ type: 'cancel' })
+  })
+
+  it('reloads history when More request completes via WebSocket', async () => {
+    const user = userEvent.setup()
+    const { wsOnMessage, dispatch } = createWsOnMessage()
+    const completedExchange = {
+      exchange_id: 'ex-more-1',
+      question: DEEPER_ANALYSIS_PROMPT,
+      answer: 'Here is the deeper analysis...',
+      timestamp: '2026-03-16T12:00:00Z',
+      tokens: { prompt: 100, completion: 200, total: 300 },
+      execution_time: 5.0,
+      trace_id: 'trace-1',
+      model: 'test-model',
+      document_ids: ['doc-1'],
+    }
+    // loadHistory returns empty initially, then the completed exchange after completion
+    const loadHistory = vi.fn()
+      .mockResolvedValueOnce([])           // initial load
+      .mockResolvedValueOnce([completedExchange]) // reload after complete
+    await renderChatArea({ wsOnMessage, loadHistory })
+
+    await user.click(screen.getByRole('button', { name: /deeper analysis/i }))
+
+    // Simulate completion message from server
+    await act(async () => {
+      dispatch({
+        type: 'complete',
+        answer: 'Here is the deeper analysis...',
+        trace_id: 'trace-1',
+        tokens: { prompt: 100, completion: 200, total: 300 },
+        duration_ms: 5000,
+      })
+    })
+
+    // loadHistory should have been called again to reload the conversation
+    // First call: initial mount, Second call: after complete message
+    await waitFor(() => {
+      expect(loadHistory).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  it('displays error toast when More request fails via WebSocket', async () => {
+    const user = userEvent.setup()
+    const { wsOnMessage, dispatch } = createWsOnMessage()
+    const mockShowToast = vi.mocked(showToast)
+    mockShowToast.mockClear()
+    await renderChatArea({ wsOnMessage })
+
+    await user.click(screen.getByRole('button', { name: /deeper analysis/i }))
+
+    // Simulate error message from server
+    await act(async () => {
+      dispatch({ type: 'error', message: 'Analysis failed: timeout exceeded' })
+    })
+
+    expect(mockShowToast).toHaveBeenCalledWith('Analysis failed: timeout exceeded', 'error')
   })
 })

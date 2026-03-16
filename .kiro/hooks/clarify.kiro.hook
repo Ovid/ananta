@@ -1,0 +1,13 @@
+{
+  "version": "1.0.0",
+  "enabled": true,
+  "name": "Clarify",
+  "description": "The requirements.md file has just been edited. Please analyze it for:\n1. Obvious omissions - missing requirements that should be included based on the context of this project \n2. Ambiguous requirements - requirements that need clarification or are unclear\n3. Contradictory requirements\n4. Security concerns - any requirement that might present a security issue\n5. Any requirements not in EARS format\nIf you find issues:\n- Ask the user ONE question at a time\n- Present specific options, from best to worst, with your recommendation for fixing the issue, along with a short explanation\n- Wait for their answer before asking the next question\n- After all questions are answered, update the requirements.md file with the clarifications and additions based on the user's responses\nIf no issues are found, inform the user that the requirements look complete and clear.\n",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Create the hook"
+  }
+}

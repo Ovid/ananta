@@ -8,7 +8,7 @@ export const api = {
     list: () => request<DocumentInfo[]>('/documents'),
     listUncategorized: () => request<DocumentInfo[]>('/documents/uncategorized'),
     listForTopic: (topic: string) =>
-      request<DocumentInfo[]>(`/topics/${encodeURIComponent(topic)}/documents`),
+      request<DocumentInfo[]>(`/topics/${encodeURIComponent(topic)}/items`),
     get: (id: string) => request<DocumentInfo>(`/documents/${encodeURIComponent(id)}`),
     delete: (id: string) =>
       request<{ status: string }>(`/documents/${encodeURIComponent(id)}`, { method: 'DELETE' }),
@@ -29,12 +29,12 @@ export const api = {
   topicDocs: {
     add: (topic: string, docId: string) =>
       request<{ status: string }>(
-        `/topics/${encodeURIComponent(topic)}/documents/${encodeURIComponent(docId)}`,
+        `/topics/${encodeURIComponent(topic)}/items/${encodeURIComponent(docId)}`,
         { method: 'POST' },
       ),
     remove: (topic: string, docId: string) =>
       request<{ status: string }>(
-        `/topics/${encodeURIComponent(topic)}/documents/${encodeURIComponent(docId)}`,
+        `/topics/${encodeURIComponent(topic)}/items/${encodeURIComponent(docId)}`,
         { method: 'DELETE' },
       ),
   },

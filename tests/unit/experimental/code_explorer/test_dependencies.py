@@ -60,26 +60,26 @@ class TestCodeExplorerState:
 class TestCreateAppState:
     """Tests for create_app_state factory function."""
 
-    @patch("shesha.experimental.code_explorer.dependencies.Shesha")
+    @patch("shesha.experimental.shared.dependencies.Shesha")
     def test_returns_code_explorer_state(self, mock_shesha_cls: MagicMock, tmp_path: Path) -> None:
         """create_app_state returns a CodeExplorerState instance."""
         state = create_app_state(data_dir=tmp_path)
         assert isinstance(state, CodeExplorerState)
 
-    @patch("shesha.experimental.code_explorer.dependencies.Shesha")
+    @patch("shesha.experimental.shared.dependencies.Shesha")
     def test_creates_shesha_data_dir(self, mock_shesha_cls: MagicMock, tmp_path: Path) -> None:
         """create_app_state creates the shesha_data subdirectory."""
         create_app_state(data_dir=tmp_path)
         assert (tmp_path / "shesha_data").is_dir()
 
-    @patch("shesha.experimental.code_explorer.dependencies.Shesha")
+    @patch("shesha.experimental.shared.dependencies.Shesha")
     def test_creates_topics_dir(self, mock_shesha_cls: MagicMock, tmp_path: Path) -> None:
         """create_app_state creates the topics subdirectory."""
         create_app_state(data_dir=tmp_path)
         assert (tmp_path / "topics").is_dir()
 
-    @patch("shesha.experimental.code_explorer.dependencies.Shesha")
-    @patch("shesha.experimental.code_explorer.dependencies.Path.home")
+    @patch("shesha.experimental.shared.dependencies.Shesha")
+    @patch("shesha.experimental.shared.dependencies.Path.home")
     def test_default_data_dir(
         self, mock_home: MagicMock, mock_shesha_cls: MagicMock, tmp_path: Path
     ) -> None:
@@ -91,25 +91,25 @@ class TestCreateAppState:
         assert (expected_data_dir / "topics").is_dir()
         assert isinstance(state, CodeExplorerState)
 
-    @patch("shesha.experimental.code_explorer.dependencies.Shesha")
+    @patch("shesha.experimental.shared.dependencies.Shesha")
     def test_model_override(self, mock_shesha_cls: MagicMock, tmp_path: Path) -> None:
         """create_app_state passes model override to config."""
         state = create_app_state(data_dir=tmp_path, model="custom-model")
         assert state.model == "custom-model"
 
-    @patch("shesha.experimental.code_explorer.dependencies.Shesha")
+    @patch("shesha.experimental.shared.dependencies.Shesha")
     def test_state_has_topic_mgr(self, mock_shesha_cls: MagicMock, tmp_path: Path) -> None:
         """create_app_state creates a CodeExplorerTopicManager."""
         state = create_app_state(data_dir=tmp_path)
         assert isinstance(state.topic_mgr, CodeExplorerTopicManager)
 
-    @patch("shesha.experimental.code_explorer.dependencies.Shesha")
+    @patch("shesha.experimental.shared.dependencies.Shesha")
     def test_state_has_session(self, mock_shesha_cls: MagicMock, tmp_path: Path) -> None:
         """create_app_state creates a WebConversationSession."""
         state = create_app_state(data_dir=tmp_path)
         assert isinstance(state.session, WebConversationSession)
 
-    @patch("shesha.experimental.code_explorer.dependencies.Shesha")
+    @patch("shesha.experimental.shared.dependencies.Shesha")
     def test_session_project_dir_is_data_dir(
         self, mock_shesha_cls: MagicMock, tmp_path: Path
     ) -> None:

@@ -23,6 +23,7 @@ Use these guidelines when reviewing code for Shesha.
 - Follow **MANDATORY TDD** from [CLAUDE.md](../CLAUDE.md): write a failing test first, then implement minimal code.
 - Prefer minimal, focused changes that match existing patterns in `src/shesha/`.
 - Keep security boundaries intact: document content is untrusted, and sandbox code must stay isolated.
+- **Ruff isort (`I001`) splits imports that use `as` aliases** into separate `from ... import` blocks, even when they come from the same module. Do not suggest merging these — ruff will re-split them and the lint check will fail.
 
 ## Developer Workflow
 

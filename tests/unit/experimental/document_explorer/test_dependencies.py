@@ -23,7 +23,7 @@ class TestDocumentExplorerState:
             topic_mgr=MagicMock(),
             session=MagicMock(),
             model="test-model",
-            uploads_dir=Path("/tmp"),
+            extra_dirs={"uploads": Path("/tmp")},
         )
         assert hasattr(state, "shesha")
 
@@ -34,7 +34,7 @@ class TestDocumentExplorerState:
             topic_mgr=MagicMock(),
             session=MagicMock(),
             model="test-model",
-            uploads_dir=Path("/tmp"),
+            extra_dirs={"uploads": Path("/tmp")},
         )
         assert hasattr(state, "topic_mgr")
 
@@ -45,7 +45,7 @@ class TestDocumentExplorerState:
             topic_mgr=MagicMock(),
             session=MagicMock(),
             model="test-model",
-            uploads_dir=Path("/tmp"),
+            extra_dirs={"uploads": Path("/tmp")},
         )
         assert hasattr(state, "session")
 
@@ -56,18 +56,18 @@ class TestDocumentExplorerState:
             topic_mgr=MagicMock(),
             session=MagicMock(),
             model="gpt-5",
-            uploads_dir=Path("/tmp"),
+            extra_dirs={"uploads": Path("/tmp")},
         )
         assert state.model == "gpt-5"
 
     def test_has_uploads_dir_attribute(self) -> None:
-        """DocumentExplorerState has an uploads_dir attribute."""
+        """DocumentExplorerState has an uploads_dir property."""
         state = DocumentExplorerState(
             shesha=MagicMock(),
             topic_mgr=MagicMock(),
             session=MagicMock(),
             model="test-model",
-            uploads_dir=Path("/tmp/uploads"),
+            extra_dirs={"uploads": Path("/tmp/uploads")},
         )
         assert state.uploads_dir == Path("/tmp/uploads")
 
@@ -75,7 +75,7 @@ class TestDocumentExplorerState:
 class TestCreateAppState:
     """Tests for create_app_state factory function."""
 
-    @patch("shesha.experimental.document_explorer.dependencies.Shesha")
+    @patch("shesha.experimental.shared.dependencies.Shesha")
     def test_returns_document_explorer_state(
         self, mock_shesha_cls: MagicMock, tmp_path: Path
     ) -> None:
@@ -83,26 +83,26 @@ class TestCreateAppState:
         state = create_app_state(data_dir=tmp_path)
         assert isinstance(state, DocumentExplorerState)
 
-    @patch("shesha.experimental.document_explorer.dependencies.Shesha")
+    @patch("shesha.experimental.shared.dependencies.Shesha")
     def test_creates_shesha_data_dir(self, mock_shesha_cls: MagicMock, tmp_path: Path) -> None:
         """create_app_state creates the shesha_data subdirectory."""
         create_app_state(data_dir=tmp_path)
         assert (tmp_path / "shesha_data").is_dir()
 
-    @patch("shesha.experimental.document_explorer.dependencies.Shesha")
+    @patch("shesha.experimental.shared.dependencies.Shesha")
     def test_creates_topics_dir(self, mock_shesha_cls: MagicMock, tmp_path: Path) -> None:
         """create_app_state creates the topics subdirectory."""
         create_app_state(data_dir=tmp_path)
         assert (tmp_path / "topics").is_dir()
 
-    @patch("shesha.experimental.document_explorer.dependencies.Shesha")
+    @patch("shesha.experimental.shared.dependencies.Shesha")
     def test_creates_uploads_dir(self, mock_shesha_cls: MagicMock, tmp_path: Path) -> None:
         """create_app_state creates the uploads subdirectory."""
         create_app_state(data_dir=tmp_path)
         assert (tmp_path / "uploads").is_dir()
 
-    @patch("shesha.experimental.document_explorer.dependencies.Shesha")
-    @patch("shesha.experimental.document_explorer.dependencies.Path.home")
+    @patch("shesha.experimental.shared.dependencies.Shesha")
+    @patch("shesha.experimental.shared.dependencies.Path.home")
     def test_default_data_dir(
         self, mock_home: MagicMock, mock_shesha_cls: MagicMock, tmp_path: Path
     ) -> None:
@@ -115,25 +115,25 @@ class TestCreateAppState:
         assert (expected_data_dir / "uploads").is_dir()
         assert isinstance(state, DocumentExplorerState)
 
-    @patch("shesha.experimental.document_explorer.dependencies.Shesha")
+    @patch("shesha.experimental.shared.dependencies.Shesha")
     def test_model_override(self, mock_shesha_cls: MagicMock, tmp_path: Path) -> None:
         """create_app_state passes model override to config."""
         state = create_app_state(data_dir=tmp_path, model="custom-model")
         assert state.model == "custom-model"
 
-    @patch("shesha.experimental.document_explorer.dependencies.Shesha")
+    @patch("shesha.experimental.shared.dependencies.Shesha")
     def test_state_has_topic_mgr(self, mock_shesha_cls: MagicMock, tmp_path: Path) -> None:
         """create_app_state creates a DocumentTopicManager."""
         state = create_app_state(data_dir=tmp_path)
         assert isinstance(state.topic_mgr, DocumentTopicManager)
 
-    @patch("shesha.experimental.document_explorer.dependencies.Shesha")
+    @patch("shesha.experimental.shared.dependencies.Shesha")
     def test_state_has_session(self, mock_shesha_cls: MagicMock, tmp_path: Path) -> None:
         """create_app_state creates a WebConversationSession."""
         state = create_app_state(data_dir=tmp_path)
         assert isinstance(state.session, WebConversationSession)
 
-    @patch("shesha.experimental.document_explorer.dependencies.Shesha")
+    @patch("shesha.experimental.shared.dependencies.Shesha")
     def test_session_project_dir_is_data_dir(
         self, mock_shesha_cls: MagicMock, tmp_path: Path
     ) -> None:
@@ -142,7 +142,7 @@ class TestCreateAppState:
         expected = tmp_path / "conversation.json"
         assert state.session._file == expected
 
-    @patch("shesha.experimental.document_explorer.dependencies.Shesha")
+    @patch("shesha.experimental.shared.dependencies.Shesha")
     def test_uploads_dir_matches(self, mock_shesha_cls: MagicMock, tmp_path: Path) -> None:
         """State's uploads_dir points to the uploads subdirectory."""
         state = create_app_state(data_dir=tmp_path)

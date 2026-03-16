@@ -1,0 +1,13 @@
+{
+  "version": "1.0.0",
+  "enabled": true,
+  "name": "Align",
+  "description": "Analyze the requirements, design, and implementation tasks for alignment. Perform the following checks:\n1. **Requirements Coverage**: Verify that every requirement has corresponding tasks in the implementation plan\n2. **Scope Compliance**: Ensure no tasks exist that fall outside the defined requirements\n3. **Design Alignment**: Check that the design properly addresses all requirements and that tasks implement the design\nFor each issue found, provide:\n- The specific requirement/design/task that is misaligned\n- The nature of the misalignment (missing coverage, out of scope, design gap)\n- Concrete remediation steps (update requirements, add tasks, remove tasks, clarify design)\nPresent findings ONE-BY-ONE, with recommendations in order from best recommendation to least, in a clear, actionable format with severity levels (Critical, Important, Minor). Give options and a recommendation. WAIT for me to give guidance before moving to the next finding.\nReview these files:\n- Requirements documents: **/requirements.md\n- Design documents: **/design.md\n- Implementation/task documents: **/tasks.md\nWhen I have confirmed that the final alignment is complete, rewrite all of the tasks in red/green/refactor format.\n",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Create the hook"
+  }
+}

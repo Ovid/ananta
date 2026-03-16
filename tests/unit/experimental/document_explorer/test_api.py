@@ -54,7 +54,7 @@ def state(
         topic_mgr=topic_mgr,
         session=MagicMock(),
         model="test-model",
-        uploads_dir=uploads_dir,
+        extra_dirs={"uploads": uploads_dir},
     )
 
 
@@ -154,7 +154,7 @@ class TestUploadDocument:
         )
         assert resp.status_code == 200
         pid = resp.json()[0]["project_id"]
-        assert pid in topic_mgr.list_docs("Research")
+        assert pid in topic_mgr.list_items("Research")
 
     def test_upload_with_invalid_topic_name_returns_422(
         self,
@@ -209,7 +209,7 @@ class TestDeleteDocument:
         uploads_dir: Path,
     ) -> None:
         topic_mgr.create("A")
-        topic_mgr.add_doc("A", "doc-123")
+        topic_mgr.add_item("A", "doc-123")
         # Set up upload dir so delete can clean it up
         (uploads_dir / "doc-123").mkdir()
         (uploads_dir / "doc-123" / "meta.json").write_text("{}")
@@ -217,7 +217,7 @@ class TestDeleteDocument:
 
         resp = client.delete("/api/documents/doc-123")
         assert resp.status_code == 200
-        assert "doc-123" not in topic_mgr.list_docs("A")
+        assert "doc-123" not in topic_mgr.list_items("A")
         mock_shesha.delete_project.assert_called_once_with("doc-123")
 
 
@@ -244,33 +244,48 @@ class TestRenameTopic:
 
 
 class TestTopicDocumentRoutes:
-    def test_list_topic_documents(
+    def test_list_topic_items_returns_document_info(
         self,
         client: TestClient,
-        mock_shesha: MagicMock,
         topic_mgr: DocumentTopicManager,
+        mock_shesha: MagicMock,
         uploads_dir: Path,
     ) -> None:
+        """GET /topics/{name}/items returns DocumentInfo objects, not bare IDs."""
         topic_mgr.create("Research")
-        topic_mgr.add_doc("Research", "doc-1")
-        doc_dir = uploads_dir / "doc-1"
+        topic_mgr.add_item("Research", "report-a3f2")
+        # Create upload metadata so _build_doc_info can resolve the project ID
+        doc_dir = uploads_dir / "report-a3f2"
         doc_dir.mkdir()
         (doc_dir / "meta.json").write_text(
             json.dumps(
                 {
-                    "filename": "paper.pdf",
+                    "filename": "report.pdf",
                     "content_type": "application/pdf",
-                    "size": 2048,
-                    "upload_date": "2026-03-05",
-                    "page_count": 10,
+                    "size": 1024,
+                    "upload_date": "2026-03-05T12:00:00Z",
+                    "page_count": 5,
                 }
             )
         )
-        resp = client.get("/api/topics/Research/documents")
+        resp = client.get("/api/topics/Research/items")
         assert resp.status_code == 200
         data = resp.json()
         assert len(data) == 1
-        assert data[0]["project_id"] == "doc-1"
+        assert data[0]["project_id"] == "report-a3f2"
+        assert data[0]["filename"] == "report.pdf"
+
+    def test_list_topic_items_skips_missing_metadata(
+        self,
+        client: TestClient,
+        topic_mgr: DocumentTopicManager,
+    ) -> None:
+        """Items with no upload metadata are silently skipped."""
+        topic_mgr.create("Research")
+        topic_mgr.add_item("Research", "gone-doc")
+        resp = client.get("/api/topics/Research/items")
+        assert resp.status_code == 200
+        assert resp.json() == []
 
     def test_add_doc_to_topic(
         self,
@@ -278,15 +293,15 @@ class TestTopicDocumentRoutes:
         topic_mgr: DocumentTopicManager,
     ) -> None:
         topic_mgr.create("Research")
-        resp = client.post("/api/topics/Research/documents/doc-1")
+        resp = client.post("/api/topics/Research/items/doc-1")
         assert resp.status_code == 200
-        assert "doc-1" in topic_mgr.list_docs("Research")
+        assert "doc-1" in topic_mgr.list_items("Research")
 
     def test_add_doc_with_invalid_topic_returns_422(
         self,
         client: TestClient,
     ) -> None:
-        resp = client.post("/api/topics/!!!/documents/doc-1")
+        resp = client.post("/api/topics/!!!/items/doc-1")
         assert resp.status_code == 422
         assert "slug" in resp.json()["detail"].lower()
 
@@ -296,7 +311,7 @@ class TestTopicDocumentRoutes:
         topic_mgr: DocumentTopicManager,
     ) -> None:
         topic_mgr.create("Research")
-        topic_mgr.add_doc("Research", "doc-1")
-        resp = client.delete("/api/topics/Research/documents/doc-1")
+        topic_mgr.add_item("Research", "doc-1")
+        resp = client.delete("/api/topics/Research/items/doc-1")
         assert resp.status_code == 200
-        assert "doc-1" not in topic_mgr.list_docs("Research")
+        assert "doc-1" not in topic_mgr.list_items("Research")

@@ -29,12 +29,84 @@ from shesha.experimental.shared.schemas import (
     TraceStepSchema,
 )
 from shesha.experimental.shared.session import WebConversationSession
+from shesha.experimental.shared.topics import BaseTopicManager
 
 # Type aliases for callbacks
 GetSession = Callable[[Any, str], WebConversationSession]
 BuildTopicInfo = Callable[[Any], list[TopicInfo]]
 ResolveProjectIds = Callable[[Any, str], list[str]]
 ListTraceFiles = Callable[[Any, str], list[Path]]
+
+
+def _topic_error_to_status(e: ValueError) -> int:
+    """Map a topic manager ValueError to an HTTP status code."""
+    msg = str(e)
+    if "already exists" in msg and "slug" not in msg:
+        return 409
+    if "not found" in msg.lower():
+        return 404
+    return 422
+
+
+def create_item_router(topic_mgr: BaseTopicManager) -> APIRouter:
+    """Create an APIRouter with topic CRUD and item reference routes."""
+    router = APIRouter(prefix="/api")
+
+    @router.get("/topics", response_model=list[TopicInfo])
+    def list_topics() -> list[TopicInfo]:
+        names = topic_mgr.list_topics()
+        return [
+            TopicInfo(
+                name=n,
+                document_count=len(topic_mgr.list_items(n)),
+                size="",
+                project_id=f"topic:{n}",
+            )
+            for n in names
+        ]
+
+    @router.post("/topics", status_code=201)
+    def create_topic(body: TopicCreate) -> dict[str, str]:
+        try:
+            topic_mgr.create(body.name)
+        except ValueError as e:
+            raise HTTPException(_topic_error_to_status(e), str(e)) from e
+        return {"name": body.name, "project_id": f"topic:{body.name}"}
+
+    @router.patch("/topics/{name}")
+    def rename_topic(name: str, body: TopicRename) -> dict[str, str]:
+        try:
+            topic_mgr.rename(name, body.new_name)
+        except ValueError as e:
+            raise HTTPException(_topic_error_to_status(e), str(e)) from e
+        return {"name": body.new_name}
+
+    @router.delete("/topics/{name}")
+    def delete_topic(name: str) -> dict[str, str]:
+        try:
+            topic_mgr.delete(name)
+        except ValueError as e:
+            raise HTTPException(_topic_error_to_status(e), str(e)) from e
+        return {"status": "deleted", "name": name}
+
+    @router.post("/topics/{name}/items/{project_id}")
+    def add_item_to_topic(name: str, project_id: str) -> dict[str, str]:
+        try:
+            topic_mgr.create(name)
+        except ValueError as e:
+            raise HTTPException(_topic_error_to_status(e), str(e)) from e
+        topic_mgr.add_item(name, project_id)
+        return {"status": "added", "topic": name, "project_id": project_id}
+
+    @router.delete("/topics/{name}/items/{project_id}")
+    def remove_item_from_topic(name: str, project_id: str) -> dict[str, str]:
+        try:
+            topic_mgr.remove_item(name, project_id)
+        except ValueError as e:
+            raise HTTPException(404, str(e)) from e
+        return {"status": "removed", "topic": name, "project_id": project_id}
+
+    return router
 
 
 def resolve_topic_or_404(state: Any, name: str) -> str:

@@ -33,6 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Extracted `BaseTopicManager` into shared module; document and code explorer topic managers are now thin subclasses with generic `add_item`/`list_items` API
+- Consolidated shared dependencies, API routes, and WebSocket handler across explorers
+- On-disk topic format standardized to `"items"` key (breaking change for existing topic data)
+- Frontend topic-item routes unified to `/api/topics/{name}/items` (was `/documents` and `/repos`)
 - Refactored arxiv-explorer help panel to use shared HelpPanel component
 - Launcher scripts (`code-explorer.sh`, `arxiv-explorer.sh`, `document-explorer.sh`) now
   validate all prerequisites and print a single actionable error report instead of failing

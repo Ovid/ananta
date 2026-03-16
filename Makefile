@@ -11,6 +11,7 @@ test-frontend:
 
 lint:
 	ruff check src tests
+	npx tsc --noEmit -p src/shesha/experimental/shared/frontend/tsconfig.json
 
 typecheck:
 	mypy src/shesha

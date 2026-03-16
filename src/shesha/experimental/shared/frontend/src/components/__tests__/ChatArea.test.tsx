@@ -1,6 +1,7 @@
 import { render, screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeAll } from 'vitest'
+import fc from 'fast-check'
 
 beforeAll(() => {
   const store: Record<string, string> = {}
@@ -17,6 +18,39 @@ beforeAll(() => {
 })
 
 import ChatArea from '../ChatArea'
+import type { ChatAreaProps } from '../ChatArea'
+
+// Requirement 3.2: exact prompt text
+const DEEPER_ANALYSIS_PROMPT =
+  'Do a deeper dive to verify if your report is complete, accurate, and relevant. ' +
+  'Explain any changes or additions in bullet points and then present the full report ' +
+  'with those changes and/or additions. You must also walk through the entire report, ' +
+  'point by point, and ensure its aligned with the previous report and the changes or additions.'
+
+/** Default props for rendering ChatArea in a ready-to-interact state. */
+function defaultProps(overrides: Partial<ChatAreaProps> = {}): ChatAreaProps {
+  return {
+    topicName: 'test-topic',
+    connected: true,
+    wsSend: vi.fn(),
+    wsOnMessage: vi.fn().mockReturnValue(() => {}),
+    onViewTrace: vi.fn(),
+    onClearHistory: vi.fn(),
+    historyVersion: 0,
+    selectedDocuments: new Set(['doc-1']),
+    loadHistory: vi.fn().mockResolvedValue([]),
+    ...overrides,
+  }
+}
+
+/** Render ChatArea with sensible defaults; returns the props used so tests can inspect mocks. */
+async function renderChatArea(overrides: Partial<ChatAreaProps> = {}) {
+  const props = defaultProps(overrides)
+  await act(async () => {
+    render(<ChatArea {...props} />)
+  })
+  return props
+}
 
 describe('ChatArea (shared) - no topic', () => {
   it('shows placeholder when no topic is selected', async () => {
@@ -291,5 +325,32 @@ describe('ChatArea (shared) - auto-growing textarea', () => {
     expect(textarea).toHaveValue('Hello world')
     await user.click(screen.getByText('Send'))
     expect(textarea).toHaveValue('')
+  })
+})
+
+describe('ChatArea (shared) - More button test infrastructure', () => {
+  it('DEEPER_ANALYSIS_PROMPT matches the required text', () => {
+    expect(DEEPER_ANALYSIS_PROMPT).toBe(
+      'Do a deeper dive to verify if your report is complete, accurate, and relevant. ' +
+      'Explain any changes or additions in bullet points and then present the full report ' +
+      'with those changes and/or additions. You must also walk through the entire report, ' +
+      'point by point, and ensure its aligned with the previous report and the changes or additions.'
+    )
+  })
+
+  it('renderChatArea helper renders with default props', async () => {
+    await renderChatArea()
+    expect(screen.getByPlaceholderText('Ask a question...')).toBeInTheDocument()
+  })
+
+  it('renderChatArea helper accepts prop overrides', async () => {
+    const wsSend = vi.fn()
+    const props = await renderChatArea({ wsSend })
+    expect(props.wsSend).toBe(wsSend)
+  })
+
+  it('fast-check is available for property-based tests', () => {
+    // Smoke test: generate a small batch of booleans to confirm fc works
+    fc.assert(fc.property(fc.boolean(), (b) => typeof b === 'boolean'), { numRuns: 10 })
   })
 })

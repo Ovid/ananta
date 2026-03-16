@@ -701,6 +701,64 @@ describe('ChatArea (shared) - Property 1: Button enablement preconditions', () =
   })
 })
 
+describe('ChatArea (shared) - Property 2: Message transmission', () => {
+  // Feature: explorer-more-button, Property 2
+  // For any valid More button click (enabled state), wsSend is called with
+  // { type: 'query', topic: topicName, question: DEEPER_ANALYSIS_PROMPT, document_ids: [...selectedDocuments] }
+  // Requirements: 3.1, 4.3
+
+  const arbTopicName = fc.string({ minLength: 1, maxLength: 30 })
+
+  const arbDocumentIds = fc
+    .uniqueArray(fc.string({ minLength: 1, maxLength: 12 }), { minLength: 1, maxLength: 8 })
+    .map((ids) => new Set(ids))
+
+  it('wsSend receives correct message structure for any valid topic and document set', async () => {
+    const user = userEvent.setup()
+
+    await fc.assert(
+      fc.asyncProperty(
+        arbTopicName,
+        arbDocumentIds,
+        async (topicName, selectedDocuments) => {
+          const wsSend = vi.fn()
+
+          const { unmount } = await act(async () =>
+            render(
+              <ChatArea
+                topicName={topicName}
+                connected={true}
+                wsSend={wsSend}
+                wsOnMessage={vi.fn().mockReturnValue(() => {})}
+                onViewTrace={vi.fn()}
+                onClearHistory={vi.fn()}
+                historyVersion={0}
+                selectedDocuments={selectedDocuments}
+                loadHistory={vi.fn().mockResolvedValue([])}
+              />
+            ),
+          )
+
+          const moreBtn = screen.getByRole('button', { name: /deeper analysis/i })
+          await user.click(moreBtn)
+
+          expect(wsSend).toHaveBeenCalledTimes(1)
+          const sentMsg = wsSend.mock.calls[0][0] as Record<string, unknown>
+          expect(sentMsg.type).toBe('query')
+          expect(sentMsg.topic).toBe(topicName)
+          expect(sentMsg.question).toBe(DEEPER_ANALYSIS_PROMPT)
+          // document_ids should contain exactly the same IDs as selectedDocuments
+          const sentIds = new Set(sentMsg.document_ids as string[])
+          expect(sentIds).toEqual(selectedDocuments)
+
+          unmount()
+        },
+      ),
+      { numRuns: 100 },
+    )
+  })
+})
+
 describe('ChatArea (shared) - UX consistency after More button click', () => {
   it('displays thinking indicator after More button click', async () => {
     const user = userEvent.setup()

@@ -276,7 +276,7 @@ The feature uses TypeScript/React and integrates with the existing WebSocket-bas
 
 ### Cycle 12: Property-Based Test - Keyboard Activation (OPTIONAL)
 
-- [ ] 12.1 RED: Write property test for keyboard activation
+- [x] 12.1 RED: Write property test for keyboard activation
   - **Property 6: Keyboard Activation**
   - Generate random valid states and key events
   - Simulate key press on focused More button
@@ -286,12 +286,12 @@ The feature uses TypeScript/React and integrates with the existing WebSocket-bas
   - Run test → verify it fails
   - _Requirements: 6.3_
 
-- [ ] 12.2 GREEN: Verify property test passes
+- [x] 12.2 GREEN: Verify property test passes
   - No code changes needed
   - Run test → verify it passes
   - _Requirements: 6.3_
 
-- [ ] 12.3 REFACTOR: Not applicable
+- [x] 12.3 REFACTOR: Not applicable
 
 ---
 
@@ -322,7 +322,7 @@ The feature uses TypeScript/React and integrates with the existing WebSocket-bas
 - Refactor steps are optional if code is already clean
 - Property tests verify implementation, not drive it (tests written after GREEN phase)
 - Integration and UX consistency tests verify inherited behavior
-- At the end of each task, commit your changes
+- At the end of each task, **commit your changes**
 
 ## Success Criteria
 

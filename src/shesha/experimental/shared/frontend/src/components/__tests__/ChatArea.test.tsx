@@ -981,6 +981,99 @@ describe('ChatArea (shared) - UX consistency after More button click', () => {
   })
 })
 
+describe('ChatArea (shared) - Property 6: Keyboard activation', () => {
+  // Feature: explorer-more-button, Property 6
+  // For any More button that has focus, when the user presses Enter or Space key,
+  // the ChatArea SHALL trigger the same handleMore function as a mouse click would.
+  // The onKeyDown handler must call preventDefault for Enter and Space to prevent
+  // default browser behavior (e.g. Space scrolling the page, Enter submitting a form).
+  // Other keys must NOT trigger handleMore.
+  // Requirements: 6.3
+
+  const ACTIVATING_KEYS = ['Enter', ' '] as const
+  const NON_ACTIVATING_KEYS = [
+    'a', 'b', 'z', '1', '0', 'Tab', 'Escape', 'ArrowUp', 'ArrowDown',
+    'ArrowLeft', 'ArrowRight', 'Backspace', 'Delete', 'Shift', 'Control',
+    'Alt', 'Meta', 'F1', 'F12', 'Home', 'End', 'PageUp', 'PageDown',
+  ] as const
+
+  // Arbitrary that picks any key string — activating or not
+  const arbKeyEvent = fc.oneof(
+    fc.constantFrom(...ACTIVATING_KEYS),
+    fc.constantFrom(...NON_ACTIVATING_KEYS),
+  )
+
+  it('handleMore fires iff Enter or Space is pressed on focused More button, with preventDefault', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        arbKeyEvent,
+        async (key) => {
+          const wsSend = vi.fn()
+
+          const { unmount } = await act(async () =>
+            render(
+              <ChatArea
+                topicName="test-topic"
+                connected={true}
+                wsSend={wsSend}
+                wsOnMessage={vi.fn().mockReturnValue(() => {})}
+                onViewTrace={vi.fn()}
+                onClearHistory={vi.fn()}
+                historyVersion={0}
+                selectedDocuments={new Set(['doc-1'])}
+                loadHistory={vi.fn().mockResolvedValue([])}
+              />
+            ),
+          )
+
+          const moreBtn = screen.getByRole('button', { name: /deeper analysis/i })
+          moreBtn.focus()
+          expect(document.activeElement).toBe(moreBtn)
+
+          const shouldActivate = key === 'Enter' || key === ' '
+
+          // Dispatch a raw KeyboardEvent so we can inspect preventDefault.
+          // (userEvent triggers the native button click path, which bypasses
+          // any custom onKeyDown handler — we need to test the handler directly.)
+          const event = new KeyboardEvent('keydown', {
+            key,
+            bubbles: true,
+            cancelable: true,
+          })
+          const preventDefaultSpy = vi.spyOn(event, 'preventDefault')
+
+          await act(async () => {
+            moreBtn.dispatchEvent(event)
+          })
+
+          if (shouldActivate) {
+            // The custom onKeyDown handler must call preventDefault
+            expect(preventDefaultSpy).toHaveBeenCalled()
+            // And it must trigger the query
+            expect(wsSend).toHaveBeenCalledWith(
+              expect.objectContaining({
+                type: 'query',
+                question: DEEPER_ANALYSIS_PROMPT,
+              }),
+            )
+          } else {
+            // Non-activating keys must NOT call preventDefault or trigger a query
+            expect(preventDefaultSpy).not.toHaveBeenCalled()
+            const queryCalls = wsSend.mock.calls.filter(
+              (call: unknown[]) => (call[0] as Record<string, unknown>)?.type === 'query',
+            )
+            expect(queryCalls).toHaveLength(0)
+          }
+
+          preventDefaultSpy.mockRestore()
+          unmount()
+        },
+      ),
+      { numRuns: 100 },
+    )
+  })
+})
+
 describe('ChatArea (shared) - Property 5: Pending question display', () => {
   // Feature: explorer-more-button, Property 5
   // For any More button click, the ChatArea SHALL set the pendingQuestion state

@@ -823,6 +823,61 @@ describe('ChatArea (shared) - Property 3: Textarea clearing', () => {
   })
 })
 
+describe('ChatArea (shared) - Property 4: Thinking state activation', () => {
+  // Feature: explorer-more-button, Property 4
+  // For any More button click, the ChatArea SHALL set the thinking state to true,
+  // which disables further queries and displays the thinking indicator.
+  // Requirements: 3.4
+
+  const arbTopicName = fc.string({ minLength: 1, maxLength: 30 })
+
+  const arbDocumentIds = fc
+    .uniqueArray(fc.string({ minLength: 1, maxLength: 12 }), { minLength: 1, maxLength: 8 })
+    .map((ids) => new Set(ids))
+
+  it('thinking indicator appears after More click for any valid state', async () => {
+    const user = userEvent.setup()
+
+    await fc.assert(
+      fc.asyncProperty(
+        arbTopicName,
+        arbDocumentIds,
+        async (topicName, selectedDocuments) => {
+          const { unmount } = await act(async () =>
+            render(
+              <ChatArea
+                topicName={topicName}
+                connected={true}
+                wsSend={vi.fn()}
+                wsOnMessage={vi.fn().mockReturnValue(() => {})}
+                onViewTrace={vi.fn()}
+                onClearHistory={vi.fn()}
+                historyVersion={0}
+                selectedDocuments={selectedDocuments}
+                loadHistory={vi.fn().mockResolvedValue([])}
+              />
+            ),
+          )
+
+          // More button should be present before click
+          const moreBtn = screen.getByRole('button', { name: /deeper analysis/i })
+          await user.click(moreBtn)
+
+          // Thinking indicator (3 animated dots) should be visible
+          const thinkingDots = document.querySelectorAll('.animate-bounce')
+          expect(thinkingDots.length).toBe(3)
+
+          // More button should be hidden while thinking
+          expect(screen.queryByRole('button', { name: /deeper analysis/i })).toBeNull()
+
+          unmount()
+        },
+      ),
+      { numRuns: 100 },
+    )
+  })
+})
+
 describe('ChatArea (shared) - UX consistency after More button click', () => {
   it('displays thinking indicator after More button click', async () => {
     const user = userEvent.setup()

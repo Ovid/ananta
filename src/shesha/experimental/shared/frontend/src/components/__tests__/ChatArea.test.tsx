@@ -328,6 +328,43 @@ describe('ChatArea (shared) - auto-growing textarea', () => {
   })
 })
 
+describe('ChatArea (shared) - More button rendering', () => {
+  it('renders a button with text "More"', async () => {
+    await renderChatArea()
+    expect(screen.getByRole('button', { name: /more/i })).toBeInTheDocument()
+  })
+
+  it('positions More button between textarea and Send button', async () => {
+    await renderChatArea()
+    const textarea = screen.getByPlaceholderText('Ask a question...')
+    const moreBtn = screen.getByRole('button', { name: /more/i })
+    const sendBtn = screen.getByRole('button', { name: /send/i })
+
+    // All three should share the same parent flex container
+    const container = textarea.parentElement!
+    const children = Array.from(container.children)
+    const textareaIdx = children.indexOf(textarea)
+    const moreIdx = children.indexOf(moreBtn)
+    const sendIdx = children.indexOf(sendBtn)
+
+    expect(moreIdx).toBeGreaterThan(textareaIdx)
+    expect(moreIdx).toBeLessThan(sendIdx)
+  })
+
+  it('hides More button when thinking is true', async () => {
+    const user = userEvent.setup()
+    await renderChatArea()
+
+    // Type and send to enter thinking state
+    const textarea = screen.getByPlaceholderText('Ask a question...')
+    await user.type(textarea, 'Hello')
+    await user.click(screen.getByRole('button', { name: /send/i }))
+
+    // Now in thinking state — More button should not be in the DOM
+    expect(screen.queryByRole('button', { name: /more/i })).not.toBeInTheDocument()
+  })
+})
+
 describe('ChatArea (shared) - More button test infrastructure', () => {
   it('DEEPER_ANALYSIS_PROMPT matches the required text', () => {
     expect(DEEPER_ANALYSIS_PROMPT).toBe(

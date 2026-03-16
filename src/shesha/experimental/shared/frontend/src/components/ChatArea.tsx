@@ -24,6 +24,12 @@ interface ChatAreaProps {
 
 export type { ChatAreaProps }
 
+export const DEEPER_ANALYSIS_PROMPT =
+  'Do a deeper dive to verify if your report is complete, accurate, and relevant. ' +
+  'Explain any changes or additions in bullet points and then present the full report ' +
+  'with those changes and/or additions. You must also walk through the entire report, ' +
+  'point by point, and ensure its aligned with the previous report and the changes or additions.'
+
 export default function ChatArea({
   topicName,
   connected,
@@ -216,6 +222,15 @@ export default function ChatArea({
             style={{ maxHeight: '6rem' }}
             className="flex-1 bg-surface-2 border border-border rounded px-3 py-2 text-sm text-text-primary resize-none overflow-y-auto focus:outline-none focus:border-accent disabled:opacity-50"
           />
+          {!thinking && (
+            <button
+              onClick={() => {}}
+              disabled={!hasDocuments || !topicName || !connected}
+              className="px-4 py-2 bg-surface-2 border border-border text-text-primary rounded text-sm font-medium hover:bg-surface-3 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              More
+            </button>
+          )}
           {thinking ? (
             <button
               onClick={() => wsSend({ type: 'cancel' })}

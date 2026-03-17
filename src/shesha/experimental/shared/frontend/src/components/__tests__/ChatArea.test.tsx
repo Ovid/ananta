@@ -601,7 +601,7 @@ describe('ChatArea (shared) - More button test infrastructure', () => {
 
   it('fast-check is available for property-based tests', () => {
     // Smoke test: generate a small batch of booleans to confirm fc works
-    fc.assert(fc.property(fc.boolean(), (b) => typeof b === 'boolean'), { numRuns: 10 })
+    fc.assert(fc.property(fc.boolean(), (b: boolean) => typeof b === 'boolean'), { numRuns: 10 })
   })
 })
 
@@ -634,7 +634,7 @@ describe('ChatArea (shared) - Property 1: Button enablement preconditions', () =
     fc.constant(new Set<string>()),
     fc
       .uniqueArray(fc.string({ minLength: 1, maxLength: 8 }), { minLength: 1, maxLength: 5 })
-      .map((ids) => new Set(ids)),
+      .map((ids: string[]) => new Set(ids)),
   )
 
   // Arbitrary for topicName: null or a non-empty string
@@ -650,7 +650,7 @@ describe('ChatArea (shared) - Property 1: Button enablement preconditions', () =
         arbSelectedDocuments,   // selectedDocuments
         arbTopicName,           // topicName
         fc.boolean(),           // thinking
-        async (connected, selectedDocuments, topicName, thinking) => {
+        async (connected: boolean, selectedDocuments: Set<string> | undefined, topicName: string | null, thinking: boolean) => {
           const hasDocuments = selectedDocuments != null && selectedDocuments.size > 0
           const expectedEnabled = connected && hasDocuments && !!topicName && !thinking
 
@@ -710,7 +710,7 @@ describe('ChatArea (shared) - Property 2: Message transmission', () => {
 
   const arbDocumentIds = fc
     .uniqueArray(fc.string({ minLength: 1, maxLength: 12 }), { minLength: 1, maxLength: 8 })
-    .map((ids) => new Set(ids))
+    .map((ids: string[]) => new Set(ids))
 
   it('wsSend receives correct message structure for any valid topic and document set', async () => {
     const user = userEvent.setup()
@@ -719,7 +719,7 @@ describe('ChatArea (shared) - Property 2: Message transmission', () => {
       fc.asyncProperty(
         arbTopicName,
         arbDocumentIds,
-        async (topicName, selectedDocuments) => {
+        async (topicName: string, selectedDocuments: Set<string>) => {
           const wsSend = vi.fn()
 
           const { unmount } = await act(async () =>
@@ -778,7 +778,7 @@ describe('ChatArea (shared) - Property 3: Textarea clearing', () => {
     await fc.assert(
       fc.asyncProperty(
         arbTextareaContent,
-        async (content) => {
+        async (content: string) => {
           const { unmount } = await act(async () =>
             render(
               <ChatArea
@@ -832,7 +832,7 @@ describe('ChatArea (shared) - Property 4: Thinking state activation', () => {
 
   const arbDocumentIds = fc
     .uniqueArray(fc.string({ minLength: 1, maxLength: 12 }), { minLength: 1, maxLength: 8 })
-    .map((ids) => new Set(ids))
+    .map((ids: string[]) => new Set(ids))
 
   it('thinking indicator appears after More click for any valid state', async () => {
     const user = userEvent.setup()
@@ -841,7 +841,7 @@ describe('ChatArea (shared) - Property 4: Thinking state activation', () => {
       fc.asyncProperty(
         arbTopicName,
         arbDocumentIds,
-        async (topicName, selectedDocuments) => {
+        async (topicName: string, selectedDocuments: Set<string>) => {
           const { unmount } = await act(async () =>
             render(
               <ChatArea
@@ -1006,7 +1006,7 @@ describe('ChatArea (shared) - Property 6: Keyboard activation', () => {
     await fc.assert(
       fc.asyncProperty(
         arbKeyEvent,
-        async (key) => {
+        async (key: string) => {
           const wsSend = vi.fn()
 
           const { unmount } = await act(async () =>
@@ -1083,7 +1083,7 @@ describe('ChatArea (shared) - Property 5: Pending question display', () => {
 
   const arbDocumentIds = fc
     .uniqueArray(fc.string({ minLength: 1, maxLength: 12 }), { minLength: 1, maxLength: 8 })
-    .map((ids) => new Set(ids))
+    .map((ids: string[]) => new Set(ids))
 
   it('pendingQuestion equals DEEPER_ANALYSIS_PROMPT after More click for any valid state', async () => {
     const user = userEvent.setup()
@@ -1092,7 +1092,7 @@ describe('ChatArea (shared) - Property 5: Pending question display', () => {
       fc.asyncProperty(
         arbTopicName,
         arbDocumentIds,
-        async (topicName, selectedDocuments) => {
+        async (topicName: string, selectedDocuments: Set<string>) => {
           const { unmount } = await act(async () =>
             render(
               <ChatArea

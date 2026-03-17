@@ -183,6 +183,14 @@ async def _handle_query(
         )
         return
 
+    # Validate document_ids against _SAFE_ID_RE (matching multi-project handler)
+    for did in document_ids:
+        if not isinstance(did, str) or not _SAFE_ID_RE.match(did):
+            await websocket.send_json(
+                {"type": "error", "message": f"Invalid document id: {did!r}"}
+            )
+            return
+
     # Load only the requested documents, skipping any that don't exist
     loaded_docs = []
     for did in document_ids:
@@ -263,9 +271,10 @@ async def _handle_query(
             ),
         )
     except Exception as exc:
+        logger.exception("Query execution failed: %s", exc)
         await message_queue.put(None)
         await drain_task
-        await websocket.send_json({"type": "error", "message": str(exc)})
+        await websocket.send_json({"type": "error", "message": "Query execution failed"})
         return
 
     # Signal the drain task to stop, then wait for it
@@ -467,9 +476,10 @@ async def handle_multi_project_query(
             ),
         )
     except Exception as exc:
+        logger.exception("Query execution failed: %s", exc)
         await message_queue.put(None)
         await drain_task
-        await ws.send_json({"type": "error", "message": str(exc)})
+        await ws.send_json({"type": "error", "message": "Query execution failed"})
         return
 
     # Signal the drain task to stop, then wait for it

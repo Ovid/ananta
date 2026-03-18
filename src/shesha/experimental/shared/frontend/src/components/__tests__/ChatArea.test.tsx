@@ -1052,6 +1052,26 @@ describe('ChatArea — allowBackgroundKnowledge', () => {
   })
 })
 
+describe('ChatArea — background knowledge hint', () => {
+  it('shows hint below More button when checkbox is off and exchanges exist', async () => {
+    await renderChatArea({ allowBackgroundKnowledge: false })
+    expect(screen.getByText(/Enable.*background knowledge/i)).toBeInTheDocument()
+  })
+
+  it('does not show hint when checkbox is on', async () => {
+    await renderChatArea({ allowBackgroundKnowledge: true })
+    expect(screen.queryByText(/Enable.*background knowledge/i)).not.toBeInTheDocument()
+  })
+
+  it('does not show hint when no exchanges exist', async () => {
+    await renderChatArea({
+      allowBackgroundKnowledge: false,
+      loadHistory: vi.fn().mockResolvedValue([]),
+    })
+    expect(screen.queryByText(/Enable.*background knowledge/i)).not.toBeInTheDocument()
+  })
+})
+
 // Property 6 (custom onKeyDown handler) was removed because the handler was
 // redundant with native <button> Enter/Space activation and caused double-fire.
 // Keyboard activation is now tested by the unit tests above via userEvent.

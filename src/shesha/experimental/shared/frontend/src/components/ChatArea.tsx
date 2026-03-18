@@ -276,6 +276,11 @@ export default function ChatArea({
               More
             </button>
           )}
+          {!allowBackgroundKnowledge && exchanges.length > 0 && !thinking && (
+            <span className="text-[10px] text-text-dim">
+              Enable "Allow background knowledge" for more complete analysis
+            </span>
+          )}
           {thinking ? (
             <button
               onClick={() => wsSend({ type: 'cancel' })}

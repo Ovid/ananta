@@ -206,6 +206,10 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** The shared WebSocket handlers and routes access `state.topic_mgr._storage`, `project._rlm_engine`, `state.shesha._storage`, and even double-private `_storage._project_path()`. This tightly couples the experimental modules to internal structure of `Project`, `Shesha`, and topic managers, making any refactoring of these internals break the web layer.
 - **Evidence:** `shared/websockets.py:167,197,208,256,263,288,363,462`; `shared/routes.py:223` (`_storage._project_path`)
 - **Found by:** Structure, Coupling, Integration (3 specialists agreed)
+- **Status:** Fixed
+- **Status reason:** Added Shesha.storage, Project.rlm_engine, StorageBackend.get_project_dir() public APIs. Updated all 8 experimental source files to use public APIs exclusively.
+- **Status date:** 2026-03-18 19:42 UTC
+- **Status commit:** efe0d0a
 
 ### [F-3] No authentication on web API endpoints
 - **Category:** 30 (Security as an afterthought)

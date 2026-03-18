@@ -56,6 +56,10 @@ make all                         # Format + lint + typecheck + test
 - Untested code "because it's simple"
 - Tests which emit warnings — fix the root cause (e.g., wrap async state updates in `act()`). Only suppress if the warning originates outside this codebase and cannot be fixed here; add a comment explaining why.
 
+## API Boundaries
+
+- **No private API access across module boundaries.** Never access `_`-prefixed attributes from outside the owning class. Use or create public properties/methods instead. Private attributes are internal implementation details — accessing them from another module creates tight coupling that breaks when internals change. The experimental layer uses `Shesha.storage`, `Project.rlm_engine`, and `StorageBackend.get_project_dir()` — not `_storage`, `_rlm_engine`, or `_project_path()`.
+
 ## Code Style
 
 - **Imports at top of file:** All imports must be at the top of the file, not inside functions or methods. If an import cannot be at the top (e.g., circular import, optional dependency), add a comment explaining why.

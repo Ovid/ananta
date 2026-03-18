@@ -2724,3 +2724,80 @@ class TestMaxIterationsFallback:
 
         assert result.answer == "The answer is 42 based on my analysis."
         assert mock_llm.complete.call_count == 3
+
+
+class TestAllowBackgroundKnowledge:
+    """Tests for allow_background_knowledge parameter on query()."""
+
+    @patch("shesha.rlm.engine.ContainerExecutor")
+    @patch("shesha.rlm.engine.LLMClient")
+    def test_query_passes_augmented_true_when_background_knowledge_allowed(
+        self,
+        mock_llm_cls: MagicMock,
+        mock_executor_cls: MagicMock,
+    ) -> None:
+        """query(allow_background_knowledge=True) calls render_system_prompt(augmented=True)."""
+        mock_llm = MagicMock()
+        mock_llm.complete.return_value = MagicMock(
+            content="```repl\nFINAL('answer')\n```",
+            prompt_tokens=100,
+            completion_tokens=50,
+            total_tokens=150,
+        )
+        mock_llm_cls.return_value = mock_llm
+
+        mock_executor = MagicMock()
+        mock_executor.execute.return_value = MagicMock(
+            stdout="",
+            stderr="",
+            error=None,
+            final_answer="answer",
+        )
+        mock_executor_cls.return_value = mock_executor
+
+        engine = RLMEngine(model="test-model")
+        with patch.object(engine.prompt_loader, "render_system_prompt", wraps=engine.prompt_loader.render_system_prompt) as spy:
+            engine.query(
+                documents=["doc content"],
+                question="What?",
+                allow_background_knowledge=True,
+            )
+            spy.assert_called_once()
+            call_kwargs = spy.call_args[1]
+            assert call_kwargs.get("augmented") is True
+
+    @patch("shesha.rlm.engine.ContainerExecutor")
+    @patch("shesha.rlm.engine.LLMClient")
+    def test_query_passes_augmented_false_by_default(
+        self,
+        mock_llm_cls: MagicMock,
+        mock_executor_cls: MagicMock,
+    ) -> None:
+        """query() without allow_background_knowledge calls render_system_prompt(augmented=False)."""
+        mock_llm = MagicMock()
+        mock_llm.complete.return_value = MagicMock(
+            content="```repl\nFINAL('answer')\n```",
+            prompt_tokens=100,
+            completion_tokens=50,
+            total_tokens=150,
+        )
+        mock_llm_cls.return_value = mock_llm
+
+        mock_executor = MagicMock()
+        mock_executor.execute.return_value = MagicMock(
+            stdout="",
+            stderr="",
+            error=None,
+            final_answer="answer",
+        )
+        mock_executor_cls.return_value = mock_executor
+
+        engine = RLMEngine(model="test-model")
+        with patch.object(engine.prompt_loader, "render_system_prompt", wraps=engine.prompt_loader.render_system_prompt) as spy:
+            engine.query(
+                documents=["doc content"],
+                question="What?",
+            )
+            spy.assert_called_once()
+            call_kwargs = spy.call_args[1]
+            assert call_kwargs.get("augmented") is False

@@ -327,7 +327,7 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Status:** Fixed
 - **Status reason:** Changed constructor to accept two callables (get_project, get_project_sha) instead of full Shesha instance
 - **Status date:** 2026-03-18 22:02 UTC
-- **Status commit:** (pending)
+- **Status commit:** 699ea3d
 
 ### [F-18] Non-idempotent document upload
 - **Category:** 19 (Lack of idempotency)
@@ -342,6 +342,9 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** WebSocket `complete` message uses `duration_ms` (int) while `ExchangeSchema` uses `execution_time` (float seconds). Different field names for the same concept across channels.
 - **Evidence:** `shared/websockets.py:320` vs `shared/schemas.py:65`
 - **Found by:** Integration
+- **Status:** Won't fix
+- **Status reason:** False positive — the naming split is intentional. execution_time (float seconds) is the internal representation used in QueryResult, ExchangeSchema, and session storage. duration_ms (int milliseconds) is the WebSocket wire format for client convenience, produced by build_complete_response() at the API boundary. Different units at different layers, not inconsistent naming.
+- **Status date:** 2026-03-18 22:05 UTC
 
 ### [F-20] Code explorer pending_updates in memory
 - **Category:** 26 (Poor transactional boundaries)

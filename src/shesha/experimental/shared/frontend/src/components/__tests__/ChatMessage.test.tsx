@@ -222,3 +222,29 @@ describe('ChatMessage — background knowledge rendering', () => {
     expect(screen.queryByText('Background knowledge')).not.toBeInTheDocument()
   })
 })
+
+describe('ChatMessage — documents-only notice', () => {
+  it('shows notice when allow_background_knowledge is true and no markers present', () => {
+    const exchange = {
+      ...baseExchange,
+      allow_background_knowledge: true,
+    }
+    render(<ChatMessage exchange={exchange} onViewTrace={vi.fn()} />)
+    expect(screen.getByText(/Based entirely on your documents/)).toBeInTheDocument()
+  })
+
+  it('does not show notice when allow_background_knowledge is false', () => {
+    render(<ChatMessage exchange={baseExchange} onViewTrace={vi.fn()} />)
+    expect(screen.queryByText(/Based entirely on your documents/)).not.toBeInTheDocument()
+  })
+
+  it('does not show notice when background markers are present', () => {
+    const exchange = {
+      ...baseExchange,
+      allow_background_knowledge: true,
+      answer: 'Doc.\n<!-- BACKGROUND_KNOWLEDGE_START -->\nBg.\n<!-- BACKGROUND_KNOWLEDGE_END -->',
+    }
+    render(<ChatMessage exchange={exchange} onViewTrace={vi.fn()} />)
+    expect(screen.queryByText(/Based entirely on your documents/)).not.toBeInTheDocument()
+  })
+})

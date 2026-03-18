@@ -48,7 +48,16 @@ export default function ChatMessage({ exchange, onViewTrace, renderAnswer, answe
                   const sections = splitAugmentedSections(sanitized)
                   const hasBackground = sections.some(s => s.type === 'background')
                   if (!hasBackground) {
-                    return <Markdown components={mdComponents}>{sanitized}</Markdown>
+                    return (
+                      <>
+                        <Markdown components={mdComponents}>{sanitized}</Markdown>
+                        {exchange.allow_background_knowledge && (
+                          <p className="text-[10px] text-text-dim mt-2 italic">
+                            Based entirely on your documents — no background knowledge was needed.
+                          </p>
+                        )}
+                      </>
+                    )
                   }
                   return (
                     <>

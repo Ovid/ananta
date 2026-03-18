@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import threading
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -63,7 +62,7 @@ class TestHandleQueryDocIdValidation:
 
         error_msgs = [m for m in ws.sent if m.get("type") == "error"]
         assert len(error_msgs) == 1
-        assert "invalid" in error_msgs[0]["message"].lower() or "Invalid" in error_msgs[0]["message"]
+        assert "invalid" in error_msgs[0]["message"].lower()
         # Must NOT reach the storage layer
         state.topic_mgr._storage.get_document.assert_not_called()
 
@@ -132,7 +131,10 @@ class TestHandleQueryExceptionLeakage:
             "document_ids": ["valid-doc"],
         }
 
-        sensitive_message = "ConnectionError: failed to connect to /internal/db:5432 with password=s3cret"
+        sensitive_message = (
+            "ConnectionError: failed to connect to"
+            " /internal/db:5432 with password=s3cret"
+        )
         project = state.shesha.get_project.return_value
         project._rlm_engine.query.side_effect = RuntimeError(sensitive_message)
 

@@ -136,7 +136,7 @@ export default function ChatArea({
    * More button sends the predefined DEEPER_ANALYSIS_PROMPT.
    * See Requirements 2.1–2.5 in the explorer-more-button spec.
    */
-  const canSendMore = !!topicName && !thinking && connected && hasDocuments
+  const canSendMore = !!topicName && !thinking && connected && hasDocuments && exchanges.length > 0
 
   /**
    * Sends a query message via WebSocket and updates UI state.
@@ -151,7 +151,6 @@ export default function ChatArea({
       document_ids: Array.from(selectedDocuments),
     }
     wsSend(msg)
-    setInput('')
     setPendingQuestion(question)
     setPendingSentAt(new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }))
     setThinking(true)
@@ -162,6 +161,7 @@ export default function ChatArea({
   const handleSend = useCallback(() => {
     if (!canSend) return
     sendQuery(input.trim())
+    setInput('')
   }, [canSend, input, sendQuery])
 
   /** Sends the predefined deeper-analysis prompt with one click. */

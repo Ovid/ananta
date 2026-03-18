@@ -30,6 +30,19 @@ const DEEPER_ANALYSIS_PROMPT =
   'with those changes and/or additions. You must also walk through the entire report, ' +
   'point by point, and ensure its aligned with the previous report and the changes or additions.'
 
+/** Sample exchange for tests that need non-empty history (required for More button). */
+const sampleExchangeForHistory = {
+  exchange_id: 'ex-0',
+  question: 'Prior question',
+  answer: 'Prior answer',
+  timestamp: '2026-02-13T12:00:00Z',
+  tokens: { prompt: 10, completion: 5, total: 15 },
+  execution_time: 1.0,
+  trace_id: null,
+  model: 'test',
+  document_ids: ['doc-1'],
+}
+
 /** Default props for rendering ChatArea in a ready-to-interact state. */
 function defaultProps(overrides: Partial<ChatAreaProps> = {}): ChatAreaProps {
   return {
@@ -41,7 +54,7 @@ function defaultProps(overrides: Partial<ChatAreaProps> = {}): ChatAreaProps {
     onClearHistory: vi.fn(),
     historyVersion: 0,
     selectedDocuments: new Set(['doc-1']),
-    loadHistory: vi.fn().mockResolvedValue([]),
+    loadHistory: vi.fn().mockResolvedValue([sampleExchangeForHistory]),
     ...overrides,
   }
 }
@@ -394,7 +407,7 @@ describe('ChatArea (shared) - More button enablement', () => {
     expect(screen.queryByRole('button', { name: /deeper analysis/i })).not.toBeInTheDocument()
   })
 
-  it('enables More button when all conditions met (connected, has documents, has topic, not thinking)', async () => {
+  it('enables More button when all conditions met (connected, has documents, has topic, has exchanges, not thinking)', async () => {
     await renderChatArea({
       connected: true,
       selectedDocuments: new Set(['doc-1']),
@@ -402,6 +415,17 @@ describe('ChatArea (shared) - More button enablement', () => {
     })
     const moreBtn = screen.getByRole('button', { name: /deeper analysis/i })
     expect(moreBtn).not.toBeDisabled()
+  })
+
+  it('disables More button when no prior exchanges exist', async () => {
+    await renderChatArea({
+      connected: true,
+      selectedDocuments: new Set(['doc-1']),
+      topicName: 'test-topic',
+      loadHistory: vi.fn().mockResolvedValue([]),
+    })
+    const moreBtn = screen.getByRole('button', { name: /deeper analysis/i })
+    expect(moreBtn).toBeDisabled()
   })
 })
 
@@ -428,7 +452,7 @@ describe('ChatArea (shared) - More button click behavior', () => {
     )
   })
 
-  it('clears textarea content when More is clicked', async () => {
+  it('preserves textarea draft when More is clicked', async () => {
     const user = userEvent.setup()
     await renderChatArea()
 
@@ -438,7 +462,7 @@ describe('ChatArea (shared) - More button click behavior', () => {
 
     await user.click(screen.getByRole('button', { name: /deeper analysis/i }))
 
-    expect(textarea).toHaveValue('')
+    expect(textarea).toHaveValue('some draft text')
   })
 
   it('sets thinking state to true when More is clicked (Cancel button appears)', async () => {
@@ -627,7 +651,7 @@ function createWsOnMessage() {
 describe('ChatArea (shared) - Property 1: Button enablement preconditions', () => {
   // Feature: explorer-more-button, Property 1
   // For any ChatArea state, the More button is enabled iff:
-  // connected && hasDocuments && hasTopic && !thinking
+  // connected && hasDocuments && hasTopic && hasExchanges && !thinking
   // Requirements: 2.1, 2.2, 2.4, 2.5
 
   // Arbitrary for selectedDocuments: undefined, empty Set, or non-empty Set
@@ -645,16 +669,17 @@ describe('ChatArea (shared) - Property 1: Button enablement preconditions', () =
     fc.string({ minLength: 1, maxLength: 20 }),
   )
 
-  it('button enabled iff connected && hasDocuments && hasTopic && !thinking', async () => {
+  it('button enabled iff connected && hasDocuments && hasTopic && hasExchanges && !thinking', async () => {
     await fc.assert(
       fc.asyncProperty(
         fc.boolean(),           // connected
         arbSelectedDocuments,   // selectedDocuments
         arbTopicName,           // topicName
         fc.boolean(),           // thinking
-        async (connected: boolean, selectedDocuments: Set<string> | undefined, topicName: string | null, thinking: boolean) => {
+        fc.boolean(),           // hasExchanges
+        async (connected: boolean, selectedDocuments: Set<string> | undefined, topicName: string | null, thinking: boolean, hasExchanges: boolean) => {
           const hasDocuments = selectedDocuments != null && selectedDocuments.size > 0
-          const expectedEnabled = connected && hasDocuments && !!topicName && !thinking
+          const expectedEnabled = connected && hasDocuments && !!topicName && !thinking && hasExchanges
 
           // When topicName is null, the component renders a placeholder — no More button at all
           if (topicName === null) {
@@ -665,10 +690,12 @@ describe('ChatArea (shared) - Property 1: Button enablement preconditions', () =
           // To test the thinking state, we need to put the component into thinking mode.
           // We can't directly set thinking=true via props, so we skip thinking=true combos
           // and rely on the unit tests for that case. The property still covers the
-          // connected × documents × topic dimensions exhaustively.
+          // connected × documents × topic × exchanges dimensions exhaustively.
           if (thinking) {
             return
           }
+
+          const exchanges = hasExchanges ? [sampleExchangeForHistory] : []
 
           const { unmount } = await act(async () =>
             render(
@@ -681,7 +708,7 @@ describe('ChatArea (shared) - Property 1: Button enablement preconditions', () =
                 onClearHistory={vi.fn()}
                 historyVersion={0}
                 selectedDocuments={selectedDocuments}
-                loadHistory={vi.fn().mockResolvedValue([])}
+                loadHistory={vi.fn().mockResolvedValue(exchanges)}
               />
             ),
           )
@@ -735,7 +762,7 @@ describe('ChatArea (shared) - Property 2: Message transmission', () => {
                 onClearHistory={vi.fn()}
                 historyVersion={0}
                 selectedDocuments={selectedDocuments}
-                loadHistory={vi.fn().mockResolvedValue([])}
+                loadHistory={vi.fn().mockResolvedValue([sampleExchangeForHistory])}
               />
             ),
           )
@@ -760,10 +787,10 @@ describe('ChatArea (shared) - Property 2: Message transmission', () => {
   })
 })
 
-describe('ChatArea (shared) - Property 3: Textarea clearing', () => {
+describe('ChatArea (shared) - Property 3: Textarea preservation on More click', () => {
   // Feature: explorer-more-button, Property 3
-  // For any More button click, regardless of current textarea content,
-  // the textarea SHALL be empty after the click.
+  // For any More button click, the textarea content SHALL be preserved
+  // (the More button sends a predefined prompt, not the user's draft).
   // Requirements: 3.3
 
   const arbTextareaContent = fc.oneof(
@@ -774,7 +801,7 @@ describe('ChatArea (shared) - Property 3: Textarea clearing', () => {
     fc.constant('  \t  '),
   )
 
-  it('textarea is empty after More click for any initial content', async () => {
+  it('textarea content is preserved after More click for any initial content', async () => {
     const user = userEvent.setup()
 
     await fc.assert(
@@ -792,7 +819,7 @@ describe('ChatArea (shared) - Property 3: Textarea clearing', () => {
                 onClearHistory={vi.fn()}
                 historyVersion={0}
                 selectedDocuments={new Set(['doc-1'])}
-                loadHistory={vi.fn().mockResolvedValue([])}
+                loadHistory={vi.fn().mockResolvedValue([sampleExchangeForHistory])}
               />
             ),
           )
@@ -813,8 +840,8 @@ describe('ChatArea (shared) - Property 3: Textarea clearing', () => {
           const moreBtn = screen.getByRole('button', { name: /deeper analysis/i })
           await user.click(moreBtn)
 
-          // Textarea must be empty after click
-          expect(textarea.value).toBe('')
+          // Textarea must preserve its content after More click
+          expect(textarea.value).toBe(content)
 
           unmount()
         },
@@ -855,7 +882,7 @@ describe('ChatArea (shared) - Property 4: Thinking state activation', () => {
                 onClearHistory={vi.fn()}
                 historyVersion={0}
                 selectedDocuments={selectedDocuments}
-                loadHistory={vi.fn().mockResolvedValue([])}
+                loadHistory={vi.fn().mockResolvedValue([sampleExchangeForHistory])}
               />
             ),
           )
@@ -1017,7 +1044,7 @@ describe('ChatArea (shared) - Property 5: Pending question display', () => {
                 onClearHistory={vi.fn()}
                 historyVersion={0}
                 selectedDocuments={selectedDocuments}
-                loadHistory={vi.fn().mockResolvedValue([])}
+                loadHistory={vi.fn().mockResolvedValue([sampleExchangeForHistory])}
               />
             ),
           )
@@ -1025,10 +1052,12 @@ describe('ChatArea (shared) - Property 5: Pending question display', () => {
           const moreBtn = screen.getByRole('button', { name: /deeper analysis/i })
           await user.click(moreBtn)
 
-          // The pending question should be rendered in the chat area
-          // It's displayed via a Markdown component inside a div with bg-accent/10
-          const pendingEl = document.querySelector('.bg-accent\\/10')
-          expect(pendingEl).not.toBeNull()
+          // The pending question should be rendered in the chat area.
+          // Multiple elements use bg-accent/10 (loaded exchanges + pending question).
+          // The pending question is always the last one rendered.
+          const allAccent = document.querySelectorAll('.bg-accent\\/10')
+          const pendingEl = allAccent[allAccent.length - 1]
+          expect(pendingEl).toBeDefined()
           expect(pendingEl!.textContent).toContain(DEEPER_ANALYSIS_PROMPT)
 
           unmount()

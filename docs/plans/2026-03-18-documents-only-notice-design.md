@@ -50,18 +50,27 @@ Optional so old history entries (without the field) default to `undefined`/falsy
 
 ### 4. Frontend — ChatMessage rendering
 
-In `ChatMessage.tsx`, in the default rendering path (after `splitAugmentedSections`):
-
-- If `hasBackground` is false AND `exchange.allow_background_knowledge` is true,
-  render a muted notice after the Markdown content:
+In `ChatMessage.tsx`, the default rendering path has an early return when
+`hasBackground` is false. Replace that early return with a fragment that includes
+the conditional notice:
 
 ```typescript
-{!hasBackground && exchange.allow_background_knowledge && (
-  <p className="text-[10px] text-text-dim mt-2 italic">
-    Based entirely on your documents — no background knowledge was needed.
-  </p>
-)}
+if (!hasBackground) {
+  return (
+    <>
+      <Markdown components={mdComponents}>{sanitized}</Markdown>
+      {exchange.allow_background_knowledge && (
+        <p className="text-[10px] text-text-dim mt-2 italic">
+          Based entirely on your documents — no background knowledge was needed.
+        </p>
+      )}
+    </>
+  )
+}
 ```
+
+This keeps the existing fast path (no `splitAugmentedSections` mapping) while
+adding the notice only when `allow_background_knowledge` is true on the exchange.
 
 ### 5. Style
 

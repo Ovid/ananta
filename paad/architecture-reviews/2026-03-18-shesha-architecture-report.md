@@ -359,6 +359,9 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** 5 of 12 config fields (`container_memory_mb`, `execution_timeout_sec`, `sandbox_image`, `max_output_chars`, `keep_raw_files`) lack environment variable mappings, requiring config files for those settings.
 - **Evidence:** `config.py:110-118` (env_map has 7 entries)
 - **Found by:** Error Handling
+- **Status:** Fixed
+- **Status reason:** Added env var mappings for all 6 missing fields (keep_raw_files, container_memory_mb, execution_timeout_sec, sandbox_image, max_output_chars, verify) with proper int/bool parsing
+- **Status date:** 2026-03-18 18:12 UTC
 
 ### [F-25] sanitize_filename defined but never used
 - **Category:** 31 (Dead code / unused dependencies)

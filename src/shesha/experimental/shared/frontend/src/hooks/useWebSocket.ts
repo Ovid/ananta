@@ -40,8 +40,11 @@ export function useWebSocket<M = WSMessage>() {
     }
   }, [])
 
-  const send = useCallback((data: object) => {
-    wsRef.current?.send(JSON.stringify(data))
+  const send = useCallback((data: object): boolean => {
+    const ws = wsRef.current
+    if (!ws || ws.readyState !== WebSocket.OPEN) return false
+    ws.send(JSON.stringify(data))
+    return true
   }, [])
 
   const onMessage = useCallback((fn: (msg: M) => void) => {

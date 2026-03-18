@@ -102,3 +102,26 @@ describe('ChatArea state preservation', () => {
     expect(screen.getByText('Starting')).toBeInTheDocument()
   })
 })
+
+describe('ChatArea (arXiv) - More button integration', () => {
+  it('renders More button when papers are selected', async () => {
+    const props = {
+      topicName: 'physics',
+      connected: true,
+      wsSend: vi.fn(),
+      wsOnMessage: vi.fn().mockReturnValue(() => {}),
+      onViewTrace: vi.fn(),
+      onClearHistory: vi.fn(),
+      historyVersion: 0,
+      selectedPapers: new Set(['2301.00001']),
+      topicPapers: [],
+      onPaperClick: vi.fn(),
+    }
+
+    await act(async () => {
+      render(<ChatArea {...props} />)
+    })
+
+    expect(screen.getByRole('button', { name: /deeper analysis/i })).toBeInTheDocument()
+  })
+})

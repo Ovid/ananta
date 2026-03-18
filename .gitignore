@@ -42,7 +42,8 @@ TODO.md
 src/shesha/_version.py
 /rlm/
 node_modules/
-.kiro/settings
+/package.json
+/package-lock.json
 
 # Shesha runtime data
 shesha_data/

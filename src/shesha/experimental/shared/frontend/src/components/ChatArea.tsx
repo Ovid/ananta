@@ -24,6 +24,17 @@ interface ChatAreaProps {
 
 export type { ChatAreaProps }
 
+/**
+ * Predefined prompt sent when the user clicks the "More" button.
+ * Asks the system to verify, enhance, and re-present its previous analysis.
+ * Referenced by Requirement 3.2 in the explorer-more-button spec.
+ */
+export const DEEPER_ANALYSIS_PROMPT =
+  'Do a deeper dive to verify if your report is complete, accurate, and relevant. ' +
+  'Explain any changes or additions in bullet points and then present the full report ' +
+  'with those changes and/or additions. You must also walk through the entire report, ' +
+  'point by point, and ensure its aligned with the previous report and the changes or additions.'
+
 export default function ChatArea({
   topicName,
   connected,
@@ -110,19 +121,54 @@ export default function ChatArea({
   }, [exchanges, thinking])
 
   const hasDocuments = selectedDocuments != null && selectedDocuments.size > 0
+
+  /** Send button requires non-empty input plus all shared preconditions. */
   const canSend = !!input.trim() && !!topicName && !thinking && connected && hasDocuments
 
-  const handleSend = useCallback(() => {
-    if (!canSend || !selectedDocuments) return
-    const question = input.trim()
-    const msg: Record<string, unknown> = { type: 'query', topic: topicName, question, document_ids: Array.from(selectedDocuments) }
+  /**
+   * More button enabled when all shared preconditions are met:
+   * - A topic is selected (topicName is truthy)
+   * - Not currently processing a query (!thinking)
+   * - WebSocket is connected
+   * - At least one document is selected (hasDocuments)
+   *
+   * Unlike canSend, this does NOT require text in the textarea since the
+   * More button sends the predefined DEEPER_ANALYSIS_PROMPT.
+   * See Requirements 2.1–2.5 in the explorer-more-button spec.
+   */
+  const canSendMore = !!topicName && !thinking && connected && hasDocuments && exchanges.length > 0
+
+  /**
+   * Sends a query message via WebSocket and updates UI state.
+   * Shared by both the Send button (user-typed question) and the More button (predefined prompt).
+   */
+  const sendQuery = useCallback((question: string) => {
+    if (!selectedDocuments) return
+    const msg: Record<string, unknown> = {
+      type: 'query',
+      topic: topicName,
+      question,
+      document_ids: Array.from(selectedDocuments),
+    }
     wsSend(msg)
-    setInput('')
     setPendingQuestion(question)
     setPendingSentAt(new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }))
     setThinking(true)
     setPhase('Starting')
-  }, [canSend, input, topicName, wsSend, selectedDocuments])
+  }, [topicName, wsSend, selectedDocuments])
+
+  /** Sends the user-typed question from the textarea. */
+  const handleSend = useCallback(() => {
+    if (!canSend) return
+    sendQuery(input.trim())
+    setInput('')
+  }, [canSend, input, sendQuery])
+
+  /** Sends the predefined deeper-analysis prompt with one click. */
+  const handleMore = useCallback(() => {
+    if (!canSendMore) return
+    sendQuery(DEEPER_ANALYSIS_PROMPT)
+  }, [canSendMore, sendQuery])
 
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -216,6 +262,17 @@ export default function ChatArea({
             style={{ maxHeight: '6rem' }}
             className="flex-1 bg-surface-2 border border-border rounded px-3 py-2 text-sm text-text-primary resize-none overflow-y-auto focus:outline-none focus:border-accent disabled:opacity-50"
           />
+          {!thinking && (
+            <button
+              onClick={handleMore}
+              disabled={!canSendMore}
+              aria-label="Request deeper analysis"
+              aria-disabled={!canSendMore}
+              className="px-4 py-2 bg-surface-2 border border-border text-text-primary rounded text-sm font-medium hover:bg-surface-3 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              More
+            </button>
+          )}
           {thinking ? (
             <button
               onClick={() => wsSend({ type: 'cancel' })}

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **"More" button** in ChatArea for one-click deeper analysis across all explorers — sends a predefined prompt to verify, enhance, and re-present the previous analysis; requires at least one prior exchange
 - Document context menu now includes a "Delete" option with confirmation dialog (shared TopicSidebar component)
 - **Help panel** (`?` button) for Code Explorer and Document Explorer with customized quick-start guides, FAQs, and keyboard shortcuts
 - **Document Explorer** web application for uploading, organizing, and querying documents (PDF, Word, PowerPoint, Excel, RTF, plain text) via RLM

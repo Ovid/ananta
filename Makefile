@@ -1,4 +1,4 @@
-.PHONY: install test test-frontend lint typecheck format all loc cover
+.PHONY: install test test-frontend lint typecheck typecheck-frontend format all loc cover
 
 install:
 	pip install -e ".[dev]"
@@ -15,11 +15,14 @@ lint:
 typecheck:
 	mypy src/shesha
 
+typecheck-frontend:
+	cd src/shesha/experimental/shared/frontend && npx tsc --noEmit
+
 format:
 	ruff format src tests
 	ruff check --fix src tests
 
-all: format lint typecheck test test-frontend
+all: format lint typecheck typecheck-frontend test test-frontend
 
 cover:
 	pytest --cov=src/shesha --cov-report=term-missing --cov-report=html

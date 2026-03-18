@@ -29,19 +29,3 @@ def safe_path(base: Path, *parts: str) -> Path:
     if not target.is_relative_to(base):
         raise PathTraversalError(f"Path escapes base directory: {'/'.join(parts)}")
     return target
-
-
-def sanitize_filename(name: str) -> str:
-    """
-    Sanitize a filename for safe filesystem storage.
-
-    Removes/replaces: path separators, null bytes, leading dots.
-    """
-    # Remove null bytes
-    name = name.replace("\x00", "")
-    # Replace path separators
-    name = name.replace("/", "_").replace("\\", "_")
-    # Remove leading dots (hidden files)
-    name = name.lstrip(".")
-    # Fallback for empty result
-    return name or "unnamed"

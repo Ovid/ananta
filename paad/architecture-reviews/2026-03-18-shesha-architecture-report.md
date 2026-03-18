@@ -363,6 +363,9 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** `sanitize_filename()` is defined in `security/paths.py`, exported from `security/__init__.py`, and tested, but never called in application code.
 - **Evidence:** `security/paths.py:34-47`
 - **Found by:** Security
+- **Status:** Fixed
+- **Status reason:** Removed function from paths.py, export from __init__.py, and associated tests
+- **Status date:** 2026-03-18 18:05 UTC
 
 ### [F-26] TraceWriter.write_trace() replaced but not removed
 - **Category:** 31 (Dead code / unused dependencies)

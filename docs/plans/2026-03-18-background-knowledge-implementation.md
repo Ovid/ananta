@@ -8,20 +8,26 @@
 
 **Tech Stack:** Python (FastAPI, pytest), TypeScript/React (Vitest, @testing-library/react), Tailwind CSS
 
+**Design doc:** `docs/plans/2026-03-18-background-knowledge-design.md`
+
 ---
 
 ### Task 1: Create augmented system prompt file
 
+**Requirement:** D1 — new `prompts/system_augmented.md` with relaxed grounding + marker instructions
+
 **Files:**
 - Create: `prompts/system_augmented.md`
 
-**Step 1: Create the augmented prompt**
+#### RED
 
-Create `prompts/system_augmented.md` — a copy of `prompts/system.md` with the `CRITICAL:` paragraph (line 3) replaced. Everything else stays identical.
+No test for this task — it's a prompt file, not code. Task 2 will test that the loader picks it up.
 
-```markdown
-You are tasked with answering a query with associated context. You can access, transform, and analyze this context interactively in a REPL environment that can recursively query sub-LLMs, which you are strongly encouraged to use as much as possible. You will be queried iteratively until you provide a final answer.
+#### GREEN
 
+Create `prompts/system_augmented.md` — an exact copy of `prompts/system.md` with the `CRITICAL:` paragraph (line 3) replaced by:
+
+```
 You must PRIORITIZE information found in the provided context documents. When the context documents fully answer the question, use only document content. However, when the documents contain gaps, incomplete coverage, or insufficient detail, you may supplement with your general knowledge. When you do supplement, you MUST clearly separate document-grounded content from your background knowledge using these markers:
 
 <!-- BACKGROUND_KNOWLEDGE_START -->
@@ -31,10 +37,13 @@ Your supplementary content here.
 Place these markers around EVERY section where you use background knowledge. Document-grounded content should NOT be wrapped in these markers. This separation is critical for user trust.
 ```
 
-The rest of the file (from "The REPL environment is initialized with:" onwards) is copied verbatim from `system.md`.
+Everything else (from "The REPL environment is initialized with:" onwards) is copied **verbatim** from `system.md`, preserving all `{{double brace}}` escaping.
 
-**Step 2: Commit**
+#### REFACTOR
 
+Nothing — single file creation.
+
+**Commit:**
 ```bash
 git add prompts/system_augmented.md
 git commit -m "feat: add augmented system prompt allowing background knowledge"
@@ -44,14 +53,16 @@ git commit -m "feat: add augmented system prompt allowing background knowledge"
 
 ### Task 2: Register augmented prompt in validator and update PromptLoader
 
+**Requirement:** D2 — PromptLoader selects prompt based on flag; D5 — security boundary tokens apply to both
+
 **Files:**
-- Modify: `src/shesha/prompts/validator.py:16-51` (add schema entry)
-- Modify: `src/shesha/prompts/loader.py:66-108` (load + render method)
+- Modify: `src/shesha/prompts/validator.py:16-51`
+- Modify: `src/shesha/prompts/loader.py:90-108`
 - Test: `tests/unit/prompts/test_loader.py`
 
-**Step 1: Write failing test — validator accepts system_augmented.md**
+#### RED — Cycle 1: validator accepts the new file
 
-Add to `tests/unit/prompts/test_loader.py`:
+Write test in `tests/unit/prompts/test_loader.py`:
 
 ```python
 def test_loader_loads_system_augmented(valid_prompts_dir: Path):
@@ -64,14 +75,14 @@ def test_loader_loads_system_augmented(valid_prompts_dir: Path):
     assert "Augmented" in raw
 ```
 
-**Step 2: Run test to verify it fails**
+- Expected failure: `PromptValidationError` — `system_augmented.md` not in `PROMPT_SCHEMAS`
+- If it passes unexpectedly: the validator already accepts unknown files, which would be a security concern
 
 Run: `pytest tests/unit/prompts/test_loader.py::test_loader_loads_system_augmented -v`
-Expected: FAIL — `system_augmented.md` not in PROMPT_SCHEMAS
 
-**Step 3: Add schema entry in validator.py**
+#### GREEN — Cycle 1
 
-Add to `PROMPT_SCHEMAS` dict in `src/shesha/prompts/validator.py`:
+Add to `PROMPT_SCHEMAS` in `src/shesha/prompts/validator.py`:
 
 ```python
 "system_augmented.md": PromptSchema(
@@ -81,14 +92,9 @@ Add to `PROMPT_SCHEMAS` dict in `src/shesha/prompts/validator.py`:
 ),
 ```
 
-**Step 4: Run test to verify it passes**
+Run: `pytest tests/unit/prompts/test_loader.py::test_loader_loads_system_augmented -v` → PASS
 
-Run: `pytest tests/unit/prompts/test_loader.py::test_loader_loads_system_augmented -v`
-Expected: PASS
-
-**Step 5: Write failing test — render_system_prompt with augmented=True**
-
-Add to `tests/unit/prompts/test_loader.py`:
+#### RED — Cycle 2: render_system_prompt(augmented=True) uses augmented file
 
 ```python
 def test_render_system_prompt_augmented(valid_prompts_dir: Path):
@@ -99,19 +105,18 @@ def test_render_system_prompt_augmented(valid_prompts_dir: Path):
     loader = PromptLoader(prompts_dir=valid_prompts_dir)
     result = loader.render_system_prompt(augmented=True)
     assert "Augmented prompt" in result
-    # Double braces should be unescaped
-    assert "{chunk}" in result
+    assert "{chunk}" in result  # double braces unescaped
     assert "{{" not in result
 ```
 
-**Step 6: Run test to verify it fails**
+- Expected failure: `TypeError` — `render_system_prompt` doesn't accept `augmented`
+- If it passes unexpectedly: someone already added this parameter
 
 Run: `pytest tests/unit/prompts/test_loader.py::test_render_system_prompt_augmented -v`
-Expected: FAIL — `render_system_prompt` doesn't accept `augmented` parameter
 
-**Step 7: Update render_system_prompt in loader.py**
+#### GREEN — Cycle 2
 
-Modify `render_system_prompt` in `src/shesha/prompts/loader.py`:
+Update `render_system_prompt` in `src/shesha/prompts/loader.py`:
 
 ```python
 def render_system_prompt(
@@ -136,64 +141,59 @@ def render_system_prompt(
     return prompt
 ```
 
-**Step 8: Run tests to verify they pass**
+Run: `pytest tests/unit/prompts/test_loader.py -v` → ALL PASS
 
-Run: `pytest tests/unit/prompts/test_loader.py -v`
-Expected: ALL PASS
-
-**Step 9: Write test — augmented=True falls back to standard when file missing**
+#### RED — Cycle 3: fallback when augmented file is absent
 
 ```python
-def test_render_system_prompt_augmented_fallback(valid_prompts_dir: Path):
+def test_render_system_prompt_augmented_fallback(tmp_path: Path):
     """render_system_prompt falls back to system.md when augmented file is absent."""
-    loader = PromptLoader(prompts_dir=valid_prompts_dir)
+    prompts_dir = tmp_path / "prompts_no_aug"
+    prompts_dir.mkdir()
+    (prompts_dir / "system.md").write_text("Standard only prompt")
+    (prompts_dir / "context_metadata.md").write_text(
+        "{context_type} {context_total_length} {context_lengths}"
+    )
+    (prompts_dir / "iteration_zero.md").write_text("{question}")
+    (prompts_dir / "iteration_continue.md").write_text("{question}")
+    (prompts_dir / "subcall.md").write_text("{instruction}\n\n{content}\n\nRemember: raw data.")
+    (prompts_dir / "code_required.md").write_text("Write code now.")
+
+    loader = PromptLoader(prompts_dir=prompts_dir)
     result = loader.render_system_prompt(augmented=True)
-    # Should use standard system.md (from valid_prompts_dir fixture)
-    assert "System prompt" in result
+    assert "Standard only prompt" in result
 ```
 
-**Step 10: Run test**
+- Expected failure: should PASS immediately (fallback logic already handles this)
+- If it passes: correct — the ternary falls back to `system.md`
 
-Run: `pytest tests/unit/prompts/test_loader.py::test_render_system_prompt_augmented_fallback -v`
-Expected: PASS (fallback logic already handles this)
+**Important:** This test uses its own `tmp_path`-based fixture (NOT `valid_prompts_dir`) so it genuinely tests the absent-file case.
 
-**Step 11: Write test — existing render_system_prompt unchanged**
+#### RED — Cycle 4: default behavior unchanged
 
 ```python
 def test_render_system_prompt_default_unchanged(valid_prompts_dir: Path):
     """render_system_prompt without augmented param still uses system.md."""
-    (valid_prompts_dir / "system_augmented.md").write_text("Augmented")
+    (valid_prompts_dir / "system_augmented.md").write_text("AUGMENTED ONLY CONTENT")
     loader = PromptLoader(prompts_dir=valid_prompts_dir)
     result = loader.render_system_prompt()
-    assert "System prompt" in result
-    assert "Augmented" not in result
+    assert "AUGMENTED ONLY CONTENT" not in result
 ```
 
-**Step 12: Run test**
+- Expected failure: should PASS immediately (default `augmented=False`)
+- If it fails: the default parameter is wrong
 
-Run: `pytest tests/unit/prompts/test_loader.py::test_render_system_prompt_default_unchanged -v`
-Expected: PASS
+Also verify: `pytest tests/unit/prompts/test_loader.py::test_system_prompt_contains_document_only_constraint -v` → PASS
 
-**Step 13: Write test — existing document-only constraint test still passes**
+#### REFACTOR
 
-Run: `pytest tests/unit/prompts/test_loader.py::test_system_prompt_contains_document_only_constraint -v`
-Expected: PASS (standard prompt unchanged)
+- Update `valid_prompts_dir` fixture to include `system_augmented.md` so future tests have it available:
+  ```python
+  (prompts_dir / "system_augmented.md").write_text("Augmented system prompt with no placeholders")
+  ```
+- Run full suite: `pytest tests/unit/prompts/ -v` → ALL PASS
 
-**Step 14: Update valid_prompts_dir fixture**
-
-The fixture in `tests/unit/prompts/test_loader.py` should also create `system_augmented.md` so all tests have it available. Add to the fixture:
-
-```python
-(prompts_dir / "system_augmented.md").write_text("Augmented system prompt with no placeholders")
-```
-
-**Step 15: Run all prompt tests**
-
-Run: `pytest tests/unit/prompts/ -v`
-Expected: ALL PASS
-
-**Step 16: Commit**
-
+**Commit:**
 ```bash
 git add src/shesha/prompts/validator.py src/shesha/prompts/loader.py tests/unit/prompts/test_loader.py
 git commit -m "feat: add augmented prompt support to PromptLoader"
@@ -203,17 +203,15 @@ git commit -m "feat: add augmented prompt support to PromptLoader"
 
 ### Task 3: Update RLMEngine.query() to accept allow_background_knowledge
 
+**Requirement:** D4 — engine passes flag to PromptLoader
+
 **Files:**
-- Modify: `src/shesha/rlm/engine.py:436-459` (query method signature + prompt selection)
-- Test: `tests/unit/rlm/test_engine.py` (or relevant engine test file)
+- Modify: `src/shesha/rlm/engine.py:436-459`
+- Test: find existing engine test file in `tests/unit/rlm/`
 
-**Step 1: Find existing engine tests**
+#### RED
 
-Check: `tests/unit/rlm/` for engine test files. We need to find where `query()` is tested to add our test.
-
-**Step 2: Write failing test**
-
-Add a test that calls `engine.query(..., allow_background_knowledge=True)` and verifies the prompt loader receives `augmented=True`. Use mocking:
+First, find the engine test file: `ls tests/unit/rlm/`. Then add:
 
 ```python
 def test_query_passes_augmented_flag_to_prompt_loader(engine_with_mocks):
@@ -226,17 +224,18 @@ def test_query_passes_augmented_flag_to_prompt_loader(engine_with_mocks):
             allow_background_knowledge=True,
         )
         spy.assert_called_once()
-        call_kwargs = spy.call_args
-        assert call_kwargs.kwargs.get('augmented') is True or call_kwargs[1].get('augmented') is True
+        _, kwargs = spy.call_args
+        assert kwargs.get('augmented') is True
 ```
 
-**Step 3: Run test to verify it fails**
+- Expected failure: `TypeError` — `query()` doesn't accept `allow_background_knowledge`
+- If it passes unexpectedly: someone already added this parameter
 
-Expected: FAIL — `query()` doesn't accept `allow_background_knowledge`
+**Note:** Adapt the test fixture name (`engine_with_mocks`) to match whatever the existing tests use. If no fixture exists, create one with a mocked executor and prompt loader.
 
-**Step 4: Add parameter to query method**
+#### GREEN
 
-In `src/shesha/rlm/engine.py`, modify `query()` signature (line ~436):
+In `src/shesha/rlm/engine.py`, modify `query()` signature (~line 436):
 
 ```python
 def query(
@@ -252,7 +251,7 @@ def query(
 ) -> QueryResult:
 ```
 
-And update line ~459:
+Update prompt rendering (~line 459):
 
 ```python
 system_prompt = self.prompt_loader.render_system_prompt(
@@ -260,17 +259,14 @@ system_prompt = self.prompt_loader.render_system_prompt(
 )
 ```
 
-**Step 5: Run test to verify it passes**
+Run: `pytest tests/unit/rlm/ -v` → ALL PASS
 
-Expected: PASS
+#### REFACTOR
 
-**Step 6: Run all engine tests**
+- Check that no existing callers are broken (all use keyword args, new param has default)
+- No extraction needed — single line change
 
-Run: `pytest tests/unit/rlm/ -v`
-Expected: ALL PASS (existing tests use default `allow_background_knowledge=False`)
-
-**Step 7: Commit**
-
+**Commit:**
 ```bash
 git add src/shesha/rlm/engine.py tests/unit/rlm/
 git commit -m "feat: pass allow_background_knowledge through RLMEngine to PromptLoader"
@@ -280,11 +276,14 @@ git commit -m "feat: pass allow_background_knowledge through RLMEngine to Prompt
 
 ### Task 4: Update WebSocket handlers to pass allow_background_knowledge
 
-**Files:**
-- Modify: `src/shesha/experimental/shared/websockets.py:148-272` (_handle_query) and `324-527` (handle_multi_project_query)
-- Test: `tests/unit/experimental/shared/test_ws.py`
+**Requirement:** D3 — `allow_background_knowledge` field flows through WebSocket
 
-**Step 1: Write failing test — _handle_query passes flag to engine**
+**Files:**
+- Modify: `src/shesha/experimental/shared/websockets.py:148-272` and `324-527`
+- Test: `tests/unit/experimental/shared/test_ws.py`
+- Test: `tests/unit/experimental/shared/test_ws_multi.py`
+
+#### RED — Cycle 1: _handle_query passes flag
 
 Add to `tests/unit/experimental/shared/test_ws.py`:
 
@@ -326,76 +325,68 @@ def test_ws_query_passes_allow_background_knowledge(client: TestClient, mock_sta
                 if msg["type"] in ("complete", "error"):
                     break
 
-    # Verify engine.query was called with allow_background_knowledge=True
     call_kwargs = mock_project._rlm_engine.query.call_args
-    assert call_kwargs.kwargs.get("allow_background_knowledge") is True or \
-        call_kwargs[1].get("allow_background_knowledge") is True
+    assert call_kwargs.kwargs.get("allow_background_knowledge") is True
 ```
 
-**Step 2: Run test to verify it fails**
+- Expected failure: assertion fails — `allow_background_knowledge` not in call kwargs
+- If it passes unexpectedly: the handler already reads and passes the field
 
-Run: `pytest tests/unit/experimental/shared/test_ws.py::test_ws_query_passes_allow_background_knowledge -v`
-Expected: FAIL — `allow_background_knowledge` not passed to engine
+#### GREEN — Cycle 1
 
-**Step 3: Update _handle_query in websockets.py**
-
-In `_handle_query` (line ~158), read the flag from data:
+In `_handle_query` (~line 158), after reading `question`:
 
 ```python
 allow_background = bool(data.get("allow_background_knowledge", False))
 ```
 
-Then pass it to `rlm_engine.query()` (in the lambda around line ~263):
+In the `rlm_engine.query()` lambda (~line 263), add:
 
 ```python
-lambda: rlm_engine.query(
-    documents=[d.content for d in loaded_docs],
-    question=full_question,
-    doc_names=[d.name for d in loaded_docs],
-    on_progress=on_progress,
-    storage=storage,
-    project_id=project_id,
-    cancel_event=cancel_event,
-    allow_background_knowledge=allow_background,
-),
+allow_background_knowledge=allow_background,
 ```
 
-**Step 4: Run test to verify it passes**
+Run: `pytest tests/unit/experimental/shared/test_ws.py -v` → ALL PASS
 
-Expected: PASS
+#### RED — Cycle 2: handle_multi_project_query passes flag
 
-**Step 5: Update handle_multi_project_query similarly**
+Add to `tests/unit/experimental/shared/test_ws_multi.py` (adapt to existing fixtures in that file):
 
-In `handle_multi_project_query` (line ~341), read the flag:
+```python
+def test_multi_project_query_passes_allow_background_knowledge(...) -> None:
+    """Multi-project query passes allow_background_knowledge to engine."""
+    # Setup similar to existing multi-project tests, then:
+    # Send query with allow_background_knowledge: True
+    # Assert engine.query was called with allow_background_knowledge=True
+```
+
+- Expected failure: flag not passed through
+- If it passes unexpectedly: handler already does this
+
+#### GREEN — Cycle 2
+
+In `handle_multi_project_query` (~line 341), after reading `question`:
 
 ```python
 allow_background = bool(data.get("allow_background_knowledge", False))
 ```
 
-Pass to `rlm_engine.query()` (in the lambda around line ~468):
+In the `rlm_engine.query()` lambda (~line 468), add:
 
 ```python
-lambda: rlm_engine.query(
-    documents=[d.content for d in loaded_docs],
-    question=full_question,
-    doc_names=[d.name for d in loaded_docs],
-    on_progress=on_progress,
-    storage=storage,
-    project_id=first_project_id,
-    cancel_event=cancel_event,
-    allow_background_knowledge=allow_background,
-),
+allow_background_knowledge=allow_background,
 ```
 
-**Step 6: Run all websocket tests**
+Run: `pytest tests/unit/experimental/shared/test_ws_multi.py -v` → ALL PASS
 
-Run: `pytest tests/unit/experimental/shared/test_ws.py -v`
-Expected: ALL PASS
+#### REFACTOR
 
-**Step 7: Commit**
+- Verify both handlers read the field identically (same `bool(data.get(...))` pattern)
+- Run all WS tests: `pytest tests/unit/experimental/shared/ -v` → ALL PASS
 
+**Commit:**
 ```bash
-git add src/shesha/experimental/shared/websockets.py tests/unit/experimental/shared/test_ws.py
+git add src/shesha/experimental/shared/websockets.py tests/unit/experimental/shared/test_ws.py tests/unit/experimental/shared/test_ws_multi.py
 git commit -m "feat: pass allow_background_knowledge through WebSocket to engine"
 ```
 
@@ -403,17 +394,18 @@ git commit -m "feat: pass allow_background_knowledge through WebSocket to engine
 
 ### Task 5: Frontend — splitAugmentedSections utility
 
+**Requirement:** D10 — parsing utility for background knowledge markers
+
 **Files:**
 - Create: `src/shesha/experimental/shared/frontend/src/utils/augmented.ts`
 - Test: `src/shesha/experimental/shared/frontend/src/utils/__tests__/augmented.test.ts`
 
-**Step 1: Write failing tests**
+#### RED
 
 Create `src/shesha/experimental/shared/frontend/src/utils/__tests__/augmented.test.ts`:
 
 ```typescript
 import { describe, it, expect } from 'vitest'
-
 import { splitAugmentedSections } from '../augmented'
 
 describe('splitAugmentedSections', () => {
@@ -470,15 +462,23 @@ describe('splitAugmentedSections', () => {
     const result = splitAugmentedSections(input)
     expect(result[1].content).toBe('Line 1\n\nLine 2\n\n- bullet')
   })
+
+  it('treats malformed markers (no END) as document content', () => {
+    const input = 'Before\n<!-- BACKGROUND_KNOWLEDGE_START -->\nOrphan content'
+    const result = splitAugmentedSections(input)
+    expect(result).toHaveLength(2)
+    expect(result[0]).toEqual({ type: 'document', content: 'Before' })
+    expect(result[1]).toEqual({ type: 'document', content: 'Orphan content' })
+  })
 })
 ```
 
-**Step 2: Run tests to verify they fail**
+- Expected failure: module not found
+- If it passes unexpectedly: file already exists
 
 Run: `cd src/shesha/experimental/shared/frontend && npx vitest run src/utils/__tests__/augmented.test.ts`
-Expected: FAIL — module not found
 
-**Step 3: Implement splitAugmentedSections**
+#### GREEN
 
 Create `src/shesha/experimental/shared/frontend/src/utils/augmented.ts`:
 
@@ -505,27 +505,22 @@ export function splitAugmentedSections(text: string): AugmentedSection[] {
   while (remaining.length > 0) {
     const startIdx = remaining.indexOf(BG_START)
     if (startIdx === -1) {
-      // No more markers — rest is document content
       const trimmed = remaining.trim()
       if (trimmed) sections.push({ type: 'document', content: trimmed })
       break
     }
 
-    // Document content before the marker
     const before = remaining.slice(0, startIdx).trim()
     if (before) sections.push({ type: 'document', content: before })
 
-    // Find the end marker
     const afterStart = remaining.slice(startIdx + BG_START.length)
     const endIdx = afterStart.indexOf(BG_END)
     if (endIdx === -1) {
-      // No end marker — treat rest as document content (malformed)
       const rest = afterStart.trim()
       if (rest) sections.push({ type: 'document', content: rest })
       break
     }
 
-    // Background content between markers
     const bgContent = afterStart.slice(0, endIdx).trim()
     if (bgContent) sections.push({ type: 'background', content: bgContent })
 
@@ -536,22 +531,18 @@ export function splitAugmentedSections(text: string): AugmentedSection[] {
 }
 ```
 
-**Step 4: Run tests to verify they pass**
+Run: `cd src/shesha/experimental/shared/frontend && npx vitest run src/utils/__tests__/augmented.test.ts` → ALL PASS
 
-Run: `cd src/shesha/experimental/shared/frontend && npx vitest run src/utils/__tests__/augmented.test.ts`
-Expected: ALL PASS
+#### REFACTOR
 
-**Step 5: Export from barrel**
+- Export from barrel in `src/shesha/experimental/shared/frontend/src/index.ts`:
+  ```typescript
+  export { splitAugmentedSections } from './utils/augmented'
+  export type { AugmentedSection } from './utils/augmented'
+  ```
+- No duplication to extract
 
-Add to `src/shesha/experimental/shared/frontend/src/index.ts`:
-
-```typescript
-export { splitAugmentedSections } from './utils/augmented'
-export type { AugmentedSection } from './utils/augmented'
-```
-
-**Step 6: Commit**
-
+**Commit:**
 ```bash
 git add src/shesha/experimental/shared/frontend/src/utils/augmented.ts src/shesha/experimental/shared/frontend/src/utils/__tests__/augmented.test.ts src/shesha/experimental/shared/frontend/src/index.ts
 git commit -m "feat: add splitAugmentedSections utility for parsing background knowledge markers"
@@ -561,13 +552,15 @@ git commit -m "feat: add splitAugmentedSections utility for parsing background k
 
 ### Task 6: Frontend — Update ChatMessage to render augmented sections
 
+**Requirement:** D11 (tinted bg), D12 (text label), D13 (ARIA), D14 (contrast)
+
 **Files:**
 - Modify: `src/shesha/experimental/shared/frontend/src/components/ChatMessage.tsx`
 - Test: `src/shesha/experimental/shared/frontend/src/components/__tests__/ChatMessage.test.tsx`
 
-**Step 1: Write failing tests**
+#### RED
 
-Add to `src/shesha/experimental/shared/frontend/src/components/__tests__/ChatMessage.test.tsx`:
+Add to `ChatMessage.test.tsx`:
 
 ```typescript
 describe('ChatMessage — background knowledge rendering', () => {
@@ -576,9 +569,7 @@ describe('ChatMessage — background knowledge rendering', () => {
       ...baseExchange,
       answer: 'Document content.\n<!-- BACKGROUND_KNOWLEDGE_START -->\nInferred content.\n<!-- BACKGROUND_KNOWLEDGE_END -->',
     }
-    render(
-      <ChatMessage exchange={exchange} onViewTrace={vi.fn()} />
-    )
+    render(<ChatMessage exchange={exchange} onViewTrace={vi.fn()} />)
     expect(screen.getByText('Document content.')).toBeInTheDocument()
     expect(screen.getByText('Inferred content.')).toBeInTheDocument()
     expect(screen.getByText('Background knowledge')).toBeInTheDocument()
@@ -586,9 +577,7 @@ describe('ChatMessage — background knowledge rendering', () => {
   })
 
   it('does not render background label when no markers present', () => {
-    render(
-      <ChatMessage exchange={baseExchange} onViewTrace={vi.fn()} />
-    )
+    render(<ChatMessage exchange={baseExchange} onViewTrace={vi.fn()} />)
     expect(screen.queryByText('Background knowledge')).not.toBeInTheDocument()
     expect(screen.queryByRole('complementary')).not.toBeInTheDocument()
   })
@@ -599,29 +588,29 @@ describe('ChatMessage — background knowledge rendering', () => {
       answer: 'Doc.\n<!-- BACKGROUND_KNOWLEDGE_START -->\nBg.\n<!-- BACKGROUND_KNOWLEDGE_END -->',
     }
     const customRenderer = (answer: string) => <span data-testid="custom">{answer}</span>
-    render(
-      <ChatMessage exchange={exchange} onViewTrace={vi.fn()} renderAnswer={customRenderer} />
-    )
-    // Custom renderer gets raw answer; no augmented parsing
+    render(<ChatMessage exchange={exchange} onViewTrace={vi.fn()} renderAnswer={customRenderer} />)
     expect(screen.getByTestId('custom')).toBeInTheDocument()
     expect(screen.queryByText('Background knowledge')).not.toBeInTheDocument()
   })
 })
 ```
 
-**Step 2: Run tests to verify they fail**
+- Expected failure: markers rendered as raw text or stripped by `stripBoundaryMarkers`
+- If it passes unexpectedly: augmented rendering already exists
 
 Run: `cd src/shesha/experimental/shared/frontend && npx vitest run src/components/__tests__/ChatMessage.test.tsx`
-Expected: FAIL — background knowledge markers rendered as raw text or stripped
 
-**Step 3: Update ChatMessage.tsx**
+#### GREEN
 
-Modify `ChatMessage.tsx` to use `splitAugmentedSections` in the default (no `renderAnswer`) code path. Replace the default markdown rendering:
+In `ChatMessage.tsx`, add import:
 
 ```typescript
 import { splitAugmentedSections } from '../utils/augmented'
+```
 
-// Inside the component, replace the answer rendering block:
+Replace the default answer rendering block (the `renderAnswer ? ... : <Markdown>` ternary):
+
+```typescript
 {renderAnswer
   ? renderAnswer(exchange.answer)
   : (() => {
@@ -655,18 +644,14 @@ import { splitAugmentedSections } from '../utils/augmented'
     })()}
 ```
 
-**Step 4: Run tests to verify they pass**
+Run: `cd src/shesha/experimental/shared/frontend && npx vitest run src/components/__tests__/ChatMessage.test.tsx` → ALL PASS
 
-Run: `cd src/shesha/experimental/shared/frontend && npx vitest run src/components/__tests__/ChatMessage.test.tsx`
-Expected: ALL PASS
+#### REFACTOR
 
-**Step 5: Run all shared frontend tests**
+- Verify contrast: `text-amber` on `bg-amber/5` — amber text on near-white bg exceeds 4.5:1 in light mode; `dark:bg-amber/10` maintains ratio in dark mode. Visually inspect both themes.
+- Run all shared frontend tests: `cd src/shesha/experimental/shared/frontend && npx vitest run` → ALL PASS
 
-Run: `cd src/shesha/experimental/shared/frontend && npx vitest run`
-Expected: ALL PASS
-
-**Step 6: Commit**
-
+**Commit:**
 ```bash
 git add src/shesha/experimental/shared/frontend/src/components/ChatMessage.tsx src/shesha/experimental/shared/frontend/src/components/__tests__/ChatMessage.test.tsx
 git commit -m "feat: render background knowledge sections with tinted block and ARIA role"
@@ -676,13 +661,15 @@ git commit -m "feat: render background knowledge sections with tinted block and 
 
 ### Task 7: Frontend — Add bottomControls slot to TopicSidebar
 
+**Requirement:** D9 — TopicSidebar `bottomControls` slot
+
 **Files:**
-- Modify: `src/shesha/experimental/shared/frontend/src/components/TopicSidebar.tsx:7-28` (props) and `320-524` (render)
+- Modify: `src/shesha/experimental/shared/frontend/src/components/TopicSidebar.tsx`
 - Test: `src/shesha/experimental/shared/frontend/src/components/__tests__/TopicSidebar.test.tsx`
 
-**Step 1: Write failing test**
+#### RED
 
-Add to TopicSidebar tests:
+Add to `TopicSidebar.test.tsx`:
 
 ```typescript
 it('renders bottomControls slot when provided', async () => {
@@ -690,7 +677,7 @@ it('renders bottomControls slot when provided', async () => {
   render(
     <TopicSidebar {...props} bottomControls={<div data-testid="bottom-ctrl">My Control</div>} />
   )
-  await screen.findByText('chess') // wait for topics to load
+  await screen.findByText('chess')
   expect(screen.getByTestId('bottom-ctrl')).toBeInTheDocument()
   expect(screen.getByText('My Control')).toBeInTheDocument()
 })
@@ -703,41 +690,42 @@ it('does not render bottomControls area when not provided', async () => {
 })
 ```
 
-**Step 2: Run tests to verify they fail**
+- Expected failure: `bottomControls` prop not recognized / content not rendered
+- If it passes unexpectedly: prop already exists
 
-Expected: FAIL — `bottomControls` prop not recognized / not rendered
+Run: `cd src/shesha/experimental/shared/frontend && npx vitest run src/components/__tests__/TopicSidebar.test.tsx`
 
-**Step 3: Add bottomControls prop to TopicSidebar**
+#### GREEN
 
 In `TopicSidebar.tsx`:
 
-Add to `TopicSidebarProps` interface:
-```typescript
-bottomControls?: ReactNode
-```
+1. Add to `TopicSidebarProps` interface:
+   ```typescript
+   bottomControls?: ReactNode
+   ```
 
-Add to destructured props:
-```typescript
-bottomControls,
-```
+2. Add to destructured props:
+   ```typescript
+   bottomControls,
+   ```
 
-Render it between the topic list `</div>` (end of the scrollable area, line ~491) and the `{deletingTopic && ...}` confirm dialog:
+3. Render between the topic list `</div>` (~line 491) and the `{deletingTopic && ...}` confirm dialog:
+   ```typescript
+   {bottomControls && (
+     <div className="border-t border-border px-3 py-2">
+       {bottomControls}
+     </div>
+   )}
+   ```
 
-```typescript
-{bottomControls && (
-  <div className="border-t border-border px-3 py-2">
-    {bottomControls}
-  </div>
-)}
-```
+Run: `cd src/shesha/experimental/shared/frontend && npx vitest run src/components/__tests__/TopicSidebar.test.tsx` → ALL PASS
 
-**Step 4: Run tests to verify they pass**
+#### REFACTOR
 
-Run: `cd src/shesha/experimental/shared/frontend && npx vitest run src/components/__tests__/TopicSidebar.test.tsx`
-Expected: ALL PASS
+- No duplication — single slot addition
+- Verify existing TopicSidebar tests still pass
 
-**Step 5: Commit**
-
+**Commit:**
 ```bash
 git add src/shesha/experimental/shared/frontend/src/components/TopicSidebar.tsx src/shesha/experimental/shared/frontend/src/components/__tests__/TopicSidebar.test.tsx
 git commit -m "feat: add bottomControls slot to TopicSidebar"
@@ -747,13 +735,15 @@ git commit -m "feat: add bottomControls slot to TopicSidebar"
 
 ### Task 8: Frontend — Update ChatArea to accept and send allowBackgroundKnowledge
 
+**Requirement:** D3 (WS message field), D15 ("More" respects checkbox)
+
 **Files:**
-- Modify: `src/shesha/experimental/shared/frontend/src/components/ChatArea.tsx:9-23` (props) and `145-158` (sendQuery)
+- Modify: `src/shesha/experimental/shared/frontend/src/components/ChatArea.tsx`
 - Test: `src/shesha/experimental/shared/frontend/src/components/__tests__/ChatArea.test.tsx`
 
-**Step 1: Write failing test — flag included in WebSocket message**
+#### RED
 
-Add to ChatArea tests:
+Add to `ChatArea.test.tsx`:
 
 ```typescript
 describe('ChatArea — allowBackgroundKnowledge', () => {
@@ -806,50 +796,44 @@ describe('ChatArea — allowBackgroundKnowledge', () => {
 })
 ```
 
-**Step 2: Run tests to verify they fail**
+- Expected failure: `allowBackgroundKnowledge` prop not recognized, field missing from WS message
+- If it passes unexpectedly: prop already exists
 
 Run: `cd src/shesha/experimental/shared/frontend && npx vitest run src/components/__tests__/ChatArea.test.tsx`
-Expected: FAIL — `allowBackgroundKnowledge` prop not recognized
 
-**Step 3: Update ChatArea.tsx**
+#### GREEN
 
-Add to `ChatAreaProps` interface:
-```typescript
-allowBackgroundKnowledge?: boolean
-```
+In `ChatArea.tsx`:
 
-Add to destructured props:
-```typescript
-allowBackgroundKnowledge = false,
-```
+1. Add to `ChatAreaProps` interface:
+   ```typescript
+   allowBackgroundKnowledge?: boolean
+   ```
 
-Update `sendQuery` to include the flag in the WebSocket message (line ~147-153):
+2. Add to destructured props:
+   ```typescript
+   allowBackgroundKnowledge = false,
+   ```
 
-```typescript
-const msg: Record<string, unknown> = {
-  type: 'query',
-  topic: topicName,
-  question,
-  document_ids: Array.from(selectedDocuments),
-  allow_background_knowledge: allowBackgroundKnowledge,
-}
-```
+3. Update `sendQuery` message (~line 147-153):
+   ```typescript
+   const msg: Record<string, unknown> = {
+     type: 'query',
+     topic: topicName,
+     question,
+     document_ids: Array.from(selectedDocuments),
+     allow_background_knowledge: allowBackgroundKnowledge,
+   }
+   ```
 
-**Step 4: Run tests to verify they pass**
+Run: `cd src/shesha/experimental/shared/frontend && npx vitest run src/components/__tests__/ChatArea.test.tsx` → ALL PASS
 
-Run: `cd src/shesha/experimental/shared/frontend && npx vitest run src/components/__tests__/ChatArea.test.tsx`
-Expected: ALL PASS
+#### REFACTOR
 
-**Step 5: Update defaultProps in test file**
+- Verify `sendQuery` dependency array includes `allowBackgroundKnowledge`
+- Run all ChatArea tests to confirm no regressions
 
-Update the `defaultProps` function to include `allowBackgroundKnowledge`:
-```typescript
-allowBackgroundKnowledge: false,
-```
-(Only if needed for existing tests — check if the new prop's default covers it.)
-
-**Step 6: Commit**
-
+**Commit:**
 ```bash
 git add src/shesha/experimental/shared/frontend/src/components/ChatArea.tsx src/shesha/experimental/shared/frontend/src/components/__tests__/ChatArea.test.tsx
 git commit -m "feat: ChatArea sends allow_background_knowledge in query messages"
@@ -859,53 +843,58 @@ git commit -m "feat: ChatArea sends allow_background_knowledge in query messages
 
 ### Task 9: Frontend — Wire up checkbox in all three explorer App.tsx files
 
+**Requirement:** D6 (checkbox), D7 (default unchecked), D8 (state in App.tsx)
+
 **Files:**
 - Modify: `src/shesha/experimental/code_explorer/frontend/src/App.tsx`
 - Modify: `src/shesha/experimental/web/frontend/src/App.tsx`
 - Modify: `src/shesha/experimental/document_explorer/frontend/src/App.tsx`
 
-For each explorer App.tsx:
+#### RED
 
-**Step 1: Add state**
+No unit test for this task — it's wiring state to existing tested components. Visual verification required.
 
-```typescript
-const [allowBgKnowledge, setAllowBgKnowledge] = useState(false)
-```
+#### GREEN
 
-**Step 2: Pass bottomControls to TopicSidebar**
+For each explorer's `App.tsx`:
 
-```typescript
-<TopicSidebar
-  {...existingProps}
-  bottomControls={
-    <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer select-none">
-      <input
-        type="checkbox"
-        checked={allowBgKnowledge}
-        onChange={e => setAllowBgKnowledge(e.target.checked)}
-        className="accent-accent"
-      />
-      Allow background knowledge
-    </label>
-  }
-/>
-```
+1. Add state:
+   ```typescript
+   const [allowBgKnowledge, setAllowBgKnowledge] = useState(false)
+   ```
 
-**Step 3: Pass allowBackgroundKnowledge to ChatArea**
+2. Pass `bottomControls` to TopicSidebar:
+   ```typescript
+   <TopicSidebar
+     {...existingProps}
+     bottomControls={
+       <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer select-none">
+         <input
+           type="checkbox"
+           checked={allowBgKnowledge}
+           onChange={e => setAllowBgKnowledge(e.target.checked)}
+           className="accent-accent"
+         />
+         Allow background knowledge
+       </label>
+     }
+   />
+   ```
 
-```typescript
-<ChatArea
-  {...existingProps}
-  allowBackgroundKnowledge={allowBgKnowledge}
-/>
-```
+3. Pass `allowBackgroundKnowledge` to ChatArea:
+   ```typescript
+   <ChatArea
+     {...existingProps}
+     allowBackgroundKnowledge={allowBgKnowledge}
+   />
+   ```
 
-**Step 4: Verify manually**
+#### REFACTOR
 
-Run each explorer and confirm the checkbox appears below topics and affects query behavior.
+- Check all three explorers have identical checkbox markup (DRY — but extracting a shared component is premature for a single checkbox)
+- Verify each explorer still builds: check for TypeScript errors
 
-**Step 5: Commit**
-
+**Commit:**
 ```bash
 git add src/shesha/experimental/code_explorer/frontend/src/App.tsx src/shesha/experimental/web/frontend/src/App.tsx src/shesha/experimental/document_explorer/frontend/src/App.tsx
 git commit -m "feat: wire up Allow background knowledge checkbox in all explorers"
@@ -913,14 +902,84 @@ git commit -m "feat: wire up Allow background knowledge checkbox in all explorer
 
 ---
 
-### Task 10: Update Help Panel FAQ in all three explorers
+### Task 10: Frontend — "More" button hint when checkbox is off
+
+**Requirement:** D16 — hint nudging user to enable background knowledge
 
 **Files:**
-- Modify: `src/shesha/experimental/code_explorer/frontend/src/App.tsx` (faq array, ~line 331)
-- Modify: `src/shesha/experimental/web/frontend/src/App.tsx` (faq array, ~line 323)
-- Modify: `src/shesha/experimental/document_explorer/frontend/src/App.tsx` (faq array, ~line 305)
+- Modify: `src/shesha/experimental/shared/frontend/src/components/ChatArea.tsx`
+- Test: `src/shesha/experimental/shared/frontend/src/components/__tests__/ChatArea.test.tsx`
 
-**Step 1: Add FAQ entries to each explorer**
+#### RED
+
+Add to `ChatArea.test.tsx`:
+
+```typescript
+describe('ChatArea — background knowledge hint', () => {
+  it('shows hint below More button when checkbox is off and exchanges exist', async () => {
+    await renderChatArea({ allowBackgroundKnowledge: false })
+    expect(screen.getByText(/Enable.*background knowledge/i)).toBeInTheDocument()
+  })
+
+  it('does not show hint when checkbox is on', async () => {
+    await renderChatArea({ allowBackgroundKnowledge: true })
+    expect(screen.queryByText(/Enable.*background knowledge/i)).not.toBeInTheDocument()
+  })
+
+  it('does not show hint when no exchanges exist', async () => {
+    await renderChatArea({
+      allowBackgroundKnowledge: false,
+      loadHistory: vi.fn().mockResolvedValue([]),
+    })
+    expect(screen.queryByText(/Enable.*background knowledge/i)).not.toBeInTheDocument()
+  })
+})
+```
+
+- Expected failure: hint text not found in DOM
+- If it passes unexpectedly: hint already exists
+
+#### GREEN
+
+In `ChatArea.tsx`, below the "More" button (inside the `{!thinking && ...}` block), add:
+
+```typescript
+{!allowBackgroundKnowledge && exchanges.length > 0 && !thinking && (
+  <span className="text-[10px] text-text-dim">
+    Enable "Allow background knowledge" for more complete analysis
+  </span>
+)}
+```
+
+Run: `cd src/shesha/experimental/shared/frontend && npx vitest run src/components/__tests__/ChatArea.test.tsx` → ALL PASS
+
+#### REFACTOR
+
+- Ensure the hint doesn't clutter the input area — it's 10px text, same size as status text
+- Run all ChatArea tests
+
+**Commit:**
+```bash
+git add src/shesha/experimental/shared/frontend/src/components/ChatArea.tsx src/shesha/experimental/shared/frontend/src/components/__tests__/ChatArea.test.tsx
+git commit -m "feat: show background knowledge hint below More button when checkbox is off"
+```
+
+---
+
+### Task 11: Update Help Panel FAQ in all three explorers
+
+**Requirement:** D17, D18 — FAQ entries for "More" button and background knowledge
+
+**Files:**
+- Modify: `src/shesha/experimental/code_explorer/frontend/src/App.tsx` (~line 331)
+- Modify: `src/shesha/experimental/web/frontend/src/App.tsx` (~line 323)
+- Modify: `src/shesha/experimental/document_explorer/frontend/src/App.tsx` (~line 305)
+
+#### RED
+
+No unit test — FAQ content is static data. Visual verification.
+
+#### GREEN
 
 Add these two entries to the `faq` arrays in all three explorer `App.tsx` files:
 
@@ -929,8 +988,11 @@ Add these two entries to the `faq` arrays in all three explorer `App.tsx` files:
 { q: 'What does "Allow background knowledge" do?', a: 'By default, answers are based strictly on your documents \u2014 this reduces hallucinations but may leave gaps. When enabled, the AI supplements document content with its general knowledge. Background knowledge sections are visually marked so you can tell what came from your documents versus the AI.' },
 ```
 
-**Step 2: Commit**
+#### REFACTOR
 
+- Verify all three explorers have identical FAQ text (copy-paste consistency)
+
+**Commit:**
 ```bash
 git add src/shesha/experimental/code_explorer/frontend/src/App.tsx src/shesha/experimental/web/frontend/src/App.tsx src/shesha/experimental/document_explorer/frontend/src/App.tsx
 git commit -m "docs: add FAQ entries for More button and background knowledge toggle"
@@ -938,19 +1000,22 @@ git commit -m "docs: add FAQ entries for More button and background knowledge to
 
 ---
 
-### Task 11: Update CHANGELOG
+### Task 12: Update CHANGELOG
+
+**Requirement:** A1 — changelog entry
 
 **Files:**
 - Modify: `CHANGELOG.md`
 
-**Step 1: Add entry under [Unreleased] > Added**
+#### GREEN
+
+Add under `[Unreleased]` > `Added`:
 
 ```markdown
 - **"Allow background knowledge" toggle** in all explorer sidebars — lets the LLM supplement document content with its training knowledge; background knowledge sections are visually distinguished with a tinted block, left border, and "Background knowledge" label with ARIA accessibility support
 ```
 
-**Step 2: Commit**
-
+**Commit:**
 ```bash
 git add CHANGELOG.md
 git commit -m "docs: add CHANGELOG entry for background knowledge toggle"
@@ -958,16 +1023,10 @@ git commit -m "docs: add CHANGELOG entry for background knowledge toggle"
 
 ---
 
-### Task 12: Run full test suite
+### Task 13: Run full test suite
 
-**Step 1: Run all Python tests**
+#### Verification
 
-Run: `make all`
-Expected: ALL PASS
-
-**Step 2: Run all frontend tests**
-
-Run: `cd src/shesha/experimental/shared/frontend && npx vitest run`
-Expected: ALL PASS
-
-**Step 3: Fix any failures, commit fixes**
+1. Python: `make all` → ALL PASS
+2. Frontend: `cd src/shesha/experimental/shared/frontend && npx vitest run` → ALL PASS
+3. Fix any failures, commit fixes

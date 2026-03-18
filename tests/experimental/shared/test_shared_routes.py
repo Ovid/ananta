@@ -109,6 +109,30 @@ class TestGetSessionCallback:
         assert len(resp.json()["exchanges"]) == 1
         assert resp.json()["exchanges"][0]["question"] == "hi"
 
+    def test_history_includes_allow_background_knowledge(self, tmp_path: Path) -> None:
+        state = _make_state(tmp_path)
+        state.topic_mgr.resolve.return_value = "proj-1"
+
+        session = WebConversationSession(tmp_path)
+        session.add_exchange(
+            question="bg q",
+            answer="bg a",
+            trace_id=None,
+            tokens={"prompt": 1, "completion": 1, "total": 2},
+            execution_time=0.1,
+            model="test",
+            allow_background_knowledge=True,
+        )
+
+        def custom_session(s: object, topic_name: str) -> WebConversationSession:
+            return session
+
+        app = _make_app(state, get_session=custom_session)
+        client = TestClient(app)
+        resp = client.get("/api/topics/my-topic/history")
+        assert resp.status_code == 200
+        assert resp.json()["exchanges"][0]["allow_background_knowledge"] is True
+
     def test_custom_session_used_for_export(self, tmp_path: Path) -> None:
         state = _make_state(tmp_path)
         state.topic_mgr.resolve.return_value = "proj-1"

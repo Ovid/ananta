@@ -157,6 +157,7 @@ async def _handle_query(
     """Execute a query and stream progress via the WebSocket."""
     topic = str(data.get("topic", ""))
     question = str(data.get("question", ""))
+    allow_background = bool(data.get("allow_background_knowledge", False))
 
     project_id = state.topic_mgr.resolve(topic)
     if not project_id:
@@ -268,6 +269,7 @@ async def _handle_query(
                 storage=storage,
                 project_id=project_id,
                 cancel_event=cancel_event,
+                allow_background_knowledge=allow_background,
             ),
         )
     except Exception as exc:
@@ -339,6 +341,7 @@ async def handle_multi_project_query(
     topic-based session resolution.
     """
     question = str(data.get("question", ""))
+    allow_background = bool(data.get("allow_background_knowledge", False))
     document_ids = data.get("document_ids")
 
     if not document_ids or not isinstance(document_ids, list):
@@ -473,6 +476,7 @@ async def handle_multi_project_query(
                 storage=storage,
                 project_id=first_project_id,
                 cancel_event=cancel_event,
+                allow_background_knowledge=allow_background,
             ),
         )
     except Exception as exc:

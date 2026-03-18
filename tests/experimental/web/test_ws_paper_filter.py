@@ -56,7 +56,7 @@ def _make_state(doc_names: list[str]) -> MagicMock:
     state.topic_mgr.resolve.return_value = "proj-123"
 
     # Storage mock
-    storage = state.topic_mgr._storage
+    storage = state.shesha.storage
     storage.list_documents.return_value = doc_names
     storage.load_all_documents.return_value = [_make_doc(n) for n in doc_names]
     storage.get_document.side_effect = lambda pid, name: _make_doc(name)
@@ -66,7 +66,7 @@ def _make_state(doc_names: list[str]) -> MagicMock:
     project = MagicMock()
     project.project_id = "proj-123"
     project._storage = storage
-    project._rlm_engine.query.return_value = FakeQueryResult()
+    project.rlm_engine.query.return_value = FakeQueryResult()
     project.query.return_value = FakeQueryResult()
     state.shesha.get_project.return_value = project
 
@@ -98,7 +98,7 @@ class TestDocumentIdsFilterLoadsSelectedDocs:
             mock_session_cls.return_value.format_history_prefix.return_value = ""
             await _handle_query(ws, data, state, threading.Event())
 
-        storage = state.topic_mgr._storage
+        storage = state.shesha.storage
         # get_document should be called for each document_id
         storage.get_document.assert_any_call("proj-123", "paper-a")
         storage.get_document.assert_any_call("proj-123", "paper-c")
@@ -124,7 +124,7 @@ class TestDocumentIdsFilterLoadsSelectedDocs:
             await _handle_query(ws, data, state, threading.Event())
 
         project = state.shesha.get_project.return_value
-        engine = project._rlm_engine
+        engine = project.rlm_engine
 
         # The engine should have been called with only the filtered doc
         engine.query.assert_called_once()
@@ -149,7 +149,7 @@ class TestDocumentIdsFilterLoadsSelectedDocs:
 
         await _handle_query(ws, data, state, threading.Event())
 
-        storage = state.topic_mgr._storage
+        storage = state.shesha.storage
         storage.load_all_documents.assert_not_called()
         storage.get_document.assert_not_called()
 
@@ -178,7 +178,7 @@ class TestNoDocumentIdsSendsError:
 
         await _handle_query(ws, data, state, threading.Event())
 
-        storage = state.topic_mgr._storage
+        storage = state.shesha.storage
         storage.load_all_documents.assert_not_called()
         storage.get_document.assert_not_called()
 
@@ -251,7 +251,7 @@ class TestDocumentIdsAllInvalid:
         ws = _make_ws()
 
         # Make get_document raise for unknown docs
-        storage = state.topic_mgr._storage
+        storage = state.shesha.storage
         storage.get_document.side_effect = DocumentNotFoundError("proj-123", "nonexistent")
 
         data: dict[str, object] = {

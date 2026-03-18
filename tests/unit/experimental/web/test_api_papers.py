@@ -28,7 +28,7 @@ def test_list_papers_in_topic(client: TestClient, mock_state: MagicMock) -> None
     from shesha.experimental.arxiv.models import PaperMeta
 
     mock_state.topic_mgr.resolve.return_value = "proj-id"
-    mock_state.topic_mgr._storage.list_documents.return_value = ["2501.08753"]
+    mock_state.topic_mgr.storage.list_documents.return_value = ["2501.08753"]
 
     meta = MagicMock(spec=PaperMeta)
     meta.arxiv_id = "2501.08753"
@@ -68,7 +68,7 @@ def test_add_paper_cached(client: TestClient, mock_state: MagicMock) -> None:
         )
 
     assert resp.status_code == 200
-    mock_state.topic_mgr._storage.store_document.assert_called_once()
+    mock_state.topic_mgr.storage.store_document.assert_called_once()
 
 
 def test_add_paper_needs_download(client: TestClient, mock_state: MagicMock) -> None:
@@ -99,14 +99,14 @@ def test_add_paper_multi_topic_cached(client: TestClient, mock_state: MagicMock)
         )
 
     assert resp.status_code == 200
-    assert mock_state.topic_mgr._storage.store_document.call_count == 2
+    assert mock_state.topic_mgr.storage.store_document.call_count == 2
 
 
 def test_remove_paper(client: TestClient, mock_state: MagicMock) -> None:
     mock_state.topic_mgr.resolve.return_value = "proj-id"
     resp = client.delete("/api/topics/chess/papers/2501.08753")
     assert resp.status_code == 200
-    mock_state.topic_mgr._storage.delete_document.assert_called_once_with("proj-id", "2501.08753")
+    mock_state.topic_mgr.storage.delete_document.assert_called_once_with("proj-id", "2501.08753")
 
 
 def test_remove_paper_topic_not_found(client: TestClient, mock_state: MagicMock) -> None:

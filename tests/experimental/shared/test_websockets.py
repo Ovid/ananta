@@ -26,16 +26,16 @@ def _make_state() -> MagicMock:
     """Build a minimal mock state for _handle_query."""
     state = MagicMock()
     state.topic_mgr.resolve.return_value = "proj-1"
-    state.topic_mgr._storage.list_documents.return_value = ["doc-a"]
-    state.topic_mgr._storage.get_document.return_value = MagicMock(name="doc-a", content="hello")
-    state.topic_mgr._storage._project_path.return_value = "/tmp/proj"
-    state.topic_mgr._storage.list_traces.return_value = []
+    state.shesha.storage.list_documents.return_value = ["doc-a"]
+    state.shesha.storage.get_document.return_value = MagicMock(name="doc-a", content="hello")
+    state.shesha.storage.get_project_dir.return_value = "/tmp/proj"
+    state.shesha.storage.list_traces.return_value = []
     state.model = "test-model"
 
     # RLM engine mock
     engine = MagicMock()
     project = MagicMock()
-    project._rlm_engine = engine
+    project.rlm_engine = engine
     state.shesha.get_project.return_value = project
 
     return state
@@ -62,7 +62,7 @@ class TestHandleQueryDocIdValidation:
         assert len(error_msgs) == 1
         assert "invalid" in error_msgs[0]["message"].lower()
         # Must NOT reach the storage layer
-        state.topic_mgr._storage.get_document.assert_not_called()
+        state.shesha.storage.get_document.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_rejects_document_id_with_special_chars(self) -> None:
@@ -80,7 +80,7 @@ class TestHandleQueryDocIdValidation:
 
         error_msgs = [m for m in ws.sent if m.get("type") == "error"]
         assert len(error_msgs) == 1
-        state.topic_mgr._storage.get_document.assert_not_called()
+        state.shesha.storage.get_document.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_accepts_valid_document_ids(self) -> None:
@@ -104,11 +104,11 @@ class TestHandleQueryDocIdValidation:
         ):
             # Make the query raise to short-circuit execution after validation
             project = state.shesha.get_project.return_value
-            project._rlm_engine.query.side_effect = RuntimeError("stop here")
+            project.rlm_engine.query.side_effect = RuntimeError("stop here")
             await _handle_query(ws, data, state, cancel)
 
         # Should have reached the storage layer (validation passed)
-        assert state.topic_mgr._storage.get_document.call_count >= 1
+        assert state.shesha.storage.get_document.call_count >= 1
 
 
 class TestHandleQueryExceptionLeakage:
@@ -133,7 +133,7 @@ class TestHandleQueryExceptionLeakage:
             "ConnectionError: failed to connect to /internal/db:5432 with password=s3cret"
         )
         project = state.shesha.get_project.return_value
-        project._rlm_engine.query.side_effect = RuntimeError(sensitive_message)
+        project.rlm_engine.query.side_effect = RuntimeError(sensitive_message)
 
         with patch(
             "shesha.experimental.shared.websockets.WebConversationSession",
@@ -156,7 +156,7 @@ class TestHandleQueryExceptionLeakage:
 
         # Set up state for multi-project handler
         storage = MagicMock()
-        state.shesha._storage = storage
+        state.shesha.storage = storage
         storage.list_documents.return_value = ["doc-a"]
         storage.get_document.return_value = MagicMock(name="doc-a", content="hello")
 
@@ -164,7 +164,7 @@ class TestHandleQueryExceptionLeakage:
         engine = MagicMock()
         sensitive_message = "OSError: /opt/shesha/config.yaml not found"
         engine.query.side_effect = RuntimeError(sensitive_message)
-        project._rlm_engine = engine
+        project.rlm_engine = engine
         state.shesha.get_project.return_value = project
         state.session = MagicMock()
         state.session.format_history_prefix.return_value = ""

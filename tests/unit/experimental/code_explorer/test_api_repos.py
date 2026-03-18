@@ -21,8 +21,8 @@ def mock_shesha() -> MagicMock:
     shesha = MagicMock()
     shesha.list_projects.return_value = []
     # Use a real MagicMock for _storage to allow list_documents calls
-    shesha._storage = MagicMock()
-    shesha._storage.list_documents.return_value = []
+    shesha.storage = MagicMock()
+    shesha.storage.list_documents.return_value = []
     return shesha
 
 
@@ -71,7 +71,7 @@ class TestListRepos:
             source_exists=True,
             analysis_status="missing",
         )
-        mock_shesha._storage.list_documents.return_value = ["file1.py", "file2.py", "file3.py"]
+        mock_shesha.storage.list_documents.return_value = ["file1.py", "file2.py", "file3.py"]
 
         resp = client.get("/api/repos")
         assert resp.status_code == 200
@@ -102,7 +102,7 @@ class TestListRepos:
                 analysis_status="stale",
             ),
         ]
-        mock_shesha._storage.list_documents.side_effect = [["f1"], ["f2", "f3"]]
+        mock_shesha.storage.list_documents.side_effect = [["f1"], ["f2", "f3"]]
 
         resp = client.get("/api/repos")
         assert resp.status_code == 200
@@ -128,7 +128,7 @@ class TestListUncategorizedRepos:
             source_exists=True,
             analysis_status="missing",
         )
-        mock_shesha._storage.list_documents.return_value = ["f1"]
+        mock_shesha.storage.list_documents.return_value = ["f1"]
 
         resp = client.get("/api/repos/uncategorized")
         assert resp.status_code == 200
@@ -154,7 +154,7 @@ class TestListUncategorizedRepos:
             source_exists=True,
             analysis_status="missing",
         )
-        mock_shesha._storage.list_documents.return_value = ["f1"]
+        mock_shesha.storage.list_documents.return_value = ["f1"]
 
         resp = client.get("/api/repos/uncategorized")
         assert resp.status_code == 200
@@ -275,7 +275,7 @@ class TestGetRepo:
             source_exists=True,
             analysis_status="current",
         )
-        mock_shesha._storage.list_documents.return_value = ["a.py", "b.py"]
+        mock_shesha.storage.list_documents.return_value = ["a.py", "b.py"]
 
         resp = client.get("/api/repos/owner-myrepo")
         assert resp.status_code == 200

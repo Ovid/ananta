@@ -18,8 +18,8 @@ from shesha.experimental.shared.session import WebConversationSession
 def state(tmp_path: Path) -> CodeExplorerState:
     shesha = MagicMock()
     shesha.list_projects.return_value = []
-    shesha._storage = MagicMock()
-    shesha._storage.list_traces.return_value = []
+    shesha.storage = MagicMock()
+    shesha.storage.list_traces.return_value = []
 
     topics_dir = tmp_path / "topics"
     topics_dir.mkdir()

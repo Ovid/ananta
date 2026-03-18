@@ -192,7 +192,7 @@ def _check_single_paper(
                 citations.extend(extract_citations_from_bbl(content))
     else:
         try:
-            doc = state.topic_mgr._storage.get_document(project_id, paper_id)
+            doc = state.topic_mgr.storage.get_document(project_id, paper_id)
             full_text = doc.content
             citations.extend(extract_citations_from_text(full_text))
         except Exception:

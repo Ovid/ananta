@@ -478,6 +478,20 @@ class TestTraceOperations:
         assert traces[2].name == "2026-02-03T10-00-02-000_cccc3333.jsonl"
 
 
+class TestGetProjectDir:
+    """Tests for get_project_dir method."""
+
+    def test_returns_path_for_existing_project(self, storage: FilesystemStorage) -> None:
+        storage.create_project("my-project")
+        project_dir = storage.get_project_dir("my-project")
+        assert project_dir.exists()
+        assert project_dir.name == "my-project"
+
+    def test_raises_for_nonexistent_project(self, storage: FilesystemStorage) -> None:
+        with pytest.raises(ProjectNotFoundError):
+            storage.get_project_dir("no-such-project")
+
+
 class TestAnalysisOperations:
     """Tests for analysis CRUD operations."""
 

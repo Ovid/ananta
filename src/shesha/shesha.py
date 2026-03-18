@@ -103,6 +103,11 @@ class Shesha:
         # Track if stopped to avoid double-cleanup
         self._stopped = False
 
+    @property
+    def storage(self) -> StorageBackend:
+        """The storage backend used by this instance."""
+        return self._storage
+
         # Register cleanup on exit using weak reference
         weak_self = weakref.ref(self)
 

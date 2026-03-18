@@ -195,7 +195,7 @@ async def _handle_query(
         await websocket.send_json({"type": "error", "message": f"Topic '{topic}' not found"})
         return
 
-    doc_names = state.topic_mgr._storage.list_documents(project_id)
+    doc_names = state.shesha.storage.list_documents(project_id)
     if not doc_names:
         await websocket.send_json({"type": "error", "message": "No documents in topic"})
         return
@@ -225,7 +225,7 @@ async def _handle_query(
     loaded_docs = []
     for did in document_ids:
         try:
-            doc = state.topic_mgr._storage.get_document(project_id, str(did))
+            doc = state.shesha.storage.get_document(project_id, str(did))
             loaded_docs.append(doc)
         except DocumentNotFoundError:
             logger.warning("Requested document_id %r not found in project %s", did, project_id)
@@ -236,7 +236,7 @@ async def _handle_query(
         return
 
     # Load session for history prefix
-    project_dir = state.topic_mgr._storage._project_path(project_id)
+    project_dir = state.shesha.storage.get_project_dir(project_id)
     factory = session_factory or WebConversationSession
     session = factory(project_dir)
     history_prefix = session.format_history_prefix()
@@ -284,14 +284,14 @@ async def _handle_query(
     drain_task = asyncio.create_task(drain_queue())
 
     # Run query in thread to avoid blocking the event loop.
-    rlm_engine = project._rlm_engine
+    rlm_engine = project.rlm_engine
     if rlm_engine is None:
         await websocket.send_json({"type": "error", "message": "Query engine not configured"})
         await message_queue.put(None)
         await drain_task
         return
 
-    storage = state.topic_mgr._storage
+    storage = state.shesha.storage
     try:
         result = await loop.run_in_executor(
             None,
@@ -316,7 +316,7 @@ async def _handle_query(
 
     # Save to session
     trace_id = None
-    traces = state.topic_mgr._storage.list_traces(project_id)
+    traces = state.shesha.storage.list_traces(project_id)
     if traces:
         trace_id = traces[-1].stem
 
@@ -386,7 +386,7 @@ async def handle_multi_project_query(
     # Load documents from all requested projects
     loaded_docs: list[ParsedDocument] = []
     loaded_project_ids: list[str] = []
-    storage = state.shesha._storage
+    storage = state.shesha.storage
     for project_id in document_ids:
         pid_str = str(project_id)
         try:
@@ -485,8 +485,8 @@ async def handle_multi_project_query(
         except Exception:
             # Project may be stale or deleted; try the next one
             continue
-        if project._rlm_engine is not None:
-            rlm_engine = project._rlm_engine
+        if project.rlm_engine is not None:
+            rlm_engine = project.rlm_engine
             first_project_id = pid_str
             break
 

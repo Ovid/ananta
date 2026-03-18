@@ -20,8 +20,8 @@ def mock_shesha() -> MagicMock:
     """Create a mock Shesha instance."""
     shesha = MagicMock()
     shesha.list_projects.return_value = []
-    shesha._storage = MagicMock()
-    shesha._storage.list_documents.return_value = []
+    shesha.storage = MagicMock()
+    shesha.storage.list_documents.return_value = []
     return shesha
 
 

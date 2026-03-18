@@ -194,7 +194,7 @@ class TestCheckCitationsHandler:
         # Storage returns document with arXiv ID in content
         doc = MagicMock()
         doc.content = "This paper cites arXiv:2301.55555 in the text."
-        mock_state.topic_mgr._storage.get_document.return_value = doc
+        mock_state.topic_mgr.storage.get_document.return_value = doc
 
         mock_result = VerificationResult(
             citation_key="text-2301.55555",

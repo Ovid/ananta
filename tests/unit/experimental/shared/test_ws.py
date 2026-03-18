@@ -89,13 +89,13 @@ def test_ws_query_returns_complete(client: TestClient, mock_state: MagicMock) ->
     mock_result.trace = Trace(steps=[])
 
     mock_project = MagicMock()
-    mock_project._rlm_engine.query.return_value = mock_result
+    mock_project.rlm_engine.query.return_value = mock_result
 
     mock_state.topic_mgr.resolve.return_value = "proj-id"
     mock_state.shesha.get_project.return_value = mock_project
-    mock_state.topic_mgr._storage.list_documents.return_value = ["doc1"]
-    mock_state.topic_mgr._storage.get_document.side_effect = lambda pid, name: _make_doc(name)
-    mock_state.topic_mgr._storage.list_traces.return_value = []
+    mock_state.shesha.storage.list_documents.return_value = ["doc1"]
+    mock_state.shesha.storage.get_document.side_effect = lambda pid, name: _make_doc(name)
+    mock_state.shesha.storage.list_traces.return_value = []
 
     with patch(_SESSION_PATCH) as mock_sess_cls:
         mock_sess_cls.return_value = _mock_session()
@@ -144,12 +144,12 @@ def test_ws_cancel(client: TestClient, mock_state: MagicMock) -> None:
 def test_ws_query_engine_exception_sends_error(client: TestClient, mock_state: MagicMock) -> None:
     """If the RLM engine raises, drain_task is cleaned up and error is sent."""
     mock_project = MagicMock()
-    mock_project._rlm_engine.query.side_effect = RuntimeError("engine exploded")
+    mock_project.rlm_engine.query.side_effect = RuntimeError("engine exploded")
 
     mock_state.topic_mgr.resolve.return_value = "proj-id"
     mock_state.shesha.get_project.return_value = mock_project
-    mock_state.topic_mgr._storage.list_documents.return_value = ["doc1"]
-    mock_state.topic_mgr._storage.get_document.side_effect = lambda pid, name: _make_doc(name)
+    mock_state.shesha.storage.list_documents.return_value = ["doc1"]
+    mock_state.shesha.storage.get_document.side_effect = lambda pid, name: _make_doc(name)
 
     with patch(_SESSION_PATCH) as mock_sess_cls:
         mock_sess_cls.return_value = _mock_session()
@@ -187,7 +187,7 @@ def test_ws_unknown_message_type(client: TestClient, mock_state: MagicMock) -> N
 def test_ws_query_no_document_ids(client: TestClient, mock_state: MagicMock) -> None:
     """Query without document_ids returns error."""
     mock_state.topic_mgr.resolve.return_value = "proj-id"
-    mock_state.topic_mgr._storage.list_documents.return_value = ["doc1"]
+    mock_state.shesha.storage.list_documents.return_value = ["doc1"]
     with client.websocket_connect("/ws") as ws:
         ws.send_json({"type": "query", "topic": "test", "question": "What?"})
         msg = ws.receive_json()
@@ -225,13 +225,13 @@ def test_ws_build_context_called(mock_state: MagicMock) -> None:
     mock_result.trace = Trace(steps=[])
 
     mock_project = MagicMock()
-    mock_project._rlm_engine.query.return_value = mock_result
+    mock_project.rlm_engine.query.return_value = mock_result
 
     mock_state.topic_mgr.resolve.return_value = "proj-id"
     mock_state.shesha.get_project.return_value = mock_project
-    mock_state.topic_mgr._storage.list_documents.return_value = ["doc1"]
-    mock_state.topic_mgr._storage.get_document.side_effect = lambda pid, name: _make_doc(name)
-    mock_state.topic_mgr._storage.list_traces.return_value = []
+    mock_state.shesha.storage.list_documents.return_value = ["doc1"]
+    mock_state.shesha.storage.get_document.side_effect = lambda pid, name: _make_doc(name)
+    mock_state.shesha.storage.list_traces.return_value = []
 
     def my_build_context(
         document_ids: list[str], state: object, loaded_docs: list[ParsedDocument]
@@ -264,7 +264,7 @@ def test_ws_build_context_called(mock_state: MagicMock) -> None:
     assert len(complete) == 1
 
     # Verify the build_context output was included in the question
-    call_args = mock_project._rlm_engine.query.call_args
+    call_args = mock_project.rlm_engine.query.call_args
     actual_question = call_args.kwargs.get("question") or call_args[1].get("question", "")
     assert "EXTRA CONTEXT" in actual_question
 
@@ -272,12 +272,12 @@ def test_ws_build_context_called(mock_state: MagicMock) -> None:
 def test_ws_query_no_engine_sends_error(client: TestClient, mock_state: MagicMock) -> None:
     """Query when RLM engine is None returns error."""
     mock_project = MagicMock()
-    mock_project._rlm_engine = None
+    mock_project.rlm_engine = None
 
     mock_state.topic_mgr.resolve.return_value = "proj-id"
     mock_state.shesha.get_project.return_value = mock_project
-    mock_state.topic_mgr._storage.list_documents.return_value = ["doc1"]
-    mock_state.topic_mgr._storage.get_document.side_effect = lambda pid, name: _make_doc(name)
+    mock_state.shesha.storage.list_documents.return_value = ["doc1"]
+    mock_state.shesha.storage.get_document.side_effect = lambda pid, name: _make_doc(name)
 
     with patch(_SESSION_PATCH) as mock_sess_cls:
         mock_sess_cls.return_value = _mock_session()
@@ -312,13 +312,13 @@ def test_ws_session_factory_is_used(mock_state: MagicMock) -> None:
     mock_result.trace = Trace(steps=[])
 
     mock_project = MagicMock()
-    mock_project._rlm_engine.query.return_value = mock_result
+    mock_project.rlm_engine.query.return_value = mock_result
 
     mock_state.topic_mgr.resolve.return_value = "proj-id"
     mock_state.shesha.get_project.return_value = mock_project
-    mock_state.topic_mgr._storage.list_documents.return_value = ["doc1"]
-    mock_state.topic_mgr._storage.get_document.side_effect = lambda pid, name: _make_doc(name)
-    mock_state.topic_mgr._storage.list_traces.return_value = []
+    mock_state.shesha.storage.list_documents.return_value = ["doc1"]
+    mock_state.shesha.storage.get_document.side_effect = lambda pid, name: _make_doc(name)
+    mock_state.shesha.storage.list_traces.return_value = []
 
     custom_session = _mock_session()
     custom_factory = MagicMock(return_value=custom_session)
@@ -385,13 +385,13 @@ def test_ws_query_passes_allow_background_knowledge(
     mock_result.trace = Trace(steps=[])
 
     mock_project = MagicMock()
-    mock_project._rlm_engine.query.return_value = mock_result
+    mock_project.rlm_engine.query.return_value = mock_result
 
     mock_state.topic_mgr.resolve.return_value = "proj-id"
     mock_state.shesha.get_project.return_value = mock_project
-    mock_state.topic_mgr._storage.list_documents.return_value = ["doc1"]
-    mock_state.topic_mgr._storage.get_document.side_effect = lambda pid, name: _make_doc(name)
-    mock_state.topic_mgr._storage.list_traces.return_value = []
+    mock_state.shesha.storage.list_documents.return_value = ["doc1"]
+    mock_state.shesha.storage.get_document.side_effect = lambda pid, name: _make_doc(name)
+    mock_state.shesha.storage.list_traces.return_value = []
 
     with patch(_SESSION_PATCH) as mock_sess_cls:
         mock_sess_cls.return_value = _mock_session()
@@ -413,7 +413,7 @@ def test_ws_query_passes_allow_background_knowledge(
                 if msg["type"] in ("complete", "error"):
                     break
 
-    call_kwargs = mock_project._rlm_engine.query.call_args
+    call_kwargs = mock_project.rlm_engine.query.call_args
     assert call_kwargs.kwargs.get("allow_background_knowledge") is True
 
     # Verify complete message includes allow_background_knowledge
@@ -433,13 +433,13 @@ def test_ws_complete_includes_allow_background_knowledge_false(
     mock_result.trace = Trace(steps=[])
 
     mock_project = MagicMock()
-    mock_project._rlm_engine.query.return_value = mock_result
+    mock_project.rlm_engine.query.return_value = mock_result
 
     mock_state.topic_mgr.resolve.return_value = "proj-id"
     mock_state.shesha.get_project.return_value = mock_project
-    mock_state.topic_mgr._storage.list_documents.return_value = ["doc1"]
-    mock_state.topic_mgr._storage.get_document.side_effect = lambda pid, name: _make_doc(name)
-    mock_state.topic_mgr._storage.list_traces.return_value = []
+    mock_state.shesha.storage.list_documents.return_value = ["doc1"]
+    mock_state.shesha.storage.get_document.side_effect = lambda pid, name: _make_doc(name)
+    mock_state.shesha.storage.list_traces.return_value = []
 
     with patch(_SESSION_PATCH) as mock_sess_cls:
         mock_sess_cls.return_value = _mock_session()

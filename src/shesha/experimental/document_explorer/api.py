@@ -98,7 +98,7 @@ def _list_doc_trace_files(
     project_id: str,
 ) -> list[Path]:
     """List trace files from Shesha storage."""
-    return state.shesha._storage.list_traces(project_id)
+    return state.shesha.storage.list_traces(project_id)
 
 
 def _create_document_router(state: DocumentExplorerState) -> APIRouter:
@@ -197,7 +197,7 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                 metadata={"filename": file.filename, "size": len(content)},
                 char_count=len(text),
             )
-            state.shesha._storage.store_document(project_id, doc)
+            state.shesha.storage.store_document(project_id, doc)
 
             # Add to topic (already created/validated above)
             if topic:

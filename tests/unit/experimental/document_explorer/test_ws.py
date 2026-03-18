@@ -74,11 +74,11 @@ class TestQueryDocuments:
         mock_result.trace = Trace(steps=[])
 
         mock_project = MagicMock()
-        mock_project._rlm_engine.query.return_value = mock_result
+        mock_project.rlm_engine.query.return_value = mock_result
 
-        mock_state.shesha._storage.list_documents.return_value = ["content.json"]
-        mock_state.shesha._storage.get_document.side_effect = lambda pid, name: _make_doc(name)
-        mock_state.shesha._storage.list_traces.return_value = []
+        mock_state.shesha.storage.list_documents.return_value = ["content.json"]
+        mock_state.shesha.storage.get_document.side_effect = lambda pid, name: _make_doc(name)
+        mock_state.shesha.storage.list_traces.return_value = []
         mock_state.shesha.get_project.return_value = mock_project
 
         app = _make_app(mock_state)
@@ -150,11 +150,11 @@ class TestSessionRecordsDocumentIds:
         mock_result.trace = Trace(steps=[])
 
         mock_project = MagicMock()
-        mock_project._rlm_engine.query.return_value = mock_result
+        mock_project.rlm_engine.query.return_value = mock_result
 
-        mock_state.shesha._storage.list_documents.return_value = ["file.txt"]
-        mock_state.shesha._storage.get_document.side_effect = lambda pid, name: _make_doc(name)
-        mock_state.shesha._storage.list_traces.return_value = []
+        mock_state.shesha.storage.list_documents.return_value = ["file.txt"]
+        mock_state.shesha.storage.get_document.side_effect = lambda pid, name: _make_doc(name)
+        mock_state.shesha.storage.list_traces.return_value = []
         mock_state.shesha.get_project.return_value = mock_project
 
         app = _make_app(mock_state)
@@ -190,16 +190,16 @@ class TestSessionRecordsDocumentIds:
         mock_result.trace = Trace(steps=[])
 
         mock_project = MagicMock()
-        mock_project._rlm_engine.query.return_value = mock_result
+        mock_project.rlm_engine.query.return_value = mock_result
 
         def list_documents(pid: str) -> list[str]:
             if pid == "empty-proj":
                 return []
             return ["file.txt"]
 
-        mock_state.shesha._storage.list_documents.side_effect = list_documents
-        mock_state.shesha._storage.get_document.side_effect = lambda pid, name: _make_doc(name)
-        mock_state.shesha._storage.list_traces.return_value = []
+        mock_state.shesha.storage.list_documents.side_effect = list_documents
+        mock_state.shesha.storage.get_document.side_effect = lambda pid, name: _make_doc(name)
+        mock_state.shesha.storage.list_traces.return_value = []
         mock_state.shesha.get_project.return_value = mock_project
 
         app = _make_app(mock_state)
@@ -233,9 +233,9 @@ class TestSessionRecordsDocumentIds:
         mock_result.trace = Trace(steps=[])
 
         mock_project = MagicMock()
-        mock_project._rlm_engine.query.return_value = mock_result
+        mock_project.rlm_engine.query.return_value = mock_result
 
-        mock_state.shesha._storage.list_documents.return_value = ["good.txt", "bad.txt"]
+        mock_state.shesha.storage.list_documents.return_value = ["good.txt", "bad.txt"]
 
         call_count = 0
 
@@ -246,8 +246,8 @@ class TestSessionRecordsDocumentIds:
                 raise OSError("corrupt file")
             return _make_doc(name)
 
-        mock_state.shesha._storage.get_document.side_effect = get_document
-        mock_state.shesha._storage.list_traces.return_value = []
+        mock_state.shesha.storage.get_document.side_effect = get_document
+        mock_state.shesha.storage.list_traces.return_value = []
         mock_state.shesha.get_project.return_value = mock_project
 
         app = _make_app(mock_state)
@@ -284,11 +284,11 @@ class TestCompleteMessageFields:
         mock_result.trace = Trace(steps=[])
 
         mock_project = MagicMock()
-        mock_project._rlm_engine.query.return_value = mock_result
+        mock_project.rlm_engine.query.return_value = mock_result
 
-        mock_state.shesha._storage.list_documents.return_value = ["main.pdf"]
-        mock_state.shesha._storage.get_document.side_effect = lambda pid, name: _make_doc(name)
-        mock_state.shesha._storage.list_traces.return_value = []
+        mock_state.shesha.storage.list_documents.return_value = ["main.pdf"]
+        mock_state.shesha.storage.get_document.side_effect = lambda pid, name: _make_doc(name)
+        mock_state.shesha.storage.list_traces.return_value = []
         mock_state.shesha.get_project.return_value = mock_project
 
         app = _make_app(mock_state)
@@ -341,10 +341,10 @@ class TestNoEngine:
     def test_no_engine(self, tmp_path: Path) -> None:
         mock_state = _make_state(tmp_path)
         mock_project = MagicMock()
-        mock_project._rlm_engine = None
+        mock_project.rlm_engine = None
 
-        mock_state.shesha._storage.list_documents.return_value = ["main.pdf"]
-        mock_state.shesha._storage.get_document.side_effect = lambda pid, name: _make_doc(name)
+        mock_state.shesha.storage.list_documents.return_value = ["main.pdf"]
+        mock_state.shesha.storage.get_document.side_effect = lambda pid, name: _make_doc(name)
         mock_state.shesha.get_project.return_value = mock_project
 
         app = _make_app(mock_state)
@@ -377,10 +377,10 @@ class TestEngineException:
     def test_engine_error_sends_error(self, tmp_path: Path) -> None:
         mock_state = _make_state(tmp_path)
         mock_project = MagicMock()
-        mock_project._rlm_engine.query.side_effect = RuntimeError("engine exploded")
+        mock_project.rlm_engine.query.side_effect = RuntimeError("engine exploded")
 
-        mock_state.shesha._storage.list_documents.return_value = ["main.pdf"]
-        mock_state.shesha._storage.get_document.side_effect = lambda pid, name: _make_doc(name)
+        mock_state.shesha.storage.list_documents.return_value = ["main.pdf"]
+        mock_state.shesha.storage.get_document.side_effect = lambda pid, name: _make_doc(name)
         mock_state.shesha.get_project.return_value = mock_project
 
         app = _make_app(mock_state)
@@ -427,11 +427,11 @@ class TestMetadataContext:
         mock_result.trace = Trace(steps=[])
 
         mock_project = MagicMock()
-        mock_project._rlm_engine.query.return_value = mock_result
+        mock_project.rlm_engine.query.return_value = mock_result
 
-        mock_state.shesha._storage.list_documents.return_value = ["content.json"]
-        mock_state.shesha._storage.get_document.side_effect = lambda pid, name: _make_doc(name)
-        mock_state.shesha._storage.list_traces.return_value = []
+        mock_state.shesha.storage.list_documents.return_value = ["content.json"]
+        mock_state.shesha.storage.get_document.side_effect = lambda pid, name: _make_doc(name)
+        mock_state.shesha.storage.list_traces.return_value = []
         mock_state.shesha.get_project.return_value = mock_project
 
         app = _make_app(mock_state)
@@ -456,7 +456,7 @@ class TestMetadataContext:
         assert len(complete) == 1
 
         # Verify metadata was included in the question
-        call_args = mock_project._rlm_engine.query.call_args
+        call_args = mock_project.rlm_engine.query.call_args
         actual_question = call_args.kwargs.get("question") or call_args[1].get("question", "")
         assert "quarterly_report.pdf" in actual_question
         assert "application/pdf" in actual_question
@@ -509,7 +509,7 @@ class TestNoDocsFoundInProjects:
 
     def test_no_docs_found(self, tmp_path: Path) -> None:
         mock_state = _make_state(tmp_path)
-        mock_state.shesha._storage.list_documents.return_value = []
+        mock_state.shesha.storage.list_documents.return_value = []
 
         app = _make_app(mock_state)
         test_client = TestClient(app)
@@ -534,8 +534,8 @@ class TestStaleProjectId:
     def test_get_project_stale_sends_error(self, tmp_path: Path) -> None:
         """get_project raising ProjectNotFoundError should send error message."""
         mock_state = _make_state(tmp_path)
-        mock_state.shesha._storage.list_documents.return_value = ["main.pdf"]
-        mock_state.shesha._storage.get_document.side_effect = lambda pid, name: _make_doc(name)
+        mock_state.shesha.storage.list_documents.return_value = ["main.pdf"]
+        mock_state.shesha.storage.get_document.side_effect = lambda pid, name: _make_doc(name)
         mock_state.shesha.get_project.side_effect = ProjectNotFoundError("gone-doc")
 
         app = _make_app(mock_state)
@@ -573,12 +573,12 @@ class TestStaleFirstProjectFallback:
         mock_result.trace = Trace(steps=[])
 
         mock_project = MagicMock()
-        mock_project._rlm_engine.query.return_value = mock_result
+        mock_project.rlm_engine.query.return_value = mock_result
 
         # First project loads docs, second also loads docs
-        mock_state.shesha._storage.list_documents.return_value = ["file.txt"]
-        mock_state.shesha._storage.get_document.side_effect = lambda pid, name: _make_doc(name)
-        mock_state.shesha._storage.list_traces.return_value = []
+        mock_state.shesha.storage.list_documents.return_value = ["file.txt"]
+        mock_state.shesha.storage.get_document.side_effect = lambda pid, name: _make_doc(name)
+        mock_state.shesha.storage.list_traces.return_value = []
 
         # First project is stale, second exists
         def get_project(pid: str) -> MagicMock:
@@ -628,11 +628,11 @@ class TestInvalidTopicFallsBack:
         mock_result.trace = Trace(steps=[])
 
         mock_project = MagicMock()
-        mock_project._rlm_engine.query.return_value = mock_result
+        mock_project.rlm_engine.query.return_value = mock_result
 
-        mock_state.shesha._storage.list_documents.return_value = ["file.txt"]
-        mock_state.shesha._storage.get_document.side_effect = lambda pid, name: _make_doc(name)
-        mock_state.shesha._storage.list_traces.return_value = []
+        mock_state.shesha.storage.list_documents.return_value = ["file.txt"]
+        mock_state.shesha.storage.get_document.side_effect = lambda pid, name: _make_doc(name)
+        mock_state.shesha.storage.list_traces.return_value = []
         mock_state.shesha.get_project.return_value = mock_project
 
         app = _make_app(mock_state)
@@ -673,11 +673,11 @@ class TestMissingMetadataSkipped:
         mock_result.trace = Trace(steps=[])
 
         mock_project = MagicMock()
-        mock_project._rlm_engine.query.return_value = mock_result
+        mock_project.rlm_engine.query.return_value = mock_result
 
-        mock_state.shesha._storage.list_documents.return_value = ["file.txt"]
-        mock_state.shesha._storage.get_document.side_effect = lambda pid, name: _make_doc(name)
-        mock_state.shesha._storage.list_traces.return_value = []
+        mock_state.shesha.storage.list_documents.return_value = ["file.txt"]
+        mock_state.shesha.storage.get_document.side_effect = lambda pid, name: _make_doc(name)
+        mock_state.shesha.storage.list_traces.return_value = []
         mock_state.shesha.get_project.return_value = mock_project
 
         app = _make_app(mock_state)

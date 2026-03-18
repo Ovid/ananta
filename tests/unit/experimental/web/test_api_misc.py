@@ -26,7 +26,7 @@ def client(mock_state: MagicMock) -> TestClient:
 
 def test_get_history(client: TestClient, mock_state: MagicMock, tmp_path: Path) -> None:
     mock_state.topic_mgr.resolve.return_value = "proj-id"
-    mock_state.topic_mgr._storage._project_path.return_value = tmp_path
+    mock_state.topic_mgr.storage.get_project_dir.return_value = tmp_path
 
     # Seed a conversation via the session
     session = WebConversationSession(tmp_path)
@@ -55,7 +55,7 @@ def test_get_history_preserves_document_ids(
     ``document_ids`` as-is.
     """
     mock_state.topic_mgr.resolve.return_value = "proj-id"
-    mock_state.topic_mgr._storage._project_path.return_value = tmp_path
+    mock_state.topic_mgr.storage.get_project_dir.return_value = tmp_path
 
     session = WebConversationSession(tmp_path)
     session.add_exchange(
@@ -76,7 +76,7 @@ def test_get_history_preserves_document_ids(
 
 def test_clear_history(client: TestClient, mock_state: MagicMock, tmp_path: Path) -> None:
     mock_state.topic_mgr.resolve.return_value = "proj-id"
-    mock_state.topic_mgr._storage._project_path.return_value = tmp_path
+    mock_state.topic_mgr.storage.get_project_dir.return_value = tmp_path
 
     session = WebConversationSession(tmp_path)
     session.add_exchange(
@@ -99,7 +99,7 @@ def test_clear_history(client: TestClient, mock_state: MagicMock, tmp_path: Path
 
 def test_export_transcript(client: TestClient, mock_state: MagicMock, tmp_path: Path) -> None:
     mock_state.topic_mgr.resolve.return_value = "proj-id"
-    mock_state.topic_mgr._storage._project_path.return_value = tmp_path
+    mock_state.topic_mgr.storage.get_project_dir.return_value = tmp_path
 
     session = WebConversationSession(tmp_path)
     session.add_exchange(
@@ -135,12 +135,12 @@ def test_update_model(client: TestClient, mock_state: MagicMock) -> None:
 
 def test_context_budget(client: TestClient, mock_state: MagicMock, tmp_path: Path) -> None:
     mock_state.topic_mgr.resolve.return_value = "proj-id"
-    mock_state.topic_mgr._storage._project_path.return_value = tmp_path
+    mock_state.topic_mgr.storage.get_project_dir.return_value = tmp_path
 
     # Mock documents
     doc = MagicMock()
     doc.content = "x" * 4000  # 4000 chars ~= 1000 tokens
-    mock_state.topic_mgr._storage.load_all_documents.return_value = [doc]
+    mock_state.topic_mgr.storage.load_all_documents.return_value = [doc]
 
     # Empty session
     WebConversationSession(tmp_path)

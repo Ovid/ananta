@@ -5,6 +5,10 @@ import { useWebSocket } from '../useWebSocket'
 // Mock WebSocket
 class MockWebSocket {
   static instances: MockWebSocket[] = []
+  static readonly CONNECTING = 0
+  static readonly OPEN = 1
+  static readonly CLOSING = 2
+  static readonly CLOSED = 3
   onopen: (() => void) | null = null
   onclose: (() => void) | null = null
   onmessage: ((event: { data: string }) => void) | null = null
@@ -74,6 +78,27 @@ describe('useWebSocket', () => {
 
     // Should have created a second WebSocket for reconnection
     expect(MockWebSocket.instances).toHaveLength(2)
+  })
+
+  it('send() returns true when WebSocket is connected', () => {
+    const { result } = renderHook(() => useWebSocket())
+
+    const ws = MockWebSocket.instances[0]
+    act(() => ws.simulateOpen())
+
+    let sent: boolean
+    act(() => { sent = result.current.send({ type: 'test' }) })
+    expect(sent!).toBe(true)
+    expect(ws.send).toHaveBeenCalledWith(JSON.stringify({ type: 'test' }))
+  })
+
+  it('send() returns false when WebSocket is not connected', () => {
+    const { result } = renderHook(() => useWebSocket())
+    // Don't simulate open — wsRef.current exists but isn't connected
+
+    let sent: boolean
+    act(() => { sent = result.current.send({ type: 'test' }) })
+    expect(sent!).toBe(false)
   })
 
   it('does not re-render host component on every message', () => {

@@ -20,15 +20,8 @@ beforeAll(() => {
   Element.prototype.scrollTo = vi.fn()
 })
 
-import ChatArea from '../ChatArea'
+import ChatArea, { DEEPER_ANALYSIS_PROMPT } from '../ChatArea'
 import type { ChatAreaProps } from '../ChatArea'
-
-// Requirement 3.2: exact prompt text
-const DEEPER_ANALYSIS_PROMPT =
-  'Do a deeper dive to verify if your report is complete, accurate, and relevant. ' +
-  'Explain any changes or additions in bullet points and then present the full report ' +
-  'with those changes and/or additions. You must also walk through the entire report, ' +
-  'point by point, and ensure its aligned with the previous report and the changes or additions.'
 
 /** Sample exchange for tests that need non-empty history (required for More button). */
 const sampleExchangeForHistory = {

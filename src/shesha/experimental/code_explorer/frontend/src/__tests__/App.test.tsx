@@ -199,7 +199,7 @@ describe('App', () => {
 })
 
 describe('App - More button integration', () => {
-  it('renders More button in ChatArea when topic is active and repos are selected', async () => {
+  it('renders More button in ChatArea when topic is active', async () => {
     const sharedUi = await import('@shesha/shared-ui')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const spy = vi.spyOn(sharedUi as any, 'useAppState')

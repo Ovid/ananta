@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { request, sharedApi } from '../client'
 
 const mockFetch = vi.fn()
@@ -189,6 +189,76 @@ describe('sharedApi.contextBudget', () => {
   it('encodes topic name', async () => {
     await sharedApi.contextBudget('a topic')
     expect(mockFetch).toHaveBeenCalledWith('/api/topics/a%20topic/context-budget', expect.any(Object))
+  })
+})
+
+describe('sharedApi.traces.download', () => {
+  let clickSpy: ReturnType<typeof vi.fn>
+  let createElementSpy: ReturnType<typeof vi.spyOn>
+  let appendChildSpy: ReturnType<typeof vi.spyOn>
+  let removeChildSpy: ReturnType<typeof vi.spyOn>
+  let revokeObjectURLSpy: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    clickSpy = vi.fn()
+    revokeObjectURLSpy = vi.fn()
+    vi.stubGlobal('URL', {
+      createObjectURL: vi.fn().mockReturnValue('blob:http://localhost/fake'),
+      revokeObjectURL: revokeObjectURLSpy,
+    })
+    createElementSpy = vi.spyOn(document, 'createElement').mockReturnValue({
+      href: '',
+      download: '',
+      click: clickSpy,
+    } as unknown as HTMLAnchorElement)
+    appendChildSpy = vi.spyOn(document.body, 'appendChild').mockImplementation((node) => node)
+    removeChildSpy = vi.spyOn(document.body, 'removeChild').mockImplementation((node) => node)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    createElementSpy.mockRestore()
+    appendChildSpy.mockRestore()
+    removeChildSpy.mockRestore()
+  })
+
+  it('fetches the trace-download endpoint and triggers a file download', async () => {
+    const blob = new Blob(['test'], { type: 'application/x-ndjson' })
+    mockFetch.mockResolvedValue({
+      ok: true,
+      headers: new Headers({
+        'content-disposition': 'attachment; filename="trace.jsonl"',
+      }),
+      blob: () => Promise.resolve(blob),
+    })
+
+    await sharedApi.traces.download('my-topic', 'trace-123')
+
+    expect(mockFetch).toHaveBeenCalledWith('/api/topics/my-topic/trace-download/trace-123')
+    expect(clickSpy).toHaveBeenCalled()
+    expect(revokeObjectURLSpy).toHaveBeenCalledWith('blob:http://localhost/fake')
+  })
+
+  it('uses traceId as fallback filename when no content-disposition', async () => {
+    const blob = new Blob(['test'], { type: 'application/x-ndjson' })
+    mockFetch.mockResolvedValue({
+      ok: true,
+      headers: new Headers({}),
+      blob: () => Promise.resolve(blob),
+    })
+
+    await sharedApi.traces.download('my-topic', 'trace-456')
+
+    expect(clickSpy).toHaveBeenCalled()
+  })
+
+  it('throws on non-ok response', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      statusText: 'Not Found',
+    })
+
+    await expect(sharedApi.traces.download('t', 'x')).rejects.toThrow('Not Found')
   })
 })
 

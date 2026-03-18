@@ -1,7 +1,11 @@
 """Analysis shortcut — skip RLM when the pre-computed analysis can answer."""
 
+from collections.abc import Callable
+
 from shesha.llm.client import LLMClient
 from shesha.rlm.boundary import wrap_untrusted
+
+LLMClientFactory = Callable[..., LLMClient]
 
 _SYSTEM_PROMPT = """\
 You are a helpful assistant. You have access to a pre-computed codebase analysis.
@@ -63,7 +67,12 @@ _SENTINEL = "NEED_DEEPER"
 _CLASSIFIER_OK = "ANALYSIS_OK"
 
 
-def classify_query(question: str, model: str, api_key: str | None) -> tuple[bool, int, int]:
+def classify_query(
+    question: str,
+    model: str,
+    api_key: str | None,
+    llm_client_factory: LLMClientFactory | None = None,
+) -> tuple[bool, int, int]:
     """Classify whether a query can be answered from the codebase analysis.
 
     Returns ``(should_try, prompt_tokens, completion_tokens)``.  The first
@@ -71,7 +80,8 @@ def classify_query(question: str, model: str, api_key: str | None) -> tuple[bool
     the query should go straight to the full RLM engine.  Returns ``True``
     on any error or unparseable output (graceful fallback).
     """
-    client = LLMClient(model=model, system_prompt=_CLASSIFIER_PROMPT, api_key=api_key)
+    factory = llm_client_factory or LLMClient
+    client = factory(model=model, system_prompt=_CLASSIFIER_PROMPT, api_key=api_key)
 
     try:
         response = client.complete([{"role": "user", "content": question}])
@@ -93,6 +103,7 @@ def try_answer_from_analysis(
     model: str,
     api_key: str | None,
     boundary: str | None = None,
+    llm_client_factory: LLMClientFactory | None = None,
 ) -> tuple[str, int, int] | None:
     """Try to answer a question using only the pre-computed analysis.
 
@@ -103,11 +114,14 @@ def try_answer_from_analysis(
     if not analysis_context:
         return None
 
-    should_try, cls_prompt, cls_completion = classify_query(question, model, api_key)
+    should_try, cls_prompt, cls_completion = classify_query(
+        question, model, api_key, llm_client_factory=llm_client_factory
+    )
     if not should_try:
         return None
 
-    client = LLMClient(model=model, system_prompt=_SYSTEM_PROMPT, api_key=api_key)
+    factory = llm_client_factory or LLMClient
+    client = factory(model=model, system_prompt=_SYSTEM_PROMPT, api_key=api_key)
 
     if boundary is not None:
         wrapped = wrap_untrusted(analysis_context, boundary)

@@ -219,6 +219,61 @@ class TestClassifierPromptContent:
         assert "When in doubt, respond NEED_DEEPER" in _CLASSIFIER_PROMPT
 
 
+class TestLLMClientFactoryInjection:
+    """Tests for llm_client_factory parameter in shortcut functions."""
+
+    def test_classify_query_uses_injected_factory(self):
+        """classify_query uses the provided llm_client_factory."""
+        mock_response = MagicMock()
+        mock_response.content = "ANALYSIS_OK"
+        mock_response.prompt_tokens = 10
+        mock_response.completion_tokens = 5
+
+        mock_factory = MagicMock()
+        mock_factory.return_value.complete.return_value = mock_response
+
+        result = classify_query(
+            question="What does this do?",
+            model="test-model",
+            api_key="test-key",
+            llm_client_factory=mock_factory,
+        )
+
+        mock_factory.assert_called_once()
+        assert result[0] is True
+
+    def test_try_answer_uses_injected_factory(self):
+        """try_answer_from_analysis uses the provided llm_client_factory."""
+        classifier_response = MagicMock()
+        classifier_response.content = "ANALYSIS_OK"
+        classifier_response.prompt_tokens = 10
+        classifier_response.completion_tokens = 5
+
+        answer_response = MagicMock()
+        answer_response.content = "The answer."
+        answer_response.prompt_tokens = 50
+        answer_response.completion_tokens = 10
+
+        mock_factory = MagicMock()
+        classifier_client = MagicMock()
+        classifier_client.complete.return_value = classifier_response
+        answer_client = MagicMock()
+        answer_client.complete.return_value = answer_response
+        mock_factory.side_effect = [classifier_client, answer_client]
+
+        result = try_answer_from_analysis(
+            question="What does this do?",
+            analysis_context="Some analysis",
+            model="test-model",
+            api_key="test-key",
+            llm_client_factory=mock_factory,
+        )
+
+        assert result is not None
+        assert result[0] == "The answer."
+        assert mock_factory.call_count == 2
+
+
 class TestTryAnswerFromAnalysisWithClassifier:
     """Integration: classifier gates the shortcut LLM call."""
 

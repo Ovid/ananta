@@ -191,3 +191,34 @@ describe('ChatMessage (shared) - user question markdown', () => {
     expect(screen.queryByText('Quoted content')).not.toBeInTheDocument()
   })
 })
+
+describe('ChatMessage — background knowledge rendering', () => {
+  it('renders background knowledge section with label and aside role', () => {
+    const exchange = {
+      ...baseExchange,
+      answer: 'Document content.\n<!-- BACKGROUND_KNOWLEDGE_START -->\nInferred content.\n<!-- BACKGROUND_KNOWLEDGE_END -->',
+    }
+    render(<ChatMessage exchange={exchange} onViewTrace={vi.fn()} />)
+    expect(screen.getByText('Document content.')).toBeInTheDocument()
+    expect(screen.getByText('Inferred content.')).toBeInTheDocument()
+    expect(screen.getByText('Background knowledge')).toBeInTheDocument()
+    expect(screen.getByRole('complementary')).toBeInTheDocument()
+  })
+
+  it('does not render background label when no markers present', () => {
+    render(<ChatMessage exchange={baseExchange} onViewTrace={vi.fn()} />)
+    expect(screen.queryByText('Background knowledge')).not.toBeInTheDocument()
+    expect(screen.queryByRole('complementary')).not.toBeInTheDocument()
+  })
+
+  it('skips augmented rendering when renderAnswer prop is provided', () => {
+    const exchange = {
+      ...baseExchange,
+      answer: 'Doc.\n<!-- BACKGROUND_KNOWLEDGE_START -->\nBg.\n<!-- BACKGROUND_KNOWLEDGE_END -->',
+    }
+    const customRenderer = (answer: string) => <span data-testid="custom">{answer}</span>
+    render(<ChatMessage exchange={exchange} onViewTrace={vi.fn()} renderAnswer={customRenderer} />)
+    expect(screen.getByTestId('custom')).toBeInTheDocument()
+    expect(screen.queryByText('Background knowledge')).not.toBeInTheDocument()
+  })
+})

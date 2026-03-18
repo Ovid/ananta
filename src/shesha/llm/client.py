@@ -27,6 +27,11 @@ class LLMResponse:
     raw_response: Any = None
 
 
+# Default timeout for LLM API calls (seconds). Prevents infinite hangs
+# when the API connection is established but the response never arrives.
+DEFAULT_TIMEOUT = 300
+
+
 class LLMClient:
     """Wrapper around LiteLLM for unified LLM access."""
 
@@ -36,6 +41,7 @@ class LLMClient:
         system_prompt: str | None = None,
         api_key: str | None = None,
         retry_config: RetryConfig | None = None,
+        timeout: int = DEFAULT_TIMEOUT,
         **kwargs: Any,
     ) -> None:
         """Initialize the LLM client."""
@@ -43,6 +49,7 @@ class LLMClient:
         self.system_prompt = system_prompt
         self.api_key = api_key
         self.retry_config = retry_config or RetryConfig()
+        self.timeout = timeout
         self.extra_kwargs = kwargs
 
     def complete(
@@ -58,6 +65,7 @@ class LLMClient:
         call_kwargs: dict[str, Any] = {
             "model": self.model,
             "messages": full_messages,
+            "timeout": self.timeout,
             **self.extra_kwargs,
             **kwargs,
         }

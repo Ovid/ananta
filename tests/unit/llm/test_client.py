@@ -49,6 +49,35 @@ class TestLLMClient:
         client = LLMClient(model="claude-sonnet-4-20250514")
         assert client.model == "claude-sonnet-4-20250514"
 
+    @patch("shesha.llm.client.litellm")
+    def test_complete_passes_timeout_to_litellm(self, mock_litellm: MagicMock):
+        """LLMClient passes timeout to litellm.completion()."""
+        mock_litellm.completion.return_value = MagicMock(
+            choices=[MagicMock(message=MagicMock(content="ok"))],
+            usage=MagicMock(prompt_tokens=1, completion_tokens=1, total_tokens=2),
+        )
+
+        client = LLMClient(model="gpt-4", timeout=120)
+        client.complete(messages=[{"role": "user", "content": "Hi"}])
+
+        call_kwargs = mock_litellm.completion.call_args.kwargs
+        assert call_kwargs["timeout"] == 120
+
+    @patch("shesha.llm.client.litellm")
+    def test_default_timeout(self, mock_litellm: MagicMock):
+        """LLMClient uses a default timeout when none specified."""
+        mock_litellm.completion.return_value = MagicMock(
+            choices=[MagicMock(message=MagicMock(content="ok"))],
+            usage=MagicMock(prompt_tokens=1, completion_tokens=1, total_tokens=2),
+        )
+
+        client = LLMClient(model="gpt-4")
+        client.complete(messages=[{"role": "user", "content": "Hi"}])
+
+        call_kwargs = mock_litellm.completion.call_args.kwargs
+        assert "timeout" in call_kwargs
+        assert call_kwargs["timeout"] > 0
+
 
 class TestLLMClientRetry:
     """Tests for LLM client retry integration."""

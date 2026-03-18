@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -302,3 +303,118 @@ class TestCodeExplorerCallbacks:
         data = resp.json()
         assert data[0]["document_count"] == 2
         assert data[0]["project_id"] == "topic:my-topic"
+
+
+class TestTraceDownload:
+    """The trace-download endpoint returns the raw JSONL file."""
+
+    def _make_trace_file(
+        self,
+        tmp_path: Path,
+        filename: str = "2025-01-15T10-30-00-123_abc12345.jsonl",
+    ) -> Path:
+        trace_file = tmp_path / filename
+        header = {
+            "type": "header",
+            "trace_id": "abc12345",
+            "timestamp": "2025-01-15T10:30:00Z",
+            "question": "What is abiogenesis?",
+            "document_ids": ["doc1"],
+            "model": "gpt-5-mini",
+            "system_prompt": "You are a helpful assistant",
+            "subcall_prompt": "Answer concisely",
+        }
+        step = {
+            "type": "step",
+            "step_type": "code_generated",
+            "iteration": 0,
+            "timestamp": "2025-01-15T10:30:01Z",
+            "content": "print('hello')",
+            "tokens_used": 150,
+            "duration_ms": None,
+        }
+        summary = {
+            "type": "summary",
+            "answer": "Abiogenesis is...",
+            "total_iterations": 1,
+            "total_tokens": {"prompt": 100, "completion": 50},
+            "total_duration_ms": 5000,
+            "status": "success",
+        }
+        trace_file.write_text(
+            json.dumps(header)
+            + "\n"
+            + json.dumps(step)
+            + "\n"
+            + json.dumps(summary)
+            + "\n"
+        )
+        return trace_file
+
+    def test_download_returns_raw_jsonl(self, tmp_path: Path) -> None:
+        state = _make_state(tmp_path)
+        state.topic_mgr.resolve.return_value = "proj-1"
+        state.topic_mgr.resolve_all = MagicMock(return_value=["proj-1"])
+        trace_file = self._make_trace_file(tmp_path)
+        state.topic_mgr._storage.list_traces.return_value = [trace_file]
+
+        app = _make_app(state)
+        client = TestClient(app)
+        resp = client.get("/api/topics/my-topic/trace-download/abc12345")
+        assert resp.status_code == 200
+        assert resp.headers["content-type"] == "application/x-ndjson"
+        assert "attachment" in resp.headers["content-disposition"]
+        assert (
+            "2025-01-15T10-30-00-123_abc12345.jsonl"
+            in resp.headers["content-disposition"]
+        )
+        # Body is the raw file content
+        lines = resp.text.strip().splitlines()
+        assert len(lines) == 3
+        assert json.loads(lines[0])["type"] == "header"
+        assert json.loads(lines[0])["system_prompt"] == "You are a helpful assistant"
+
+    def test_download_matches_by_stem(self, tmp_path: Path) -> None:
+        state = _make_state(tmp_path)
+        state.topic_mgr.resolve.return_value = "proj-1"
+        state.topic_mgr.resolve_all = MagicMock(return_value=["proj-1"])
+        trace_file = self._make_trace_file(tmp_path)
+        state.topic_mgr._storage.list_traces.return_value = [trace_file]
+
+        app = _make_app(state)
+        client = TestClient(app)
+        resp = client.get(
+            "/api/topics/my-topic/trace-download/2025-01-15T10-30-00-123_abc12345"
+        )
+        assert resp.status_code == 200
+        assert "attachment" in resp.headers["content-disposition"]
+
+    def test_download_not_found(self, tmp_path: Path) -> None:
+        state = _make_state(tmp_path)
+        state.topic_mgr.resolve.return_value = "proj-1"
+        state.topic_mgr.resolve_all = MagicMock(return_value=["proj-1"])
+        state.topic_mgr._storage.list_traces.return_value = []
+
+        app = _make_app(state)
+        client = TestClient(app)
+        resp = client.get("/api/topics/my-topic/trace-download/nonexistent")
+        assert resp.status_code == 404
+
+    def test_download_uses_custom_callbacks(self, tmp_path: Path) -> None:
+        state = _make_state(tmp_path)
+        trace_file = self._make_trace_file(tmp_path)
+
+        def custom_resolve(s: object, name: str) -> list[str]:
+            return ["custom-proj"]
+
+        def custom_list(s: object, project_id: str) -> list[Path]:
+            return [trace_file]
+
+        app = _make_app(
+            state,
+            resolve_project_ids=custom_resolve,
+            list_trace_files=custom_list,
+        )
+        client = TestClient(app)
+        resp = client.get("/api/topics/my-topic/trace-download/abc12345")
+        assert resp.status_code == 200

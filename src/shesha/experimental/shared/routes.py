@@ -14,7 +14,7 @@ from typing import Any
 
 import litellm
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import FileResponse, PlainTextResponse
 
 from shesha.experimental.shared.schemas import (
     ContextBudget,
@@ -309,8 +309,13 @@ def create_shared_router(
         items.sort(key=lambda item: item.timestamp)
         return items
 
-    @router.get("/api/topics/{name}/traces/{trace_id:path}", response_model=TraceFull)
-    def get_trace(name: str, trace_id: str) -> TraceFull:
+    def _find_trace_file(
+        name: str, trace_id: str
+    ) -> tuple[Path, dict[str, object]]:
+        """Find a trace file by topic name and trace ID.
+
+        Returns the file path and parsed contents, or raises 404.
+        """
         project_ids = _get_project_ids(name)
         for project_id in project_ids:
             trace_files = _get_trace_files(project_id)
@@ -319,38 +324,56 @@ def create_shared_router(
                 header = parsed["header"]
                 assert isinstance(header, dict)
                 if tf.stem == trace_id or header.get("trace_id") == trace_id:
-                    summary = parsed["summary"]
-                    steps_raw = parsed["steps"]
-                    assert isinstance(summary, dict)
-                    assert isinstance(steps_raw, list)
-                    total_tokens_raw = summary.get("total_tokens", {})
-                    assert isinstance(total_tokens_raw, dict)
-                    steps = [
-                        TraceStepSchema(
-                            step_type=str(s.get("step_type", "")),
-                            iteration=int(s.get("iteration", 0)),
-                            content=str(s.get("content", "")),
-                            timestamp=str(s.get("timestamp", "")),
-                            tokens_used=s.get("tokens_used"),
-                            duration_ms=s.get("duration_ms"),
-                        )
-                        for s in steps_raw
-                    ]
-                    doc_ids_raw = header.get("document_ids", [])
-                    doc_ids = list(doc_ids_raw) if isinstance(doc_ids_raw, list) else []
-                    return TraceFull(
-                        trace_id=trace_id,
-                        question=str(header.get("question", "")),
-                        model=str(header.get("model", "")),
-                        timestamp=str(header.get("timestamp", "")),
-                        steps=steps,
-                        total_tokens=total_tokens_raw,
-                        total_iterations=int(summary.get("total_iterations", 0)),
-                        duration_ms=int(summary.get("total_duration_ms", 0)),
-                        status=str(summary.get("status", "unknown")),
-                        document_ids=doc_ids,
-                    )
+                    return tf, parsed
         raise HTTPException(404, f"Trace '{trace_id}' not found")
+
+    @router.get("/api/topics/{name}/traces/{trace_id:path}", response_model=TraceFull)
+    def get_trace(name: str, trace_id: str) -> TraceFull:
+        _tf, parsed = _find_trace_file(name, trace_id)
+        header = parsed["header"]
+        summary = parsed["summary"]
+        steps_raw = parsed["steps"]
+        assert isinstance(header, dict)
+        assert isinstance(summary, dict)
+        assert isinstance(steps_raw, list)
+        total_tokens_raw = summary.get("total_tokens", {})
+        assert isinstance(total_tokens_raw, dict)
+        steps = [
+            TraceStepSchema(
+                step_type=str(s.get("step_type", "")),
+                iteration=int(s.get("iteration", 0)),
+                content=str(s.get("content", "")),
+                timestamp=str(s.get("timestamp", "")),
+                tokens_used=s.get("tokens_used"),
+                duration_ms=s.get("duration_ms"),
+            )
+            for s in steps_raw
+        ]
+        doc_ids_raw = header.get("document_ids", [])
+        doc_ids = list(doc_ids_raw) if isinstance(doc_ids_raw, list) else []
+        return TraceFull(
+            trace_id=trace_id,
+            question=str(header.get("question", "")),
+            model=str(header.get("model", "")),
+            timestamp=str(header.get("timestamp", "")),
+            steps=steps,
+            total_tokens=total_tokens_raw,
+            total_iterations=int(summary.get("total_iterations", 0)),
+            duration_ms=int(summary.get("total_duration_ms", 0)),
+            status=str(summary.get("status", "unknown")),
+            document_ids=doc_ids,
+        )
+
+    # --- Trace Download ---
+
+    @router.get("/api/topics/{name}/trace-download/{trace_id}")
+    def download_trace(name: str, trace_id: str) -> FileResponse:
+        tf, _parsed = _find_trace_file(name, trace_id)
+        return FileResponse(
+            tf,
+            filename=tf.name,
+            media_type="application/x-ndjson",
+        )
 
     # --- History & Export (optional) ---
 

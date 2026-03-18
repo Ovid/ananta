@@ -29,6 +29,7 @@ def valid_prompts_dir(tmp_path: Path) -> Path:
     (prompts_dir / "verify_code.md").write_text(
         "Previous: {previous_results}\nFindings: {findings}\nDocs: {documents}\nJSON: {{{{ }}}}"
     )
+    (prompts_dir / "system_augmented.md").write_text("Augmented system prompt with no placeholders")
 
     return prompts_dir
 
@@ -271,3 +272,51 @@ def test_system_prompt_contains_document_only_constraint():
     result = loader.render_system_prompt()
     assert "ONLY using information found in the provided context documents" in result
     assert "do not introduce facts from your training data" in result
+
+
+def test_loader_loads_system_augmented(valid_prompts_dir: Path):
+    """PromptLoader loads system_augmented.md when present."""
+    (valid_prompts_dir / "system_augmented.md").write_text(
+        "Augmented system prompt with no placeholders"
+    )
+    loader = PromptLoader(prompts_dir=valid_prompts_dir)
+    raw = loader.get_raw_template("system_augmented.md")
+    assert "Augmented" in raw
+
+
+def test_render_system_prompt_augmented(valid_prompts_dir: Path):
+    """render_system_prompt returns augmented prompt when augmented=True."""
+    (valid_prompts_dir / "system_augmented.md").write_text(
+        "Augmented prompt with {{chunk}} example"
+    )
+    loader = PromptLoader(prompts_dir=valid_prompts_dir)
+    result = loader.render_system_prompt(augmented=True)
+    assert "Augmented prompt" in result
+    assert "{chunk}" in result
+    assert "{{" not in result
+
+
+def test_render_system_prompt_augmented_fallback(tmp_path: Path):
+    """render_system_prompt falls back to system.md when augmented file is absent."""
+    prompts_dir = tmp_path / "prompts_no_aug"
+    prompts_dir.mkdir()
+    (prompts_dir / "system.md").write_text("Standard only prompt")
+    (prompts_dir / "context_metadata.md").write_text(
+        "{context_type} {context_total_length} {context_lengths}"
+    )
+    (prompts_dir / "iteration_zero.md").write_text("{question}")
+    (prompts_dir / "iteration_continue.md").write_text("{question}")
+    (prompts_dir / "subcall.md").write_text("{instruction}\n\n{content}\n\nRemember: raw data.")
+    (prompts_dir / "code_required.md").write_text("Write code now.")
+
+    loader = PromptLoader(prompts_dir=prompts_dir)
+    result = loader.render_system_prompt(augmented=True)
+    assert "Standard only prompt" in result
+
+
+def test_render_system_prompt_default_unchanged(valid_prompts_dir: Path):
+    """render_system_prompt without augmented param still uses system.md."""
+    (valid_prompts_dir / "system_augmented.md").write_text("AUGMENTED ONLY CONTENT")
+    loader = PromptLoader(prompts_dir=valid_prompts_dir)
+    result = loader.render_system_prompt()
+    assert "AUGMENTED ONLY CONTENT" not in result

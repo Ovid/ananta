@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Trace download endpoint** (`GET /api/topics/{name}/trace-download/{trace_id}`) returns raw JSONL trace files with correct `application/x-ndjson` content type and attachment disposition; uses iterate-and-match (no path construction from user input)
+- **"Allow background knowledge" toggle** in all explorer sidebars — lets the LLM supplement document content with its training knowledge; background knowledge sections are visually distinguished with a tinted block, left border, and "Background knowledge" label with ARIA accessibility support
 - **"More" button** in ChatArea for one-click deeper analysis across all explorers — sends a predefined prompt to verify, enhance, and re-present the previous analysis; requires at least one prior exchange
 - Document context menu now includes a "Delete" option with confirmation dialog (shared TopicSidebar component)
 - **Help panel** (`?` button) for Code Explorer and Document Explorer with customized quick-start guides, FAQs, and keyboard shortcuts

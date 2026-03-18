@@ -65,6 +65,7 @@ class ExchangeSchema(BaseModel):
     execution_time: float
     model: str
     document_ids: list[str] | None = None
+    allow_background_knowledge: bool = False
 
 
 class ConversationHistory(BaseModel):

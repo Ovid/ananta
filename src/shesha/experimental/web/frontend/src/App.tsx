@@ -68,6 +68,7 @@ export default function App() {
 
   const [searchOpen, setSearchOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
+  const [allowBgKnowledge, setAllowBgKnowledge] = useState(false)
 
   const [showEmailModal, setShowEmailModal] = useState(false)
   const [pendingCitationCheck, setPendingCitationCheck] = useState(false)
@@ -250,6 +251,17 @@ export default function App() {
           onPapersLoaded={handlePapersLoaded}
           viewingPaperId={viewingPaper?.arxiv_id}
           style={{ width: sidebarWidth }}
+          bottomControls={
+            <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={allowBgKnowledge}
+                onChange={e => setAllowBgKnowledge(e.target.checked)}
+                className="accent-accent"
+              />
+              Allow background knowledge
+            </label>
+          }
         />
 
         {/* Resize handle */}
@@ -280,6 +292,7 @@ export default function App() {
               selectedPapers={selectedPapers}
               topicPapers={topicPapersList}
               onPaperClick={handlePaperClick}
+              allowBackgroundKnowledge={allowBgKnowledge}
             />
           </div>
         </div>
@@ -307,6 +320,7 @@ export default function App() {
           traceId={traceView.traceId}
           onClose={() => setTraceView(null)}
           fetchTrace={api.traces.get}
+          downloadTrace={api.traces.download}
         />
       )}
 
@@ -327,6 +341,8 @@ export default function App() {
             { q: 'Can I cancel a running query?', a: 'Yes, press Escape or click the cancel button while a query is running.' },
             { q: 'What is the citation check?', a: 'It verifies that claims in the LLM\u2019s answer are supported by the source documents. Results show which citations are verified, unverified, or missing.' },
             { q: 'How do I export my conversation?', a: 'Click the export button in the header to download a Markdown transcript of the current topic\u2019s conversation.' },
+            { q: 'What does the "More" button do?', a: 'It asks the AI to verify and expand its previous analysis. It checks for completeness, accuracy, and relevance, then presents an updated report with any changes highlighted. Requires at least one prior exchange.' },
+            { q: 'What does "Allow background knowledge" do?', a: 'By default, answers are based strictly on your documents \u2014 this reduces hallucinations but may leave gaps. When enabled, the AI supplements document content with its general knowledge. Background knowledge sections are visually marked so you can tell what comes from your documents versus the AI.' },
           ]}
           shortcuts={[
             { label: 'Send message', key: 'Enter' },

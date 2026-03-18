@@ -124,6 +124,49 @@ class TestNoDocsLoaded:
         assert "no documents" in msg["message"].lower()
 
 
+class TestAllowBackgroundKnowledge:
+    @pytest.mark.asyncio
+    async def test_multi_query_passes_allow_background_knowledge(
+        self, mock_ws: AsyncMock, mock_state: MagicMock
+    ) -> None:
+        """Multi-project query passes allow_background_knowledge to engine."""
+        data: dict[str, object] = {
+            "question": "hi",
+            "document_ids": ["proj1"],
+            "allow_background_knowledge": True,
+        }
+        await handle_multi_project_query(
+            mock_ws,
+            data,
+            mock_state,
+            threading.Event(),
+            item_noun="documents",
+        )
+        engine = mock_state.shesha.get_project.return_value._rlm_engine
+        call_kwargs = engine.query.call_args
+        assert call_kwargs.kwargs.get("allow_background_knowledge") is True
+
+    @pytest.mark.asyncio
+    async def test_multi_query_defaults_allow_background_knowledge_false(
+        self, mock_ws: AsyncMock, mock_state: MagicMock
+    ) -> None:
+        """Multi-project query defaults allow_background_knowledge to False."""
+        data: dict[str, object] = {
+            "question": "hi",
+            "document_ids": ["proj1"],
+        }
+        await handle_multi_project_query(
+            mock_ws,
+            data,
+            mock_state,
+            threading.Event(),
+            item_noun="documents",
+        )
+        engine = mock_state.shesha.get_project.return_value._rlm_engine
+        call_kwargs = engine.query.call_args
+        assert call_kwargs.kwargs.get("allow_background_knowledge") is False
+
+
 class TestTopicResolution:
     @pytest.mark.asyncio
     async def test_invalid_topic_sends_error(

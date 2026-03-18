@@ -588,6 +588,23 @@ describe('TopicSidebar (shared)', () => {
     expect(loadDocuments).toHaveBeenCalledWith('chess')
   })
 
+  it('renders bottomControls slot when provided', async () => {
+    const props = defaultProps()
+    render(
+      <TopicSidebar {...props} bottomControls={<div data-testid="bottom-ctrl">My Control</div>} />
+    )
+    await screen.findByText('chess')
+    expect(screen.getByTestId('bottom-ctrl')).toBeInTheDocument()
+    expect(screen.getByText('My Control')).toBeInTheDocument()
+  })
+
+  it('does not render bottomControls area when not provided', async () => {
+    const props = defaultProps()
+    render(<TopicSidebar {...props} />)
+    await screen.findByText('chess')
+    expect(screen.queryByTestId('bottom-ctrl')).not.toBeInTheDocument()
+  })
+
   it('shows viewing highlight on the document with viewingDocumentId', async () => {
     const props = defaultProps({
       activeTopic: 'chess',

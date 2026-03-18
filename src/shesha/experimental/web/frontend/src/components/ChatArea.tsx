@@ -19,9 +19,10 @@ interface ChatAreaProps {
   selectedPapers?: Set<string>
   topicPapers?: PaperInfo[]
   onPaperClick?: (paper: PaperInfo) => void
+  allowBackgroundKnowledge?: boolean
 }
 
-export default function ChatArea({ topicName, connected, wsSend, wsOnMessage, onViewTrace, onClearHistory, historyVersion, selectedPapers, topicPapers, onPaperClick }: ChatAreaProps) {
+export default function ChatArea({ topicName, connected, wsSend, wsOnMessage, onViewTrace, onClearHistory, historyVersion, selectedPapers, topicPapers, onPaperClick, allowBackgroundKnowledge }: ChatAreaProps) {
   const loadHistory = useCallback(async (topic: string): Promise<Exchange[]> => {
     const data = await api.history.get(topic)
     return data.exchanges
@@ -103,6 +104,7 @@ export default function ChatArea({ topicName, connected, wsSend, wsOnMessage, on
       loadHistory={loadHistory}
       renderAnswer={renderAnswer}
       renderAnswerFooter={renderAnswerFooter}
+      allowBackgroundKnowledge={allowBackgroundKnowledge}
     />
   )
 }

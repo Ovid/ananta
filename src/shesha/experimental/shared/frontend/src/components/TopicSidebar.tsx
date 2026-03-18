@@ -22,6 +22,7 @@ export interface TopicSidebarProps {
   removeDocFromTopic?: (docId: string, topicName: string) => Promise<void>
   deleteDocument?: (docId: string) => Promise<void>
   addButton?: ReactNode
+  bottomControls?: ReactNode
   uncategorizedDocs?: DocumentItem[]
   viewingDocumentId?: string | null
   style?: CSSProperties
@@ -45,6 +46,7 @@ export default function TopicSidebar({
   removeDocFromTopic,
   deleteDocument,
   addButton,
+  bottomControls,
   uncategorizedDocs,
   viewingDocumentId,
   style,
@@ -489,6 +491,12 @@ export default function TopicSidebar({
           </div>
         )}
       </div>
+
+      {bottomControls && (
+        <div className="border-t border-border px-3 py-2">
+          {bottomControls}
+        </div>
+      )}
 
       {deletingTopic && (
         <ConfirmDialog

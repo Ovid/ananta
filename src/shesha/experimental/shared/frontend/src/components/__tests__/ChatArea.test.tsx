@@ -1003,6 +1003,75 @@ describe('ChatArea (shared) - UX consistency after More button click', () => {
   })
 })
 
+describe('ChatArea — allowBackgroundKnowledge', () => {
+  it('includes allow_background_knowledge in query message when true', async () => {
+    const user = userEvent.setup()
+    const props = await renderChatArea({ allowBackgroundKnowledge: true })
+
+    const input = screen.getByRole('textbox')
+    await user.type(input, 'Test question')
+    await user.keyboard('{Enter}')
+
+    expect(props.wsSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'query',
+        allow_background_knowledge: true,
+      })
+    )
+  })
+
+  it('includes allow_background_knowledge=false by default', async () => {
+    const user = userEvent.setup()
+    const props = await renderChatArea()
+
+    const input = screen.getByRole('textbox')
+    await user.type(input, 'Test question')
+    await user.keyboard('{Enter}')
+
+    expect(props.wsSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'query',
+        allow_background_knowledge: false,
+      })
+    )
+  })
+
+  it('sends allow_background_knowledge with More button', async () => {
+    const user = userEvent.setup()
+    const props = await renderChatArea({ allowBackgroundKnowledge: true })
+
+    const moreBtn = screen.getByRole('button', { name: /deeper analysis/i })
+    await user.click(moreBtn)
+
+    expect(props.wsSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'query',
+        allow_background_knowledge: true,
+      })
+    )
+  })
+})
+
+describe('ChatArea — background knowledge hint', () => {
+  it('shows hint below More button when checkbox is off and exchanges exist', async () => {
+    await renderChatArea({ allowBackgroundKnowledge: false })
+    expect(screen.getByText(/Enable.*background knowledge/i)).toBeInTheDocument()
+  })
+
+  it('does not show hint when checkbox is on', async () => {
+    await renderChatArea({ allowBackgroundKnowledge: true })
+    expect(screen.queryByText(/Enable.*background knowledge/i)).not.toBeInTheDocument()
+  })
+
+  it('does not show hint when no exchanges exist', async () => {
+    await renderChatArea({
+      allowBackgroundKnowledge: false,
+      loadHistory: vi.fn().mockResolvedValue([]),
+    })
+    expect(screen.queryByText(/Enable.*background knowledge/i)).not.toBeInTheDocument()
+  })
+})
+
 // Property 6 (custom onKeyDown handler) was removed because the handler was
 // redundant with native <button> Enter/Space activation and caused double-fire.
 // Keyboard activation is now tested by the unit tests above via userEvent.

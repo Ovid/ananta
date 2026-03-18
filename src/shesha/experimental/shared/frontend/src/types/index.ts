@@ -52,6 +52,7 @@ export interface Exchange {
   execution_time: number
   model: string
   document_ids?: string[]
+  allow_background_knowledge?: boolean
 }
 
 export interface ContextBudget {

@@ -120,3 +120,49 @@ describe('TraceViewer markdown rendering', () => {
     expect(stepContent.textContent).toContain('# this is a comment')
   })
 })
+
+describe('TraceViewer download button', () => {
+  it('renders a download button in the header', async () => {
+    const fetchTrace = vi.fn().mockResolvedValue(mockTrace)
+    const downloadTrace = vi.fn()
+
+    await act(async () => {
+      render(
+        <TraceViewer
+          topicName="test"
+          traceId="t-1"
+          onClose={vi.fn()}
+          fetchTrace={fetchTrace}
+          downloadTrace={downloadTrace}
+        />
+      )
+    })
+
+    await screen.findByText(/test-model/)
+    const btn = screen.getByRole('button', { name: /download/i })
+    expect(btn).toBeTruthy()
+  })
+
+  it('calls downloadTrace with topicName and traceId on click', async () => {
+    const user = userEvent.setup()
+    const fetchTrace = vi.fn().mockResolvedValue(mockTrace)
+    const downloadTrace = vi.fn()
+
+    await act(async () => {
+      render(
+        <TraceViewer
+          topicName="test"
+          traceId="t-1"
+          onClose={vi.fn()}
+          fetchTrace={fetchTrace}
+          downloadTrace={downloadTrace}
+        />
+      )
+    })
+
+    await screen.findByText(/test-model/)
+    const btn = screen.getByRole('button', { name: /download/i })
+    await user.click(btn)
+    expect(downloadTrace).toHaveBeenCalledWith('test', 't-1')
+  })
+})

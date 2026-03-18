@@ -157,6 +157,7 @@ async def _handle_query(
     """Execute a query and stream progress via the WebSocket."""
     topic = str(data.get("topic", ""))
     question = str(data.get("question", ""))
+    allow_background = bool(data.get("allow_background_knowledge", False))
 
     project_id = state.topic_mgr.resolve(topic)
     if not project_id:
@@ -186,9 +187,7 @@ async def _handle_query(
     # Validate document_ids against _SAFE_ID_RE (matching multi-project handler)
     for did in document_ids:
         if not isinstance(did, str) or not _SAFE_ID_RE.match(did):
-            await websocket.send_json(
-                {"type": "error", "message": f"Invalid document id: {did!r}"}
-            )
+            await websocket.send_json({"type": "error", "message": f"Invalid document id: {did!r}"})
             return
 
     # Load only the requested documents, skipping any that don't exist
@@ -238,13 +237,18 @@ async def _handle_query(
 
     await websocket.send_json({"type": "status", "phase": "Starting", "iteration": 0})
 
-    # Drain the queue in a background task
+    # Drain the queue in a background task.  Guard sends against a
+    # closed WebSocket so that client disconnects during a query don't
+    # surface as unhandled "Task exception was never retrieved" errors.
     async def drain_queue() -> None:
         while True:
             msg = await message_queue.get()
             if msg is None:
                 break
-            await websocket.send_json(msg)
+            try:
+                await websocket.send_json(msg)
+            except (RuntimeError, WebSocketDisconnect):
+                break  # WebSocket already closed
 
     drain_task = asyncio.create_task(drain_queue())
 
@@ -268,18 +272,16 @@ async def _handle_query(
                 storage=storage,
                 project_id=project_id,
                 cancel_event=cancel_event,
+                allow_background_knowledge=allow_background,
             ),
         )
     except Exception as exc:
         logger.exception("Query execution failed: %s", exc)
-        await message_queue.put(None)
-        await drain_task
         await websocket.send_json({"type": "error", "message": "Query execution failed"})
         return
-
-    # Signal the drain task to stop, then wait for it
-    await message_queue.put(None)
-    await drain_task
+    finally:
+        await message_queue.put(None)
+        await drain_task
 
     # Save to session
     trace_id = None
@@ -302,6 +304,7 @@ async def _handle_query(
         execution_time=result.execution_time,
         model=state.model,
         document_ids=consulted_document_ids,
+        allow_background_knowledge=allow_background,
     )
 
     await websocket.send_json(
@@ -317,6 +320,7 @@ async def _handle_query(
             "duration_ms": int(result.execution_time * 1000),
             "document_ids": consulted_document_ids,
             "document_bytes": document_bytes,
+            "allow_background_knowledge": allow_background,
         }
     )
 
@@ -339,6 +343,7 @@ async def handle_multi_project_query(
     topic-based session resolution.
     """
     question = str(data.get("question", ""))
+    allow_background = bool(data.get("allow_background_knowledge", False))
     document_ids = data.get("document_ids")
 
     if not document_ids or not isinstance(document_ids, list):
@@ -428,13 +433,18 @@ async def handle_multi_project_query(
 
     await ws.send_json({"type": "status", "phase": "Starting", "iteration": 0})
 
-    # Drain the queue in a background task
+    # Drain the queue in a background task.  Guard sends against a
+    # closed WebSocket so that client disconnects during a query don't
+    # surface as unhandled "Task exception was never retrieved" errors.
     async def drain_queue() -> None:
         while True:
             msg = await message_queue.get()
             if msg is None:
                 break
-            await ws.send_json(msg)
+            try:
+                await ws.send_json(msg)
+            except (RuntimeError, WebSocketDisconnect):
+                break  # WebSocket already closed
 
     drain_task = asyncio.create_task(drain_queue())
 
@@ -473,18 +483,16 @@ async def handle_multi_project_query(
                 storage=storage,
                 project_id=first_project_id,
                 cancel_event=cancel_event,
+                allow_background_knowledge=allow_background,
             ),
         )
     except Exception as exc:
         logger.exception("Query execution failed: %s", exc)
-        await message_queue.put(None)
-        await drain_task
         await ws.send_json({"type": "error", "message": "Query execution failed"})
         return
-
-    # Signal the drain task to stop, then wait for it
-    await message_queue.put(None)
-    await drain_task
+    finally:
+        await message_queue.put(None)
+        await drain_task
 
     # Get trace_id
     trace_id = None
@@ -507,6 +515,7 @@ async def handle_multi_project_query(
         execution_time=result.execution_time,
         model=state.model,
         document_ids=consulted_ids,
+        allow_background_knowledge=allow_background,
     )
 
     await ws.send_json(
@@ -522,5 +531,6 @@ async def handle_multi_project_query(
             "duration_ms": int(result.execution_time * 1000),
             "document_ids": consulted_ids,
             "document_bytes": document_bytes,
+            "allow_background_knowledge": allow_background,
         }
     )

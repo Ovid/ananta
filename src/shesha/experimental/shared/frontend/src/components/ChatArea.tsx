@@ -20,6 +20,7 @@ interface ChatAreaProps {
   loadHistory: (topic: string) => Promise<Exchange[]>
   renderAnswer?: (answer: string) => ReactNode
   renderAnswerFooter?: (exchange: Exchange) => ReactNode
+  allowBackgroundKnowledge?: boolean
 }
 
 export type { ChatAreaProps }
@@ -49,6 +50,7 @@ export default function ChatArea({
   loadHistory,
   renderAnswer,
   renderAnswerFooter,
+  allowBackgroundKnowledge = false,
 }: ChatAreaProps) {
   const [exchanges, setExchanges] = useState<Exchange[]>([])
   const [input, setInput] = useState('')
@@ -149,13 +151,14 @@ export default function ChatArea({
       topic: topicName,
       question,
       document_ids: Array.from(selectedDocuments),
+      allow_background_knowledge: allowBackgroundKnowledge,
     }
     wsSend(msg)
     setPendingQuestion(question)
     setPendingSentAt(new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }))
     setThinking(true)
     setPhase('Starting')
-  }, [topicName, wsSend, selectedDocuments])
+  }, [topicName, wsSend, selectedDocuments, allowBackgroundKnowledge])
 
   /** Sends the user-typed question from the textarea. */
   const handleSend = useCallback(() => {
@@ -272,6 +275,11 @@ export default function ChatArea({
             >
               More
             </button>
+          )}
+          {!allowBackgroundKnowledge && exchanges.length > 0 && !thinking && (
+            <span className="text-[10px] text-text-dim">
+              Enable "Allow background knowledge" for more complete analysis
+            </span>
           )}
           {thinking ? (
             <button

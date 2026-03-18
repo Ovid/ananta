@@ -19,6 +19,8 @@ interface TraceViewerProps {
   onClose: () => void
   /** Fetch full trace data. Receives (topicName, traceId) and returns TraceFull. */
   fetchTrace: (topicName: string, traceId: string) => Promise<TraceFull>
+  /** Download trace as a file. Receives (topicName, traceId). */
+  downloadTrace?: (topicName: string, traceId: string) => void
 }
 
 const stepTypeColors: Record<string, string> = {
@@ -31,7 +33,7 @@ const stepTypeColors: Record<string, string> = {
   semantic_verification: 'bg-purple-500',
 }
 
-export default function TraceViewer({ topicName, traceId, onClose, fetchTrace }: TraceViewerProps) {
+export default function TraceViewer({ topicName, traceId, onClose, fetchTrace, downloadTrace }: TraceViewerProps) {
   const [trace, setTrace] = useState<TraceFull | null>(null)
   const [loading, setLoading] = useState(true)
   const [expandedSteps, setExpandedSteps] = useState<Set<number>>(new Set())
@@ -71,7 +73,19 @@ export default function TraceViewer({ topicName, traceId, onClose, fetchTrace }:
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <h2 className="text-sm font-semibold text-text-primary">Trace Viewer</h2>
-        <button onClick={onClose} className="text-text-dim hover:text-text-secondary text-lg">&times;</button>
+        <div className="flex items-center gap-2">
+          {downloadTrace && (
+            <button
+              onClick={() => downloadTrace(topicName, traceId)}
+              className="text-text-dim hover:text-text-secondary text-sm"
+              aria-label="Download trace"
+              title="Download trace"
+            >
+              ↓
+            </button>
+          )}
+          <button onClick={onClose} className="text-text-dim hover:text-text-secondary text-lg">&times;</button>
+        </div>
       </div>
 
       {loading ? (

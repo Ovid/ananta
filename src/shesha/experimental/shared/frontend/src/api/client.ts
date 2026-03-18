@@ -32,6 +32,22 @@ export const sharedApi = {
     get: (topic: string, traceId: string) => request<TraceFull>(
       `/topics/${encodeURIComponent(topic)}/traces/${encodeURIComponent(traceId)}`,
     ),
+    download: async (topic: string, traceId: string) => {
+      const resp = await fetch(`${BASE}/topics/${encodeURIComponent(topic)}/trace-download/${encodeURIComponent(traceId)}`)
+      if (!resp.ok) throw new Error(resp.statusText)
+      const blob = await resp.blob()
+      const disposition = resp.headers.get('content-disposition') || ''
+      const match = disposition.match(/filename="?([^"]+)"?/)
+      const filename = match ? match[1] : `${traceId}.jsonl`
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    },
   },
   history: {
     get: (topic: string) => request<{ exchanges: Exchange[] }>(`/topics/${encodeURIComponent(topic)}/history`),

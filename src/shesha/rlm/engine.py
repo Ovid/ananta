@@ -442,6 +442,7 @@ class RLMEngine:
         storage: StorageBackend | None = None,
         project_id: str | None = None,
         cancel_event: threading.Event | None = None,
+        allow_background_knowledge: bool = False,
     ) -> QueryResult:
         """Run an RLM query against documents."""
         start_time = time.time()
@@ -456,7 +457,9 @@ class RLMEngine:
         doc_sizes = [len(d) for d in documents]
         total_chars = sum(doc_sizes)
 
-        system_prompt = self.prompt_loader.render_system_prompt(boundary=boundary)
+        system_prompt = self.prompt_loader.render_system_prompt(
+            boundary=boundary, augmented=allow_background_knowledge
+        )
 
         # Context metadata as assistant message: primes the model to
         # continue working rather than start fresh. Matches reference

@@ -27,9 +27,7 @@ def _make_state() -> MagicMock:
     state = MagicMock()
     state.topic_mgr.resolve.return_value = "proj-1"
     state.topic_mgr._storage.list_documents.return_value = ["doc-a"]
-    state.topic_mgr._storage.get_document.return_value = MagicMock(
-        name="doc-a", content="hello"
-    )
+    state.topic_mgr._storage.get_document.return_value = MagicMock(name="doc-a", content="hello")
     state.topic_mgr._storage._project_path.return_value = "/tmp/proj"
     state.topic_mgr._storage.list_traces.return_value = []
     state.model = "test-model"
@@ -132,8 +130,7 @@ class TestHandleQueryExceptionLeakage:
         }
 
         sensitive_message = (
-            "ConnectionError: failed to connect to"
-            " /internal/db:5432 with password=s3cret"
+            "ConnectionError: failed to connect to /internal/db:5432 with password=s3cret"
         )
         project = state.shesha.get_project.return_value
         project._rlm_engine.query.side_effect = RuntimeError(sensitive_message)

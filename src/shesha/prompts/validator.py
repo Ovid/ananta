@@ -48,6 +48,11 @@ PROMPT_SCHEMAS: dict[str, PromptSchema] = {
         optional=set(),
         required_file=False,
     ),
+    "system_augmented.md": PromptSchema(
+        required=set(),
+        optional=set(),
+        required_file=False,
+    ),
 }
 
 

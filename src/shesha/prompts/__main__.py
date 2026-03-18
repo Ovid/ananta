@@ -31,9 +31,13 @@ def main() -> int:
 
     errors: list[str] = []
     for filename in sorted(PROMPT_SCHEMAS.keys()):
+        schema = PROMPT_SCHEMAS[filename]
         filepath = prompts_dir / filename
         if not filepath.exists():
-            errors.append(f"✗ {filename} - File not found")
+            if schema.required_file:
+                errors.append(f"✗ {filename} - File not found")
+            else:
+                print(f"- {filename} - Skipped (optional)")
             continue
 
         try:

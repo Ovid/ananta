@@ -2756,7 +2756,11 @@ class TestAllowBackgroundKnowledge:
         mock_executor_cls.return_value = mock_executor
 
         engine = RLMEngine(model="test-model")
-        with patch.object(engine.prompt_loader, "render_system_prompt", wraps=engine.prompt_loader.render_system_prompt) as spy:
+        with patch.object(
+            engine.prompt_loader,
+            "render_system_prompt",
+            wraps=engine.prompt_loader.render_system_prompt,
+        ) as spy:
             engine.query(
                 documents=["doc content"],
                 question="What?",
@@ -2773,7 +2777,7 @@ class TestAllowBackgroundKnowledge:
         mock_llm_cls: MagicMock,
         mock_executor_cls: MagicMock,
     ) -> None:
-        """query() without allow_background_knowledge calls render_system_prompt(augmented=False)."""
+        """query() default calls render_system_prompt(augmented=False)."""
         mock_llm = MagicMock()
         mock_llm.complete.return_value = MagicMock(
             content="```repl\nFINAL('answer')\n```",
@@ -2793,7 +2797,11 @@ class TestAllowBackgroundKnowledge:
         mock_executor_cls.return_value = mock_executor
 
         engine = RLMEngine(model="test-model")
-        with patch.object(engine.prompt_loader, "render_system_prompt", wraps=engine.prompt_loader.render_system_prompt) as spy:
+        with patch.object(
+            engine.prompt_loader,
+            "render_system_prompt",
+            wraps=engine.prompt_loader.render_system_prompt,
+        ) as spy:
             engine.query(
                 documents=["doc content"],
                 question="What?",

@@ -342,12 +342,7 @@ class TestTraceDownload:
             "status": "success",
         }
         trace_file.write_text(
-            json.dumps(header)
-            + "\n"
-            + json.dumps(step)
-            + "\n"
-            + json.dumps(summary)
-            + "\n"
+            json.dumps(header) + "\n" + json.dumps(step) + "\n" + json.dumps(summary) + "\n"
         )
         return trace_file
 
@@ -364,10 +359,7 @@ class TestTraceDownload:
         assert resp.status_code == 200
         assert resp.headers["content-type"] == "application/x-ndjson"
         assert "attachment" in resp.headers["content-disposition"]
-        assert (
-            "2025-01-15T10-30-00-123_abc12345.jsonl"
-            in resp.headers["content-disposition"]
-        )
+        assert "2025-01-15T10-30-00-123_abc12345.jsonl" in resp.headers["content-disposition"]
         # Body is the raw file content
         lines = resp.text.strip().splitlines()
         assert len(lines) == 3
@@ -383,9 +375,7 @@ class TestTraceDownload:
 
         app = _make_app(state)
         client = TestClient(app)
-        resp = client.get(
-            "/api/topics/my-topic/trace-download/2025-01-15T10-30-00-123_abc12345"
-        )
+        resp = client.get("/api/topics/my-topic/trace-download/2025-01-15T10-30-00-123_abc12345")
         assert resp.status_code == 200
         assert "attachment" in resp.headers["content-disposition"]
 

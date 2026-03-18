@@ -309,9 +309,7 @@ def create_shared_router(
         items.sort(key=lambda item: item.timestamp)
         return items
 
-    def _find_trace_file(
-        name: str, trace_id: str
-    ) -> tuple[Path, dict[str, object]]:
+    def _find_trace_file(name: str, trace_id: str) -> tuple[Path, dict[str, object]]:
         """Find a trace file by topic name and trace ID.
 
         Returns the file path and parsed contents, or raises 404.

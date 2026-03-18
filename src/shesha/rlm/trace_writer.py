@@ -7,7 +7,7 @@ from pathlib import Path
 
 from shesha.exceptions import TraceWriteError
 from shesha.models import QueryContext
-from shesha.rlm.trace import TokenUsage, Trace, TraceStep
+from shesha.rlm.trace import TokenUsage, TraceStep
 from shesha.security.redaction import redact
 from shesha.storage.base import StorageBackend
 
@@ -21,100 +21,6 @@ class TraceWriter:
         """Initialize with storage backend."""
         self.storage = storage
         self.suppress_errors = suppress_errors
-
-    def write_trace(
-        self,
-        project_id: str,
-        trace: Trace,
-        context: QueryContext,
-        answer: str,
-        token_usage: TokenUsage,
-        execution_time: float,
-        status: str,
-    ) -> Path | None:
-        """Write a trace to a JSONL file.
-
-        Args:
-            project_id: The project ID
-            trace: The execution trace
-            context: Query metadata
-            answer: The final answer
-            token_usage: Token usage statistics
-            execution_time: Total execution time in seconds
-            status: Query status (success, max_iterations, error)
-
-        Returns:
-            Path to the created trace file, or None if write failed
-        """
-        try:
-            # Apply redaction
-            redacted_trace = trace.redacted()
-
-            traces_dir = self.storage.get_traces_dir(project_id)
-
-            # Generate filename: YYYY-MM-DDTHH-MM-SS-mmm_shortid.jsonl
-            now = datetime.datetime.now(datetime.UTC)
-            timestamp = now.strftime("%Y-%m-%dT%H-%M-%S") + f"-{now.microsecond // 1000:03d}"
-            short_id = context.trace_id[:8]
-            filename = f"{timestamp}_{short_id}.jsonl"
-
-            # Build lines
-            lines: list[str] = []
-
-            # Header
-            header = {
-                "type": "header",
-                "trace_id": context.trace_id,
-                "timestamp": now.isoformat(),
-                "question": context.question,
-                "document_ids": context.document_ids,
-                "model": context.model,
-                "system_prompt": context.system_prompt,
-                "subcall_prompt": context.subcall_prompt,
-            }
-            lines.append(json.dumps(header))
-
-            # Steps (use redacted trace)
-            for step in redacted_trace.steps:
-                step_data = {
-                    "type": "step",
-                    "step_type": step.type.value,
-                    "iteration": step.iteration,
-                    "timestamp": datetime.datetime.fromtimestamp(
-                        step.timestamp, tz=datetime.UTC
-                    ).isoformat(),
-                    "content": step.content,
-                    "tokens_used": step.tokens_used,
-                    "duration_ms": step.duration_ms,
-                }
-                lines.append(json.dumps(step_data))
-
-            # Summary
-            max_iteration = max((s.iteration for s in redacted_trace.steps), default=0)
-            summary = {
-                "type": "summary",
-                "answer": answer,
-                "total_iterations": max_iteration + 1,
-                "total_tokens": {
-                    "prompt": token_usage.prompt_tokens,
-                    "completion": token_usage.completion_tokens,
-                },
-                "total_duration_ms": int(execution_time * 1000),
-                "status": status,
-            }
-            lines.append(json.dumps(summary))
-
-            # Write file
-            path = traces_dir / filename
-            path.write_text("\n".join(lines) + "\n")
-
-            return path
-
-        except Exception as e:
-            if self.suppress_errors:
-                logger.warning(f"Failed to write trace for project {project_id}: {e}")
-                return None
-            raise TraceWriteError(f"Failed to write trace for project {project_id}: {e}") from e
 
     def cleanup_old_traces(self, project_id: str, max_count: int = 50) -> None:
         """Remove oldest traces if count exceeds max_count.

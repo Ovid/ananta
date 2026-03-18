@@ -382,6 +382,9 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** The batch `write_trace()` method has been replaced by `IncrementalTraceWriter` for production use. `TraceWriter` is only instantiated for `cleanup_old_traces()`. The `write_trace()` method is tested but never called in production.
 - **Evidence:** `rlm/trace_writer.py:25-117`, `engine.py:480` (uses `IncrementalTraceWriter`), `engine.py:511` (uses `TraceWriter` only for cleanup)
 - **Found by:** Security
+- **Status:** Fixed
+- **Status reason:** Removed write_trace() method (~93 lines) and associated tests. TraceWriter class retained for cleanup_old_traces().
+- **Status date:** 2026-03-18 18:20 UTC
 
 ## Coverage Checklist
 

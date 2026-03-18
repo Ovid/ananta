@@ -374,7 +374,9 @@ def test_ws_query_handler_callback_is_called(mock_state: MagicMock) -> None:
     assert received_data[0]["question"] == "What?"
 
 
-def test_ws_query_passes_allow_background_knowledge(client: TestClient, mock_state: MagicMock) -> None:
+def test_ws_query_passes_allow_background_knowledge(
+    client: TestClient, mock_state: MagicMock
+) -> None:
     """WebSocket query passes allow_background_knowledge to engine."""
     mock_result = MagicMock()
     mock_result.answer = "Augmented answer."

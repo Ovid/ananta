@@ -29,9 +29,7 @@ def valid_prompts_dir(tmp_path: Path) -> Path:
     (prompts_dir / "verify_code.md").write_text(
         "Previous: {previous_results}\nFindings: {findings}\nDocs: {documents}\nJSON: {{{{ }}}}"
     )
-    (prompts_dir / "system_augmented.md").write_text(
-        "Augmented system prompt with no placeholders"
-    )
+    (prompts_dir / "system_augmented.md").write_text("Augmented system prompt with no placeholders")
 
     return prompts_dir
 

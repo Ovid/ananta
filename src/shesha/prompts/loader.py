@@ -87,9 +87,7 @@ class PromptLoader:
             validate_prompt(filename, content)
             self._prompts[filename] = content
 
-    def render_system_prompt(
-        self, boundary: str | None = None, *, augmented: bool = False
-    ) -> str:
+    def render_system_prompt(self, boundary: str | None = None, *, augmented: bool = False) -> str:
         """Render the system prompt (no variables -- 500K hardcoded).
 
         Calls .format() to unescape {{/}} in code examples (e.g. {{chunk}} -> {chunk})

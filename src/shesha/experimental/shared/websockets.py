@@ -187,9 +187,7 @@ async def _handle_query(
     # Validate document_ids against _SAFE_ID_RE (matching multi-project handler)
     for did in document_ids:
         if not isinstance(did, str) or not _SAFE_ID_RE.match(did):
-            await websocket.send_json(
-                {"type": "error", "message": f"Invalid document id: {did!r}"}
-            )
+            await websocket.send_json({"type": "error", "message": f"Invalid document id: {did!r}"})
             return
 
     # Load only the requested documents, skipping any that don't exist

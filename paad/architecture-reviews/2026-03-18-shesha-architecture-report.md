@@ -217,6 +217,9 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** The FastAPI app factory configures `allow_origins=["*"]` with `allow_credentials=True` and adds no authentication middleware. All REST and WebSocket endpoints are accessible to any network client. The comment says "during development" but there is no production auth path. These endpoints trigger LLM queries (consuming API credits) and execute code in Docker containers.
 - **Evidence:** `shared/app_factory.py:66-72` (`CORSMiddleware(allow_origins=["*"], allow_credentials=True)`), no auth checks anywhere in shared or explorer modules
 - **Found by:** Security
+- **Status:** Won't fix
+- **Status reason:** Acceptable for local-only PoC. Web explorers bind to localhost and are single-user. Auth middleware would be premature — the real mitigation is the bind address.
+- **Status date:** 2026-03-18 19:45 UTC
 
 ### [F-4] Shesha.start() directly mutates RLMEngine._pool
 - **Category:** 27 (Temporal coupling) / 13 (Inconsistent boundaries)

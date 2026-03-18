@@ -27,4 +27,6 @@ export { request, sharedApi } from './api/client'
 
 // Utils
 export { stripBoundaryMarkers } from './utils/sanitize'
+export { splitAugmentedSections } from './utils/augmented'
+export type { AugmentedSection } from './utils/augmented'
 export { mdComponents } from './components/mdComponents'

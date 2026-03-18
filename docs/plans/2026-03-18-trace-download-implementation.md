@@ -12,13 +12,15 @@
 
 ### Task 1: Backend — trace download endpoint
 
+**Requirement:** Design § Backend — new endpoint returning raw JSONL with correct headers, using iterate-and-match (no path construction from user input).
+
 **Files:**
 - Modify: `src/shesha/experimental/shared/routes.py`
 - Test: `tests/experimental/shared/test_shared_routes.py`
 
-**Step 1: Write the failing test**
+#### RED
 
-Add to `tests/experimental/shared/test_shared_routes.py`:
+Write four failing tests. Add to `tests/experimental/shared/test_shared_routes.py`:
 
 ```python
 import json
@@ -122,12 +124,11 @@ class TestTraceDownload:
         assert resp.status_code == 200
 ```
 
-**Step 2: Run tests to verify they fail**
-
 Run: `pytest tests/experimental/shared/test_shared_routes.py::TestTraceDownload -v`
 Expected: FAIL — 404 because the route does not exist yet.
+If passes unexpectedly: the route already exists (check recent commits).
 
-**Step 3: Write minimal implementation**
+#### GREEN
 
 In `src/shesha/experimental/shared/routes.py`:
 
@@ -157,18 +158,19 @@ In `src/shesha/experimental/shared/routes.py`:
         raise HTTPException(404, f"Trace '{trace_id}' not found")
 ```
 
-**Step 4: Run tests to verify they pass**
-
 Run: `pytest tests/experimental/shared/test_shared_routes.py::TestTraceDownload -v`
 Expected: PASS (all 4 tests)
-
-**Step 5: Run full test suite for shared routes**
 
 Run: `pytest tests/experimental/shared/test_shared_routes.py -v`
 Expected: PASS (all existing tests still pass)
 
-**Step 6: Commit**
+#### REFACTOR
 
+Look for:
+- Duplicated iterate-and-match logic between `get_trace` and `download_trace` — consider extracting a `_find_trace_file` helper that returns the matching `Path` (or `None`)
+- Any other trace route duplication
+
+Commit:
 ```bash
 git add src/shesha/experimental/shared/routes.py tests/experimental/shared/test_shared_routes.py
 git commit -m "feat: add trace download endpoint"
@@ -178,11 +180,13 @@ git commit -m "feat: add trace download endpoint"
 
 ### Task 2: Frontend — API client download method
 
+**Requirement:** Design § Frontend API Client — download method using blob URL + anchor element.
+
 **Files:**
 - Modify: `src/shesha/experimental/shared/frontend/src/api/client.ts`
-- Test: `src/shesha/experimental/shared/frontend/src/api/__tests__/client.test.ts`
+- Create: `src/shesha/experimental/shared/frontend/src/api/__tests__/client.test.ts`
 
-**Step 1: Write the failing test**
+#### RED
 
 Create `src/shesha/experimental/shared/frontend/src/api/__tests__/client.test.ts`:
 
@@ -243,12 +247,11 @@ describe('sharedApi.traces.download', () => {
 })
 ```
 
-**Step 2: Run test to verify it fails**
-
 Run: `cd src/shesha/experimental/shared/frontend && npx vitest run src/api/__tests__/client.test.ts`
 Expected: FAIL — `sharedApi.traces.download` is not a function.
+If passes unexpectedly: method already exists (check client.ts).
 
-**Step 3: Write minimal implementation**
+#### GREEN
 
 In `src/shesha/experimental/shared/frontend/src/api/client.ts`, add `download` to the `traces` object:
 
@@ -279,13 +282,16 @@ In `src/shesha/experimental/shared/frontend/src/api/client.ts`, add `download` t
   },
 ```
 
-**Step 4: Run test to verify it passes**
-
 Run: `cd src/shesha/experimental/shared/frontend && npx vitest run src/api/__tests__/client.test.ts`
 Expected: PASS
 
-**Step 5: Commit**
+#### REFACTOR
 
+Look for:
+- Whether the blob download pattern exists elsewhere in the codebase (e.g., the export endpoint uses `r.text()` — different pattern, no consolidation needed)
+- Naming consistency with other API methods
+
+Commit:
 ```bash
 git add src/shesha/experimental/shared/frontend/src/api/client.ts src/shesha/experimental/shared/frontend/src/api/__tests__/client.test.ts
 git commit -m "feat: add trace download method to shared API client"
@@ -295,11 +301,13 @@ git commit -m "feat: add trace download method to shared API client"
 
 ### Task 3: Frontend — download button in TraceViewer
 
+**Requirement:** Design § Frontend UI — download icon button in TraceViewer header bar.
+
 **Files:**
 - Modify: `src/shesha/experimental/shared/frontend/src/components/TraceViewer.tsx`
-- Test: `src/shesha/experimental/shared/frontend/src/components/__tests__/TraceViewer.test.tsx`
+- Modify: `src/shesha/experimental/shared/frontend/src/components/__tests__/TraceViewer.test.tsx`
 
-**Step 1: Write the failing test**
+#### RED
 
 Add to `src/shesha/experimental/shared/frontend/src/components/__tests__/TraceViewer.test.tsx`:
 
@@ -351,12 +359,11 @@ describe('TraceViewer download button', () => {
 })
 ```
 
-**Step 2: Run test to verify it fails**
-
 Run: `cd src/shesha/experimental/shared/frontend && npx vitest run src/components/__tests__/TraceViewer.test.tsx`
 Expected: FAIL — `downloadTrace` is not a recognized prop / download button not found.
+If passes unexpectedly: prop and button already exist.
 
-**Step 3: Write minimal implementation**
+#### GREEN
 
 In `src/shesha/experimental/shared/frontend/src/components/TraceViewer.tsx`:
 
@@ -397,22 +404,18 @@ export default function TraceViewer({ topicName, traceId, onClose, fetchTrace, d
       </div>
 ```
 
-**Step 4: Run test to verify it passes**
+4. Fix existing tests: add `downloadTrace={vi.fn()}` to every existing `<TraceViewer ... />` render call in the shared test file to satisfy the new required prop.
 
 Run: `cd src/shesha/experimental/shared/frontend && npx vitest run src/components/__tests__/TraceViewer.test.tsx`
-Expected: PASS
+Expected: PASS (all tests including existing ones)
 
-**Step 5: Fix existing tests**
+#### REFACTOR
 
-The existing TraceViewer tests don't pass `downloadTrace`. Add `downloadTrace={vi.fn()}` to every existing `<TraceViewer ... />` render call in the test file to satisfy the new required prop.
+Look for:
+- Whether the header buttons should share a common button style class
+- Consistency of icon sizing between download and close buttons
 
-**Step 6: Run all TraceViewer tests**
-
-Run: `cd src/shesha/experimental/shared/frontend && npx vitest run src/components/__tests__/TraceViewer.test.tsx`
-Expected: PASS (all tests)
-
-**Step 7: Commit**
-
+Commit:
 ```bash
 git add src/shesha/experimental/shared/frontend/src/components/TraceViewer.tsx src/shesha/experimental/shared/frontend/src/components/__tests__/TraceViewer.test.tsx
 git commit -m "feat: add download button to TraceViewer"
@@ -422,10 +425,30 @@ git commit -m "feat: add download button to TraceViewer"
 
 ### Task 4: Wire up TraceViewer download prop in all explorers
 
-**Files:**
-- Modify: Each explorer's `App.tsx` that renders `<TraceViewer>`
+**Requirement:** All three explorers must pass the download callback to TraceViewer.
 
-Find all `App.tsx` files that render `<TraceViewer>` and pass the `downloadTrace` prop using `sharedApi.traces.download` (or the explorer's own API wrapper if it extends the shared one). Each explorer renders TraceViewer like:
+**Files:**
+- Modify: `src/shesha/experimental/web/frontend/src/App.tsx`
+- Modify: `src/shesha/experimental/code_explorer/frontend/src/App.tsx`
+- Modify: `src/shesha/experimental/document_explorer/frontend/src/App.tsx`
+- Modify: `src/shesha/experimental/web/frontend/src/components/__tests__/TraceViewer.test.tsx`
+
+#### RED
+
+After adding the required prop to the component, TypeScript will report errors in all three `App.tsx` files (missing `downloadTrace` prop) and the web explorer's `TraceViewer.test.tsx` will fail.
+
+Run: `cd src/shesha/experimental/shared/frontend && npx tsc --noEmit`
+Run: `cd src/shesha/experimental/web/frontend && npx tsc --noEmit`
+Run: `cd src/shesha/experimental/code_explorer/frontend && npx tsc --noEmit`
+Run: `cd src/shesha/experimental/document_explorer/frontend && npx tsc --noEmit`
+Expected: Type errors about missing `downloadTrace` prop.
+
+Run: `cd src/shesha/experimental/web/frontend && npx vitest run src/components/__tests__/TraceViewer.test.tsx`
+Expected: FAIL — missing required prop.
+
+#### GREEN
+
+1. In each of the three `App.tsx` files, add `downloadTrace={api.traces.download}` to the `<TraceViewer>` render:
 
 ```tsx
 {traceView && (
@@ -434,29 +457,27 @@ Find all `App.tsx` files that render `<TraceViewer>` and pass the `downloadTrace
     traceId={traceView.traceId}
     onClose={() => setTraceView(null)}
     fetchTrace={api.traces.get}
-    downloadTrace={api.traces.download}   // ← add this line
+    downloadTrace={api.traces.download}
   />
 )}
 ```
 
-**Step 1: Find all TraceViewer usages**
+All three explorers use `...sharedApi` in their `api` object, so `api.traces.download` is available automatically from Task 2.
 
-Run: `grep -rn "TraceViewer" src/shesha/experimental/*/frontend/src/ --include="*.tsx" -l`
+2. Fix `src/shesha/experimental/web/frontend/src/components/__tests__/TraceViewer.test.tsx`: add `downloadTrace={vi.fn()}` to the `<TraceViewer>` render call (line 31).
 
-**Step 2: Add `downloadTrace={api.traces.download}` to each TraceViewer render**
+Run type-checks and web explorer test again.
+Expected: PASS
 
-For each file found, add the prop. The `api` object should already include `sharedApi.traces` or extend it.
+#### REFACTOR
 
-**Step 3: Run frontend type-check for all explorers**
+Look for:
+- Whether any explorer has a custom trace rendering that also needs updating
+- Consistency of prop ordering across the three App.tsx files
 
-Run: `cd src/shesha/experimental/shared/frontend && npx tsc --noEmit`
-
-Repeat for each explorer's frontend directory. Expected: no type errors.
-
-**Step 4: Commit**
-
+Commit:
 ```bash
-git add src/shesha/experimental/*/frontend/src/App.tsx
+git add src/shesha/experimental/*/frontend/src/App.tsx src/shesha/experimental/web/frontend/src/components/__tests__/TraceViewer.test.tsx
 git commit -m "feat: wire up trace download in all explorers"
 ```
 
@@ -464,23 +485,25 @@ git commit -m "feat: wire up trace download in all explorers"
 
 ### Task 5: Type-check, lint, and full test pass
 
-**Step 1: Run Python tests and checks**
+**Requirement:** All checks green before declaring done.
+
+#### RED
 
 Run: `make all`
-Expected: PASS
-
-**Step 2: Run frontend tests for shared**
-
 Run: `cd src/shesha/experimental/shared/frontend && npx vitest run`
-Expected: PASS
-
-**Step 3: Run frontend type-check**
-
 Run: `cd src/shesha/experimental/shared/frontend && npx tsc --noEmit`
-Expected: PASS
 
-**Step 4: Commit if any fixes were needed**
+Note any failures.
 
+#### GREEN
+
+Fix any lint, type, or test failures found.
+
+#### REFACTOR
+
+Final pass — no further cleanup expected for a feature this small.
+
+Commit (only if fixes were needed):
 ```bash
 git commit -m "fix: address lint/type issues from trace download"
 ```

@@ -31,4 +31,4 @@ Add a `download` method to `sharedApi.traces` in `client.ts` that:
 
 ## Frontend UI
 
-Add a download icon button in the `TraceViewer.tsx` panel header bar, next to the close button. Uses a Lucide download icon. Clicking it calls the download method.
+Add a download icon button in the `TraceViewer.tsx` panel header bar, next to the close button. Uses a download icon. Clicking it calls the download method.

@@ -29,7 +29,8 @@ class LLMResponse:
 
 # Default timeout for LLM API calls (seconds). Prevents infinite hangs
 # when the API connection is established but the response never arrives.
-DEFAULT_TIMEOUT = 300
+# 120s gives headroom beyond the observed worst case (~82s for large responses).
+DEFAULT_TIMEOUT = 120
 
 
 class LLMClient:

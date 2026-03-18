@@ -123,8 +123,12 @@ class SheshaConfig:
             "SHESHA_MAX_TRACES_PER_PROJECT": "max_traces_per_project",
         }
         _int_fields = {
-            "pool_size", "container_memory_mb", "execution_timeout_sec",
-            "max_iterations", "max_output_chars", "max_traces_per_project",
+            "pool_size",
+            "container_memory_mb",
+            "execution_timeout_sec",
+            "max_iterations",
+            "max_output_chars",
+            "max_traces_per_project",
         }
         _bool_fields = {"keep_raw_files", "verify_citations", "verify"}
         for env_var, field_name in env_map.items():

@@ -60,6 +60,7 @@ def build_complete_response(
         "allow_background_knowledge": allow_background_knowledge,
     }
 
+
 # Type alias for multi-project context builder.
 # Signature: async def builder(state, project_ids) -> str
 MultiProjectContextBuilder = Callable[[Any, list[str]], Coroutine[Any, Any, str]]

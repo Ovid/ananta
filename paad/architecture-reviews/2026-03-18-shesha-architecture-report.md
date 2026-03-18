@@ -261,6 +261,9 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** Both `classify_query` and `try_answer_from_analysis` catch bare `except Exception` and return fallback values with zero logging. Persistent auth errors, configuration issues, or unexpected failures produce no diagnostic signal.
 - **Evidence:** `analysis/shortcut.py:78` (`except Exception: return (True, 0, 0)`), `:120` (`except Exception: return None`)
 - **Found by:** Error Handling
+- **Status:** Won't fix
+- **Status reason:** False positive — both exception handlers have explanatory comments per codebase style guide. The fallback behavior is intentional: shortcut failure degrades gracefully to the full RLM query path.
+- **Status date:** 2026-03-18 18:22 UTC
 
 ### [F-11] Business logic in TUI layer
 - **Category:** 25 (Business logic in the UI)

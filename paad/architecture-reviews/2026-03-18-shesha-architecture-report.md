@@ -195,6 +195,10 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** The `query()` method spans ~515 lines and manages LLM interaction, code extraction, FINAL parsing, variable resolution, code execution, verification, semantic verification, trace writing, cancellation, executor lifecycle, and fallback answers. Deeply nested with 7+ levels and many interleaved responsibilities.
 - **Evidence:** `rlm/engine.py:436-951` — handles `LLMClient`, `ContainerExecutor`, `Trace`, `TokenUsage`, `IncrementalTraceWriter`, `VerificationResult`, `SemanticVerificationReport` all in one method
 - **Found by:** Structure
+- **Status:** Fixed
+- **Status reason:** Extracted _execute_code_blocks(), _resolve_final_var(), _run_verifications(), and _CodeBlockResult dataclass. query() reduced from ~515 to ~310 lines.
+- **Status date:** 2026-03-18 18:38 UTC
+- **Status commit:** dc4edca
 
 ### [F-2] Pervasive private API access from experimental layer
 - **Category:** 6 (Leaky abstractions) / 13 (Inconsistent boundaries)

@@ -416,6 +416,54 @@ def test_ws_query_passes_allow_background_knowledge(
     call_kwargs = mock_project._rlm_engine.query.call_args
     assert call_kwargs.kwargs.get("allow_background_knowledge") is True
 
+    # Verify complete message includes allow_background_knowledge
+    complete = [m for m in messages if m["type"] == "complete"]
+    assert len(complete) == 1
+    assert complete[0]["allow_background_knowledge"] is True
+
+
+def test_ws_complete_includes_allow_background_knowledge_false(
+    client: TestClient, mock_state: MagicMock
+) -> None:
+    """Complete message includes allow_background_knowledge=false by default."""
+    mock_result = MagicMock()
+    mock_result.answer = "Answer."
+    mock_result.token_usage = TokenUsage(prompt_tokens=10, completion_tokens=5)
+    mock_result.execution_time = 0.5
+    mock_result.trace = Trace(steps=[])
+
+    mock_project = MagicMock()
+    mock_project._rlm_engine.query.return_value = mock_result
+
+    mock_state.topic_mgr.resolve.return_value = "proj-id"
+    mock_state.shesha.get_project.return_value = mock_project
+    mock_state.topic_mgr._storage.list_documents.return_value = ["doc1"]
+    mock_state.topic_mgr._storage.get_document.side_effect = lambda pid, name: _make_doc(name)
+    mock_state.topic_mgr._storage.list_traces.return_value = []
+
+    with patch(_SESSION_PATCH) as mock_sess_cls:
+        mock_sess_cls.return_value = _mock_session()
+
+        with client.websocket_connect("/ws") as ws:
+            ws.send_json(
+                {
+                    "type": "query",
+                    "topic": "test",
+                    "question": "What?",
+                    "document_ids": ["doc1"],
+                }
+            )
+            messages = []
+            while True:
+                msg = ws.receive_json()
+                messages.append(msg)
+                if msg["type"] in ("complete", "error"):
+                    break
+
+    complete = [m for m in messages if m["type"] == "complete"]
+    assert len(complete) == 1
+    assert complete[0]["allow_background_knowledge"] is False
+
 
 def test_ws_new_query_cancels_previous_task(mock_state: MagicMock) -> None:
     """Sending a second query cancels and awaits the first before starting it."""

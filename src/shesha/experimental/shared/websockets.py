@@ -302,6 +302,7 @@ async def _handle_query(
         execution_time=result.execution_time,
         model=state.model,
         document_ids=consulted_document_ids,
+        allow_background_knowledge=allow_background,
     )
 
     await websocket.send_json(
@@ -317,6 +318,7 @@ async def _handle_query(
             "duration_ms": int(result.execution_time * 1000),
             "document_ids": consulted_document_ids,
             "document_bytes": document_bytes,
+            "allow_background_knowledge": allow_background,
         }
     )
 
@@ -509,6 +511,7 @@ async def handle_multi_project_query(
         execution_time=result.execution_time,
         model=state.model,
         document_ids=consulted_ids,
+        allow_background_knowledge=allow_background,
     )
 
     await ws.send_json(
@@ -524,5 +527,6 @@ async def handle_multi_project_query(
             "duration_ms": int(result.execution_time * 1000),
             "document_ids": consulted_ids,
             "document_bytes": document_bytes,
+            "allow_background_knowledge": allow_background,
         }
     )

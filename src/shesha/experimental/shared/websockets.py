@@ -237,13 +237,18 @@ async def _handle_query(
 
     await websocket.send_json({"type": "status", "phase": "Starting", "iteration": 0})
 
-    # Drain the queue in a background task
+    # Drain the queue in a background task.  Guard sends against a
+    # closed WebSocket so that client disconnects during a query don't
+    # surface as unhandled "Task exception was never retrieved" errors.
     async def drain_queue() -> None:
         while True:
             msg = await message_queue.get()
             if msg is None:
                 break
-            await websocket.send_json(msg)
+            try:
+                await websocket.send_json(msg)
+            except (RuntimeError, WebSocketDisconnect):
+                break  # WebSocket already closed
 
     drain_task = asyncio.create_task(drain_queue())
 
@@ -272,14 +277,11 @@ async def _handle_query(
         )
     except Exception as exc:
         logger.exception("Query execution failed: %s", exc)
-        await message_queue.put(None)
-        await drain_task
         await websocket.send_json({"type": "error", "message": "Query execution failed"})
         return
-
-    # Signal the drain task to stop, then wait for it
-    await message_queue.put(None)
-    await drain_task
+    finally:
+        await message_queue.put(None)
+        await drain_task
 
     # Save to session
     trace_id = None
@@ -431,13 +433,18 @@ async def handle_multi_project_query(
 
     await ws.send_json({"type": "status", "phase": "Starting", "iteration": 0})
 
-    # Drain the queue in a background task
+    # Drain the queue in a background task.  Guard sends against a
+    # closed WebSocket so that client disconnects during a query don't
+    # surface as unhandled "Task exception was never retrieved" errors.
     async def drain_queue() -> None:
         while True:
             msg = await message_queue.get()
             if msg is None:
                 break
-            await ws.send_json(msg)
+            try:
+                await ws.send_json(msg)
+            except (RuntimeError, WebSocketDisconnect):
+                break  # WebSocket already closed
 
     drain_task = asyncio.create_task(drain_queue())
 
@@ -481,14 +488,11 @@ async def handle_multi_project_query(
         )
     except Exception as exc:
         logger.exception("Query execution failed: %s", exc)
-        await message_queue.put(None)
-        await drain_task
         await ws.send_json({"type": "error", "message": "Query execution failed"})
         return
-
-    # Signal the drain task to stop, then wait for it
-    await message_queue.put(None)
-    await drain_task
+    finally:
+        await message_queue.put(None)
+        await drain_task
 
     # Get trace_id
     trace_id = None

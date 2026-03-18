@@ -118,4 +118,4 @@ def test_ws_query_engine_exception_sends_error(client: TestClient, mock_state: M
 
     errors = [m for m in messages if m["type"] == "error"]
     assert len(errors) == 1
-    assert "engine exploded" in errors[0]["message"]
+    assert "query execution failed" in errors[0]["message"].lower()

@@ -56,6 +56,10 @@ class StorageBackend(Protocol):
         """Load all documents in a project for querying."""
         ...
 
+    def get_project_dir(self, project_id: str) -> Path:
+        """Get the root directory for a project."""
+        ...
+
     def get_traces_dir(self, project_id: str) -> Path:
         """Get the traces directory for a project, creating it if needed."""
         ...

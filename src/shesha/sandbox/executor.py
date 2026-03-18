@@ -201,6 +201,18 @@ class ContainerExecutor:
                                     "error": str(e),
                                 }
                             )
+                        except (KeyError, UnicodeDecodeError):
+                            raise  # Protocol violations — handled by outer except
+                        except Exception as e:
+                            # LLM call failed (timeout, transient error, etc.)
+                            # Send error back to sandbox so the model can adapt
+                            # instead of crashing the executor.
+                            self._send_message(
+                                {
+                                    "action": "llm_response",
+                                    "error": f"LLM call failed: {e}",
+                                }
+                            )
                         else:
                             self._send_message(
                                 {

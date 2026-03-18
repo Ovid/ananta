@@ -31,6 +31,11 @@ from shesha.experimental.shared.schemas import (
 from shesha.experimental.shared.session import WebConversationSession
 from shesha.experimental.shared.topics import BaseTopicManager
 
+# Context budget estimation constants
+BASE_PROMPT_TOKENS = 2000  # system prompt + context metadata overhead
+CHARS_PER_TOKEN = 4  # approximate characters-per-token heuristic
+DEFAULT_MAX_CONTEXT_TOKENS = 128_000  # fallback when model info unavailable
+
 # Type aliases for callbacks
 GetSession = Callable[[Any, str], WebConversationSession]
 BuildTopicInfo = Callable[[Any], list[TopicInfo]]
@@ -181,9 +186,9 @@ def create_shared_router(
         * ``resolve_all(name) -> list[str]`` — optional; used by
           default trace resolution.  Falls back to ``resolve()`` when
           absent.  Bypassed by *resolve_project_ids*.
-        * ``_storage._project_path(project_id) -> Path`` — used to
+        * ``storage.get_project_dir(project_id) -> Path`` — used to
           create default sessions.  Bypassed by *get_session*.
-        * ``_storage.list_traces(project_id) -> list[Path]`` — used to
+        * ``storage.list_traces(project_id) -> list[Path]`` — used to
           locate trace files.  Bypassed by *list_trace_files*.
     get_session:
         Optional callback ``(state, topic_name) -> WebConversationSession``.
@@ -199,9 +204,9 @@ def create_shared_router(
     list_trace_files:
         Optional callback ``(state, project_id) -> list[Path]``.
         When provided, overrides the default
-        ``state.topic_mgr._storage.list_traces(project_id)`` call
+        ``state.shesha.storage.list_traces(project_id)`` call
         for trace routes.  Useful when trace files are stored in a
-        different storage backend (e.g. ``state.shesha._storage``).
+        different storage backend (e.g. ``state.shesha.storage``).
     include_topic_crud:
         When ``True`` (default), register topic CRUD routes (list, create,
         rename, delete).
@@ -220,7 +225,7 @@ def create_shared_router(
         if get_session is not None:
             return get_session(state, topic_name)
         project_id = resolve_topic_or_404(state, topic_name)
-        project_dir = state.topic_mgr._storage._project_path(project_id)
+        project_dir = state.shesha.storage.get_project_dir(project_id)
         return WebConversationSession(project_dir)
 
     def _get_project_ids(name: str) -> list[str]:
@@ -233,7 +238,7 @@ def create_shared_router(
         """Get trace files for a project, using callback or default."""
         if list_trace_files is not None:
             return list_trace_files(state, project_id)
-        return state.topic_mgr._storage.list_traces(project_id)  # type: ignore[no-any-return]
+        return state.shesha.storage.list_traces(project_id)  # type: ignore[no-any-return]
 
     # --- Topics ---
 
@@ -427,16 +432,12 @@ def create_shared_router(
             # The LLM context contains: system prompt (~2k tokens) +
             # conversation history prefix + iterative code/output messages.
             # We estimate: base overhead + history chars.
-            base_prompt_tokens = 2000  # system prompt + context metadata
-
             session = _get_session_for_topic(name)
             history_chars = session.context_chars()
 
-            # ~4 chars per token heuristic
-            used_tokens = base_prompt_tokens + (history_chars // 4)
+            used_tokens = BASE_PROMPT_TOKENS + (history_chars // CHARS_PER_TOKEN)
 
-            # Get max tokens from litellm
-            max_tokens = 128000  # reasonable default
+            max_tokens = DEFAULT_MAX_CONTEXT_TOKENS
             try:
                 info = litellm.get_model_info(state.model)
                 max_input = info.get("max_input_tokens")

@@ -33,7 +33,7 @@ from shesha.rlm.verification import (
     build_verification_code,
     parse_verification_output,
 )
-from shesha.sandbox.executor import ContainerExecutor, SubcallContentError
+from shesha.sandbox.executor import ContainerExecutor, ExecutionResult, SubcallContentError
 from shesha.sandbox.pool import ContainerPool
 from shesha.storage.base import StorageBackend
 
@@ -157,6 +157,15 @@ def find_final_answer(text: str) -> tuple[str, str] | None:
         return ("final", _strip_string_quotes(content))
 
     return None
+
+
+@dataclass
+class _CodeBlockResult:
+    """Result of executing code blocks within a single iteration."""
+
+    final_answer: str | None
+    all_output: list[str]
+    exec_results: list[ExecutionResult]
 
 
 class RLMEngine:
@@ -433,6 +442,204 @@ class RLMEngine:
             content_type=content_type,
         )
 
+    def _execute_code_blocks(
+        self,
+        code_blocks: list[str],
+        executor: ContainerExecutor,
+        trace: Trace,
+        iteration: int,
+        token_usage: TokenUsage,
+        on_progress: ProgressCallback | None,
+        on_step: Callable[[TraceStep], None] | None,
+    ) -> _CodeBlockResult:
+        """Execute code blocks and check for FINAL answer.
+
+        Returns a _CodeBlockResult with the final answer (if found),
+        all output strings, and raw execution results.
+        """
+        all_output: list[str] = []
+        exec_results: list[ExecutionResult] = []
+        final_answer: str | None = None
+
+        for code in code_blocks:
+            exec_start = time.time()
+            result = executor.execute(code, timeout=self.execution_timeout)
+            exec_duration = int((time.time() - exec_start) * 1000)
+
+            output_parts = []
+            if result.stdout:
+                output_parts.append(result.stdout)
+            if result.stderr:
+                output_parts.append(f"STDERR: {result.stderr}")
+            if result.error:
+                output_parts.append(f"ERROR: {result.error}")
+
+            output = "\n".join(output_parts) if output_parts else "(no output)"
+            output = truncate_code_output(output, self.max_output_chars)
+
+            step = trace.add_step(
+                type=StepType.CODE_OUTPUT,
+                content=output,
+                iteration=iteration,
+                duration_ms=exec_duration,
+            )
+            if on_step:
+                on_step(step)
+            if on_progress:
+                on_progress(StepType.CODE_OUTPUT, iteration, output, copy.copy(token_usage))
+
+            all_output.append(output)
+            exec_results.append(result)
+
+            # Check for final answer (use `is not None` to catch falsy
+            # values like FINAL(0), FINAL(""), FINAL(False))
+            if result.final_answer is not None:
+                final_answer = (
+                    result.final_answer
+                    if isinstance(result.final_answer, str)
+                    else str(result.final_answer)
+                )
+                step = trace.add_step(
+                    type=StepType.FINAL_ANSWER,
+                    content=final_answer,
+                    iteration=iteration,
+                )
+                if on_step:
+                    on_step(step)
+                if on_progress:
+                    on_progress(
+                        StepType.FINAL_ANSWER,
+                        iteration,
+                        final_answer,
+                        copy.copy(token_usage),
+                    )
+                break
+            elif result.final_var is not None:
+                final_answer = result.final_value or ""
+                step = trace.add_step(
+                    type=StepType.FINAL_ANSWER,
+                    content=final_answer,
+                    iteration=iteration,
+                )
+                if on_step:
+                    on_step(step)
+                if on_progress:
+                    on_progress(
+                        StepType.FINAL_ANSWER,
+                        iteration,
+                        final_answer,
+                        copy.copy(token_usage),
+                    )
+                break
+
+        return _CodeBlockResult(
+            final_answer=final_answer,
+            all_output=all_output,
+            exec_results=exec_results,
+        )
+
+    def _resolve_final_var(
+        self,
+        var_name: str,
+        executor: ContainerExecutor,
+    ) -> str | None:
+        """Resolve a FINAL_VAR variable from the sandbox.
+
+        Returns the variable value as a string, or None if the variable
+        was not found.
+        """
+        result = executor.execute(f"print({var_name})", timeout=self.execution_timeout)
+        if result.status == "ok":
+            return result.stdout.strip()
+        return None
+
+    def _run_verifications(
+        self,
+        final_answer: str,
+        executor: ContainerExecutor,
+        documents: list[str],
+        doc_names: list[str],
+        trace: Trace,
+        token_usage: TokenUsage,
+        iteration: int,
+        on_progress: ProgressCallback | None,
+        on_step: Callable[[TraceStep], None] | None,
+        *,
+        boundary: str,
+    ) -> tuple[VerificationResult | None, SemanticVerificationReport | None]:
+        """Run citation and semantic verification on a final answer.
+
+        Returns (verification, semantic_verification) tuple.
+        """
+        verification = None
+        if self.verify_citations and executor.is_alive:
+            try:
+                code = build_verification_code(final_answer)
+                vresult = executor.execute(code, timeout=self.execution_timeout)
+                if vresult.status == "ok" and vresult.stdout:
+                    verification = parse_verification_output(vresult.stdout)
+                    step = trace.add_step(
+                        type=StepType.VERIFICATION,
+                        content=vresult.stdout,
+                        iteration=iteration,
+                    )
+                    if on_step:
+                        on_step(step)
+                    if on_progress:
+                        on_progress(
+                            StepType.VERIFICATION,
+                            iteration,
+                            vresult.stdout,
+                            copy.copy(token_usage),
+                        )
+            except Exception as exc:
+                step = trace.add_step(
+                    type=StepType.VERIFICATION,
+                    content=f"Verification error: {exc}",
+                    iteration=iteration,
+                )
+                if on_step:
+                    on_step(step)
+                if on_progress:
+                    on_progress(
+                        StepType.VERIFICATION,
+                        iteration,
+                        f"Verification error: {exc}",
+                        copy.copy(token_usage),
+                    )
+
+        semantic_verification = None
+        if self.verify:
+            try:
+                semantic_verification = self._run_semantic_verification(
+                    final_answer=final_answer,
+                    documents=documents,
+                    doc_names=doc_names,
+                    trace=trace,
+                    token_usage=token_usage,
+                    iteration=iteration,
+                    on_progress=on_progress,
+                    on_step=on_step,
+                    boundary=boundary,
+                )
+            except Exception as exc:
+                step = trace.add_step(
+                    type=StepType.SEMANTIC_VERIFICATION,
+                    content=f"Semantic verification error: {exc}",
+                    iteration=iteration,
+                )
+                if on_step:
+                    on_step(step)
+                if on_progress:
+                    on_progress(
+                        StepType.SEMANTIC_VERIFICATION,
+                        iteration,
+                        f"Semantic verification error: {exc}",
+                        copy.copy(token_usage),
+                    )
+
+        return verification, semantic_verification
+
     def query(
         self,
         documents: list[str],
@@ -608,11 +815,8 @@ class RLMEngine:
                     if bare_final is not None:
                         final_type, final_value = bare_final
                         if final_type == "final_var":
-                            # Retrieve variable value from sandbox
-                            retrieve_result = executor.execute(
-                                f"print({final_value})", timeout=self.execution_timeout
-                            )
-                            if retrieve_result.status != "ok":
+                            bare_answer = self._resolve_final_var(final_value, executor)
+                            if bare_answer is None:
                                 # Variable not found — retry instead of
                                 # returning the variable name as the answer
                                 messages.append({"role": "assistant", "content": response.content})
@@ -627,7 +831,6 @@ class RLMEngine:
                                     }
                                 )
                                 continue
-                            bare_answer = retrieve_result.stdout.strip()
                         else:
                             bare_answer = final_value
 
@@ -665,81 +868,16 @@ class RLMEngine:
                     continue
 
                 # Execute code blocks
-                all_output = []
-                exec_results = []
-                final_answer = None
-
-                for code in code_blocks:
-                    exec_start = time.time()
-                    result = executor.execute(code, timeout=self.execution_timeout)
-                    exec_duration = int((time.time() - exec_start) * 1000)
-
-                    output_parts = []
-                    if result.stdout:
-                        output_parts.append(result.stdout)
-                    if result.stderr:
-                        output_parts.append(f"STDERR: {result.stderr}")
-                    if result.error:
-                        output_parts.append(f"ERROR: {result.error}")
-
-                    output = "\n".join(output_parts) if output_parts else "(no output)"
-
-                    # Truncate each code block's output individually (forcing function)
-                    output = truncate_code_output(output, self.max_output_chars)
-
-                    step = trace.add_step(
-                        type=StepType.CODE_OUTPUT,
-                        content=output,
-                        iteration=iteration,
-                        duration_ms=exec_duration,
-                    )
-                    _write_step(step)
-                    if on_progress:
-                        on_progress(StepType.CODE_OUTPUT, iteration, output, copy.copy(token_usage))
-
-                    all_output.append(output)
-                    exec_results.append(result)
-
-                    # Check for final answer (use `is not None` to catch falsy
-                    # values like FINAL(0), FINAL(""), FINAL(False))
-                    if result.final_answer is not None:
-                        # Sandbox FINAL() can receive any type; coerce to str
-                        # so trace steps and QueryResult.answer stay str.
-                        final_answer = (
-                            result.final_answer
-                            if isinstance(result.final_answer, str)
-                            else str(result.final_answer)
-                        )
-                        step = trace.add_step(
-                            type=StepType.FINAL_ANSWER,
-                            content=final_answer,
-                            iteration=iteration,
-                        )
-                        _write_step(step)
-                        if on_progress:
-                            on_progress(
-                                StepType.FINAL_ANSWER,
-                                iteration,
-                                final_answer,
-                                copy.copy(token_usage),
-                            )
-                        break
-                    elif result.final_var is not None:
-                        final_answer = result.final_value or ""
-                        step = trace.add_step(
-                            type=StepType.FINAL_ANSWER,
-                            content=final_answer,
-                            iteration=iteration,
-                        )
-                        _write_step(step)
-                        if on_progress:
-                            on_progress(
-                                StepType.FINAL_ANSWER,
-                                iteration,
-                                final_answer,
-                                copy.copy(token_usage),
-                            )
-                        break
+                cb_result = self._execute_code_blocks(
+                    code_blocks,
+                    executor,
+                    trace,
+                    iteration,
+                    token_usage,
+                    on_progress,
+                    _write_step,
+                )
+                final_answer = cb_result.final_answer
 
                 # If code blocks didn't produce a final answer, check for
                 # bare FINAL in the same response. Now that code blocks have
@@ -748,11 +886,9 @@ class RLMEngine:
                 if final_answer is None and bare_final is not None:
                     final_type, final_value = bare_final
                     if final_type == "final_var":
-                        retrieve_result = executor.execute(
-                            f"print({final_value})", timeout=self.execution_timeout
-                        )
-                        if retrieve_result.status == "ok":
-                            final_answer = retrieve_result.stdout.strip()
+                        resolved = self._resolve_final_var(final_value, executor)
+                        if resolved is not None:
+                            final_answer = resolved
                         else:
                             # Variable not found — record name so a helpful
                             # message is appended after the code-echo messages
@@ -776,71 +912,18 @@ class RLMEngine:
                             )
 
                 if final_answer is not None:
-                    verification = None
-                    if self.verify_citations and executor.is_alive:
-                        try:
-                            code = build_verification_code(final_answer)
-                            vresult = executor.execute(code, timeout=self.execution_timeout)
-                            if vresult.status == "ok" and vresult.stdout:
-                                verification = parse_verification_output(vresult.stdout)
-                                step = trace.add_step(
-                                    type=StepType.VERIFICATION,
-                                    content=vresult.stdout,
-                                    iteration=iteration,
-                                )
-                                _write_step(step)
-                                if on_progress:
-                                    on_progress(
-                                        StepType.VERIFICATION,
-                                        iteration,
-                                        vresult.stdout,
-                                        copy.copy(token_usage),
-                                    )
-                        except Exception as exc:
-                            # Verification failure doesn't affect answer delivery,
-                            # but record the error for diagnostics.
-                            step = trace.add_step(
-                                type=StepType.VERIFICATION,
-                                content=f"Verification error: {exc}",
-                                iteration=iteration,
-                            )
-                            _write_step(step)
-                            if on_progress:
-                                on_progress(
-                                    StepType.VERIFICATION,
-                                    iteration,
-                                    f"Verification error: {exc}",
-                                    copy.copy(token_usage),
-                                )
-
-                    semantic_verification = None
-                    if self.verify:
-                        try:
-                            semantic_verification = self._run_semantic_verification(
-                                final_answer=final_answer,
-                                documents=documents,
-                                doc_names=doc_names or [],
-                                trace=trace,
-                                token_usage=token_usage,
-                                iteration=iteration,
-                                on_progress=on_progress,
-                                on_step=_write_step,
-                                boundary=boundary,
-                            )
-                        except Exception as exc:
-                            step = trace.add_step(
-                                type=StepType.SEMANTIC_VERIFICATION,
-                                content=f"Semantic verification error: {exc}",
-                                iteration=iteration,
-                            )
-                            _write_step(step)
-                            if on_progress:
-                                on_progress(
-                                    StepType.SEMANTIC_VERIFICATION,
-                                    iteration,
-                                    f"Semantic verification error: {exc}",
-                                    copy.copy(token_usage),
-                                )
+                    verification, semantic_verification = self._run_verifications(
+                        final_answer,
+                        executor,
+                        documents,
+                        doc_names or [],
+                        trace,
+                        token_usage,
+                        iteration,
+                        on_progress,
+                        _write_step,
+                        boundary=boundary,
+                    )
 
                     query_result = QueryResult(
                         answer=final_answer,
@@ -873,7 +956,9 @@ class RLMEngine:
 
                 # Add assistant response, then per-block code echo messages
                 messages.append({"role": "assistant", "content": response.content})
-                for code_block, output, exec_result in zip(code_blocks, all_output, exec_results):
+                for code_block, output, exec_result in zip(
+                    code_blocks, cb_result.all_output, cb_result.exec_results
+                ):
                     messages.append(
                         {
                             "role": "user",

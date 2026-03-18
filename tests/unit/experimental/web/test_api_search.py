@@ -75,7 +75,7 @@ def test_search_arxiv_marks_existing_papers(client: TestClient, mock_state: Magi
             project_id="proj-abio",
         ),
     ]
-    mock_state.topic_mgr._storage.list_documents.return_value = ["2501.08753"]
+    mock_state.topic_mgr.storage.list_documents.return_value = ["2501.08753"]
 
     resp = client.get("/api/search?q=test")
     assert resp.status_code == 200
@@ -95,7 +95,7 @@ def test_search_local(client: TestClient, mock_state: MagicMock) -> None:
             project_id="proj-chess",
         ),
     ]
-    mock_state.topic_mgr._storage.list_documents.return_value = ["2501.12345"]
+    mock_state.topic_mgr.storage.list_documents.return_value = ["2501.12345"]
     meta = _make_meta("2501.12345", "Chess Strategies")
     mock_state.cache.get_meta.return_value = meta
 
@@ -118,7 +118,7 @@ def test_search_local_matches_author(client: TestClient, mock_state: MagicMock) 
             project_id="proj-chess",
         ),
     ]
-    mock_state.topic_mgr._storage.list_documents.return_value = ["2501.12345"]
+    mock_state.topic_mgr.storage.list_documents.return_value = ["2501.12345"]
     meta = _make_meta("2501.12345", "Unrelated Title")
     meta.authors = ["Author A"]
     mock_state.cache.get_meta.return_value = meta
@@ -141,7 +141,7 @@ def test_search_local_matches_arxiv_id(client: TestClient, mock_state: MagicMock
             project_id="proj-chess",
         ),
     ]
-    mock_state.topic_mgr._storage.list_documents.return_value = ["2501.12345"]
+    mock_state.topic_mgr.storage.list_documents.return_value = ["2501.12345"]
     meta = _make_meta("2501.12345", "Unrelated")
     mock_state.cache.get_meta.return_value = meta
 
@@ -179,7 +179,7 @@ def test_search_local_reports_all_topics(client: TestClient, mock_state: MagicMo
         ),
     ]
     # Same paper in all three topics
-    mock_state.topic_mgr._storage.list_documents.return_value = ["2501.12345"]
+    mock_state.topic_mgr.storage.list_documents.return_value = ["2501.12345"]
     meta = _make_meta("2501.12345", "Chess AI Paper")
     mock_state.cache.get_meta.return_value = meta
 

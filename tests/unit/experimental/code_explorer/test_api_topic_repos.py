@@ -18,8 +18,8 @@ def mock_shesha() -> MagicMock:
     """Create a mock Shesha instance."""
     shesha = MagicMock()
     shesha.list_projects.return_value = []
-    shesha._storage = MagicMock()
-    shesha._storage.list_documents.return_value = []
+    shesha.storage = MagicMock()
+    shesha.storage.list_documents.return_value = []
     return shesha
 
 
@@ -184,7 +184,7 @@ class TestListTopicRepos:
         proj_info.source_url = "https://github.com/owner/myrepo"
         proj_info.analysis_status = "none"
         mock_shesha.get_project_info.return_value = proj_info
-        mock_shesha._storage.list_documents.return_value = ["f1", "f2"]
+        mock_shesha.storage.list_documents.return_value = ["f1", "f2"]
 
         resp = client.get("/api/topics/RLMs/items")
         assert resp.status_code == 200
@@ -226,7 +226,7 @@ class TestListTopicRepos:
         proj_info.source_url = "https://example.com/repo-a"
         proj_info.analysis_status = "none"
         mock_shesha.get_project_info.return_value = proj_info
-        mock_shesha._storage.list_documents.return_value = []
+        mock_shesha.storage.list_documents.return_value = []
 
         resp = client.get("/api/topics/RLMs/items")
         assert resp.status_code == 200

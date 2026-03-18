@@ -216,3 +216,27 @@ class TestProject:
         call_kwargs = mock_engine.query.call_args.kwargs
         assert call_kwargs.get("storage") is mock_storage
         assert call_kwargs.get("project_id") == "test-project"
+
+
+class TestProjectPublicAPI:
+    def test_rlm_engine_property_returns_engine(
+        self, mock_storage: MagicMock, mock_registry: MagicMock
+    ) -> None:
+        engine = MagicMock()
+        project = Project(
+            project_id="test",
+            storage=mock_storage,
+            parser_registry=mock_registry,
+            rlm_engine=engine,
+        )
+        assert project.rlm_engine is engine
+
+    def test_rlm_engine_property_returns_none_when_not_set(
+        self, mock_storage: MagicMock, mock_registry: MagicMock
+    ) -> None:
+        project = Project(
+            project_id="test",
+            storage=mock_storage,
+            parser_registry=mock_registry,
+        )
+        assert project.rlm_engine is None

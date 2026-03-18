@@ -236,6 +236,21 @@ class TestVerifyWiring:
         assert shesha._rlm_engine.verify is False
 
 
+class TestStorageProperty:
+    """Tests for Shesha.storage public property."""
+
+    def test_storage_property_returns_storage_backend(self) -> None:
+        mock_storage = _make_mock_storage()
+        shesha = Shesha(model="test-model", storage=mock_storage)
+        assert shesha.storage is mock_storage
+
+    def test_storage_property_returns_default_storage(self, tmp_path: Path) -> None:
+        from shesha.storage.filesystem import FilesystemStorage
+
+        shesha = Shesha(model="test-model", storage_path=tmp_path)
+        assert isinstance(shesha.storage, FilesystemStorage)
+
+
 class TestDefaultBehaviorUnchanged:
     """Tests that default behavior works when no DI params are provided."""
 

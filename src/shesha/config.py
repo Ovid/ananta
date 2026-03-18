@@ -111,17 +111,32 @@ class SheshaConfig:
             "SHESHA_MODEL": "model",
             "SHESHA_API_KEY": "api_key",
             "SHESHA_STORAGE_PATH": "storage_path",
+            "SHESHA_KEEP_RAW_FILES": "keep_raw_files",
             "SHESHA_POOL_SIZE": "pool_size",
+            "SHESHA_CONTAINER_MEMORY_MB": "container_memory_mb",
+            "SHESHA_EXECUTION_TIMEOUT_SEC": "execution_timeout_sec",
+            "SHESHA_SANDBOX_IMAGE": "sandbox_image",
             "SHESHA_MAX_ITERATIONS": "max_iterations",
-            "SHESHA_MAX_TRACES_PER_PROJECT": "max_traces_per_project",
+            "SHESHA_MAX_OUTPUT_CHARS": "max_output_chars",
             "SHESHA_VERIFY_CITATIONS": "verify_citations",
+            "SHESHA_VERIFY": "verify",
+            "SHESHA_MAX_TRACES_PER_PROJECT": "max_traces_per_project",
         }
+        _int_fields = {
+            "pool_size",
+            "container_memory_mb",
+            "execution_timeout_sec",
+            "max_iterations",
+            "max_output_chars",
+            "max_traces_per_project",
+        }
+        _bool_fields = {"keep_raw_files", "verify_citations", "verify"}
         for env_var, field_name in env_map.items():
             if env_var in os.environ:
                 env_val: Any = os.environ[env_var]
-                if field_name in {"pool_size", "max_iterations", "max_traces_per_project"}:
+                if field_name in _int_fields:
                     env_val = int(env_val)
-                elif field_name in {"verify_citations"}:
+                elif field_name in _bool_fields:
                     env_val = _parse_bool_env(env_var, env_val)
                 config_dict[field_name] = env_val
 

@@ -41,6 +41,11 @@ class TopicManager:
         self._shesha = shesha
         self._storage = storage
 
+    @property
+    def storage(self) -> FilesystemStorage:
+        """The storage backend used by this topic manager."""
+        return self._storage
+
     def create(self, name: str) -> str:
         """Create a new topic, or return existing project ID if it already exists."""
         slug = slugify(name)
@@ -152,4 +157,4 @@ class TopicManager:
 
     def _project_path(self, project_id: str) -> Path:
         """Get the filesystem path for a project."""
-        return self._storage._project_path(project_id)
+        return self._storage.get_project_dir(project_id)

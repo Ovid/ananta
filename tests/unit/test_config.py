@@ -150,3 +150,37 @@ def test_config_has_no_allowed_hosts():
     """allowed_hosts was removed — config must not have it."""
     config = SheshaConfig()
     assert not hasattr(config, "allowed_hosts")
+
+
+class TestMissingEnvMappings:
+    """All config fields should be settable via environment variables."""
+
+    def test_keep_raw_files_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("SHESHA_KEEP_RAW_FILES", "false")
+        config = SheshaConfig.load()
+        assert config.keep_raw_files is False
+
+    def test_container_memory_mb_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("SHESHA_CONTAINER_MEMORY_MB", "1024")
+        config = SheshaConfig.load()
+        assert config.container_memory_mb == 1024
+
+    def test_execution_timeout_sec_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("SHESHA_EXECUTION_TIMEOUT_SEC", "60")
+        config = SheshaConfig.load()
+        assert config.execution_timeout_sec == 60
+
+    def test_sandbox_image_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("SHESHA_SANDBOX_IMAGE", "custom-sandbox:latest")
+        config = SheshaConfig.load()
+        assert config.sandbox_image == "custom-sandbox:latest"
+
+    def test_max_output_chars_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("SHESHA_MAX_OUTPUT_CHARS", "50000")
+        config = SheshaConfig.load()
+        assert config.max_output_chars == 50000
+
+    def test_verify_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("SHESHA_VERIFY", "true")
+        config = SheshaConfig.load()
+        assert config.verify is True

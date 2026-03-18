@@ -34,6 +34,12 @@ class FilesystemStorage:
         """Get the path for a project directory."""
         return safe_path(self.projects_dir, project_id)
 
+    def get_project_dir(self, project_id: str) -> Path:
+        """Get the root directory for a project."""
+        if not self.project_exists(project_id):
+            raise ProjectNotFoundError(project_id)
+        return self._project_path(project_id)
+
     def create_project(self, project_id: str) -> None:
         """Create a new project."""
         project_path = self._project_path(project_id)

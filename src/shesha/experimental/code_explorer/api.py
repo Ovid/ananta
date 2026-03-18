@@ -49,7 +49,7 @@ def _resolve_code_project_ids(state: CodeExplorerState, topic_name: str) -> list
 
 def _list_code_trace_files(state: CodeExplorerState, project_id: str) -> list[Path]:
     """List trace files from Shesha storage (not topic manager storage)."""
-    return state.shesha._storage.list_traces(project_id)
+    return state.shesha.storage.list_traces(project_id)
 
 
 def _create_repo_router(state: CodeExplorerState) -> APIRouter:
@@ -64,7 +64,7 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
         """Build a RepoInfo for a project_id."""
         info = state.shesha.get_project_info(pid)
         # TODO: Replace with a public Shesha API method when available
-        doc_count = len(state.shesha._storage.list_documents(pid))
+        doc_count = len(state.shesha.storage.list_documents(pid))
         return RepoInfo(
             project_id=pid,
             source_url=info.source_url or "",

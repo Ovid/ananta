@@ -736,6 +736,69 @@ class TestSubcallContentErrorHandling:
         mock_stop.assert_not_called()
 
 
+class TestLLMCallFailureHandling:
+    """Tests for generic LLM call failures (timeout, transient errors) in execute()."""
+
+    def test_execute_sends_error_response_on_llm_call_failure(self):
+        """execute() sends error back to sandbox when handler raises a generic exception."""
+        executor = ContainerExecutor()
+        executor._socket = MagicMock()
+
+        def handler_raises(instruction: str, content: str) -> str:
+            raise RuntimeError("LLM API timed out")
+
+        executor.llm_query_handler = handler_raises
+
+        llm_query_msg = {"action": "llm_query", "instruction": "summarize", "content": "text"}
+        exec_result_msg = {
+            "status": "error",
+            "stdout": "",
+            "stderr": "",
+            "return_value": None,
+            "error": "ValueError: LLM call failed: LLM API timed out",
+        }
+
+        with patch.object(executor, "_read_message", side_effect=[llm_query_msg, exec_result_msg]):
+            sent_data: list[dict] = []
+            with patch.object(
+                executor, "_send_message", side_effect=lambda d, **kw: sent_data.append(d)
+            ):
+                executor.execute("result = llm_query('summarize', 'text')")
+
+        # First _send_message is the execute command, second is the error response
+        assert len(sent_data) == 2
+        error_response = sent_data[1]
+        assert error_response["action"] == "llm_response"
+        assert "error" in error_response
+        assert "LLM API timed out" in error_response["error"]
+
+    def test_execute_does_not_stop_container_on_llm_call_failure(self):
+        """Generic LLM failure does not kill the container — it's recoverable."""
+        executor = ContainerExecutor()
+        executor._socket = MagicMock()
+
+        def handler_raises(instruction: str, content: str) -> str:
+            raise RuntimeError("timeout")
+
+        executor.llm_query_handler = handler_raises
+
+        llm_query_msg = {"action": "llm_query", "instruction": "x", "content": "y"}
+        exec_result_msg = {
+            "status": "error",
+            "stdout": "",
+            "stderr": "",
+            "return_value": None,
+            "error": "ValueError: LLM call failed: timeout",
+        }
+
+        with patch.object(executor, "_read_message", side_effect=[llm_query_msg, exec_result_msg]):
+            with patch.object(executor, "_send_message"):
+                with patch.object(executor, "stop") as mock_stop:
+                    executor.execute("llm_query('x', 'y')")
+
+        mock_stop.assert_not_called()
+
+
 class TestNoHandlerErrorProtocol:
     """Tests for llm_query when no handler is configured."""
 

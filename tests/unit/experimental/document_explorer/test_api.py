@@ -26,8 +26,8 @@ class TestMakeProjectId:
 def mock_shesha() -> MagicMock:
     shesha = MagicMock()
     shesha.list_projects.return_value = []
-    shesha._storage = MagicMock()
-    shesha._storage.list_documents.return_value = []
+    shesha.storage = MagicMock()
+    shesha.storage.list_documents.return_value = []
     return shesha
 
 

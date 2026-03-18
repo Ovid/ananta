@@ -189,7 +189,7 @@ def _make_trace_file(
 def test_list_traces(client: TestClient, mock_state: MagicMock, tmp_path: Path) -> None:
     mock_state.topic_mgr.resolve.return_value = "proj-id"
     trace_file = _make_trace_file(tmp_path)
-    mock_state.topic_mgr._storage.list_traces.return_value = [trace_file]
+    mock_state.shesha.storage.list_traces.return_value = [trace_file]
 
     resp = client.get("/api/topics/test-topic/traces")
     assert resp.status_code == 200
@@ -228,7 +228,7 @@ def test_list_traces_multi_project(
             return [trace_b]
         return []
 
-    mock_state.topic_mgr._storage.list_traces.side_effect = mock_list_traces
+    mock_state.shesha.storage.list_traces.side_effect = mock_list_traces
 
     resp = client.get("/api/topics/test-topic/traces")
     assert resp.status_code == 200
@@ -241,7 +241,7 @@ def test_list_traces_multi_project(
 def test_get_trace_full(client: TestClient, mock_state: MagicMock, tmp_path: Path) -> None:
     mock_state.topic_mgr.resolve.return_value = "proj-id"
     trace_file = _make_trace_file(tmp_path)
-    mock_state.topic_mgr._storage.list_traces.return_value = [trace_file]
+    mock_state.shesha.storage.list_traces.return_value = [trace_file]
 
     resp = client.get("/api/topics/test-topic/traces/2025-01-15T10-30-00-123_abc12345")
     assert resp.status_code == 200
@@ -255,7 +255,7 @@ def test_get_trace_full(client: TestClient, mock_state: MagicMock, tmp_path: Pat
 
 def test_get_trace_not_found(client: TestClient, mock_state: MagicMock) -> None:
     mock_state.topic_mgr.resolve.return_value = "proj-id"
-    mock_state.topic_mgr._storage.list_traces.return_value = []
+    mock_state.shesha.storage.list_traces.return_value = []
     resp = client.get("/api/topics/test-topic/traces/nonexistent")
     assert resp.status_code == 404
 
@@ -267,7 +267,7 @@ def test_get_trace_not_found(client: TestClient, mock_state: MagicMock) -> None:
 
 def test_get_history(client: TestClient, mock_state: MagicMock, tmp_path: Path) -> None:
     mock_state.topic_mgr.resolve.return_value = "proj-id"
-    mock_state.topic_mgr._storage._project_path.return_value = tmp_path
+    mock_state.shesha.storage.get_project_dir.return_value = tmp_path
 
     session = WebConversationSession(tmp_path)
     session.add_exchange(
@@ -288,7 +288,7 @@ def test_get_history(client: TestClient, mock_state: MagicMock, tmp_path: Path) 
 
 def test_clear_history(client: TestClient, mock_state: MagicMock, tmp_path: Path) -> None:
     mock_state.topic_mgr.resolve.return_value = "proj-id"
-    mock_state.topic_mgr._storage._project_path.return_value = tmp_path
+    mock_state.shesha.storage.get_project_dir.return_value = tmp_path
 
     session = WebConversationSession(tmp_path)
     session.add_exchange(
@@ -311,7 +311,7 @@ def test_clear_history(client: TestClient, mock_state: MagicMock, tmp_path: Path
 
 def test_export_transcript(client: TestClient, mock_state: MagicMock, tmp_path: Path) -> None:
     mock_state.topic_mgr.resolve.return_value = "proj-id"
-    mock_state.topic_mgr._storage._project_path.return_value = tmp_path
+    mock_state.shesha.storage.get_project_dir.return_value = tmp_path
 
     session = WebConversationSession(tmp_path)
     session.add_exchange(
@@ -383,7 +383,7 @@ def test_update_model(client: TestClient, mock_state: MagicMock) -> None:
 
 def test_context_budget(client: TestClient, mock_state: MagicMock, tmp_path: Path) -> None:
     mock_state.topic_mgr.resolve.return_value = "proj-id"
-    mock_state.topic_mgr._storage._project_path.return_value = tmp_path
+    mock_state.shesha.storage.get_project_dir.return_value = tmp_path
 
     # Empty session
     WebConversationSession(tmp_path)
@@ -398,6 +398,34 @@ def test_context_budget(client: TestClient, mock_state: MagicMock, tmp_path: Pat
     assert data["max_tokens"] == 100000
     assert data["level"] == "green"
     assert data["percentage"] >= 0
+
+
+def test_context_budget_uses_named_constants(
+    client: TestClient, mock_state: MagicMock, tmp_path: Path
+) -> None:
+    """Context budget calculation uses named constants, not magic numbers."""
+    from shesha.experimental.shared.routes import (
+        BASE_PROMPT_TOKENS,
+        CHARS_PER_TOKEN,
+        DEFAULT_MAX_CONTEXT_TOKENS,
+    )
+
+    assert BASE_PROMPT_TOKENS == 2000
+    assert CHARS_PER_TOKEN == 4
+    assert DEFAULT_MAX_CONTEXT_TOKENS == 128000
+
+    # Verify the constants are actually used in the calculation
+    mock_state.topic_mgr.resolve.return_value = "proj-id"
+    mock_state.shesha.storage.get_project_dir.return_value = tmp_path
+    WebConversationSession(tmp_path)
+
+    with patch("shesha.experimental.shared.routes.litellm") as mock_litellm:
+        mock_litellm.get_model_info.side_effect = Exception("no model info")
+        resp = client.get("/api/topics/test-topic/context-budget")
+
+    data = resp.json()
+    # When litellm fails, should fall back to DEFAULT_MAX_CONTEXT_TOKENS
+    assert data["max_tokens"] == DEFAULT_MAX_CONTEXT_TOKENS
 
 
 def test_context_budget_excluded_when_disabled(
@@ -431,7 +459,7 @@ def test_get_trace_multi_project(client: TestClient, mock_state: MagicMock, tmp_
             return [trace_b]
         return []
 
-    mock_state.topic_mgr._storage.list_traces.side_effect = mock_list_traces
+    mock_state.shesha.storage.list_traces.side_effect = mock_list_traces
 
     resp = client.get("/api/topics/test-topic/traces/2025-01-16T10-30-00-123_bbb")
     assert resp.status_code == 200

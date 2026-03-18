@@ -23,22 +23,22 @@ def mock_state() -> MagicMock:
     state.model = "test-model"
     state.session = MagicMock()
     state.session.format_history_prefix.return_value = ""
-    state.shesha._storage.list_documents.return_value = ["doc1.txt"]
+    state.shesha.storage.list_documents.return_value = ["doc1.txt"]
     doc = MagicMock()
     doc.content = "Hello"
     doc.name = "doc1.txt"
-    state.shesha._storage.get_document.return_value = doc
+    state.shesha.storage.get_document.return_value = doc
     project = MagicMock()
-    project._rlm_engine = MagicMock()
+    project.rlm_engine = MagicMock()
     result = MagicMock()
     result.answer = "42"
     result.token_usage.prompt_tokens = 10
     result.token_usage.completion_tokens = 5
     result.token_usage.total_tokens = 15
     result.execution_time = 1.5
-    project._rlm_engine.query.return_value = result
+    project.rlm_engine.query.return_value = result
     state.shesha.get_project.return_value = project
-    state.shesha._storage.list_traces.return_value = []
+    state.shesha.storage.list_traces.return_value = []
     return state
 
 
@@ -109,7 +109,7 @@ class TestValidation:
 class TestNoDocsLoaded:
     @pytest.mark.asyncio
     async def test_no_docs_sends_error(self, mock_ws: AsyncMock, mock_state: MagicMock) -> None:
-        mock_state.shesha._storage.list_documents.return_value = []
+        mock_state.shesha.storage.list_documents.return_value = []
         data: dict[str, object] = {"question": "hi", "document_ids": ["empty-proj"]}
         await handle_multi_project_query(
             mock_ws,
@@ -142,7 +142,7 @@ class TestAllowBackgroundKnowledge:
             threading.Event(),
             item_noun="documents",
         )
-        engine = mock_state.shesha.get_project.return_value._rlm_engine
+        engine = mock_state.shesha.get_project.return_value.rlm_engine
         call_kwargs = engine.query.call_args
         assert call_kwargs.kwargs.get("allow_background_knowledge") is True
 
@@ -162,7 +162,7 @@ class TestAllowBackgroundKnowledge:
             threading.Event(),
             item_noun="documents",
         )
-        engine = mock_state.shesha.get_project.return_value._rlm_engine
+        engine = mock_state.shesha.get_project.return_value.rlm_engine
         call_kwargs = engine.query.call_args
         assert call_kwargs.kwargs.get("allow_background_knowledge") is False
 

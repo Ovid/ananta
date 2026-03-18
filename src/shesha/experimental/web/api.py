@@ -54,7 +54,7 @@ def _build_arxiv_topic_info(state: AppState) -> list[TopicInfo]:
 def _get_arxiv_session(state: AppState, topic_name: str) -> WebConversationSession:
     """Return the arxiv-flavoured session for a topic."""
     project_id = resolve_topic_or_404(state, topic_name)
-    project_dir = state.topic_mgr._storage._project_path(project_id)
+    project_dir = state.topic_mgr.storage.get_project_dir(project_id)
     return WebConversationSession(project_dir)
 
 
@@ -72,7 +72,7 @@ def _create_arxiv_router(state: AppState) -> APIRouter:
     @router.get("/api/topics/{name}/papers", response_model=list[PaperInfo])
     def list_papers(name: str) -> list[PaperInfo]:
         project_id = resolve_topic_or_404(state, name)
-        doc_names = state.topic_mgr._storage.list_documents(project_id)
+        doc_names = state.topic_mgr.storage.list_documents(project_id)
         papers: list[PaperInfo] = []
         for doc_name in doc_names:
             meta = state.cache.get_meta(doc_name)
@@ -105,7 +105,7 @@ def _create_arxiv_router(state: AppState) -> APIRouter:
             # Already cached — copy into all topics immediately
             doc = to_parsed_document(body.arxiv_id, state.cache)
             for _, project_id in topic_projects:
-                state.topic_mgr._storage.store_document(project_id, doc)
+                state.topic_mgr.storage.store_document(project_id, doc)
             return {"status": "added", "arxiv_id": body.arxiv_id}
 
         # Need to download — create background task
@@ -132,7 +132,7 @@ def _create_arxiv_router(state: AppState) -> APIRouter:
                 download_paper(meta, state.cache)
                 doc = to_parsed_document(body.arxiv_id, state.cache)
                 for _, project_id in topic_projects:
-                    state.topic_mgr._storage.store_document(project_id, doc)
+                    state.topic_mgr.storage.store_document(project_id, doc)
                 papers_list[0]["status"] = "complete"
             except Exception:
                 papers_list[0]["status"] = "error"
@@ -145,7 +145,7 @@ def _create_arxiv_router(state: AppState) -> APIRouter:
     @router.delete("/api/topics/{name}/papers/{arxiv_id}")
     def remove_paper(name: str, arxiv_id: str) -> dict[str, str]:
         project_id = resolve_topic_or_404(state, name)
-        state.topic_mgr._storage.delete_document(project_id, arxiv_id)
+        state.topic_mgr.storage.delete_document(project_id, arxiv_id)
         return {"status": "removed", "arxiv_id": arxiv_id}
 
     @router.get("/api/papers/tasks/{task_id}")
@@ -174,7 +174,7 @@ def _create_arxiv_router(state: AppState) -> APIRouter:
         # Build a mapping of arxiv_id -> list of topic names
         topic_docs: dict[str, list[str]] = {}
         for topic in state.topic_mgr.list_topics():
-            docs = state.topic_mgr._storage.list_documents(topic.project_id)
+            docs = state.topic_mgr.storage.list_documents(topic.project_id)
             for doc_name in docs:
                 topic_docs.setdefault(doc_name, []).append(topic.name)
 
@@ -199,7 +199,7 @@ def _create_arxiv_router(state: AppState) -> APIRouter:
         # Build doc -> topics mapping across all topics
         topic_docs: dict[str, list[str]] = {}
         for topic in state.topic_mgr.list_topics():
-            docs = state.topic_mgr._storage.list_documents(topic.project_id)
+            docs = state.topic_mgr.storage.list_documents(topic.project_id)
             for doc_name in docs:
                 topic_docs.setdefault(doc_name, []).append(topic.name)
 

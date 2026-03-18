@@ -23,7 +23,7 @@ def _make_shesha_and_storage(tmp_path: Path) -> tuple[MagicMock, FilesystemStora
     storage = FilesystemStorage(storage_path)
 
     shesha = MagicMock()
-    shesha._storage = storage
+    shesha.storage = storage
     shesha.list_projects.side_effect = lambda: storage.list_projects()
     shesha.delete_project.side_effect = lambda pid, cleanup_repo=True: storage.delete_project(pid)
     return shesha, storage
@@ -189,7 +189,7 @@ class TestTopicManager:
 
         storage = FilesystemStorage(shesha_data)
         shesha = MagicMock()
-        shesha._storage = storage
+        shesha.storage = storage
 
         mgr = TopicManager(shesha, storage)
         mgr.create("regression-test")

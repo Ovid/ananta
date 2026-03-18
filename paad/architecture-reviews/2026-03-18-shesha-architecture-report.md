@@ -195,6 +195,10 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** The `query()` method spans ~515 lines and manages LLM interaction, code extraction, FINAL parsing, variable resolution, code execution, verification, semantic verification, trace writing, cancellation, executor lifecycle, and fallback answers. Deeply nested with 7+ levels and many interleaved responsibilities.
 - **Evidence:** `rlm/engine.py:436-951` — handles `LLMClient`, `ContainerExecutor`, `Trace`, `TokenUsage`, `IncrementalTraceWriter`, `VerificationResult`, `SemanticVerificationReport` all in one method
 - **Found by:** Structure
+- **Status:** Fixed
+- **Status reason:** Extracted _execute_code_blocks(), _resolve_final_var(), _run_verifications(), and _CodeBlockResult dataclass. query() reduced from ~515 to ~310 lines.
+- **Status date:** 2026-03-18 18:38 UTC
+- **Status commit:** dc4edca
 
 ### [F-2] Pervasive private API access from experimental layer
 - **Category:** 6 (Leaky abstractions) / 13 (Inconsistent boundaries)
@@ -202,6 +206,10 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** The shared WebSocket handlers and routes access `state.topic_mgr._storage`, `project._rlm_engine`, `state.shesha._storage`, and even double-private `_storage._project_path()`. This tightly couples the experimental modules to internal structure of `Project`, `Shesha`, and topic managers, making any refactoring of these internals break the web layer.
 - **Evidence:** `shared/websockets.py:167,197,208,256,263,288,363,462`; `shared/routes.py:223` (`_storage._project_path`)
 - **Found by:** Structure, Coupling, Integration (3 specialists agreed)
+- **Status:** Fixed
+- **Status reason:** Added Shesha.storage, Project.rlm_engine, StorageBackend.get_project_dir() public APIs. Updated all 8 experimental source files to use public APIs exclusively.
+- **Status date:** 2026-03-18 19:42 UTC
+- **Status commit:** efe0d0a
 
 ### [F-3] No authentication on web API endpoints
 - **Category:** 30 (Security as an afterthought)
@@ -209,6 +217,9 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** The FastAPI app factory configures `allow_origins=["*"]` with `allow_credentials=True` and adds no authentication middleware. All REST and WebSocket endpoints are accessible to any network client. The comment says "during development" but there is no production auth path. These endpoints trigger LLM queries (consuming API credits) and execute code in Docker containers.
 - **Evidence:** `shared/app_factory.py:66-72` (`CORSMiddleware(allow_origins=["*"], allow_credentials=True)`), no auth checks anywhere in shared or explorer modules
 - **Found by:** Security
+- **Status:** Won't fix
+- **Status reason:** Acceptable for local-only PoC. Web explorers bind to localhost and are single-user. Auth middleware would be premature — the real mitigation is the bind address.
+- **Status date:** 2026-03-18 19:45 UTC
 
 ### [F-4] Shesha.start() directly mutates RLMEngine._pool
 - **Category:** 27 (Temporal coupling) / 13 (Inconsistent boundaries)
@@ -230,6 +241,9 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** The WebSocket `complete` response is built as inline dict construction at two separate locations for single-project and multi-project handlers. Adding a new field (like `allow_background_knowledge` in commit `56fd993`) requires updating both. No shared schema enforces consistency.
 - **Evidence:** `shared/websockets.py:310-325` (single-project) and `:521-535` (multi-project) — structurally identical but separately maintained
 - **Found by:** Structure
+- **Status:** Fixed
+- **Status reason:** Extracted build_complete_response() helper used by both single-project and multi-project handlers
+- **Status date:** 2026-03-18 18:16 UTC
 
 ### [F-7] RLMEngine creates LLMClient instances directly
 - **Category:** 3 (Tight coupling)
@@ -258,6 +272,9 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** Both `classify_query` and `try_answer_from_analysis` catch bare `except Exception` and return fallback values with zero logging. Persistent auth errors, configuration issues, or unexpected failures produce no diagnostic signal.
 - **Evidence:** `analysis/shortcut.py:78` (`except Exception: return (True, 0, 0)`), `:120` (`except Exception: return None`)
 - **Found by:** Error Handling
+- **Status:** Won't fix
+- **Status reason:** False positive — both exception handlers have explanatory comments per codebase style guide. The fallback behavior is intentional: shortcut failure degrades gracefully to the full RLM query path.
+- **Status date:** 2026-03-18 18:22 UTC
 
 ### [F-11] Business logic in TUI layer
 - **Category:** 25 (Business logic in the UI)
@@ -342,6 +359,9 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** Context budget endpoint uses `2000` (base prompt tokens), `// 4` (chars-per-token ratio), and `128000` (default max tokens) as inline literals without named constants.
 - **Evidence:** `shared/routes.py:430,436,439`
 - **Found by:** Error Handling
+- **Status:** Fixed
+- **Status reason:** Extracted BASE_PROMPT_TOKENS, CHARS_PER_TOKEN, DEFAULT_MAX_CONTEXT_TOKENS as module-level constants
+- **Status date:** 2026-03-18 18:08 UTC
 
 ### [F-23] Hidden side effect in _finalize_trace
 - **Category:** 12 (Hidden side effects)
@@ -356,6 +376,9 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** 5 of 12 config fields (`container_memory_mb`, `execution_timeout_sec`, `sandbox_image`, `max_output_chars`, `keep_raw_files`) lack environment variable mappings, requiring config files for those settings.
 - **Evidence:** `config.py:110-118` (env_map has 7 entries)
 - **Found by:** Error Handling
+- **Status:** Fixed
+- **Status reason:** Added env var mappings for all 6 missing fields (keep_raw_files, container_memory_mb, execution_timeout_sec, sandbox_image, max_output_chars, verify) with proper int/bool parsing
+- **Status date:** 2026-03-18 18:12 UTC
 
 ### [F-25] sanitize_filename defined but never used
 - **Category:** 31 (Dead code / unused dependencies)
@@ -363,6 +386,9 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** `sanitize_filename()` is defined in `security/paths.py`, exported from `security/__init__.py`, and tested, but never called in application code.
 - **Evidence:** `security/paths.py:34-47`
 - **Found by:** Security
+- **Status:** Fixed
+- **Status reason:** Removed function from paths.py, export from __init__.py, and associated tests
+- **Status date:** 2026-03-18 18:05 UTC
 
 ### [F-26] TraceWriter.write_trace() replaced but not removed
 - **Category:** 31 (Dead code / unused dependencies)
@@ -370,6 +396,9 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** The batch `write_trace()` method has been replaced by `IncrementalTraceWriter` for production use. `TraceWriter` is only instantiated for `cleanup_old_traces()`. The `write_trace()` method is tested but never called in production.
 - **Evidence:** `rlm/trace_writer.py:25-117`, `engine.py:480` (uses `IncrementalTraceWriter`), `engine.py:511` (uses `TraceWriter` only for cleanup)
 - **Found by:** Security
+- **Status:** Fixed
+- **Status reason:** Removed write_trace() method (~93 lines) and associated tests. TraceWriter class retained for cleanup_old_traces().
+- **Status date:** 2026-03-18 18:20 UTC
 
 ## Coverage Checklist
 

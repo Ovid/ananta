@@ -11,7 +11,7 @@ class TestAnalysisPromptLoading:
     def test_load_prompt_returns_string(self):
         """_load_prompt returns prompt content as string."""
         mock_shesha = MagicMock()
-        generator = AnalysisGenerator(mock_shesha)
+        generator = AnalysisGenerator(get_project=mock_shesha.get_project, get_project_sha=mock_shesha.get_project_sha)
 
         prompt = generator._load_prompt("generate")
 
@@ -21,7 +21,7 @@ class TestAnalysisPromptLoading:
     def test_load_prompt_contains_json_schema(self):
         """_load_prompt for generate contains JSON schema example."""
         mock_shesha = MagicMock()
-        generator = AnalysisGenerator(mock_shesha)
+        generator = AnalysisGenerator(get_project=mock_shesha.get_project, get_project_sha=mock_shesha.get_project_sha)
 
         prompt = generator._load_prompt("generate")
 
@@ -37,12 +37,17 @@ class TestAnalysisGeneratorStructure:
         """AnalysisGenerator can be imported from shesha.analysis."""
         assert AnalysisGenerator is not None
 
-    def test_generator_takes_shesha_instance(self):
-        """AnalysisGenerator constructor takes a Shesha instance."""
-        mock_shesha = MagicMock()
-        generator = AnalysisGenerator(mock_shesha)
+    def test_generator_accepts_callables(self):
+        """AnalysisGenerator constructor takes get_project and get_project_sha callables."""
+        mock_get_project = MagicMock()
+        mock_get_sha = MagicMock()
+        generator = AnalysisGenerator(
+            get_project=mock_get_project,
+            get_project_sha=mock_get_sha,
+        )
 
-        assert generator._shesha is mock_shesha
+        assert generator._get_project is mock_get_project
+        assert generator._get_project_sha is mock_get_sha
 
 
 class TestAnalysisGeneration:
@@ -85,7 +90,7 @@ class TestAnalysisGeneration:
         # Mock repo ingester for SHA
         mock_shesha.get_project_sha.return_value = "abc123def"
 
-        generator = AnalysisGenerator(mock_shesha)
+        generator = AnalysisGenerator(get_project=mock_shesha.get_project, get_project_sha=mock_shesha.get_project_sha)
         result = generator.generate("test-project")
 
         assert isinstance(result, RepoAnalysis)
@@ -106,7 +111,7 @@ class TestAnalysisGeneration:
         mock_project.query.return_value = mock_result
         mock_shesha.get_project_sha.return_value = "sha123"
 
-        generator = AnalysisGenerator(mock_shesha)
+        generator = AnalysisGenerator(get_project=mock_shesha.get_project, get_project_sha=mock_shesha.get_project_sha)
         generator.generate("test-project")
 
         mock_shesha.get_project.assert_called_once_with("test-project")
@@ -129,7 +134,7 @@ class TestAnalysisGeneration:
         mock_project.query.return_value = mock_result
         mock_shesha.get_project_sha.return_value = None
 
-        generator = AnalysisGenerator(mock_shesha)
+        generator = AnalysisGenerator(get_project=mock_shesha.get_project, get_project_sha=mock_shesha.get_project_sha)
         result = generator.generate("test-project")
 
         assert result.head_sha == ""  # Empty string when no SHA
@@ -153,7 +158,7 @@ class TestAnalysisGeneration:
         mock_project.query.return_value = mock_result
         mock_shesha.get_project_sha.return_value = "sha789"
 
-        generator = AnalysisGenerator(mock_shesha)
+        generator = AnalysisGenerator(get_project=mock_shesha.get_project, get_project_sha=mock_shesha.get_project_sha)
         result = generator.generate("test-project")
 
         assert isinstance(result.overview, str)
@@ -188,7 +193,7 @@ class TestAnalysisGeneration:
         mock_project.query.return_value = mock_result
         mock_shesha.get_project_sha.return_value = "sha999"
 
-        generator = AnalysisGenerator(mock_shesha)
+        generator = AnalysisGenerator(get_project=mock_shesha.get_project, get_project_sha=mock_shesha.get_project_sha)
         result = generator.generate("test-project")
 
         comp = result.components[0]
@@ -243,7 +248,7 @@ class TestAnalysisGeneration:
         mock_project.query.return_value = mock_result
         mock_shesha.get_project_sha.return_value = "sha000"
 
-        generator = AnalysisGenerator(mock_shesha)
+        generator = AnalysisGenerator(get_project=mock_shesha.get_project, get_project_sha=mock_shesha.get_project_sha)
         result = generator.generate("test-project")
 
         comp = result.components[0]
@@ -278,7 +283,7 @@ class TestAnalysisGeneration:
         mock_project.query.return_value = mock_result
         mock_shesha.get_project_sha.return_value = "sha111"
 
-        generator = AnalysisGenerator(mock_shesha)
+        generator = AnalysisGenerator(get_project=mock_shesha.get_project, get_project_sha=mock_shesha.get_project_sha)
         result = generator.generate("test-project")
 
         dep = result.external_dependencies[0]
@@ -299,7 +304,7 @@ class TestAnalysisGeneration:
         mock_project.query.return_value = mock_result
         mock_shesha.get_project_sha.return_value = "sha456"
 
-        generator = AnalysisGenerator(mock_shesha)
+        generator = AnalysisGenerator(get_project=mock_shesha.get_project, get_project_sha=mock_shesha.get_project_sha)
         result = generator.generate("test-project")
 
         # Fallback: raw answer becomes overview, empty components/deps

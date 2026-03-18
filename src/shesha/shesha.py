@@ -295,7 +295,10 @@ class Shesha:
         if not self._storage.project_exists(project_id):
             raise ProjectNotFoundError(project_id)
 
-        generator = AnalysisGenerator(self)
+        generator = AnalysisGenerator(
+            get_project=self.get_project,
+            get_project_sha=self.get_project_sha,
+        )
         analysis = generator.generate(project_id)
         self._storage.store_analysis(project_id, analysis)
         return analysis

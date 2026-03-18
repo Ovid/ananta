@@ -2,6 +2,7 @@
 
 import json
 import re
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
@@ -15,19 +16,25 @@ from shesha.models import (
 )
 
 if TYPE_CHECKING:
-    from shesha import Shesha
+    from shesha.project import Project
 
 
 class AnalysisGenerator:
     """Generates codebase analysis using RLM queries."""
 
-    def __init__(self, shesha: "Shesha") -> None:
+    def __init__(
+        self,
+        get_project: Callable[[str], "Project"],
+        get_project_sha: Callable[[str], str | None],
+    ) -> None:
         """Initialize the generator.
 
         Args:
-            shesha: Shesha instance for project access.
+            get_project: Callable that returns a Project for a given project ID.
+            get_project_sha: Callable that returns the HEAD SHA for a project.
         """
-        self._shesha = shesha
+        self._get_project = get_project
+        self._get_project_sha = get_project_sha
 
     def _load_prompt(self, name: str) -> str:
         """Load a prompt template from the prompts directory.
@@ -85,7 +92,7 @@ class AnalysisGenerator:
         Returns:
             RepoAnalysis with the generated analysis.
         """
-        project = self._shesha.get_project(project_id)
+        project = self._get_project(project_id)
         prompt = self._load_prompt("generate")
 
         result = project.query(prompt)
@@ -95,7 +102,7 @@ class AnalysisGenerator:
             data = {"overview": result.answer, "components": [], "external_dependencies": []}
 
         # Get current SHA
-        head_sha = self._shesha.get_project_sha(project_id) or ""
+        head_sha = self._get_project_sha(project_id) or ""
 
         # Parse components
         components = []

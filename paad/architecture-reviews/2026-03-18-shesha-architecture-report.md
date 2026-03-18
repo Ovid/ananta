@@ -324,6 +324,10 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** `AnalysisGenerator.__init__` takes a `Shesha` instance but only uses `get_project()` and `get_project_sha()`. Wider dependency surface than necessary.
 - **Evidence:** `analysis/generator.py:24`
 - **Found by:** Coupling
+- **Status:** Fixed
+- **Status reason:** Changed constructor to accept two callables (get_project, get_project_sha) instead of full Shesha instance
+- **Status date:** 2026-03-18 22:02 UTC
+- **Status commit:** (pending)
 
 ### [F-18] Non-idempotent document upload
 - **Category:** 19 (Lack of idempotency)
@@ -376,7 +380,7 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Status:** Fixed
 - **Status reason:** Renamed to _finalize_trace_and_cleanup to make the cleanup side effect visible in the name
 - **Status date:** 2026-03-18 21:58 UTC
-- **Status commit:** (pending)
+- **Status commit:** f2aa232
 
 ### [F-24] Config env_map incomplete
 - **Category:** 22 (Configuration sprawl)

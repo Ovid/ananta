@@ -48,7 +48,7 @@ shesha-document-explorer         # Document explorer
 ## Common Commands
 
 ```bash
-source .venv/bin/activate        # Always activate venv first
+source .venv/bin/activate        # Only activate at session start. You should not need it more than once
 pip install -e ".[dev]"          # Install with dev deps
 make all                         # Format + lint + typecheck + test + test-frontend
 pytest                           # Run all tests

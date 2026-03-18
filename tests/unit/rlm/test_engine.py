@@ -119,6 +119,40 @@ def test_engine_defaults_llm_client_factory_to_llm_client():
     assert engine._llm_client_factory is LLMClient
 
 
+class TestSetPool:
+    """Tests for RLMEngine.set_pool()."""
+
+    def test_set_pool_assigns_pool(self):
+        """set_pool() stores the pool for use during queries."""
+        from shesha.sandbox.pool import ContainerPool
+
+        engine = RLMEngine(model="test-model")
+        pool = MagicMock(spec=ContainerPool)
+        engine.set_pool(pool)
+        assert engine._pool is pool
+
+    def test_set_pool_accepts_none_to_clear(self):
+        """set_pool(None) clears the pool, reverting to standalone executors."""
+        from shesha.sandbox.pool import ContainerPool
+
+        pool = MagicMock(spec=ContainerPool)
+        engine = RLMEngine(model="test-model", pool=pool)
+        engine.set_pool(None)
+        assert engine._pool is None
+
+    def test_set_pool_rejects_non_pool(self):
+        """set_pool() raises TypeError for non-ContainerPool arguments."""
+        engine = RLMEngine(model="test-model")
+        with pytest.raises(TypeError, match="ContainerPool"):
+            engine.set_pool("not a pool")  # type: ignore[arg-type]
+
+    def test_set_pool_rejects_arbitrary_objects(self):
+        """set_pool() rejects objects that aren't ContainerPool instances."""
+        engine = RLMEngine(model="test-model")
+        with pytest.raises(TypeError, match="ContainerPool"):
+            engine.set_pool(MagicMock())  # type: ignore[arg-type]
+
+
 @patch("shesha.rlm.engine.ContainerExecutor")
 def test_engine_uses_injected_llm_factory(mock_executor_cls: MagicMock):
     """Engine uses the injected factory instead of importing LLMClient directly."""

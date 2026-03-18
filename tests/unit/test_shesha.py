@@ -44,7 +44,9 @@ class TestDockerAvailability:
 
     def test_start_checks_docker_and_creates_pool(self, tmp_path: Path):
         """start() checks Docker and creates the container pool."""
-        mock_pool = MagicMock()
+        from shesha.sandbox.pool import ContainerPool
+
+        mock_pool = MagicMock(spec=ContainerPool)
         with (
             patch("shesha.shesha.docker") as mock_docker,
             patch("shesha.shesha.ContainerPool", return_value=mock_pool) as mock_pool_cls,
@@ -108,9 +110,14 @@ class TestDockerAvailability:
 
     def test_start_is_idempotent(self, tmp_path: Path):
         """Calling start() twice creates only one pool."""
+        from shesha.sandbox.pool import ContainerPool
+
         with (
             patch("shesha.shesha.docker"),
-            patch("shesha.shesha.ContainerPool") as mock_pool_cls,
+            patch(
+                "shesha.shesha.ContainerPool",
+                return_value=MagicMock(spec=ContainerPool),
+            ) as mock_pool_cls,
         ):
             shesha = Shesha(model="test-model", storage_path=tmp_path)
             shesha.start()
@@ -119,18 +126,17 @@ class TestDockerAvailability:
             mock_pool_cls.assert_called_once()
 
     def test_start_sets_pool_on_engine(self, tmp_path: Path):
-        """start() sets the pool on the RLM engine."""
+        """start() sets the pool on the RLM engine via set_pool()."""
         mock_pool = MagicMock()
         with (
             patch("shesha.shesha.docker"),
             patch("shesha.shesha.ContainerPool", return_value=mock_pool),
         ):
             shesha = Shesha(model="test-model", storage_path=tmp_path)
-            assert shesha._rlm_engine._pool is None
 
-            shesha.start()
-
-            assert shesha._rlm_engine._pool is mock_pool
+            with patch.object(shesha._rlm_engine, "set_pool") as mock_set:
+                shesha.start()
+                mock_set.assert_called_once_with(mock_pool)
 
 
 class TestShesha:
@@ -184,7 +190,9 @@ class TestShesha:
 
     def test_stop_after_restart_stops_pool(self, tmp_path: Path):
         """Stop after start-stop-start cycle should stop the pool."""
-        mock_pool = MagicMock()
+        from shesha.sandbox.pool import ContainerPool
+
+        mock_pool = MagicMock(spec=ContainerPool)
         with (
             patch("shesha.shesha.docker"),
             patch("shesha.shesha.ContainerPool", return_value=mock_pool),
@@ -207,7 +215,7 @@ class TestShesha:
             mock_pool.stop.assert_called_once()
 
     def test_shesha_passes_pool_to_engine_on_start(self, tmp_path: Path):
-        """Shesha passes pool to RLMEngine when start() is called."""
+        """Shesha passes pool to RLMEngine via set_pool() when start() is called."""
         mock_pool = MagicMock()
         with (
             patch("shesha.shesha.docker"),
@@ -215,13 +223,9 @@ class TestShesha:
         ):
             shesha = Shesha(model="test-model", storage_path=tmp_path)
 
-            # Before start: engine has no pool
-            assert shesha._rlm_engine._pool is None
-
-            shesha.start()
-
-            # After start: engine has the pool
-            assert shesha._rlm_engine._pool is mock_pool
+            with patch.object(shesha._rlm_engine, "set_pool") as mock_set:
+                shesha.start()
+                mock_set.assert_called_once_with(mock_pool)
 
     def test_shesha_uses_config_load_by_default(self, tmp_path: Path):
         """Shesha uses SheshaConfig.load() by default, picking up env vars."""

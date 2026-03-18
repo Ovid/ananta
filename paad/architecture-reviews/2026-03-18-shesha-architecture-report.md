@@ -227,6 +227,10 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** The pool is assigned to the engine via direct private attribute mutation (`self._rlm_engine._pool = self._pool`) inside `start()`. The engine's behavior depends on whether this external method was called. Without `start()`, the engine silently creates standalone executors instead of using the pool.
 - **Evidence:** `shesha.py:342`, read in `engine.py:546-553`
 - **Found by:** Structure, Coupling
+- **Status:** Fixed
+- **Status reason:** Added RLMEngine.set_pool() with isinstance validation. Shesha.start() now uses the public API instead of mutating _pool directly.
+- **Status date:** 2026-03-18 23:30 UTC
+- **Status commit:** 909d354
 
 ### [F-5] Repo ingestion logic misplaced in Shesha facade
 - **Category:** 10 (Feature envy / anemic domain model)

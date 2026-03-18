@@ -105,7 +105,7 @@ class TestEngineInjection:
         assert project._rlm_engine is mock_engine
 
     def test_start_sets_pool_on_injected_engine(self, tmp_path: Path):
-        """start() creates pool and sets it on injected engine."""
+        """start() creates pool and sets it on injected engine via set_pool()."""
         mock_storage = _make_mock_storage()
         mock_engine = _make_mock_engine()
         mock_pool = MagicMock()
@@ -122,7 +122,7 @@ class TestEngineInjection:
 
             shesha.start()
 
-            assert mock_engine._pool is mock_pool
+            mock_engine.set_pool.assert_called_once_with(mock_pool)
 
 
 class TestParserRegistryInjection:

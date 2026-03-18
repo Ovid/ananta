@@ -344,7 +344,7 @@ class Shesha:
             image=self._config.sandbox_image,
             memory_limit=f"{self._config.container_memory_mb}m",
         )
-        self._rlm_engine._pool = self._pool
+        self._rlm_engine.set_pool(self._pool)
         self._pool.start()
 
     def stop(self) -> None:

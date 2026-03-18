@@ -207,6 +207,21 @@ class RLMEngine:
         self._llm_client_factory: LLMClientFactory = llm_client_factory or LLMClient
         self._subcall_lock = threading.Lock()
 
+    def set_pool(self, pool: ContainerPool | None) -> None:
+        """Set or clear the container pool used for query execution.
+
+        Args:
+            pool: A ContainerPool instance, or None to clear.
+
+        Raises:
+            TypeError: If *pool* is not a ContainerPool instance or None.
+        """
+        if pool is not None and not isinstance(pool, ContainerPool):
+            raise TypeError(
+                f"Expected ContainerPool or None, got {type(pool).__name__}"
+            )
+        self._pool = pool
+
     def _handle_llm_query(
         self,
         instruction: str,

@@ -490,8 +490,9 @@ describe('ChatArea (shared) - More button click behavior', () => {
 
     await user.click(screen.getByRole('button', { name: /deeper analysis/i }))
 
-    // A timestamp string should appear near the pending question (format: "H:MM AM/PM")
-    const timePattern = /\d{1,2}:\d{2}\s*[AP]M/i
+    // A timestamp string should appear near the pending question.
+    // Accepts both 12-hour ("3:45 PM") and 24-hour ("15:45") locale formats.
+    const timePattern = /\d{1,2}:\d{2}(\s*[AP]M)?/i
     const allText = document.body.textContent ?? ''
     expect(allText).toMatch(timePattern)
   })

@@ -230,6 +230,9 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** The WebSocket `complete` response is built as inline dict construction at two separate locations for single-project and multi-project handlers. Adding a new field (like `allow_background_knowledge` in commit `56fd993`) requires updating both. No shared schema enforces consistency.
 - **Evidence:** `shared/websockets.py:310-325` (single-project) and `:521-535` (multi-project) — structurally identical but separately maintained
 - **Found by:** Structure
+- **Status:** Fixed
+- **Status reason:** Extracted build_complete_response() helper used by both single-project and multi-project handlers
+- **Status date:** 2026-03-18 18:16 UTC
 
 ### [F-7] RLMEngine creates LLMClient instances directly
 - **Category:** 3 (Tight coupling)

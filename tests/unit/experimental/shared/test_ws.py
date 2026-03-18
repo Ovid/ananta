@@ -11,7 +11,7 @@ import pytest
 from fastapi import FastAPI, WebSocket
 from fastapi.testclient import TestClient
 
-from shesha.experimental.shared.websockets import websocket_handler
+from shesha.experimental.shared.websockets import build_complete_response, websocket_handler
 from shesha.models import ParsedDocument
 from shesha.rlm.trace import TokenUsage, Trace
 
@@ -515,3 +515,44 @@ def test_ws_new_query_cancels_previous_task(mock_state: MagicMock) -> None:
     completes = [m for m in messages if m["type"] == "complete"]
     assert len(completes) == 1
     assert completes[0]["answer"] == "second"
+
+
+class TestBuildCompleteResponse:
+    """Tests for the shared build_complete_response helper."""
+
+    def test_builds_expected_fields(self) -> None:
+        """Response contains all required fields with correct values."""
+        usage = TokenUsage(prompt_tokens=10, completion_tokens=20)
+        resp = build_complete_response(
+            answer="42",
+            trace_id="t-001",
+            token_usage=usage,
+            execution_time=1.5,
+            document_ids=["doc-a", "doc-b"],
+            document_bytes=1024,
+            allow_background_knowledge=True,
+        )
+        assert resp == {
+            "type": "complete",
+            "answer": "42",
+            "trace_id": "t-001",
+            "tokens": {"prompt": 10, "completion": 20, "total": 30},
+            "duration_ms": 1500,
+            "document_ids": ["doc-a", "doc-b"],
+            "document_bytes": 1024,
+            "allow_background_knowledge": True,
+        }
+
+    def test_truncates_duration_ms(self) -> None:
+        """duration_ms is truncated to int, not rounded."""
+        usage = TokenUsage()
+        resp = build_complete_response(
+            answer="x",
+            trace_id=None,
+            token_usage=usage,
+            execution_time=0.9999,
+            document_ids=[],
+            document_bytes=0,
+            allow_background_knowledge=False,
+        )
+        assert resp["duration_ms"] == 999

@@ -30,6 +30,36 @@ logger = logging.getLogger(__name__)
 
 _SAFE_ID_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
 
+
+def build_complete_response(
+    *,
+    answer: str,
+    trace_id: str | None,
+    token_usage: TokenUsage,
+    execution_time: float,
+    document_ids: list[str],
+    document_bytes: int,
+    allow_background_knowledge: bool,
+) -> dict[str, object]:
+    """Build the WebSocket ``complete`` response dict.
+
+    Single source of truth so that adding a field only requires one change.
+    """
+    return {
+        "type": "complete",
+        "answer": answer,
+        "trace_id": trace_id,
+        "tokens": {
+            "prompt": token_usage.prompt_tokens,
+            "completion": token_usage.completion_tokens,
+            "total": token_usage.total_tokens,
+        },
+        "duration_ms": int(execution_time * 1000),
+        "document_ids": document_ids,
+        "document_bytes": document_bytes,
+        "allow_background_knowledge": allow_background_knowledge,
+    }
+
 # Type alias for multi-project context builder.
 # Signature: async def builder(state, project_ids) -> str
 MultiProjectContextBuilder = Callable[[Any, list[str]], Coroutine[Any, Any, str]]
@@ -308,20 +338,15 @@ async def _handle_query(
     )
 
     await websocket.send_json(
-        {
-            "type": "complete",
-            "answer": result.answer,
-            "trace_id": trace_id,
-            "tokens": {
-                "prompt": result.token_usage.prompt_tokens,
-                "completion": result.token_usage.completion_tokens,
-                "total": result.token_usage.total_tokens,
-            },
-            "duration_ms": int(result.execution_time * 1000),
-            "document_ids": consulted_document_ids,
-            "document_bytes": document_bytes,
-            "allow_background_knowledge": allow_background,
-        }
+        build_complete_response(
+            answer=result.answer,
+            trace_id=trace_id,
+            token_usage=result.token_usage,
+            execution_time=result.execution_time,
+            document_ids=consulted_document_ids,
+            document_bytes=document_bytes,
+            allow_background_knowledge=allow_background,
+        )
     )
 
 
@@ -519,18 +544,13 @@ async def handle_multi_project_query(
     )
 
     await ws.send_json(
-        {
-            "type": "complete",
-            "answer": result.answer,
-            "trace_id": trace_id,
-            "tokens": {
-                "prompt": result.token_usage.prompt_tokens,
-                "completion": result.token_usage.completion_tokens,
-                "total": result.token_usage.total_tokens,
-            },
-            "duration_ms": int(result.execution_time * 1000),
-            "document_ids": consulted_ids,
-            "document_bytes": document_bytes,
-            "allow_background_knowledge": allow_background,
-        }
+        build_complete_response(
+            answer=result.answer,
+            trace_id=trace_id,
+            token_usage=result.token_usage,
+            execution_time=result.execution_time,
+            document_ids=consulted_ids,
+            document_bytes=document_bytes,
+            allow_background_knowledge=allow_background,
+        )
     )

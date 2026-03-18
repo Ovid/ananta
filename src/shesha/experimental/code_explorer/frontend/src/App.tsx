@@ -57,6 +57,7 @@ export default function App() {
   const [uncategorizedRepos, setUncategorizedRepos] = useState<DocumentItem[]>([])
   const [reposVersion, setReposVersion] = useState(0)
   const [helpOpen, setHelpOpen] = useState(false)
+  const [allowBgKnowledge, setAllowBgKnowledge] = useState(false)
 
   const allReposRef = useRef<RepoInfo[]>([])
   allReposRef.current = allRepos
@@ -252,6 +253,17 @@ export default function App() {
           uncategorizedDocs={uncategorizedRepos}
           viewingDocumentId={viewingRepo?.project_id}
           style={{ width: sidebarWidth }}
+          bottomControls={
+            <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={allowBgKnowledge}
+                onChange={e => setAllowBgKnowledge(e.target.checked)}
+                className="accent-accent"
+              />
+              Allow background knowledge
+            </label>
+          }
         />
 
         {/* Resize handle */}
@@ -285,6 +297,7 @@ export default function App() {
               emptySelectionMessage="Select repositories in the sidebar first..."
               placeholder="Ask a question about the selected repositories..."
               loadHistory={loadHistory}
+              allowBackgroundKnowledge={allowBgKnowledge}
             />
           </div>
         </div>

@@ -1,4 +1,4 @@
-import { useCallback, useRef, type CSSProperties } from 'react'
+import { useCallback, useRef, type CSSProperties, type ReactNode } from 'react'
 
 import { TopicSidebar as SharedTopicSidebar } from '@shesha/shared-ui'
 import type { TopicInfo, DocumentItem } from '@shesha/shared-ui'
@@ -16,6 +16,7 @@ interface TopicSidebarProps {
   onPapersLoaded: (papers: PaperInfo[]) => void
   viewingPaperId?: string | null
   style?: CSSProperties
+  bottomControls?: ReactNode
 }
 
 function paperToDocument(paper: PaperInfo): DocumentItem {
@@ -34,6 +35,7 @@ export default function TopicSidebar({
   onPapersLoaded,
   viewingPaperId,
   style,
+  bottomControls,
 }: TopicSidebarProps) {
   // Keep a lookup from document ID -> PaperInfo so we can reverse-map
   // in onDocumentClick and onDocumentsLoaded callbacks.
@@ -94,6 +96,7 @@ export default function TopicSidebar({
       deleteTopic={handleDeleteTopic}
       viewingDocumentId={viewingPaperId}
       style={style}
+      bottomControls={bottomControls}
     />
   )
 }

@@ -48,6 +48,7 @@ export default function App() {
   const [uncategorizedDocs, setUncategorizedDocs] = useState<DocumentItem[]>([])
   const [docsVersion, setDocsVersion] = useState(0)
   const [helpOpen, setHelpOpen] = useState(false)
+  const [allowBgKnowledge, setAllowBgKnowledge] = useState(false)
 
   const allDocsRef = useRef<DocumentInfo[]>([])
   allDocsRef.current = allDocs
@@ -236,6 +237,17 @@ export default function App() {
           uncategorizedDocs={uncategorizedDocs}
           viewingDocumentId={viewingDoc?.project_id}
           style={{ width: sidebarWidth }}
+          bottomControls={
+            <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={allowBgKnowledge}
+                onChange={e => setAllowBgKnowledge(e.target.checked)}
+                className="accent-accent"
+              />
+              Allow background knowledge
+            </label>
+          }
         />
 
         <div
@@ -257,6 +269,7 @@ export default function App() {
             placeholder="Ask a question about the selected documents..."
             loadHistory={loadHistory}
             renderAnswerFooter={renderAnswerFooter}
+            allowBackgroundKnowledge={allowBgKnowledge}
           />
         </div>
       </div>

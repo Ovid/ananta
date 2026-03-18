@@ -265,12 +265,6 @@ export default function ChatArea({
           {!thinking && (
             <button
               onClick={handleMore}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  handleMore()
-                }
-              }}
               disabled={!canSendMore}
               aria-label="Request deeper analysis"
               aria-disabled={!canSendMore}

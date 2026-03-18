@@ -31,6 +31,11 @@ from shesha.experimental.shared.schemas import (
 from shesha.experimental.shared.session import WebConversationSession
 from shesha.experimental.shared.topics import BaseTopicManager
 
+# Context budget estimation constants
+BASE_PROMPT_TOKENS = 2000  # system prompt + context metadata overhead
+CHARS_PER_TOKEN = 4  # approximate characters-per-token heuristic
+DEFAULT_MAX_CONTEXT_TOKENS = 128_000  # fallback when model info unavailable
+
 # Type aliases for callbacks
 GetSession = Callable[[Any, str], WebConversationSession]
 BuildTopicInfo = Callable[[Any], list[TopicInfo]]
@@ -427,16 +432,12 @@ def create_shared_router(
             # The LLM context contains: system prompt (~2k tokens) +
             # conversation history prefix + iterative code/output messages.
             # We estimate: base overhead + history chars.
-            base_prompt_tokens = 2000  # system prompt + context metadata
-
             session = _get_session_for_topic(name)
             history_chars = session.context_chars()
 
-            # ~4 chars per token heuristic
-            used_tokens = base_prompt_tokens + (history_chars // 4)
+            used_tokens = BASE_PROMPT_TOKENS + (history_chars // CHARS_PER_TOKEN)
 
-            # Get max tokens from litellm
-            max_tokens = 128000  # reasonable default
+            max_tokens = DEFAULT_MAX_CONTEXT_TOKENS
             try:
                 info = litellm.get_model_info(state.model)
                 max_input = info.get("max_input_tokens")

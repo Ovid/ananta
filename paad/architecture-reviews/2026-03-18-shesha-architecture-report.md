@@ -342,6 +342,9 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** Context budget endpoint uses `2000` (base prompt tokens), `// 4` (chars-per-token ratio), and `128000` (default max tokens) as inline literals without named constants.
 - **Evidence:** `shared/routes.py:430,436,439`
 - **Found by:** Error Handling
+- **Status:** Fixed
+- **Status reason:** Extracted BASE_PROMPT_TOKENS, CHARS_PER_TOKEN, DEFAULT_MAX_CONTEXT_TOKENS as module-level constants
+- **Status date:** 2026-03-18 18:08 UTC
 
 ### [F-23] Hidden side effect in _finalize_trace
 - **Category:** 12 (Hidden side effects)

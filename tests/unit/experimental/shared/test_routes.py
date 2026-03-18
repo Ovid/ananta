@@ -400,6 +400,34 @@ def test_context_budget(client: TestClient, mock_state: MagicMock, tmp_path: Pat
     assert data["percentage"] >= 0
 
 
+def test_context_budget_uses_named_constants(
+    client: TestClient, mock_state: MagicMock, tmp_path: Path
+) -> None:
+    """Context budget calculation uses named constants, not magic numbers."""
+    from shesha.experimental.shared.routes import (
+        BASE_PROMPT_TOKENS,
+        CHARS_PER_TOKEN,
+        DEFAULT_MAX_CONTEXT_TOKENS,
+    )
+
+    assert BASE_PROMPT_TOKENS == 2000
+    assert CHARS_PER_TOKEN == 4
+    assert DEFAULT_MAX_CONTEXT_TOKENS == 128000
+
+    # Verify the constants are actually used in the calculation
+    mock_state.topic_mgr.resolve.return_value = "proj-id"
+    mock_state.topic_mgr._storage._project_path.return_value = tmp_path
+    WebConversationSession(tmp_path)
+
+    with patch("shesha.experimental.shared.routes.litellm") as mock_litellm:
+        mock_litellm.get_model_info.side_effect = Exception("no model info")
+        resp = client.get("/api/topics/test-topic/context-budget")
+
+    data = resp.json()
+    # When litellm fails, should fall back to DEFAULT_MAX_CONTEXT_TOKENS
+    assert data["max_tokens"] == DEFAULT_MAX_CONTEXT_TOKENS
+
+
 def test_context_budget_excluded_when_disabled(
     client_no_budget: TestClient, mock_state: MagicMock
 ) -> None:

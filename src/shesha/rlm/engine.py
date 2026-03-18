@@ -37,6 +37,9 @@ from shesha.sandbox.executor import ContainerExecutor, ExecutionResult, SubcallC
 from shesha.sandbox.pool import ContainerPool
 from shesha.storage.base import StorageBackend
 
+# Factory callable that creates LLMClient-compatible objects.
+LLMClientFactory = Callable[..., LLMClient]
+
 # Callback type for progress notifications
 ProgressCallback = Callable[[StepType, int, str, TokenUsage], None]
 
@@ -187,6 +190,7 @@ class RLMEngine:
         max_traces_per_project: int = 50,
         verify_citations: bool = True,
         verify: bool = False,
+        llm_client_factory: LLMClientFactory | None = None,
     ) -> None:
         """Initialize the RLM engine."""
         self.model = model
@@ -200,6 +204,7 @@ class RLMEngine:
         self.max_traces_per_project = max_traces_per_project
         self.verify_citations = verify_citations
         self.verify = verify
+        self._llm_client_factory: LLMClientFactory = llm_client_factory or LLMClient
         self._subcall_lock = threading.Lock()
 
     def _handle_llm_query(
@@ -267,7 +272,7 @@ class RLMEngine:
             prompt = instruction
 
         # LLM call runs outside lock — this is the I/O-bound work we parallelize
-        sub_llm = LLMClient(model=self.model, api_key=self.api_key)
+        sub_llm = self._llm_client_factory(model=self.model, api_key=self.api_key)
         response = sub_llm.complete(messages=[{"role": "user", "content": prompt}])
 
         # Record response and update tokens (lock protects shared state)
@@ -350,7 +355,7 @@ class RLMEngine:
                 copy.copy(token_usage),
             )
 
-        sub_llm = LLMClient(model=self.model, api_key=self.api_key)
+        sub_llm = self._llm_client_factory(model=self.model, api_key=self.api_key)
         response = sub_llm.complete(messages=[{"role": "user", "content": prompt}])
         token_usage.prompt_tokens += response.prompt_tokens
         token_usage.completion_tokens += response.completion_tokens
@@ -414,7 +419,7 @@ class RLMEngine:
                     copy.copy(token_usage),
                 )
 
-            sub_llm2 = LLMClient(model=self.model, api_key=self.api_key)
+            sub_llm2 = self._llm_client_factory(model=self.model, api_key=self.api_key)
             response2 = sub_llm2.complete(messages=[{"role": "user", "content": prompt}])
             token_usage.prompt_tokens += response2.prompt_tokens
             token_usage.completion_tokens += response2.completion_tokens
@@ -720,7 +725,9 @@ class RLMEngine:
                 )
 
         # Initialize LLM client
-        llm = LLMClient(model=self.model, system_prompt=system_prompt, api_key=self.api_key)
+        llm = self._llm_client_factory(
+            model=self.model, system_prompt=system_prompt, api_key=self.api_key
+        )
 
         # Iteration-0 safeguard: prevent model from jumping to FINAL()
         # without exploring. Matches reference rlm/rlm/utils/prompts.py:136.

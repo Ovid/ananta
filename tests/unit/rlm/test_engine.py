@@ -104,6 +104,54 @@ def test_engine_verify_can_be_enabled():
     assert engine.verify is True
 
 
+def test_engine_accepts_llm_client_factory():
+    """RLMEngine accepts an llm_client_factory parameter."""
+    factory = MagicMock()
+    engine = RLMEngine(model="test-model", llm_client_factory=factory)
+    assert engine._llm_client_factory is factory
+
+
+def test_engine_defaults_llm_client_factory_to_llm_client():
+    """RLMEngine defaults llm_client_factory to LLMClient."""
+    from shesha.llm.client import LLMClient
+
+    engine = RLMEngine(model="test-model")
+    assert engine._llm_client_factory is LLMClient
+
+
+@patch("shesha.rlm.engine.ContainerExecutor")
+def test_engine_uses_injected_llm_factory(mock_executor_cls: MagicMock):
+    """Engine uses the injected factory instead of importing LLMClient directly."""
+    mock_llm = MagicMock()
+    mock_llm.complete.return_value = MagicMock(
+        content='```repl\nFINAL("result")\n```',
+        prompt_tokens=10,
+        completion_tokens=5,
+        total_tokens=15,
+    )
+
+    factory = MagicMock(return_value=mock_llm)
+
+    mock_executor = MagicMock()
+    mock_executor.execute.return_value = MagicMock(
+        status="ok",
+        stdout="",
+        stderr="",
+        error=None,
+        final_answer="result",
+    )
+    mock_executor_cls.return_value = mock_executor
+
+    engine = RLMEngine(model="test-model", llm_client_factory=factory)
+    result = engine.query(
+        documents=["doc content"],
+        question="What?",
+    )
+
+    assert result.answer == "result"
+    factory.assert_called()
+
+
 class TestRLMEngine:
     """Tests for RLMEngine."""
 
@@ -1933,11 +1981,7 @@ class TestHandleLlmQueryThreadSafety:
         token counts must be consistent.
         """
         import concurrent.futures
-        from unittest.mock import MagicMock, patch
-
-        engine = RLMEngine(model="test-model")
-        trace = Trace()
-        token_usage = TokenUsage()
+        from unittest.mock import MagicMock
 
         mock_response = MagicMock(
             content="answer",
@@ -1946,23 +1990,26 @@ class TestHandleLlmQueryThreadSafety:
             total_tokens=15,
         )
 
-        with patch("shesha.rlm.engine.LLMClient") as mock_llm_cls:
-            mock_llm_cls.return_value.complete.return_value = mock_response
+        mock_llm_factory = MagicMock()
+        mock_llm_factory.return_value.complete.return_value = mock_response
 
-            n_calls = 20
+        engine = RLMEngine(model="test-model", llm_client_factory=mock_llm_factory)
+        trace = Trace()
+        token_usage = TokenUsage()
+        n_calls = 20
 
-            def call_handler(i: int) -> str:
-                return engine._handle_llm_query(
-                    instruction=f"prompt_{i}",
-                    content="",
-                    trace=trace,
-                    token_usage=token_usage,
-                    iteration=0,
-                    boundary="test",
-                )
+        def call_handler(i: int) -> str:
+            return engine._handle_llm_query(
+                instruction=f"prompt_{i}",
+                content="",
+                trace=trace,
+                token_usage=token_usage,
+                iteration=0,
+                boundary="test",
+            )
 
-            with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
-                results = list(pool.map(call_handler, range(n_calls)))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+            results = list(pool.map(call_handler, range(n_calls)))
 
         assert len(results) == n_calls
         # Each call adds 2 steps (SUBCALL_REQUEST + SUBCALL_RESPONSE)

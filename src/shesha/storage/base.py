@@ -80,6 +80,33 @@ class StorageBackend(Protocol):
         """Delete the codebase analysis for a project."""
         ...
 
+    def swap_docs(self, source_project_id: str, target_project_id: str) -> None:
+        """Replace target project's docs with source project's docs.
+
+        Backends like FilesystemStorage override this with an atomic
+        rename-based swap.  Backends that don't override can delegate to
+        ``default_swap_docs`` for a non-atomic copy-and-delete fallback.
+        """
+        ...
+
+
+def default_swap_docs(
+    storage: StorageBackend, source_project_id: str, target_project_id: str
+) -> None:
+    """Non-atomic swap: copy source docs to target, remove orphans, delete source.
+
+    Use this as the ``swap_docs`` implementation for storage backends that
+    cannot do an atomic filesystem rename.
+    """
+    staging_docs = storage.load_all_documents(source_project_id)
+    staging_names = {d.name for d in staging_docs}
+    for doc in staging_docs:
+        storage.store_document(target_project_id, doc)
+    for doc_name in storage.list_documents(target_project_id):
+        if doc_name not in staging_names:
+            storage.delete_document(target_project_id, doc_name)
+    storage.delete_project(source_project_id)
+
 
 # Re-export ParsedDocument for backwards compatibility
-__all__ = ["ParsedDocument", "StorageBackend"]
+__all__ = ["ParsedDocument", "StorageBackend", "default_swap_docs"]

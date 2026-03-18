@@ -7,8 +7,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from shesha import Shesha
-from shesha.exceptions import ParseError, ProjectNotFoundError, RepoError, RepoIngestError
+from shesha.exceptions import ProjectNotFoundError, RepoError, RepoIngestError
 from shesha.models import RepoProjectResult
+from shesha.repo.ingester import IngestResult
 from shesha.storage.filesystem import FilesystemStorage
 
 
@@ -294,29 +295,22 @@ class TestCreateProjectFromRepo:
                 mock_ingester_cls.return_value = mock_ingester
 
                 mock_ingester.is_local_path.return_value = True
-                mock_ingester.get_saved_sha.return_value = None
-                mock_ingester.get_local_sha.return_value = "abc123"
-                mock_ingester.list_files.return_value = ["src/main.py"]
+                mock_ingester.is_git_repo.return_value = True
                 mock_ingester.repos_dir = tmp_path / "repos"
 
                 shesha = Shesha(model="test-model", storage_path=tmp_path)
 
-                with patch.object(shesha._parser_registry, "find_parser") as mock_find:
-                    mock_parser = MagicMock()
-                    mock_parser.parse.return_value = MagicMock(
-                        name="main.py",
-                        content="content",
-                        format="py",
-                        metadata={},
-                        char_count=7,
-                        parse_warnings=[],
-                    )
-                    mock_find.return_value = mock_parser
+                # ingest() creates the project and returns result
+                def fake_ingest(**kwargs):
+                    shesha._storage.create_project("my-project")
+                    return IngestResult(files_ingested=1)
 
-                    result = shesha.create_project_from_repo(
-                        url="/path/to/local/repo",
-                        name="my-project",
-                    )
+                mock_ingester.ingest.side_effect = fake_ingest
+
+                result = shesha.create_project_from_repo(
+                    url="/path/to/local/repo",
+                    name="my-project",
+                )
 
                 assert isinstance(result, RepoProjectResult)
                 assert result.status == "created"
@@ -396,49 +390,62 @@ class TestCreateProjectFromRepo:
                 mock_ingester.pull.assert_not_called()
 
     def test_saves_source_url_for_local_repo(self, tmp_path: Path):
-        """create_project_from_repo saves source URL for local repos."""
+        """create_project_from_repo delegates to ingest() which saves source URL."""
         with patch("shesha.shesha.docker"), patch("shesha.shesha.ContainerPool"):
             with patch("shesha.shesha.RepoIngester") as mock_ingester_cls:
                 mock_ingester = MagicMock()
                 mock_ingester_cls.return_value = mock_ingester
 
                 mock_ingester.is_local_path.return_value = True
-                mock_ingester.get_saved_sha.return_value = None
-                mock_ingester.get_sha_from_path.return_value = "abc123"
-                mock_ingester.list_files_from_path.return_value = []
+                mock_ingester.is_git_repo.return_value = True
                 mock_ingester.repos_dir = tmp_path / "repos"
 
                 shesha = Shesha(model="test-model", storage_path=tmp_path)
+
+                def fake_ingest(**kwargs):
+                    shesha._storage.create_project("my-project")
+                    return IngestResult(files_ingested=0)
+
+                mock_ingester.ingest.side_effect = fake_ingest
+
                 shesha.create_project_from_repo(
                     url="/path/to/local/repo",
                     name="my-project",
                 )
 
-                mock_ingester.save_source_url.assert_called_once_with(
-                    "my-project", "/path/to/local/repo"
-                )
+                # ingest() is called with the right URL
+                mock_ingester.ingest.assert_called_once()
+                call_kwargs = mock_ingester.ingest.call_args[1]
+                assert call_kwargs["url"] == "/path/to/local/repo"
+                assert call_kwargs["name"] == "my-project"
 
     def test_saves_resolved_source_url_for_relative_local_path(self, tmp_path: Path):
-        """create_project_from_repo resolves relative local paths before saving."""
+        """create_project_from_repo passes relative URL to ingest() for resolution."""
         with patch("shesha.shesha.docker"), patch("shesha.shesha.ContainerPool"):
             with patch("shesha.shesha.RepoIngester") as mock_ingester_cls:
                 mock_ingester = MagicMock()
                 mock_ingester_cls.return_value = mock_ingester
 
                 mock_ingester.is_local_path.return_value = True
-                mock_ingester.get_saved_sha.return_value = None
-                mock_ingester.get_sha_from_path.return_value = "abc123"
-                mock_ingester.list_files_from_path.return_value = []
+                mock_ingester.is_git_repo.return_value = True
                 mock_ingester.repos_dir = tmp_path / "repos"
 
                 shesha = Shesha(model="test-model", storage_path=tmp_path)
+
+                def fake_ingest(**kwargs):
+                    shesha._storage.create_project("my-project")
+                    return IngestResult(files_ingested=0)
+
+                mock_ingester.ingest.side_effect = fake_ingest
+
                 shesha.create_project_from_repo(
                     url="./myrepo",
                     name="my-project",
                 )
 
-                saved_url = mock_ingester.save_source_url.call_args[0][1]
-                assert Path(saved_url).is_absolute(), f"Expected absolute path but got: {saved_url}"
+                # URL is passed through to ingest()
+                call_kwargs = mock_ingester.ingest.call_args[1]
+                assert call_kwargs["url"] == "./myrepo"
 
     def test_raises_for_non_git_local_path(self, tmp_path: Path):
         """create_project_from_repo raises RepoIngestError for non-git local dirs."""
@@ -466,8 +473,8 @@ class TestCreateProjectFromRepo:
 class TestAtomicIngestion:
     """Tests for atomic repo ingestion (stage-then-swap for updates, cleanup on failure)."""
 
-    def test_failed_new_project_ingestion_cleans_up_project(self, tmp_path: Path):
-        """Failed ingestion of a new project deletes the partially created project."""
+    def test_failed_new_project_ingestion_propagates_error(self, tmp_path: Path):
+        """Failed ingestion propagates error from ingest()."""
         with patch("shesha.shesha.docker"), patch("shesha.shesha.ContainerPool"):
             with patch("shesha.shesha.RepoIngester") as mock_ingester_cls:
                 mock_ingester = MagicMock()
@@ -475,29 +482,21 @@ class TestAtomicIngestion:
 
                 mock_ingester.is_local_path.return_value = True
                 mock_ingester.is_git_repo.return_value = True
-                mock_ingester.get_saved_sha.return_value = None
-                mock_ingester.get_sha_from_path.return_value = "abc123"
-                mock_ingester.list_files_from_path.return_value = ["crash.py"]
                 mock_ingester.repos_dir = tmp_path / "repos"
+                mock_ingester.ingest.side_effect = RepoIngestError(
+                    "/path/to/local/repo", cause=OSError("disk full")
+                )
 
                 shesha = Shesha(model="test-model", storage_path=tmp_path)
 
-                with patch.object(shesha._parser_registry, "find_parser") as mock_find:
-                    mock_parser = MagicMock()
-                    mock_parser.parse.side_effect = OSError("disk full")
-                    mock_find.return_value = mock_parser
+                with pytest.raises(RepoIngestError):
+                    shesha.create_project_from_repo(
+                        url="/path/to/local/repo",
+                        name="clean-on-fail",
+                    )
 
-                    with pytest.raises(RepoIngestError):
-                        shesha.create_project_from_repo(
-                            url="/path/to/local/repo",
-                            name="clean-on-fail",
-                        )
-
-                # Project should have been cleaned up
-                assert not shesha._storage.project_exists("clean-on-fail")
-
-    def test_failed_update_preserves_original_documents(self, tmp_path: Path):
-        """Failed update preserves the original documents untouched."""
+    def test_failed_update_propagates_error(self, tmp_path: Path):
+        """Failed update propagates error from ingest()."""
         with patch("shesha.shesha.docker"), patch("shesha.shesha.ContainerPool"):
             with patch("shesha.shesha.RepoIngester") as mock_ingester_cls:
                 mock_ingester = MagicMock()
@@ -506,24 +505,10 @@ class TestAtomicIngestion:
                 mock_ingester.is_local_path.return_value = True
                 mock_ingester.get_saved_sha.return_value = "old_sha"
                 mock_ingester.get_sha_from_path.return_value = "new_sha"
-                mock_ingester.list_files_from_path.return_value = ["crash.py"]
                 mock_ingester.repos_dir = tmp_path / "repos"
 
                 shesha = Shesha(model="test-model", storage_path=tmp_path)
                 shesha._storage.create_project("update-project")
-
-                # Store an original document
-                from shesha.models import ParsedDocument
-
-                original_doc = ParsedDocument(
-                    name="original.txt",
-                    content="original content",
-                    format="txt",
-                    metadata={},
-                    char_count=16,
-                    parse_warnings=[],
-                )
-                shesha._storage.store_document("update-project", original_doc)
 
                 result = shesha.create_project_from_repo(
                     url="/path/to/local/repo",
@@ -532,20 +517,15 @@ class TestAtomicIngestion:
 
                 assert result.status == "updates_available"
 
-                with patch.object(shesha._parser_registry, "find_parser") as mock_find:
-                    mock_parser = MagicMock()
-                    mock_parser.parse.side_effect = OSError("disk full")
-                    mock_find.return_value = mock_parser
+                mock_ingester.ingest.side_effect = RepoIngestError(
+                    "/path/to/local/repo", cause=OSError("disk full")
+                )
 
-                    with pytest.raises(RepoIngestError):
-                        result.apply_updates()
+                with pytest.raises(RepoIngestError):
+                    result.apply_updates()
 
-                # Original documents should be preserved
-                docs = shesha._storage.list_documents("update-project")
-                assert "original.txt" in docs
-
-    def test_successful_update_removes_orphaned_docs(self, tmp_path: Path):
-        """Successful update removes documents that no longer exist in the repo."""
+    def test_successful_update_wraps_ingest_result(self, tmp_path: Path):
+        """Successful update wraps IngestResult into RepoProjectResult."""
         with patch("shesha.shesha.docker"), patch("shesha.shesha.ContainerPool"):
             with patch("shesha.shesha.RepoIngester") as mock_ingester_cls:
                 mock_ingester = MagicMock()
@@ -554,25 +534,10 @@ class TestAtomicIngestion:
                 mock_ingester.is_local_path.return_value = True
                 mock_ingester.get_saved_sha.return_value = "old_sha"
                 mock_ingester.get_sha_from_path.return_value = "new_sha"
-                # Only new_file.py exists in the repo now (old_file.txt is gone)
-                mock_ingester.list_files_from_path.return_value = ["new_file.py"]
                 mock_ingester.repos_dir = tmp_path / "repos"
 
                 shesha = Shesha(model="test-model", storage_path=tmp_path)
                 shesha._storage.create_project("orphan-project")
-
-                # Store the original document (which will become orphaned)
-                from shesha.models import ParsedDocument
-
-                old_doc = ParsedDocument(
-                    name="old_file.txt",
-                    content="old",
-                    format="txt",
-                    metadata={},
-                    char_count=3,
-                    parse_warnings=[],
-                )
-                shesha._storage.store_document("orphan-project", old_doc)
 
                 result = shesha.create_project_from_repo(
                     url="/path/to/local/repo",
@@ -581,24 +546,16 @@ class TestAtomicIngestion:
 
                 assert result.status == "updates_available"
 
-                with patch.object(shesha._parser_registry, "find_parser") as mock_find:
-                    mock_parser = MagicMock()
-                    mock_parser.parse.return_value = MagicMock(
-                        name="new_file.py",
-                        content="new",
-                        format="py",
-                        metadata={},
-                        char_count=3,
-                        parse_warnings=[],
-                    )
-                    mock_find.return_value = mock_parser
+                mock_ingester.ingest.return_value = IngestResult(
+                    files_ingested=2, files_skipped=1, warnings=["skipped binary"]
+                )
 
-                    result.apply_updates()
+                updated = result.apply_updates()
 
-                # old_file.txt should be gone (orphaned), only new_file.py exists
-                docs = shesha._storage.list_documents("orphan-project")
-                assert "new_file.py" in docs
-                assert "old_file.txt" not in docs
+                assert updated.status == "created"
+                assert updated.files_ingested == 2
+                assert updated.files_skipped == 1
+                assert updated.warnings == ["skipped binary"]
 
     def test_staging_name_does_not_collide_with_user_project(self, tmp_path: Path):
         """Staging project name must not collide with existing user projects."""
@@ -655,11 +612,10 @@ class TestAtomicIngestion:
                 # The user's unrelated project must still exist
                 assert shesha._storage.project_exists("_staging_my-project")
 
-    def test_update_works_with_custom_storage_backend(self, tmp_path: Path):
-        """Updates apply docs correctly even with a non-FilesystemStorage backend."""
+    def test_update_passes_custom_storage_to_ingest(self, tmp_path: Path):
+        """Updates pass the custom storage backend to ingest()."""
         from shesha.storage.base import StorageBackend
 
-        # Use a FilesystemStorage but wrap it so isinstance check fails
         real_storage = FilesystemStorage(root_path=tmp_path)
 
         class CustomStorage:
@@ -681,23 +637,10 @@ class TestAtomicIngestion:
                 mock_ingester.is_local_path.return_value = True
                 mock_ingester.get_saved_sha.return_value = "old_sha"
                 mock_ingester.get_sha_from_path.return_value = "new_sha"
-                mock_ingester.list_files_from_path.return_value = ["new_file.py"]
                 mock_ingester.repos_dir = tmp_path / "repos"
 
                 shesha = Shesha(model="test-model", storage_path=tmp_path, storage=custom)
                 real_storage.create_project("custom-project")
-
-                from shesha.models import ParsedDocument
-
-                old_doc = ParsedDocument(
-                    name="old.txt",
-                    content="old",
-                    format="txt",
-                    metadata={},
-                    char_count=3,
-                    parse_warnings=[],
-                )
-                real_storage.store_document("custom-project", old_doc)
 
                 result = shesha.create_project_from_repo(
                     url="/path/to/local/repo",
@@ -706,44 +649,16 @@ class TestAtomicIngestion:
 
                 assert result.status == "updates_available"
 
-                with patch.object(shesha._parser_registry, "find_parser") as mock_find:
-                    mock_parser = MagicMock()
-                    mock_parser.parse.return_value = MagicMock(
-                        name="new_file.py",
-                        content="new",
-                        format="py",
-                        metadata={},
-                        char_count=3,
-                        parse_warnings=[],
-                    )
-                    mock_find.return_value = mock_parser
+                mock_ingester.ingest.return_value = IngestResult(files_ingested=1)
 
-                    result.apply_updates()
+                result.apply_updates()
 
-                # New doc should exist, old should be gone
-                docs = real_storage.list_documents("custom-project")
-                assert "new_file.py" in docs
-                assert "old.txt" not in docs
+                # Verify ingest was called with the custom storage
+                call_kwargs = mock_ingester.ingest.call_args[1]
+                assert call_kwargs["storage"] is custom
 
-    def test_fallback_update_preserves_originals_on_mid_copy_failure(self, tmp_path: Path):
-        """Non-atomic fallback preserves original docs if store_document fails mid-copy."""
-
-        # Use a FilesystemStorage but wrap it so hasattr(_, "swap_docs") is False
-        real_storage = FilesystemStorage(root_path=tmp_path)
-
-        class CustomStorage:
-            """Wrapper without swap_docs — forces non-atomic fallback."""
-
-            def __init__(self, inner: FilesystemStorage):
-                self._inner = inner
-
-            def __getattr__(self, name: str) -> object:
-                if name == "swap_docs":
-                    raise AttributeError(name)
-                return getattr(self._inner, name)
-
-        custom = CustomStorage(real_storage)
-
+    def test_ingest_receives_is_update_flag(self, tmp_path: Path):
+        """apply_updates passes is_update=True to ingest()."""
         with patch("shesha.shesha.docker"), patch("shesha.shesha.ContainerPool"):
             with patch("shesha.shesha.RepoIngester") as mock_ingester_cls:
                 mock_ingester = MagicMock()
@@ -752,167 +667,104 @@ class TestAtomicIngestion:
                 mock_ingester.is_local_path.return_value = True
                 mock_ingester.get_saved_sha.return_value = "old_sha"
                 mock_ingester.get_sha_from_path.return_value = "new_sha"
-                mock_ingester.list_files_from_path.return_value = [
-                    "good.py",
-                    "bad.py",
-                ]
                 mock_ingester.repos_dir = tmp_path / "repos"
 
-                shesha = Shesha(
-                    model="test-model",
-                    storage_path=tmp_path,
-                    storage=custom,  # type: ignore[arg-type]
-                )
-                real_storage.create_project("fallback-project")
-
-                from shesha.models import ParsedDocument
-
-                original_doc = ParsedDocument(
-                    name="original.txt",
-                    content="must survive",
-                    format="txt",
-                    metadata={},
-                    char_count=12,
-                    parse_warnings=[],
-                )
-                real_storage.store_document("fallback-project", original_doc)
+                shesha = Shesha(model="test-model", storage_path=tmp_path)
+                shesha._storage.create_project("flag-project")
 
                 result = shesha.create_project_from_repo(
                     url="/path/to/local/repo",
-                    name="fallback-project",
+                    name="flag-project",
                 )
 
                 assert result.status == "updates_available"
 
-                # Make store_document fail on second call to target project
-                original_store = real_storage.store_document
-                call_count = [0]
+                mock_ingester.ingest.return_value = IngestResult(files_ingested=1)
 
-                def failing_store(project_id, doc, **kwargs):
-                    if project_id == "fallback-project":
-                        call_count[0] += 1
-                        if call_count[0] == 2:
-                            raise OSError("Disk full")
-                    return original_store(project_id, doc, **kwargs)
+                result.apply_updates()
 
-                with patch.object(shesha._parser_registry, "find_parser") as mock_find:
-                    mock_parser = MagicMock()
-                    mock_parser.parse.side_effect = [
-                        MagicMock(
-                            name="good.py",
-                            content="good",
-                            format="py",
-                            metadata={},
-                            char_count=4,
-                            parse_warnings=[],
-                        ),
-                        MagicMock(
-                            name="bad.py",
-                            content="bad",
-                            format="py",
-                            metadata={},
-                            char_count=3,
-                            parse_warnings=[],
-                        ),
-                    ]
-                    mock_find.return_value = mock_parser
-
-                    with patch.object(real_storage, "store_document", side_effect=failing_store):
-                        with pytest.raises(OSError, match="Disk full"):
-                            result.apply_updates()
-
-                # Original doc should still exist (not deleted before copy)
-                docs = real_storage.list_documents("fallback-project")
-                assert "original.txt" in docs
+                call_kwargs = mock_ingester.ingest.call_args[1]
+                assert call_kwargs["is_update"] is True
 
 
 class TestIngestRepoErrorHandling:
-    """Tests for _ingest_repo error handling."""
+    """Tests for _ingest_repo error propagation from RepoIngester.ingest()."""
 
-    def test_parse_error_is_caught_and_recorded_as_warning(self, tmp_path: Path):
-        """ParseError during file parsing is caught and recorded as a warning."""
+    def test_ingest_result_warnings_propagated(self, tmp_path: Path):
+        """Warnings from ingest() are propagated to RepoProjectResult."""
         with patch("shesha.shesha.docker"), patch("shesha.shesha.ContainerPool"):
             with patch("shesha.shesha.RepoIngester") as mock_ingester_cls:
                 mock_ingester = MagicMock()
                 mock_ingester_cls.return_value = mock_ingester
 
                 mock_ingester.is_local_path.return_value = True
-                mock_ingester.get_saved_sha.return_value = None
-                mock_ingester.get_sha_from_path.return_value = "abc123"
-                mock_ingester.list_files_from_path.return_value = ["bad.py"]
+                mock_ingester.is_git_repo.return_value = True
                 mock_ingester.repos_dir = tmp_path / "repos"
 
                 shesha = Shesha(model="test-model", storage_path=tmp_path)
 
-                with patch.object(shesha._parser_registry, "find_parser") as mock_find:
-                    mock_parser = MagicMock()
-                    mock_parser.parse.side_effect = ParseError("bad.py", "syntax error")
-                    mock_find.return_value = mock_parser
-
-                    result = shesha.create_project_from_repo(
-                        url="/path/to/local/repo",
-                        name="parse-err-project",
+                def fake_ingest(**kwargs):
+                    shesha._storage.create_project("parse-err-project")
+                    return IngestResult(
+                        files_ingested=0,
+                        files_skipped=1,
+                        warnings=["Failed to parse bad.py: syntax error"],
                     )
+
+                mock_ingester.ingest.side_effect = fake_ingest
+
+                result = shesha.create_project_from_repo(
+                    url="/path/to/local/repo",
+                    name="parse-err-project",
+                )
 
                 assert result.files_skipped == 1
                 assert any("bad.py" in w for w in result.warnings)
 
-    def test_unexpected_error_propagates_as_repo_ingest_error(self, tmp_path: Path):
-        """Unexpected exceptions propagate as RepoIngestError."""
+    def test_unexpected_error_propagates_from_ingest(self, tmp_path: Path):
+        """RepoIngestError from ingest() propagates through _ingest_repo."""
         with patch("shesha.shesha.docker"), patch("shesha.shesha.ContainerPool"):
             with patch("shesha.shesha.RepoIngester") as mock_ingester_cls:
                 mock_ingester = MagicMock()
                 mock_ingester_cls.return_value = mock_ingester
 
                 mock_ingester.is_local_path.return_value = True
-                mock_ingester.get_saved_sha.return_value = None
-                mock_ingester.get_sha_from_path.return_value = "abc123"
-                mock_ingester.list_files_from_path.return_value = ["crash.py"]
+                mock_ingester.is_git_repo.return_value = True
                 mock_ingester.repos_dir = tmp_path / "repos"
+                mock_ingester.ingest.side_effect = RepoIngestError(
+                    "/path/to/local/repo", cause=OSError("disk full")
+                )
 
                 shesha = Shesha(model="test-model", storage_path=tmp_path)
 
-                with patch.object(shesha._parser_registry, "find_parser") as mock_find:
-                    mock_parser = MagicMock()
-                    mock_parser.parse.side_effect = OSError("disk full")
-                    mock_find.return_value = mock_parser
+                with pytest.raises(RepoIngestError) as exc_info:
+                    shesha.create_project_from_repo(
+                        url="/path/to/local/repo",
+                        name="crash-project",
+                    )
 
-                    with pytest.raises(RepoIngestError) as exc_info:
-                        shesha.create_project_from_repo(
-                            url="/path/to/local/repo",
-                            name="crash-project",
-                        )
+                assert isinstance(exc_info.value.__cause__, OSError)
 
-                    assert isinstance(exc_info.value.__cause__, OSError)
-
-    def test_failed_new_remote_project_cleans_up_cloned_repo(self, tmp_path: Path):
-        """Failed ingestion of a new remote project deletes the cloned repo."""
+    def test_failed_new_remote_project_error_from_ingest(self, tmp_path: Path):
+        """Failed ingestion of a new remote project propagates from ingest()."""
         with patch("shesha.shesha.docker"), patch("shesha.shesha.ContainerPool"):
             with patch("shesha.shesha.RepoIngester") as mock_ingester_cls:
                 mock_ingester = MagicMock()
                 mock_ingester_cls.return_value = mock_ingester
 
                 mock_ingester.is_local_path.return_value = False
-                mock_ingester.get_saved_sha.return_value = None
-                mock_ingester.clone.return_value = tmp_path / "repos" / "remote-project"
-                mock_ingester.list_files_from_path.return_value = ["crash.py"]
                 mock_ingester.repos_dir = tmp_path / "repos"
+                mock_ingester.ingest.side_effect = RepoIngestError(
+                    "https://github.com/org/repo", cause=OSError("disk full")
+                )
 
                 shesha = Shesha(model="test-model", storage_path=tmp_path)
 
-                with patch.object(shesha._parser_registry, "find_parser") as mock_find:
-                    mock_parser = MagicMock()
-                    mock_parser.parse.side_effect = OSError("disk full")
-                    mock_find.return_value = mock_parser
-
-                    with pytest.raises(RepoIngestError):
-                        shesha.create_project_from_repo(
-                            url="https://github.com/org/repo",
-                            name="remote-project",
-                        )
-
-                # Cloned repo should be cleaned up
-                mock_ingester.delete_repo.assert_called_once_with("remote-project")
+                with pytest.raises(RepoIngestError):
+                    shesha.create_project_from_repo(
+                        url="https://github.com/org/repo",
+                        name="remote-project",
+                    )
 
 
 class TestCheckRepoForUpdates:

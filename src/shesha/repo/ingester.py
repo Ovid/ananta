@@ -7,11 +7,29 @@ import shutil
 import stat
 import subprocess
 import tempfile
+import uuid
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
-from shesha.exceptions import AuthenticationError, RepoIngestError
+from shesha.exceptions import AuthenticationError, NoParserError, ParseError, RepoIngestError
+from shesha.models import ParsedDocument
 from shesha.security.paths import safe_path
+
+if TYPE_CHECKING:
+    from shesha.parser.registry import ParserRegistry
+    from shesha.storage.base import StorageBackend
+
+
+@dataclass
+class IngestResult:
+    """Result of ingesting files from a repository into storage."""
+
+    files_ingested: int
+    files_skipped: int = 0
+    warnings: list[str] = field(default_factory=list)
+
 
 # Timeouts for git subprocess calls (seconds)
 GIT_CLONE_TIMEOUT = 300
@@ -387,3 +405,96 @@ class RepoIngester:
         repo_path = self._repo_path(project_id)
         if repo_path.exists():
             shutil.rmtree(repo_path)
+
+    def ingest(
+        self,
+        storage: "StorageBackend",
+        parser_registry: "ParserRegistry",
+        url: str,
+        name: str,
+        path: str | None,
+        *,
+        is_update: bool,
+    ) -> IngestResult:
+        """Ingest files from repository into project storage.
+
+        For new projects (is_update=False): creates project, ingests files,
+        and deletes the project if ingestion fails.
+
+        For updates (is_update=True): ingests into a staging project, then
+        swaps docs into the target project. If ingestion fails, the staging
+        project is cleaned up and the original is untouched.
+        """
+        staging_name = f"_staging_{name}_{uuid.uuid4().hex[:8]}" if is_update else name
+        is_local = self.is_local_path(url)
+
+        try:
+            if not is_update:
+                storage.create_project(name)
+            else:
+                storage.create_project(staging_name)
+
+            if is_local:
+                repo_path = Path(url).expanduser()
+            else:
+                repo_path = self.repos_dir / name
+
+            files = self.list_files_from_path(repo_path, subdir=path)
+            files_ingested = 0
+            files_skipped = 0
+            warnings: list[str] = []
+
+            for file_path in files:
+                full_path = repo_path / file_path
+                try:
+                    parser = parser_registry.find_parser(full_path)
+                    if parser is None:
+                        files_skipped += 1
+                        continue
+
+                    doc = parser.parse(full_path, include_line_numbers=True, file_path=file_path)
+                    doc = ParsedDocument(
+                        name=file_path,
+                        content=doc.content,
+                        format=doc.format,
+                        metadata=doc.metadata,
+                        char_count=doc.char_count,
+                        parse_warnings=doc.parse_warnings,
+                    )
+                    storage.store_document(staging_name, doc)
+                    files_ingested += 1
+                except (ParseError, NoParserError) as e:
+                    files_skipped += 1
+                    warnings.append(f"Failed to parse {file_path}: {e}")
+                except Exception as e:
+                    raise RepoIngestError(url, cause=e) from e
+
+            if is_update:
+                storage.swap_docs(staging_name, name)
+
+        except Exception:
+            if is_update:
+                if storage.project_exists(staging_name):
+                    storage.delete_project(staging_name)
+            else:
+                if storage.project_exists(name):
+                    storage.delete_project(name)
+                if not is_local:
+                    self.delete_repo(name)
+            raise
+
+        sha = self.get_sha_from_path(repo_path)
+        if sha:
+            self.save_sha(name, sha)
+
+        if self.is_local_path(url):
+            save_url = str(Path(url).expanduser().resolve())
+        else:
+            save_url = url
+        self.save_source_url(name, save_url)
+
+        return IngestResult(
+            files_ingested=files_ingested,
+            files_skipped=files_skipped,
+            warnings=warnings,
+        )

@@ -37,7 +37,6 @@ scratch/
 .env
 research/
 barsoom_data/
-TODO.md
 .worktrees/
 src/shesha/_version.py
 /rlm/

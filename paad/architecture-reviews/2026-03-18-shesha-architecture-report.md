@@ -354,7 +354,7 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Status:** Fixed
 - **Status reason:** Changed LLMError to inherit from SheshaError, unifying the exception hierarchy
 - **Status date:** 2026-03-18 21:55 UTC
-- **Status commit:** (pending)
+- **Status commit:** 789f6a4
 - **Found by:** Error Handling
 
 ### [F-22] Magic numbers in context budget estimation
@@ -373,6 +373,10 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** The `_finalize_trace` inner function not only writes the summary but also calls `cleanup_old_traces` which deletes old trace files. The function name doesn't suggest data deletion.
 - **Evidence:** `rlm/engine.py:499-513`
 - **Found by:** Error Handling
+- **Status:** Fixed
+- **Status reason:** Renamed to _finalize_trace_and_cleanup to make the cleanup side effect visible in the name
+- **Status date:** 2026-03-18 21:58 UTC
+- **Status commit:** (pending)
 
 ### [F-24] Config env_map incomplete
 - **Category:** 22 (Configuration sprawl)

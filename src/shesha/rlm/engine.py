@@ -703,7 +703,7 @@ class RLMEngine:
             if inc_writer is not None:
                 inc_writer.write_step(step)
 
-        def _finalize_trace(answer: str, status: str) -> None:
+        def _finalize_trace_and_cleanup(answer: str, status: str) -> None:
             nonlocal trace_finalized
             if trace_finalized or inc_writer is None:
                 return
@@ -774,7 +774,7 @@ class RLMEngine:
                         token_usage=token_usage,
                         execution_time=time.time() - start_time,
                     )
-                    _finalize_trace(answer, "interrupted")
+                    _finalize_trace_and_cleanup(answer, "interrupted")
                     return query_result
 
                 executor.llm_query_handler = _make_llm_callback(iteration)
@@ -854,7 +854,7 @@ class RLMEngine:
                             token_usage=token_usage,
                             execution_time=time.time() - start_time,
                         )
-                        _finalize_trace(bare_answer, "success")
+                        _finalize_trace_and_cleanup(bare_answer, "success")
                         return query_result
 
                     # No bare FINAL either — prompt for code
@@ -933,7 +933,7 @@ class RLMEngine:
                         verification=verification,
                         semantic_verification=semantic_verification,
                     )
-                    _finalize_trace(final_answer, "success")
+                    _finalize_trace_and_cleanup(final_answer, "success")
                     return query_result
 
                 # Recover from dead executor mid-loop
@@ -951,7 +951,7 @@ class RLMEngine:
                         token_usage=token_usage,
                         execution_time=time.time() - start_time,
                     )
-                    _finalize_trace(answer, "executor_died")
+                    _finalize_trace_and_cleanup(answer, "executor_died")
                     return query_result
 
                 # Add assistant response, then per-block code echo messages
@@ -1016,11 +1016,11 @@ class RLMEngine:
                 token_usage=token_usage,
                 execution_time=time.time() - start_time,
             )
-            _finalize_trace(answer, "max_iterations")
+            _finalize_trace_and_cleanup(answer, "max_iterations")
             return query_result
 
         finally:
-            _finalize_trace("[interrupted]", "interrupted")
+            _finalize_trace_and_cleanup("[interrupted]", "interrupted")
             if owns_executor:
                 executor.stop()
             else:

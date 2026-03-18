@@ -351,6 +351,10 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Impact:** Low
 - **Explanation:** `LLMError` inherits from `Exception`, not `SheshaError`. A caller catching `SheshaError` will miss LLM errors. May be intentional (infrastructure vs domain separation) but creates a gap.
 - **Evidence:** `llm/exceptions.py:4` (`class LLMError(Exception)`)
+- **Status:** Fixed
+- **Status reason:** Changed LLMError to inherit from SheshaError, unifying the exception hierarchy
+- **Status date:** 2026-03-18 21:55 UTC
+- **Status commit:** (pending)
 - **Found by:** Error Handling
 
 ### [F-22] Magic numbers in context budget estimation

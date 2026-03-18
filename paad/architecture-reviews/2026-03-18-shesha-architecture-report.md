@@ -234,6 +234,10 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** The 115-line `_ingest_repo()` method in `Shesha` orchestrates file parsing, staging, atomic swap, error cleanup, and SHA persistence. This logic belongs in `RepoIngester` or a dedicated service, not the main API facade. `Shesha` has intimate knowledge of parser behavior and storage staging internals.
 - **Evidence:** `shesha.py:470-584` — calls `_repo_ingester.list_files_from_path()`, `_parser_registry.find_parser()`, `_storage.create_project()`, `_storage.store_document()`, `_storage.swap_docs()`, `_storage.delete_project()`
 - **Found by:** Structure
+- **Status:** Fixed
+- **Status reason:** Moved ingestion orchestration into RepoIngester.ingest(). Shesha._ingest_repo is now a thin wrapper that delegates and wraps IngestResult into RepoProjectResult.
+- **Status date:** 2026-03-18 22:40 UTC
+- **Status commit:** 3aa3f7f
 
 ### [F-6] Shotgun surgery: dual WebSocket response construction
 - **Category:** 9 (Shotgun surgery)
@@ -251,6 +255,10 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** `RLMEngine` instantiates `LLMClient` at four points throughout the engine (subcall handler, two semantic verification layers, main query loop). There is no way to inject a custom LLM client for testing without API calls or for using a different LLM abstraction.
 - **Evidence:** `engine.py:261` (subcall), `:344` (verification L1), `:408` (verification L2), `:516` (main loop)
 - **Found by:** Coupling
+- **Status:** Fixed
+- **Status reason:** Added llm_client_factory parameter to RLMEngine.__init__() defaulting to LLMClient. All 4 creation sites use self._llm_client_factory() enabling test injection without import-level patching.
+- **Status date:** 2026-03-18 22:47 UTC
+- **Status commit:** b7b3122
 
 ### [F-8] hasattr check breaks storage protocol abstraction
 - **Category:** 6 (Leaky abstractions)
@@ -258,6 +266,10 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** `Shesha._ingest_repo` uses `hasattr(self._storage, "swap_docs")` to decide between an atomic swap path and manual copy-then-delete. `swap_docs` is not part of the `StorageBackend` protocol, creating an implicit dependency on `FilesystemStorage`.
 - **Evidence:** `shesha.py:535`
 - **Found by:** Coupling
+- **Status:** Fixed
+- **Status reason:** Added swap_docs to StorageBackend protocol with default_swap_docs fallback function. hasattr check eliminated — ingestion now calls storage.swap_docs() unconditionally.
+- **Status date:** 2026-03-18 22:40 UTC
+- **Status commit:** 3aa3f7f
 
 ### [F-9] No logging in core library modules
 - **Category:** 21 (No observability plan) / 34 (Inconsistent error/logging)
@@ -317,6 +329,10 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** Both functions create `LLMClient` inline, making them impossible to test without mocking at the import level. Less impactful than engine coupling since these are standalone utility functions.
 - **Evidence:** `analysis/shortcut.py:74`, `:110`
 - **Found by:** Coupling
+- **Status:** Fixed
+- **Status reason:** Added llm_client_factory parameter to classify_query() and try_answer_from_analysis(), defaulting to LLMClient. Same pattern as F-7 fix.
+- **Status date:** 2026-03-18 22:50 UTC
+- **Status commit:** a33371a
 
 ### [F-17] AnalysisGenerator takes full Shesha instance
 - **Category:** 3 (Tight coupling)

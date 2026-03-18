@@ -340,6 +340,8 @@ export default function App() {
             { q: 'Can I cancel a running query?', a: 'Yes, press Escape or click the cancel button while a query is running.' },
             { q: 'What is the citation check?', a: 'It verifies that claims in the LLM\u2019s answer are supported by the source documents. Results show which citations are verified, unverified, or missing.' },
             { q: 'How do I export my conversation?', a: 'Click the export button in the header to download a Markdown transcript of the current topic\u2019s conversation.' },
+            { q: 'What does the "More" button do?', a: 'It asks the AI to verify and expand its previous analysis. It checks for completeness, accuracy, and relevance, then presents an updated report with any changes highlighted. Requires at least one prior exchange.' },
+            { q: 'What does "Allow background knowledge" do?', a: 'By default, answers are based strictly on your documents \u2014 this reduces hallucinations but may leave gaps. When enabled, the AI supplements document content with its general knowledge. Background knowledge sections are visually marked so you can tell what comes from your documents versus the AI.' },
           ]}
           shortcuts={[
             { label: 'Send message', key: 'Enter' },

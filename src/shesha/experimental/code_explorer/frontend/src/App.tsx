@@ -320,6 +320,7 @@ export default function App() {
           traceId={traceView.traceId}
           onClose={() => setTraceView(null)}
           fetchTrace={api.traces.get}
+          downloadTrace={api.traces.download}
         />
       )}
 

@@ -28,7 +28,7 @@ describe('TraceViewer scrollability', () => {
     const fetchTrace = vi.fn().mockResolvedValue(mockTrace)
 
     await act(async () => {
-      render(<TraceViewer topicName="test" traceId="t-1" onClose={vi.fn()} fetchTrace={fetchTrace} />)
+      render(<TraceViewer topicName="test" traceId="t-1" onClose={vi.fn()} fetchTrace={fetchTrace} downloadTrace={vi.fn()} />)
     })
 
     // Wait for trace to load

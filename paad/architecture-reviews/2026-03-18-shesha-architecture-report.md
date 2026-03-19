@@ -301,7 +301,7 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Status:** Fixed
 - **Status reason:** Extracted query_with_shortcut() and ShortcutResult dataclass into analysis/shortcut.py. TUI now calls the domain function instead of inlining the shortcut decision logic.
 - **Status date:** 2026-03-19 00:00 UTC
-- **Status commit:** (pending)
+- **Status commit:** 809e32b
 
 ### [F-12] Synchronous-only LLM client
 - **Category:** 16 (Synchronous-only integration)
@@ -316,6 +316,10 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** Document upload performs 6 sequential side effects (write file, extract text, write metadata, create project, store document, add to topic). Only text extraction failure triggers cleanup. Failures at later steps leave orphaned upload directories and unattached projects.
 - **Evidence:** `document_explorer/api.py:155-213`
 - **Found by:** Integration
+- **Status:** Fixed
+- **Status reason:** Wrapped post-extraction steps in try/except with cleanup: deletes project (if created) and upload dir on failure at any step.
+- **Status date:** 2026-03-19 00:10 UTC
+- **Status commit:** (pending)
 
 ### [F-14] ContainerPool returns concrete ContainerExecutor
 - **Category:** 6 (Leaky abstractions)

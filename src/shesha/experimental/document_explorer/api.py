@@ -188,20 +188,32 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
             }
             (upload_dir / "meta.json").write_text(json.dumps(meta, indent=2))
 
-            # Create Shesha project and store extracted text
-            state.shesha.create_project(project_id)
-            doc = ParsedDocument(
-                name=file.filename,
-                content=text,
-                format=ext.lstrip(".") or "txt",
-                metadata={"filename": file.filename, "size": len(content)},
-                char_count=len(text),
-            )
-            state.shesha.storage.store_document(project_id, doc)
+            # Create Shesha project, store document, and add to topic.
+            # If any step fails, clean up everything created so far for
+            # this file to avoid orphaned uploads/projects.
+            project_created = False
+            try:
+                state.shesha.create_project(project_id)
+                project_created = True
+                doc = ParsedDocument(
+                    name=file.filename,
+                    content=text,
+                    format=ext.lstrip(".") or "txt",
+                    metadata={"filename": file.filename, "size": len(content)},
+                    char_count=len(text),
+                )
+                state.shesha.storage.store_document(project_id, doc)
 
-            # Add to topic (already created/validated above)
-            if topic:
-                state.topic_mgr.add_item(topic, project_id)
+                if topic:
+                    state.topic_mgr.add_item(topic, project_id)
+            except Exception:
+                if project_created:
+                    try:
+                        state.shesha.delete_project(project_id)
+                    except Exception:
+                        pass  # Best-effort cleanup
+                shutil.rmtree(upload_dir, ignore_errors=True)
+                raise
 
             results.append(
                 DocumentUploadResponse(

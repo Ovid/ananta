@@ -201,20 +201,15 @@ class TestUploadDocument:
 
 
 class TestUploadAtomicity:
-    """Safety-net: upload failures at each step should not leave orphaned state.
+    """Upload failures at each step should clean up and not leave orphaned state."""
 
-    These tests document the CURRENT behavior — exceptions propagate
-    uncaught. The F-13 fix will add proper cleanup and these tests
-    will be updated to verify it.
-    """
-
-    def test_create_project_failure_propagates(
+    def test_create_project_failure_cleans_up_upload_dir(
         self,
         state: DocumentExplorerState,
         mock_shesha: MagicMock,
         uploads_dir: Path,
     ) -> None:
-        """If create_project fails, exception propagates (no cleanup)."""
+        """If create_project fails, upload dir is cleaned up."""
         mock_shesha.create_project.side_effect = RuntimeError("storage full")
         app = create_api(state)
         client = TestClient(app, raise_server_exceptions=False)
@@ -225,17 +220,16 @@ class TestUploadAtomicity:
         )
         assert resp.status_code == 500
         mock_shesha.storage.store_document.assert_not_called()
-        # Upload dir was created but NOT cleaned up — orphaned state
-        upload_dirs = list(uploads_dir.iterdir())
-        assert len(upload_dirs) == 1
+        # Upload dir should be cleaned up
+        assert list(uploads_dir.iterdir()) == []
 
-    def test_store_document_failure_leaves_orphaned_project(
+    def test_store_document_failure_cleans_up_project_and_upload(
         self,
         state: DocumentExplorerState,
         mock_shesha: MagicMock,
         uploads_dir: Path,
     ) -> None:
-        """If store_document fails after create_project, project is orphaned."""
+        """If store_document fails, both project and upload dir are cleaned up."""
         mock_shesha.create_project.return_value = MagicMock()
         mock_shesha.storage.store_document.side_effect = RuntimeError("disk error")
         app = create_api(state)
@@ -246,8 +240,10 @@ class TestUploadAtomicity:
             files=[("files", ("notes.txt", b"Hello", "text/plain"))],
         )
         assert resp.status_code == 500
-        # Project was created but document storage failed — orphaned project
-        mock_shesha.create_project.assert_called_once()
+        # Project should be deleted (cleanup)
+        mock_shesha.delete_project.assert_called_once()
+        # Upload dir should be cleaned up
+        assert list(uploads_dir.iterdir()) == []
 
     def test_text_extraction_failure_cleans_up_upload_dir(
         self,
@@ -262,6 +258,43 @@ class TestUploadAtomicity:
         assert resp.status_code == 422
         # Upload dir should be cleaned up
         assert list(uploads_dir.iterdir()) == []
+
+    def test_topic_add_failure_cleans_up_everything(
+        self,
+        state: DocumentExplorerState,
+        mock_shesha: MagicMock,
+        uploads_dir: Path,
+    ) -> None:
+        """If add_to_topic fails, project, document, and upload dir are cleaned up."""
+        mock_shesha.create_project.return_value = MagicMock()
+        # Create the topic so the pre-flight validation passes
+        state.topic_mgr.create("Research")
+
+        # Make add_item fail
+        from unittest.mock import patch as mock_patch
+
+        original_add = state.topic_mgr.add_item
+
+        def fail_add(topic: str, item: str) -> None:
+            raise RuntimeError("topic storage error")
+
+        state.topic_mgr.add_item = fail_add  # type: ignore[assignment]
+
+        app = create_api(state)
+        client = TestClient(app, raise_server_exceptions=False)
+
+        resp = client.post(
+            "/api/documents/upload",
+            files=[("files", ("notes.txt", b"Hello", "text/plain"))],
+            data={"topic": "Research"},
+        )
+        assert resp.status_code == 500
+        # Project should be deleted (cleanup)
+        mock_shesha.delete_project.assert_called_once()
+        # Upload dir should be cleaned up
+        assert list(uploads_dir.iterdir()) == []
+
+        state.topic_mgr.add_item = original_add  # type: ignore[assignment]
 
 
 class TestDeleteDocument:

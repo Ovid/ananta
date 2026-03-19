@@ -600,7 +600,7 @@ class RLMEngine:
         # defined the variable), retry resolution before reporting failure.
         if failed_final_var and final_answer is None:
             resolved = self._resolve_final_var(failed_final_var, executor)
-            if resolved is not None and resolved != "":
+            if resolved is not None:
                 final_answer = resolved
                 failed_final_var = None
                 step = trace.add_step(
@@ -912,7 +912,7 @@ class RLMEngine:
                         final_type, final_value = bare_final
                         if final_type == "final_var":
                             bare_answer = self._resolve_final_var(final_value, executor)
-                            if not bare_answer:
+                            if bare_answer is None:
                                 # Variable not found — retry instead of
                                 # returning the variable name as the answer
                                 messages.append({"role": "assistant", "content": response.content})
@@ -984,7 +984,7 @@ class RLMEngine:
                     final_type, final_value = bare_final
                     if final_type == "final_var":
                         resolved = self._resolve_final_var(final_value, executor)
-                        if resolved:
+                        if resolved is not None:
                             final_answer = resolved
                         else:
                             # Variable not found — record name so a helpful

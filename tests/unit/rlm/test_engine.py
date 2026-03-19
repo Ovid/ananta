@@ -1762,6 +1762,73 @@ class TestResolveFinalVar:
         assert result is not None
         assert result == ""
 
+    @patch("shesha.rlm.engine.ContainerExecutor")
+    @patch("shesha.rlm.engine.LLMClient")
+    def test_bare_final_var_empty_string_accepted_without_code_blocks(
+        self,
+        mock_llm_cls: MagicMock,
+        mock_executor_cls: MagicMock,
+    ):
+        """I1: bare FINAL_VAR resolving to '' must be accepted, not retried."""
+        mock_llm = MagicMock()
+        mock_llm.complete.return_value = MagicMock(
+            content='FINAL_VAR(my_var)',
+            prompt_tokens=10,
+            completion_tokens=10,
+            total_tokens=20,
+        )
+        mock_llm_cls.return_value = mock_llm
+
+        mock_executor = MagicMock()
+        mock_executor.is_alive = True
+        # _resolve_final_var prints the var and gets ""
+        mock_executor.execute.return_value = MagicMock(status="ok", stdout="")
+        mock_executor_cls.return_value = mock_executor
+
+        engine = RLMEngine(model="test-model")
+        result = engine.query(documents=["Doc"], question="What?")
+
+        assert result.answer == ""
+        # Should be one LLM call only (no retry)
+        assert mock_llm.complete.call_count == 1
+
+    @patch("shesha.rlm.engine.ContainerExecutor")
+    @patch("shesha.rlm.engine.LLMClient")
+    def test_bare_final_var_empty_string_accepted_after_code_blocks(
+        self,
+        mock_llm_cls: MagicMock,
+        mock_executor_cls: MagicMock,
+    ):
+        """I1: bare FINAL_VAR after code blocks resolving to '' accepted."""
+        mock_llm = MagicMock()
+        # Response has both a code block and a bare FINAL_VAR
+        mock_llm.complete.return_value = MagicMock(
+            content='```repl\nmy_var = ""\n```\nFINAL_VAR(my_var)',
+            prompt_tokens=10,
+            completion_tokens=10,
+            total_tokens=20,
+        )
+        mock_llm_cls.return_value = mock_llm
+
+        mock_executor = MagicMock()
+        mock_executor.is_alive = True
+        # Code block execution: no final answer
+        mock_executor.execute.side_effect = [
+            MagicMock(
+                status="ok", stdout="", stderr="", error=None,
+                final_answer=None, final_var=None, final_value=None, vars=None,
+            ),
+            # _resolve_final_var for the bare FINAL_VAR
+            MagicMock(status="ok", stdout=""),
+        ]
+        mock_executor_cls.return_value = mock_executor
+
+        engine = RLMEngine(model="test-model")
+        result = engine.query(documents=["Doc"], question="What?")
+
+        assert result.answer == ""
+        assert mock_llm.complete.call_count == 1
+
 
 class TestEngineTraceWriterSuppression:
     """Tests for engine trace writer suppress_errors configuration."""
@@ -2890,47 +2957,38 @@ class TestFindFinalAnswerInText:
 
     @patch("shesha.rlm.engine.ContainerExecutor")
     @patch("shesha.rlm.engine.LLMClient")
-    def test_engine_retries_when_var_resolves_to_empty_string(
+    def test_engine_accepts_empty_string_from_var_resolution(
         self,
         mock_llm_cls: MagicMock,
         mock_executor_cls: MagicMock,
     ):
-        """FINAL(var) where var is empty should trigger retry, not return empty answer.
+        """FINAL(var) where var is "" should accept the empty string answer.
 
-        The variable exists (status="ok") but its printed representation is
-        empty. The engine should treat this as "not found" and retry.
+        Consistent with the `is not None` policy documented at
+        _execute_code_blocks line 544-545: falsy values like FINAL(0),
+        FINAL(""), FINAL(False) are valid final answers.
         """
         mock_llm = MagicMock()
-        mock_llm.complete.side_effect = [
-            MagicMock(
-                content="FINAL(empty_var)",
-                prompt_tokens=100,
-                completion_tokens=50,
-                total_tokens=150,
-            ),
-            MagicMock(
-                content='FINAL("real answer")',
-                prompt_tokens=100,
-                completion_tokens=50,
-                total_tokens=150,
-            ),
-        ]
+        mock_llm.complete.return_value = MagicMock(
+            content="FINAL(empty_var)",
+            prompt_tokens=100,
+            completion_tokens=50,
+            total_tokens=150,
+        )
         mock_llm_cls.return_value = mock_llm
 
         mock_executor = MagicMock()
         mock_executor.is_alive = True
-        mock_executor.execute.side_effect = [
+        mock_executor.execute.return_value = MagicMock(
             # Variable exists but print("") outputs just a newline
-            MagicMock(
-                status="ok",
-                stdout="\n",
-                stderr="",
-                error=None,
-                final_answer=None,
-                final_var=None,
-                vars=None,
-            ),
-        ]
+            status="ok",
+            stdout="\n",
+            stderr="",
+            error=None,
+            final_answer=None,
+            final_var=None,
+            vars=None,
+        )
         mock_executor_cls.return_value = mock_executor
 
         engine = RLMEngine(model="test-model", max_iterations=5)
@@ -2939,8 +2997,9 @@ class TestFindFinalAnswerInText:
             question="What is the answer?",
         )
 
-        # Should retry and get the real answer, not return empty string
-        assert result.answer == "real answer"
+        # Empty string is a valid answer (is not None policy)
+        assert result.answer == ""
+        assert mock_llm.complete.call_count == 1
 
     @patch("shesha.rlm.engine.ContainerExecutor")
     @patch("shesha.rlm.engine.LLMClient")

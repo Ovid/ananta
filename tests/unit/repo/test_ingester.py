@@ -748,7 +748,11 @@ class TestGitProtocolAllowlist:
         env = ingester._no_prompt_env()
         assert "GIT_ALLOW_PROTOCOL" in env
         allowed = set(env["GIT_ALLOW_PROTOCOL"].split(":"))
-        assert {"https", "ssh", "git"} == allowed
+        assert {"https", "ssh"} == allowed
+
+    def test_git_protocol_excluded(self, ingester: RepoIngester):
+        """git:// protocol must not be allowed — unauthenticated, SSRF risk."""
+        assert "git" not in RepoIngester._GIT_SAFE_PROTOCOLS.split(":")
 
     def test_create_askpass_sets_allow_protocol(self, ingester: RepoIngester):
         """_create_askpass() restricts git protocols to safe set."""
@@ -756,7 +760,7 @@ class TestGitProtocolAllowlist:
         try:
             assert "GIT_ALLOW_PROTOCOL" in env
             allowed = set(env["GIT_ALLOW_PROTOCOL"].split(":"))
-            assert {"https", "ssh", "git"} == allowed
+            assert {"https", "ssh"} == allowed
         finally:
             askpass_path.unlink(missing_ok=True)
 

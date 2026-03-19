@@ -79,7 +79,7 @@ class RepoIngester:
 
     # Only allow safe git transport protocols — blocks ext:: (RCE) and
     # file:// (bypasses is_local_path() check, enabling local filesystem reads).
-    _GIT_SAFE_PROTOCOLS = "https:ssh:git"
+    _GIT_SAFE_PROTOCOLS = "https:ssh"
 
     @staticmethod
     def _no_prompt_env() -> dict[str, str]:

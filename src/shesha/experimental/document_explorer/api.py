@@ -37,6 +37,7 @@ from shesha.models import ParsedDocument
 
 # Maximum upload size per file (50 MB).
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+MAX_AGGREGATE_UPLOAD_BYTES = 200 * 1024 * 1024
 
 _SAFE_ID_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
 
@@ -162,6 +163,7 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
         results: list[DocumentUploadResponse] = []
         created_projects: list[str] = []
         created_upload_dirs: list[Path] = []
+        total_bytes = 0
         try:
             for file in files:
                 if not file.filename:
@@ -182,6 +184,14 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                         413,
                         f"File '{file.filename}' exceeds the "
                         f"{MAX_UPLOAD_BYTES // (1024 * 1024)} MB upload limit",
+                    )
+
+                total_bytes += len(content)
+                if total_bytes > MAX_AGGREGATE_UPLOAD_BYTES:
+                    raise HTTPException(
+                        413,
+                        f"Total upload size exceeds the "
+                        f"{MAX_AGGREGATE_UPLOAD_BYTES // (1024 * 1024)} MB aggregate limit",
                     )
 
                 # Save original file

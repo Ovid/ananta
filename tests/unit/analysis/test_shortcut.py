@@ -297,7 +297,12 @@ class TestQueryWithShortcut:
                 cancel_event=cancel,
             )
 
-        project.query.assert_called_once_with("ctx\n\nQ", on_progress=progress, cancel_event=cancel)
+        call_args = project.query.call_args
+        assert call_args[1]["on_progress"] is progress
+        assert call_args[1]["cancel_event"] is cancel
+        question_sent = call_args[0][0]
+        assert "ctx" in question_sent
+        assert "Q" in question_sent
 
     def test_rlm_fallback_prepends_analysis_context_to_question(self):
         """When shortcut declines, project.query() receives the analysis
@@ -318,8 +323,29 @@ class TestQueryWithShortcut:
 
         call_args = project.query.call_args
         question_sent = call_args[0][0]
-        assert question_sent.startswith("Overview: A web framework.")
+        assert "Overview: A web framework." in question_sent
         assert "What does module X do?" in question_sent
+
+    def test_rlm_fallback_wraps_analysis_context_in_untrusted_boundary(self):
+        """When shortcut declines, analysis context in the RLM question must
+        be wrapped in untrusted boundary markers (security)."""
+        project = self._make_project()
+
+        with patch(
+            "shesha.analysis.shortcut.try_answer_from_analysis",
+            return_value=None,
+        ):
+            query_with_shortcut(
+                project=project,
+                question="What does module X do?",
+                analysis_context="Overview: A web framework.",
+                model="test-model",
+                api_key="key",
+            )
+
+        call_args = project.query.call_args
+        question_sent = call_args[0][0]
+        assert "<untrusted_document_content>" in question_sent or "_BEGIN" in question_sent
 
     def test_rlm_fallback_without_analysis_context_passes_question_unchanged(self):
         """Without analysis context, project.query() receives the original question."""

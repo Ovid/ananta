@@ -203,6 +203,13 @@ def query_with_shortcut(
             )
 
     # Prepend analysis context for the RLM engine (the shortcut received it
-    # separately; the engine needs it in the question text).
-    rlm_question = f"{analysis_context}\n\n{question}" if analysis_context else question
+    # separately; the engine needs it in the question text).  Wrap in
+    # untrusted boundary markers — the analysis was produced by a prior LLM
+    # pass over potentially adversarial content and must not be treated as a
+    # trusted instruction.
+    if analysis_context:
+        wrapped_ctx = wrap_untrusted(analysis_context, generate_boundary())
+        rlm_question = f"{wrapped_ctx}\n\n{question}"
+    else:
+        rlm_question = question
     return project.query(rlm_question, on_progress=on_progress, cancel_event=cancel_event)

@@ -406,6 +406,26 @@ class TestCheckUpdates:
         resp = client.post("/api/repos/nonexistent/check-updates")
         assert resp.status_code == 404
 
+    def test_check_updates_clone_error_returns_422(
+        self, client: TestClient, mock_shesha: MagicMock
+    ) -> None:
+        """check-updates returns 422 when create_project_from_repo raises RepoIngestError."""
+        mock_shesha.get_project_info.return_value = ProjectInfo(
+            project_id="owner-myrepo",
+            source_url="https://github.com/owner/myrepo",
+            is_local=False,
+            source_exists=True,
+            analysis_status="current",
+        )
+        mock_shesha.create_project_from_repo.side_effect = RepoIngestError(
+            "https://github.com/owner/myrepo",
+            RuntimeError("network timeout"),
+        )
+
+        resp = client.post("/api/repos/owner-myrepo/check-updates")
+        assert resp.status_code == 422
+        assert "detail" in resp.json()
+
     def test_check_updates_no_source_url(self, client: TestClient, mock_shesha: MagicMock) -> None:
         """check-updates returns 400 when project has no source URL."""
         mock_shesha.get_project_info.return_value = ProjectInfo(
@@ -549,6 +569,40 @@ class TestApplyUpdates:
             RuntimeError("network timeout"),
         )
 
+        resp = client.post("/api/repos/owner-myrepo/apply-updates")
+        assert resp.status_code == 422
+        assert "detail" in resp.json()
+
+    def test_apply_updates_call_raises_repo_ingest_error_returns_422(
+        self, client: TestClient, mock_shesha: MagicMock
+    ) -> None:
+        """apply-updates returns 422 when apply_updates() raises RepoIngestError."""
+        mock_shesha.get_project_info.return_value = ProjectInfo(
+            project_id="owner-myrepo",
+            source_url="https://github.com/owner/myrepo",
+            is_local=False,
+            source_exists=True,
+            analysis_status="current",
+        )
+        project = MagicMock()
+        project.project_id = "owner-myrepo"
+
+        # check-updates returns updates_available, but apply_updates raises
+        check_result = RepoProjectResult(
+            project=project,
+            status="updates_available",
+            files_ingested=10,
+            _apply_updates_fn=lambda: (_ for _ in ()).throw(
+                RepoIngestError("https://github.com/owner/myrepo", RuntimeError("pull failed"))
+            ),
+        )
+        mock_shesha.create_project_from_repo.return_value = check_result
+
+        # First check for updates
+        resp = client.post("/api/repos/owner-myrepo/check-updates")
+        assert resp.status_code == 200
+
+        # Now apply — should get 422, not 500
         resp = client.post("/api/repos/owner-myrepo/apply-updates")
         assert resp.status_code == 422
         assert "detail" in resp.json()

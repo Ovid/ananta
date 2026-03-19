@@ -1763,6 +1763,17 @@ class TestResolveFinalVar:
         assert result == ""
 
     @patch("shesha.rlm.engine.ContainerExecutor")
+    def test_none_variable_returns_none(self, mock_executor_cls: MagicMock):
+        """S1: print(None) outputs 'None' — must return None, not the string."""
+        engine = RLMEngine(model="test-model", llm_client_factory=MagicMock())
+        mock_executor = MagicMock()
+        # print(None) in Python outputs "None\n"
+        mock_executor.execute.return_value = MagicMock(status="ok", stdout="None\n")
+
+        result = engine._resolve_final_var("my_var", mock_executor)
+        assert result is None
+
+    @patch("shesha.rlm.engine.ContainerExecutor")
     @patch("shesha.rlm.engine.LLMClient")
     def test_bare_final_var_empty_string_accepted_without_code_blocks(
         self,

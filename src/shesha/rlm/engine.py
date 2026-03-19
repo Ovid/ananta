@@ -638,7 +638,12 @@ class RLMEngine:
         """
         result = executor.execute(f"print({var_name})", timeout=self.execution_timeout)
         if result.status == "ok":
-            return result.stdout.strip()
+            value = result.stdout.strip()
+            # print(None) outputs "None" — treat as unresolved so the
+            # engine retries rather than returning the literal string.
+            if value == "None":
+                return None
+            return value
         return None
 
     def _run_verifications(

@@ -1,8 +1,9 @@
 """Tests for SandboxExecutor protocol."""
 
-from typing import runtime_checkable
+from typing import Any
+from unittest.mock import MagicMock
 
-from shesha.sandbox.base import SandboxExecutor
+from shesha.sandbox.base import ExecutionResult, SandboxExecutor
 from shesha.sandbox.executor import ContainerExecutor
 
 
@@ -10,12 +11,27 @@ class TestSandboxExecutorProtocol:
     """Tests for the SandboxExecutor protocol."""
 
     def test_protocol_is_runtime_checkable(self) -> None:
-        """SandboxExecutor should be runtime-checkable."""
-        assert runtime_checkable in getattr(SandboxExecutor, "__protocol_attrs__", []) or hasattr(
-            SandboxExecutor, "__protocol_attrs__"
-        )
-        # The real check: isinstance works
-        assert issubclass(type(SandboxExecutor), type)
+        """SandboxExecutor should be runtime-checkable via isinstance."""
+        assert getattr(SandboxExecutor, "_is_runtime_protocol", False) is True
+
+        # Positive case: a class implementing all required members passes
+        class _GoodExecutor:
+            llm_query_handler = None
+
+            @property
+            def is_alive(self) -> bool:
+                return False
+
+            def start(self) -> None: ...
+            def stop(self) -> None: ...
+            def setup_context(self, context: list[str]) -> None: ...
+            def reset_namespace(self) -> dict[str, Any]: ...
+            def execute(self, code: str, timeout: int = 30) -> ExecutionResult: ...
+
+        assert isinstance(_GoodExecutor(), SandboxExecutor)
+
+        # Negative case: a class missing required members fails
+        assert not isinstance(MagicMock(), SandboxExecutor)
 
     def test_container_executor_satisfies_protocol(self) -> None:
         """ContainerExecutor should satisfy the SandboxExecutor protocol."""

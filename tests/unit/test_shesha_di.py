@@ -102,7 +102,7 @@ class TestEngineInjection:
 
         project = shesha.create_project("eng-proj")
 
-        assert project._rlm_engine is mock_engine
+        assert project.rlm_engine is mock_engine
 
     def test_start_sets_pool_on_injected_engine(self, tmp_path: Path):
         """start() creates pool and sets it on injected engine via set_pool()."""
@@ -140,7 +140,7 @@ class TestParserRegistryInjection:
 
         project = shesha.create_project("reg-proj")
 
-        assert project._parser_registry is custom_registry
+        assert project.parser_registry is custom_registry
 
     def test_register_parser_uses_injected_registry(self, tmp_path: Path):
         """register_parser adds to the injected registry."""
@@ -153,9 +153,11 @@ class TestParserRegistryInjection:
         )
 
         mock_parser = MagicMock()
+        mock_parser.can_parse.return_value = True
         shesha.register_parser(mock_parser)
 
-        assert mock_parser in custom_registry._parsers
+        # Verify the parser was registered by checking behavioral output
+        assert custom_registry.find_parser(Path("test.txt")) is mock_parser
 
 
 class TestRepoIngesterInjection:

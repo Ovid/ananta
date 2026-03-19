@@ -34,6 +34,11 @@ class Project:
         """The RLM engine for this project, or None if not configured."""
         return self._rlm_engine
 
+    @property
+    def parser_registry(self) -> ParserRegistry:
+        """The parser registry for this project."""
+        return self._parser_registry
+
     def upload(self, path: Path | str, recursive: bool = False) -> list[str]:
         """Upload a file or directory to the project."""
         path = Path(path)

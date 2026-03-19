@@ -36,6 +36,16 @@ class AnalysisGenerator:
         self._get_project = get_project
         self._get_project_sha = get_project_sha
 
+    @property
+    def get_project(self) -> Callable[[str], "Project"]:
+        """The callable used to retrieve a Project by ID."""
+        return self._get_project
+
+    @property
+    def get_project_sha(self) -> Callable[[str], str | None]:
+        """The callable used to retrieve a project's HEAD SHA."""
+        return self._get_project_sha
+
     def _load_prompt(self, name: str) -> str:
         """Load a prompt template from the prompts directory.
 

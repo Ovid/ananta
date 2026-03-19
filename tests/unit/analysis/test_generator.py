@@ -50,8 +50,8 @@ class TestAnalysisGeneratorStructure:
             get_project_sha=mock_get_sha,
         )
 
-        assert generator._get_project is mock_get_project
-        assert generator._get_project_sha is mock_get_sha
+        assert generator.get_project is mock_get_project
+        assert generator.get_project_sha is mock_get_sha
 
 
 class TestAnalysisGeneration:

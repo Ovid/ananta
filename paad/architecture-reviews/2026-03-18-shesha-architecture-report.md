@@ -394,7 +394,7 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Status:** Fixed
 - **Status reason:** apply-updates now self-heals when cache is empty: re-derives update state via create_project_from_repo, returns 409 only if genuinely no updates available. Server restarts no longer lose pending updates.
 - **Status date:** 2026-03-19 06:30 UTC
-- **Status commit:** PENDING
+- **Status commit:** 0733dac
 
 ### [F-21] LLMError doesn't inherit SheshaError
 - **Category:** 20 (Weak error handling strategy)

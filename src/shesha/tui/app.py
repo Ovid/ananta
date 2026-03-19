@@ -18,8 +18,7 @@ from textual.timer import Timer
 from textual.widgets import Static, TextArea
 from textual.worker import Worker
 
-from shesha.analysis.shortcut import try_answer_from_analysis
-from shesha.rlm.boundary import generate_boundary
+from shesha.analysis.shortcut import ShortcutResult, query_with_shortcut
 from shesha.rlm.trace import StepType, TokenUsage
 from shesha.tui.commands import CommandRegistry
 from shesha.tui.history import InputHistory
@@ -382,44 +381,39 @@ class SheshaTUI(App[None]):
             self._on_progress(step_type, iteration, content, token_usage)
 
         def run() -> QueryResult | None:
-            # Try analysis shortcut before full RLM
-            if self._analysis_context and self._model:
-                shortcut_boundary = generate_boundary()
-                shortcut = try_answer_from_analysis(
-                    question_with_history or display_question,
-                    self._analysis_context,
-                    self._model,
-                    self._api_key,
-                    boundary=shortcut_boundary,
-                )
-                if shortcut is not None:
-                    answer, prompt_tokens, completion_tokens = shortcut
-                    if self._query_id == my_query_id:
-                        self.call_from_thread(
-                            self._on_shortcut_answer,
-                            my_query_id,
-                            answer,
-                            display_question,
-                            prompt_tokens,
-                            completion_tokens,
-                        )
-                    return None
-
             try:
-                result = self._project.query(
-                    full_question,
+                result = query_with_shortcut(
+                    project=self._project,
+                    question=question_with_history or full_question,
+                    analysis_context=self._analysis_context if self._model else None,
+                    model=self._model or "",
+                    api_key=self._api_key,
                     on_progress=on_progress,
                     cancel_event=my_cancel_event,
                 )
-                if self._query_id == my_query_id:
-                    self.call_from_thread(
-                        self._on_query_complete, my_query_id, result, display_question
-                    )
-                return result
             except Exception as exc:
                 if self._query_id == my_query_id:
                     self.call_from_thread(self._on_query_error, my_query_id, str(exc))
                 return None
+
+            if self._query_id != my_query_id:
+                return None
+
+            if isinstance(result, ShortcutResult):
+                self.call_from_thread(
+                    self._on_shortcut_answer,
+                    my_query_id,
+                    result.answer,
+                    display_question,
+                    result.prompt_tokens,
+                    result.completion_tokens,
+                )
+                return None
+
+            self.call_from_thread(
+                self._on_query_complete, my_query_id, result, display_question
+            )
+            return result
 
         return run
 

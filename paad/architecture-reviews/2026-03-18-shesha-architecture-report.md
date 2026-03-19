@@ -298,6 +298,10 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** The TUI's `_make_query_runner` contains analysis shortcut decision logic (try shortcut, check result, branch on success/failure). This same logic would need to be duplicated for any other frontend.
 - **Evidence:** `tui/app.py:384-423`
 - **Found by:** Error Handling
+- **Status:** Fixed
+- **Status reason:** Extracted query_with_shortcut() and ShortcutResult dataclass into analysis/shortcut.py. TUI now calls the domain function instead of inlining the shortcut decision logic.
+- **Status date:** 2026-03-19 00:00 UTC
+- **Status commit:** (pending)
 
 ### [F-12] Synchronous-only LLM client
 - **Category:** 16 (Synchronous-only integration)

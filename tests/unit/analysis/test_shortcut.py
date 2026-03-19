@@ -1,8 +1,16 @@
 """Tests for analysis shortcut — skip RLM when analysis can answer."""
 
+import threading
 from unittest.mock import MagicMock, patch
 
-from shesha.analysis.shortcut import _SYSTEM_PROMPT, try_answer_from_analysis
+from shesha.analysis.shortcut import (
+    ShortcutResult,
+    _SYSTEM_PROMPT,
+    query_with_shortcut,
+    try_answer_from_analysis,
+)
+from shesha.rlm.engine import QueryResult
+from shesha.rlm.trace import TokenUsage, Trace
 
 
 class TestTryAnswerFromAnalysis:
@@ -150,6 +158,111 @@ class TestTryAnswerFromAnalysis:
             )
 
         assert result is None
+
+
+class TestQueryWithShortcut:
+    """Tests for query_with_shortcut() — domain-level shortcut-or-query."""
+
+    def _make_project(self) -> MagicMock:
+        project = MagicMock()
+        project.query.return_value = QueryResult(
+            answer="Full RLM answer",
+            trace=Trace(),
+            token_usage=TokenUsage(),
+            execution_time=1.0,
+        )
+        return project
+
+    def test_returns_shortcut_result_when_shortcut_succeeds(self):
+        """When analysis can answer, returns ShortcutResult."""
+        project = self._make_project()
+
+        with patch(
+            "shesha.analysis.shortcut.try_answer_from_analysis",
+            return_value=("shortcut answer", 10, 5),
+        ):
+            result = query_with_shortcut(
+                project=project,
+                question="What does this do?",
+                analysis_context="Overview: ...",
+                model="test-model",
+                api_key="key",
+            )
+
+        assert isinstance(result, ShortcutResult)
+        assert result.answer == "shortcut answer"
+        assert result.prompt_tokens == 10
+        assert result.completion_tokens == 5
+        project.query.assert_not_called()
+
+    def test_falls_back_to_full_query_when_shortcut_returns_none(self):
+        """When shortcut returns None, falls back to project.query()."""
+        project = self._make_project()
+
+        with patch(
+            "shesha.analysis.shortcut.try_answer_from_analysis",
+            return_value=None,
+        ):
+            result = query_with_shortcut(
+                project=project,
+                question="Find bugs in executor",
+                analysis_context="Overview: ...",
+                model="test-model",
+                api_key="key",
+            )
+
+        assert isinstance(result, QueryResult)
+        assert result.answer == "Full RLM answer"
+        project.query.assert_called_once()
+
+    def test_skips_shortcut_when_no_analysis_context(self):
+        """Without analysis_context, goes straight to project.query()."""
+        project = self._make_project()
+
+        with patch(
+            "shesha.analysis.shortcut.try_answer_from_analysis",
+        ) as mock_try:
+            result = query_with_shortcut(
+                project=project,
+                question="What does this do?",
+                analysis_context=None,
+                model="test-model",
+                api_key="key",
+            )
+
+        mock_try.assert_not_called()
+        assert isinstance(result, QueryResult)
+
+    def test_passes_on_progress_and_cancel_event_to_query(self):
+        """on_progress and cancel_event are forwarded to project.query()."""
+        project = self._make_project()
+        progress = MagicMock()
+        cancel = threading.Event()
+
+        with patch(
+            "shesha.analysis.shortcut.try_answer_from_analysis",
+            return_value=None,
+        ):
+            query_with_shortcut(
+                project=project,
+                question="Q",
+                analysis_context="ctx",
+                model="m",
+                api_key="k",
+                on_progress=progress,
+                cancel_event=cancel,
+            )
+
+        project.query.assert_called_once_with(
+            "Q", on_progress=progress, cancel_event=cancel
+        )
+
+    def test_shortcut_result_is_dataclass(self):
+        """ShortcutResult is a proper dataclass with expected fields."""
+        sr = ShortcutResult(answer="a", prompt_tokens=1, completion_tokens=2)
+        assert sr.answer == "a"
+        assert sr.prompt_tokens == 1
+        assert sr.completion_tokens == 2
 
 
 class TestShortcutPromptContent:

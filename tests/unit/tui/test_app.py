@@ -582,6 +582,8 @@ class TestAnalysisShortcutTokenDisplay:
 
     async def test_shortcut_answer_updates_token_count(self) -> None:
         """When shortcut answers a query, token counts appear in the info bar."""
+        from shesha.analysis.shortcut import ShortcutResult
+
         project = MagicMock()
         app = SheshaTUI(
             project=project,
@@ -592,10 +594,10 @@ class TestAnalysisShortcutTokenDisplay:
         async with app.run_test() as pilot:
             pilot.app._analysis_context = "Analysis: A web framework."
 
-            def mock_shortcut(question, analysis_context, model, api_key, **kwargs):
-                return ("Shortcut answer", 200, 50)
+            def mock_qws(**kwargs):
+                return ShortcutResult(answer="Shortcut answer", prompt_tokens=200, completion_tokens=50)
 
-            with patch("shesha.tui.app.try_answer_from_analysis", mock_shortcut):
+            with patch("shesha.tui.app.query_with_shortcut", mock_qws):
                 pilot.app._run_query("What does this do?")
                 await pilot.app._worker_handle.wait()
                 await pilot.pause()
@@ -612,6 +614,8 @@ class TestAnalysisShortcutTokenDisplay:
 
     async def test_shortcut_answer_records_tokens_in_session(self) -> None:
         """Shortcut session stats include token counts, matching normal query path."""
+        from shesha.analysis.shortcut import ShortcutResult
+
         project = MagicMock()
         app = SheshaTUI(
             project=project,
@@ -622,10 +626,10 @@ class TestAnalysisShortcutTokenDisplay:
         async with app.run_test() as pilot:
             pilot.app._analysis_context = "Analysis: A web framework."
 
-            def mock_shortcut(question, analysis_context, model, api_key, **kwargs):
-                return ("Shortcut answer", 200, 50)
+            def mock_qws(**kwargs):
+                return ShortcutResult(answer="Shortcut answer", prompt_tokens=200, completion_tokens=50)
 
-            with patch("shesha.tui.app.try_answer_from_analysis", mock_shortcut):
+            with patch("shesha.tui.app.query_with_shortcut", mock_qws):
                 pilot.app._run_query("What does this do?")
                 await pilot.app._worker_handle.wait()
                 await pilot.pause()
@@ -638,6 +642,8 @@ class TestAnalysisShortcutTokenDisplay:
 
     async def test_shortcut_answer_shows_thought_time(self) -> None:
         """Shortcut answer displays 'Thought for N seconds' above the response."""
+        from shesha.analysis.shortcut import ShortcutResult
+
         project = MagicMock()
         app = SheshaTUI(
             project=project,
@@ -648,10 +654,10 @@ class TestAnalysisShortcutTokenDisplay:
         async with app.run_test() as pilot:
             pilot.app._analysis_context = "Analysis: A web framework."
 
-            def mock_shortcut(question, analysis_context, model, api_key, **kwargs):
-                return ("Shortcut answer", 200, 50)
+            def mock_qws(**kwargs):
+                return ShortcutResult(answer="Shortcut answer", prompt_tokens=200, completion_tokens=50)
 
-            with patch("shesha.tui.app.try_answer_from_analysis", mock_shortcut):
+            with patch("shesha.tui.app.query_with_shortcut", mock_qws):
                 pilot.app._run_query("What does this do?")
                 await pilot.app._worker_handle.wait()
                 await pilot.pause()
@@ -675,6 +681,8 @@ class TestAnalysisShortcutHistoryContext:
 
     async def test_shortcut_receives_history_prefix(self) -> None:
         """When conversation history exists, shortcut question includes it."""
+        from shesha.analysis.shortcut import ShortcutResult
+
         project = MagicMock()
         app = SheshaTUI(
             project=project,
@@ -691,11 +699,11 @@ class TestAnalysisShortcutHistoryContext:
 
             captured_questions: list[str] = []
 
-            def mock_shortcut(question, analysis_context, model, api_key, **kwargs):
-                captured_questions.append(question)
-                return ("Shortcut answer", 100, 25)
+            def mock_qws(**kwargs):
+                captured_questions.append(kwargs["question"])
+                return ShortcutResult(answer="Shortcut answer", prompt_tokens=100, completion_tokens=25)
 
-            with patch("shesha.tui.app.try_answer_from_analysis", mock_shortcut):
+            with patch("shesha.tui.app.query_with_shortcut", mock_qws):
                 pilot.app._run_query("What about module B?")
                 await pilot.app._worker_handle.wait()
                 await pilot.pause()

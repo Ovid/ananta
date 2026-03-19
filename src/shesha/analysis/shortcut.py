@@ -1,11 +1,29 @@
 """Analysis shortcut — skip RLM when the pre-computed analysis can answer."""
 
+from __future__ import annotations
+
+import threading
 from collections.abc import Callable
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from shesha.llm.client import LLMClient
-from shesha.rlm.boundary import wrap_untrusted
+from shesha.rlm.boundary import generate_boundary, wrap_untrusted
+
+if TYPE_CHECKING:
+    from shesha.project import Project
+    from shesha.rlm.engine import ProgressCallback, QueryResult
 
 LLMClientFactory = Callable[..., LLMClient]
+
+
+@dataclass
+class ShortcutResult:
+    """Result returned when the analysis shortcut answered the question."""
+
+    answer: str
+    prompt_tokens: int
+    completion_tokens: int
 
 _SYSTEM_PROMPT = """\
 You are a helpful assistant. You have access to a pre-computed codebase analysis.
@@ -142,4 +160,42 @@ def try_answer_from_analysis(
         answer,
         cls_prompt + response.prompt_tokens,
         cls_completion + response.completion_tokens,
+    )
+
+
+def query_with_shortcut(
+    project: Project,
+    question: str,
+    analysis_context: str | None,
+    model: str,
+    api_key: str | None,
+    on_progress: ProgressCallback | None = None,
+    cancel_event: threading.Event | None = None,
+    llm_client_factory: LLMClientFactory | None = None,
+) -> QueryResult | ShortcutResult:
+    """Try the analysis shortcut, falling back to a full RLM query.
+
+    Returns a ``ShortcutResult`` when the shortcut answered the question,
+    or a ``QueryResult`` when the full RLM engine was used.
+    """
+    if analysis_context:
+        boundary = generate_boundary()
+        shortcut = try_answer_from_analysis(
+            question,
+            analysis_context,
+            model,
+            api_key,
+            boundary=boundary,
+            llm_client_factory=llm_client_factory,
+        )
+        if shortcut is not None:
+            answer, prompt_tokens, completion_tokens = shortcut
+            return ShortcutResult(
+                answer=answer,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+            )
+
+    return project.query(
+        question, on_progress=on_progress, cancel_event=cancel_event
     )

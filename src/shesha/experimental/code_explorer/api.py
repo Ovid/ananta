@@ -35,7 +35,6 @@ from shesha.experimental.shared.app_factory import create_app
 from shesha.experimental.shared.routes import create_item_router, create_shared_router
 from shesha.models import RepoProjectResult
 
-
 _SAFE_ID_RE = _re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
 
 

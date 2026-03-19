@@ -973,8 +973,10 @@ class RLMEngine:
                             final_answer = resolved
                         else:
                             # Variable not found — record name so a helpful
-                            # message is appended after the code-echo messages
-                            var_lookup_failed = final_value
+                            # message is appended after the code-echo messages.
+                            # Don't overwrite if already set from code blocks.
+                            if var_lookup_failed is None:
+                                var_lookup_failed = final_value
                     else:
                         final_answer = final_value
 

@@ -1226,6 +1226,41 @@ class TestBatchExecution:
         )
 
 
+class TestBatchExceptionHandling:
+    """I3: _execute_batch must catch all exceptions, not just SubcallContentError."""
+
+    def test_execute_batch_catches_generic_exception(self):
+        """Non-SubcallContentError exceptions return error string instead of crashing."""
+        executor = ContainerExecutor()
+
+        def _failing_handler(instruction: str, content: str) -> str:
+            raise RuntimeError("LLM timeout")
+
+        executor.llm_query_handler = _failing_handler
+        results = executor._execute_batch(["prompt1", "prompt2"])
+
+        assert len(results) == 2
+        assert "[error:" in results[0]
+        assert "LLM timeout" in results[0]
+
+    def test_execute_batch_partial_failure(self):
+        """One failing call doesn't crash the entire batch."""
+        executor = ContainerExecutor()
+
+        def _mixed_handler(instruction: str, content: str) -> str:
+            if instruction == "fail":
+                raise ValueError("auth failed")
+            return f"ok:{instruction}"
+
+        executor.llm_query_handler = _mixed_handler
+        results = executor._execute_batch(["p1", "fail", "p3"])
+
+        assert len(results) == 3
+        assert results[0] == "ok:p1"
+        assert "[error:" in results[1]
+        assert results[2] == "ok:p3"
+
+
 class TestExecutionResultVars:
     """Tests for vars field on ExecutionResult."""
 

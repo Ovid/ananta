@@ -310,7 +310,7 @@ class ContainerExecutor:
         def _call_one(prompt: str) -> str:
             try:
                 return handler(prompt, "")
-            except SubcallContentError as e:
+            except Exception as e:
                 return f"[error: {e}]"
 
         workers = min(len(prompts), self._MAX_BATCH_WORKERS)

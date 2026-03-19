@@ -2535,6 +2535,30 @@ class TestFindFinalAnswerInText:
         # The full content must include the numbered items AFTER (point-by-point)
         assert "Second item confirmed." in result[1]
 
+    def test_find_final_answer_bare_final_paren_returns_none(self):
+        """Bare FINAL( with no content should return None, not empty answer."""
+        from shesha.rlm.engine import find_final_answer
+
+        result = find_final_answer("FINAL(")
+        assert result is None
+
+    def test_find_final_answer_bare_final_paren_whitespace_returns_none(self):
+        """FINAL( followed by only whitespace should return None."""
+        from shesha.rlm.engine import find_final_answer
+
+        result = find_final_answer("FINAL(   \n  )")
+        assert result is None
+
+    def test_find_final_answer_with_trailing_commentary(self):
+        """FINAL(answer) followed by commentary on next line extracts cleanly."""
+        from shesha.rlm.engine import find_final_answer
+
+        text = "FINAL(The answer)\nSome commentary"
+        result = find_final_answer(text)
+        assert result is not None
+        assert result[0] == "final"
+        assert result[1] == "The answer"
+
     @patch("shesha.rlm.engine.ContainerExecutor")
     @patch("shesha.rlm.engine.LLMClient")
     def test_engine_resolves_bare_final_identifier_from_sandbox(

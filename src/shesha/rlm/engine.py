@@ -145,18 +145,33 @@ def find_final_answer(text: str) -> tuple[str, str] | None:
     #
     # Pass 1: require closing ')' at end of *string* (not line).
     # This correctly handles FINAL(content with (nested) parens).
+    # Pass 1: require closing ')' at end of *string* (not line).
+    # This correctly handles FINAL(content with (nested) parens).
     final_pattern = r"^\s*FINAL\((.*)\)\s*\Z"
     match = re.search(final_pattern, stripped, re.MULTILINE | re.DOTALL)
     if match:
         content = match.group(1).strip()
     else:
-        # Pass 2: FINAL( with no matching close paren — the LLM wrote
-        # the entire answer after FINAL( without a closing ')'.
-        # Take everything after the opening paren.
-        anchor = re.search(r"^\s*FINAL\(", stripped, re.MULTILINE)
-        if not anchor:
-            return None
-        content = stripped[anchor.end() :].strip()
+        # Pass 1b: FINAL(x) on a single line, possibly followed by
+        # commentary on subsequent lines.  Uses MULTILINE (no DOTALL)
+        # so '.' stops at newlines — captures only the first line.
+        line_match = re.search(
+            r"^\s*FINAL\((.*)\)\s*$", stripped, re.MULTILINE
+        )
+        if line_match:
+            content = line_match.group(1).strip()
+        else:
+            # Pass 2: FINAL( with no matching close paren — the LLM wrote
+            # the entire answer after FINAL( without a closing ')'.
+            # Take everything after the opening paren.
+            anchor = re.search(r"^\s*FINAL\(", stripped, re.MULTILINE)
+            if not anchor:
+                return None
+            content = stripped[anchor.end() :].strip()
+
+    # Empty content (bare "FINAL(" with nothing) should trigger retry
+    if not content:
+        return None
 
     # Heuristic: if the content is a bare Python identifier (valid variable
     # name, no quotes, no spaces, no operators), the LLM almost certainly

@@ -284,7 +284,7 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Status:** Fixed
 - **Status reason:** Added logging.getLogger(__name__) to all 6 core modules. Key log points: query start/end with timing, pool lifecycle, pool exhaustion, executor recovery, LLM errors.
 - **Status date:** 2026-03-19 00:20 UTC
-- **Status commit:** f6525af
+- **Status commit:** ccf6025
 
 ### [F-10] Broad exception swallowing in analysis shortcut
 - **Category:** 20 (Weak error handling strategy)

@@ -360,13 +360,14 @@ class Shesha:
         logger.info("Starting Shesha (model=%s)", self._config.model)
         self._check_docker_available()
         self._stopped = False
-        self._pool = ContainerPool(
+        pool = ContainerPool(
             size=self._config.pool_size,
             image=self._config.sandbox_image,
             memory_limit=f"{self._config.container_memory_mb}m",
         )
-        self._pool.start()
-        self._rlm_engine.set_pool(self._pool)
+        pool.start()
+        self._pool = pool
+        self._rlm_engine.set_pool(pool)
 
     def stop(self) -> None:
         """Stop the container pool."""

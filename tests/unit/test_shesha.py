@@ -136,6 +136,34 @@ class TestDockerAvailability:
         # Should not raise
         shesha.stop()
 
+    def test_start_retries_after_pool_start_failure(self, tmp_path: Path):
+        """If pool.start() raises, subsequent start() should retry, not return early."""
+        from shesha.sandbox.pool import ContainerPool
+
+        call_count = 0
+
+        def failing_then_succeeding_start():
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise RuntimeError("Docker error")
+
+        mock_pool = MagicMock(spec=ContainerPool)
+        mock_pool.start.side_effect = failing_then_succeeding_start
+
+        with (
+            patch("shesha.shesha.docker"),
+            patch("shesha.shesha.ContainerPool", return_value=mock_pool),
+        ):
+            shesha = Shesha(model="test-model", storage_path=tmp_path)
+
+            with pytest.raises(RuntimeError, match="Docker error"):
+                shesha.start()
+
+            # Second call should retry, not return early
+            shesha.start()
+            assert call_count == 2
+
     def test_start_is_idempotent(self, tmp_path: Path):
         """Calling start() twice creates only one pool."""
         from shesha.sandbox.pool import ContainerPool

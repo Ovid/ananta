@@ -462,7 +462,74 @@ class TestApplyUpdates:
         assert data["status"] == "created"
         assert data["files_ingested"] == 25
 
-    def test_apply_updates_no_pending(self, client: TestClient, mock_shesha: MagicMock) -> None:
-        """apply-updates returns 409 when check-updates was not called first."""
+    def test_apply_updates_self_heals_without_check(
+        self, client: TestClient, mock_shesha: MagicMock
+    ) -> None:
+        """apply-updates re-derives and applies when cache is empty."""
+        mock_shesha.get_project_info.return_value = ProjectInfo(
+            project_id="owner-myrepo",
+            source_url="https://github.com/owner/myrepo",
+            is_local=False,
+            source_exists=True,
+        )
+
+        project = MagicMock()
+        project.project_id = "owner-myrepo"
+
+        updated_result = RepoProjectResult(
+            project=project,
+            status="created",
+            files_ingested=30,
+        )
+
+        # First call returns updates_available with apply fn,
+        # apply fn returns the updated result
+        check_result = RepoProjectResult(
+            project=project,
+            status="updates_available",
+            files_ingested=10,
+            _apply_updates_fn=lambda: updated_result,
+        )
+        mock_shesha.create_project_from_repo.return_value = check_result
+
+        # Call apply-updates directly without check-updates
+        resp = client.post("/api/repos/owner-myrepo/apply-updates")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "created"
+        assert data["files_ingested"] == 30
+
+    def test_apply_updates_no_source_url(self, client: TestClient, mock_shesha: MagicMock) -> None:
+        """apply-updates returns 400 when project has no source URL and cache is empty."""
+        mock_shesha.get_project_info.return_value = ProjectInfo(
+            project_id="owner-myrepo",
+            source_url=None,
+            is_local=False,
+            source_exists=False,
+        )
+        resp = client.post("/api/repos/owner-myrepo/apply-updates")
+        assert resp.status_code == 400
+
+    def test_apply_updates_unchanged_returns_409(
+        self, client: TestClient, mock_shesha: MagicMock
+    ) -> None:
+        """apply-updates returns 409 when re-check finds no updates."""
+        mock_shesha.get_project_info.return_value = ProjectInfo(
+            project_id="owner-myrepo",
+            source_url="https://github.com/owner/myrepo",
+            is_local=False,
+            source_exists=True,
+        )
+
+        project = MagicMock()
+        project.project_id = "owner-myrepo"
+
+        # Re-derive finds unchanged
+        mock_shesha.create_project_from_repo.return_value = RepoProjectResult(
+            project=project,
+            status="unchanged",
+            files_ingested=10,
+        )
+
         resp = client.post("/api/repos/owner-myrepo/apply-updates")
         assert resp.status_code == 409

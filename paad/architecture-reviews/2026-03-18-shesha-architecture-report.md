@@ -371,6 +371,9 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** `_make_project_id` includes `datetime.now(UTC).isoformat()` in its hash, so uploading the same file twice creates different project IDs. Repeated uploads waste storage.
 - **Evidence:** `document_explorer/api.py:47`
 - **Found by:** Integration
+- **Status:** Skipped
+- **Status reason:** Requires content-based hashing and duplicate detection in the upload endpoint — broader change than a simple hash fix. Deferred to a dedicated task.
+- **Status date:** 2026-03-19 06:15 UTC
 
 ### [F-19] WebSocket vs REST field naming mismatch
 - **Category:** 24 (Inconsistent API contracts)
@@ -388,6 +391,10 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** The check-updates/apply-updates two-phase operation stores state in an in-memory dict. Server restart between check and apply loses the pending update.
 - **Evidence:** `code_explorer/api.py:61` (`pending_updates: dict[str, RepoProjectResult] = {}`)
 - **Found by:** Integration
+- **Status:** Fixed
+- **Status reason:** apply-updates now self-heals when cache is empty: re-derives update state via create_project_from_repo, returns 409 only if genuinely no updates available. Server restarts no longer lose pending updates.
+- **Status date:** 2026-03-19 06:30 UTC
+- **Status commit:** PENDING
 
 ### [F-21] LLMError doesn't inherit SheshaError
 - **Category:** 20 (Weak error handling strategy)

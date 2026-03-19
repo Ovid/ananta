@@ -1,5 +1,6 @@
 """Tests for RepoIngester.ingest() — repo file ingestion orchestration."""
 
+import logging
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -360,6 +361,69 @@ class TestIngestSavesMetadata:
             )
 
         assert ingester.get_saved_sha("test-project") == "abc123"
+
+    def test_ingest_succeeds_when_save_sha_fails(
+        self,
+        ingester: RepoIngester,
+        storage: FilesystemStorage,
+        parser_registry: MagicMock,
+        caplog: pytest.LogCaptureFixture,
+    ):
+        """Metadata save failure after successful ingest must not propagate."""
+        repo_path = ingester.repos_dir / "test-project"
+        repo_path.mkdir(parents=True)
+
+        parser_registry.find_parser.return_value = None
+        ingester.list_files_from_path = MagicMock(return_value=[])
+
+        with (
+            patch.object(ingester, "get_sha_from_path", return_value="abc123"),
+            patch.object(ingester, "save_sha", side_effect=OSError("disk full")),
+            caplog.at_level(logging.WARNING),
+        ):
+            result = ingester.ingest(
+                storage=storage,
+                parser_registry=parser_registry,
+                url="/fake/repo",
+                name="test-project",
+                path=None,
+                is_update=False,
+            )
+
+        # Ingest must still succeed
+        assert result.files_ingested == 0
+        assert "disk full" in caplog.text
+
+    def test_ingest_succeeds_when_save_source_url_fails(
+        self,
+        ingester: RepoIngester,
+        storage: FilesystemStorage,
+        parser_registry: MagicMock,
+        caplog: pytest.LogCaptureFixture,
+    ):
+        """Source URL save failure after successful ingest must not propagate."""
+        repo_path = ingester.repos_dir / "test-project"
+        repo_path.mkdir(parents=True)
+
+        parser_registry.find_parser.return_value = None
+        ingester.list_files_from_path = MagicMock(return_value=[])
+
+        with (
+            patch.object(ingester, "get_sha_from_path", return_value=None),
+            patch.object(ingester, "save_source_url", side_effect=OSError("permission denied")),
+            caplog.at_level(logging.WARNING),
+        ):
+            result = ingester.ingest(
+                storage=storage,
+                parser_registry=parser_registry,
+                url="https://github.com/org/repo",
+                name="test-project",
+                path=None,
+                is_update=False,
+            )
+
+        assert result.files_ingested == 0
+        assert "permission denied" in caplog.text
 
     def test_ingest_saves_source_url(
         self, ingester: RepoIngester, storage: FilesystemStorage, parser_registry: MagicMock

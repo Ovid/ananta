@@ -1,6 +1,7 @@
 """Git repository ingester."""
 
 import json
+import logging
 import os
 import re
 import shutil
@@ -37,6 +38,9 @@ GIT_PULL_TIMEOUT = 120
 GIT_FETCH_TIMEOUT = 120
 GIT_LS_REMOTE_TIMEOUT = 30
 GIT_LOCAL_TIMEOUT = 30
+
+
+logger = logging.getLogger(__name__)
 
 
 class RepoIngester:
@@ -498,15 +502,19 @@ class RepoIngester:
                     self.delete_repo(name)
             raise
 
-        sha = self.get_sha_from_path(repo_path)
-        if sha:
-            self.save_sha(name, sha)
+        # Save metadata — failure here must not mask a successful ingest.
+        try:
+            sha = self.get_sha_from_path(repo_path)
+            if sha:
+                self.save_sha(name, sha)
 
-        if self.is_local_path(url):
-            save_url = str(Path(url).expanduser().resolve())
-        else:
-            save_url = url
-        self.save_source_url(name, save_url)
+            if self.is_local_path(url):
+                save_url = str(Path(url).expanduser().resolve())
+            else:
+                save_url = url
+            self.save_source_url(name, save_url)
+        except Exception as exc:
+            logger.warning("Failed to save repo metadata for '%s': %s", name, exc)
 
         return IngestResult(
             files_ingested=files_ingested,

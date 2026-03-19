@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from shesha.llm.client import LLMClient, LLMClientFactory
+from shesha.llm.exceptions import PermanentError
 from shesha.rlm.boundary import generate_boundary, wrap_untrusted
 
 if TYPE_CHECKING:
@@ -101,6 +102,8 @@ def classify_query(
 
     try:
         response = client.complete([{"role": "user", "content": question}])
+    except PermanentError:
+        raise  # Auth failures should surface immediately
     except Exception:
         return (True, 0, 0)  # Graceful fallback — allow shortcut attempt
 

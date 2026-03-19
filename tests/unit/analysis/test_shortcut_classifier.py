@@ -102,10 +102,12 @@ class TestClassifyQuery:
 
         assert result[0] is True
 
-    def test_returns_true_on_llm_exception(self):
-        """LLM exception -> True (graceful fallback, allow shortcut attempt)."""
+    def test_returns_true_on_transient_exception(self):
+        """Transient LLM exception -> True (graceful fallback, allow shortcut attempt)."""
+        from shesha.llm.exceptions import TransientError
+
         with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
-            mock_cls.return_value.complete.side_effect = Exception("API error")
+            mock_cls.return_value.complete.side_effect = TransientError("timeout")
             result = classify_query(
                 question="What does this do?",
                 model="test-model",
@@ -113,6 +115,21 @@ class TestClassifyQuery:
             )
 
         assert result[0] is True
+
+    def test_raises_permanent_error(self):
+        """PermanentError (auth failure) propagates instead of being swallowed."""
+        from shesha.llm.exceptions import PermanentError
+
+        import pytest
+
+        with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+            mock_cls.return_value.complete.side_effect = PermanentError("invalid key")
+            with pytest.raises(PermanentError):
+                classify_query(
+                    question="What does this do?",
+                    model="test-model",
+                    api_key="test-key",
+                )
 
     def test_returns_true_on_unparseable_output(self):
         """Unparseable LLM output -> True (graceful fallback)."""

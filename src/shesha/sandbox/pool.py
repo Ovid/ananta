@@ -65,17 +65,28 @@ class ContainerPool:
             if self._available:
                 executor = self._available.popleft()
                 logger.debug("Acquired executor from pool (%d available)", len(self._available))
-            else:
-                # Create new container if pool exhausted
-                logger.warning(
-                    "Pool exhausted (%d in use), creating overflow container",
-                    len(self._in_use),
-                )
-                executor = ContainerExecutor(
-                    image=self.image,
-                    memory_limit=self.memory_limit,
-                )
-                executor.start()
+                self._in_use.add(executor)
+                return executor
+            # Pool exhausted — create overflow outside the lock to avoid
+            # blocking release()/acquire() from other threads during
+            # Docker container startup.
+            logger.warning(
+                "Pool exhausted (%d in use), creating overflow container",
+                len(self._in_use),
+            )
+
+        # Start container without holding the lock — Docker startup takes seconds
+        executor = ContainerExecutor(
+            image=self.image,
+            memory_limit=self.memory_limit,
+        )
+        executor.start()
+
+        with self._lock:
+            if not self._started:
+                # Pool was stopped while we were starting the overflow container
+                executor.stop()
+                raise RuntimeError("Cannot acquire from a stopped pool")
             self._in_use.add(executor)
             return executor
 

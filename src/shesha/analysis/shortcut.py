@@ -25,6 +25,7 @@ class ShortcutResult:
     prompt_tokens: int
     completion_tokens: int
 
+
 _SYSTEM_PROMPT = """\
 You are a helpful assistant. You have access to a pre-computed codebase analysis.
 If the user's question can be fully and accurately answered using ONLY the
@@ -196,6 +197,4 @@ def query_with_shortcut(
                 completion_tokens=completion_tokens,
             )
 
-    return project.query(
-        question, on_progress=on_progress, cancel_event=cancel_event
-    )
+    return project.query(question, on_progress=on_progress, cancel_event=cancel_event)

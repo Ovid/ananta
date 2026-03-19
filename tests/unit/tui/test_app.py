@@ -595,7 +595,9 @@ class TestAnalysisShortcutTokenDisplay:
             pilot.app._analysis_context = "Analysis: A web framework."
 
             def mock_qws(**kwargs):
-                return ShortcutResult(answer="Shortcut answer", prompt_tokens=200, completion_tokens=50)
+                return ShortcutResult(
+                    answer="Shortcut answer", prompt_tokens=200, completion_tokens=50
+                )
 
             with patch("shesha.tui.app.query_with_shortcut", mock_qws):
                 pilot.app._run_query("What does this do?")
@@ -627,7 +629,9 @@ class TestAnalysisShortcutTokenDisplay:
             pilot.app._analysis_context = "Analysis: A web framework."
 
             def mock_qws(**kwargs):
-                return ShortcutResult(answer="Shortcut answer", prompt_tokens=200, completion_tokens=50)
+                return ShortcutResult(
+                    answer="Shortcut answer", prompt_tokens=200, completion_tokens=50
+                )
 
             with patch("shesha.tui.app.query_with_shortcut", mock_qws):
                 pilot.app._run_query("What does this do?")
@@ -655,7 +659,9 @@ class TestAnalysisShortcutTokenDisplay:
             pilot.app._analysis_context = "Analysis: A web framework."
 
             def mock_qws(**kwargs):
-                return ShortcutResult(answer="Shortcut answer", prompt_tokens=200, completion_tokens=50)
+                return ShortcutResult(
+                    answer="Shortcut answer", prompt_tokens=200, completion_tokens=50
+                )
 
             with patch("shesha.tui.app.query_with_shortcut", mock_qws):
                 pilot.app._run_query("What does this do?")
@@ -701,7 +707,9 @@ class TestAnalysisShortcutHistoryContext:
 
             def mock_qws(**kwargs):
                 captured_questions.append(kwargs["question"])
-                return ShortcutResult(answer="Shortcut answer", prompt_tokens=100, completion_tokens=25)
+                return ShortcutResult(
+                    answer="Shortcut answer", prompt_tokens=100, completion_tokens=25
+                )
 
             with patch("shesha.tui.app.query_with_shortcut", mock_qws):
                 pilot.app._run_query("What about module B?")

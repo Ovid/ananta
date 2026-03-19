@@ -1,6 +1,7 @@
 """Main Shesha class - the public API."""
 
 import atexit
+import logging
 import re
 import weakref
 from pathlib import Path
@@ -29,6 +30,8 @@ from shesha.storage.filesystem import FilesystemStorage
 if TYPE_CHECKING:
     from shesha.models import RepoAnalysis
     from shesha.parser.base import DocumentParser
+
+logger = logging.getLogger(__name__)
 
 
 class Shesha:
@@ -337,6 +340,7 @@ class Shesha:
         """Check Docker availability, create the container pool, and start it."""
         if self._pool is not None and not self._stopped:
             return
+        logger.info("Starting Shesha (model=%s)", self._config.model)
         self._check_docker_available()
         self._stopped = False
         self._pool = ContainerPool(

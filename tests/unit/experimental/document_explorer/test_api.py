@@ -271,8 +271,6 @@ class TestUploadAtomicity:
         state.topic_mgr.create("Research")
 
         # Make add_item fail
-        from unittest.mock import patch as mock_patch
-
         original_add = state.topic_mgr.add_item
 
         def fail_add(topic: str, item: str) -> None:

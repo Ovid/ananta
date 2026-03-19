@@ -1,9 +1,12 @@
 """Container pool for managing warm sandbox containers."""
 
+import logging
 import threading
 from collections import deque
 
 from shesha.sandbox.executor import ContainerExecutor
+
+logger = logging.getLogger(__name__)
 
 
 class ContainerPool:
@@ -28,6 +31,7 @@ class ContainerPool:
         """Start the pool and warm up containers."""
         if self._started:
             return
+        logger.info("Starting container pool (size=%d, image=%s)", self.size, self.image)
         for _ in range(self.size):
             executor = ContainerExecutor(
                 image=self.image,
@@ -36,9 +40,11 @@ class ContainerPool:
             executor.start()
             self._available.append(executor)
         self._started = True
+        logger.info("Container pool started with %d warm containers", self.size)
 
     def stop(self) -> None:
         """Stop all containers in the pool."""
+        logger.info("Stopping container pool")
         with self._lock:
             for executor in self._available:
                 executor.stop()
@@ -55,8 +61,13 @@ class ContainerPool:
                 raise RuntimeError("Cannot acquire from a stopped pool")
             if self._available:
                 executor = self._available.popleft()
+                logger.debug("Acquired executor from pool (%d available)", len(self._available))
             else:
                 # Create new container if pool exhausted
+                logger.warning(
+                    "Pool exhausted (%d in use), creating overflow container",
+                    len(self._in_use),
+                )
                 executor = ContainerExecutor(
                     image=self.image,
                     memory_limit=self.memory_limit,
@@ -77,6 +88,7 @@ class ContainerPool:
 
         Use this for broken executors that should not be reused.
         """
+        logger.warning("Discarding broken executor from pool")
         with self._lock:
             self._in_use.discard(executor)
 

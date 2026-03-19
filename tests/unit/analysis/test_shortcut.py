@@ -4,8 +4,8 @@ import threading
 from unittest.mock import MagicMock, patch
 
 from shesha.analysis.shortcut import (
-    ShortcutResult,
     _SYSTEM_PROMPT,
+    ShortcutResult,
     query_with_shortcut,
     try_answer_from_analysis,
 )
@@ -253,9 +253,7 @@ class TestQueryWithShortcut:
                 cancel_event=cancel,
             )
 
-        project.query.assert_called_once_with(
-            "Q", on_progress=progress, cancel_event=cancel
-        )
+        project.query.assert_called_once_with("Q", on_progress=progress, cancel_event=cancel)
 
     def test_shortcut_result_is_dataclass(self):
         """ShortcutResult is a proper dataclass with expected fields."""

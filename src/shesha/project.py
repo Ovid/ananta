@@ -1,5 +1,6 @@
 """Project class for managing document collections."""
 
+import logging
 import threading
 from pathlib import Path
 
@@ -8,6 +9,8 @@ from shesha.models import ParsedDocument
 from shesha.parser.registry import ParserRegistry
 from shesha.rlm.engine import ProgressCallback, QueryResult, RLMEngine
 from shesha.storage.base import StorageBackend
+
+logger = logging.getLogger(__name__)
 
 
 class Project:
@@ -82,6 +85,7 @@ class Project:
             raise EngineNotConfiguredError()
 
         docs = self._storage.load_all_documents(self.project_id)
+        logger.info("Querying project %s (%d docs)", self.project_id, len(docs))
         return self._rlm_engine.query(
             documents=[d.content for d in docs],
             question=question,

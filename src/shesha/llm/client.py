@@ -1,5 +1,6 @@
 """LLM client wrapper using LiteLLM."""
 
+import logging
 from dataclasses import dataclass
 from typing import Any
 
@@ -14,6 +15,8 @@ from litellm.exceptions import RateLimitError as LiteLLMRateLimit
 
 from shesha.llm.exceptions import PermanentError, RateLimitError, TransientError
 from shesha.llm.retry import RetryConfig, retry_with_backoff
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -75,7 +78,13 @@ class LLMClient:
 
         def _do_request() -> LLMResponse:
             try:
+                logger.debug("LLM request to %s (%d messages)", self.model, len(full_messages))
                 response = litellm.completion(**call_kwargs)
+                logger.debug(
+                    "LLM response: %d prompt, %d completion tokens",
+                    response.usage.prompt_tokens,
+                    response.usage.completion_tokens,
+                )
                 return LLMResponse(
                     content=response.choices[0].message.content,
                     prompt_tokens=response.usage.prompt_tokens,
@@ -84,10 +93,13 @@ class LLMClient:
                     raw_response=response,
                 )
             except LiteLLMRateLimit as e:
+                logger.warning("Rate limited by %s", self.model)
                 raise RateLimitError(str(e)) from e
             except (APIConnectionError, Timeout) as e:
+                logger.warning("Transient LLM error: %s", e)
                 raise TransientError(str(e)) from e
             except AuthenticationError as e:
+                logger.error("LLM authentication failed for %s", self.model)
                 raise PermanentError(str(e)) from e
             except APIError as e:
                 if hasattr(e, "status_code") and e.status_code and e.status_code >= 500:

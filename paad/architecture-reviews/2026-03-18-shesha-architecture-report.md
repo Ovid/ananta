@@ -281,6 +281,10 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** The entire core library (RLM engine, LLM client, sandbox executor, container pool, Shesha facade, Project) has zero `logging` module usage. Only `trace_writer.py` and the `experimental/` subsystem use loggers. Operator-facing diagnostics (container lifecycle, LLM call timing, pool exhaustion, executor restarts) are invisible.
 - **Evidence:** Zero `logger` instances in `engine.py`, `client.py`, `executor.py`, `pool.py`, `shesha.py`, `project.py`
 - **Found by:** Error Handling
+- **Status:** Fixed
+- **Status reason:** Added logging.getLogger(__name__) to all 6 core modules. Key log points: query start/end with timing, pool lifecycle, pool exhaustion, executor recovery, LLM errors.
+- **Status date:** 2026-03-19 00:20 UTC
+- **Status commit:** f6525af
 
 ### [F-10] Broad exception swallowing in analysis shortcut
 - **Category:** 20 (Weak error handling strategy)
@@ -319,7 +323,7 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Status:** Fixed
 - **Status reason:** Wrapped post-extraction steps in try/except with cleanup: deletes project (if created) and upload dir on failure at any step.
 - **Status date:** 2026-03-19 00:10 UTC
-- **Status commit:** (pending)
+- **Status commit:** acd713c
 
 ### [F-14] ContainerPool returns concrete ContainerExecutor
 - **Category:** 6 (Leaky abstractions)

@@ -410,9 +410,7 @@ class SheshaTUI(App[None]):
                 )
                 return None
 
-            self.call_from_thread(
-                self._on_query_complete, my_query_id, result, display_question
-            )
+            self.call_from_thread(self._on_query_complete, my_query_id, result, display_question)
             return result
 
         return run

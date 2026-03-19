@@ -4,6 +4,7 @@ import ast
 import copy
 import json
 import keyword
+import logging
 import re
 import threading
 import time
@@ -36,6 +37,8 @@ from shesha.rlm.verification import (
 from shesha.sandbox.executor import ContainerExecutor, ExecutionResult, SubcallContentError
 from shesha.sandbox.pool import ContainerPool
 from shesha.storage.base import StorageBackend
+
+logger = logging.getLogger(__name__)
 
 # Factory callable that creates LLMClient-compatible objects.
 LLMClientFactory = Callable[..., LLMClient]
@@ -217,9 +220,7 @@ class RLMEngine:
             TypeError: If *pool* is not a ContainerPool instance or None.
         """
         if pool is not None and not isinstance(pool, ContainerPool):
-            raise TypeError(
-                f"Expected ContainerPool or None, got {type(pool).__name__}"
-            )
+            raise TypeError(f"Expected ContainerPool or None, got {type(pool).__name__}")
         self._pool = pool
 
     def _handle_llm_query(
@@ -672,6 +673,12 @@ class RLMEngine:
         allow_background_knowledge: bool = False,
     ) -> QueryResult:
         """Run an RLM query against documents."""
+        logger.info(
+            "Starting query (model=%s, docs=%d, project=%s)",
+            self.model,
+            len(documents),
+            project_id,
+        )
         start_time = time.time()
         trace = Trace()
         token_usage = TokenUsage()
@@ -947,11 +954,19 @@ class RLMEngine:
                         boundary=boundary,
                     )
 
+                    execution_time = time.time() - start_time
+                    logger.info(
+                        "Query completed in %.1fs (%d iters, %d+%d tokens)",
+                        execution_time,
+                        iteration + 1,
+                        token_usage.prompt_tokens,
+                        token_usage.completion_tokens,
+                    )
                     query_result = QueryResult(
                         answer=final_answer,
                         trace=trace,
                         token_usage=token_usage,
-                        execution_time=time.time() - start_time,
+                        execution_time=execution_time,
                         verification=verification,
                         semantic_verification=semantic_verification,
                     )
@@ -960,12 +975,14 @@ class RLMEngine:
 
                 # Recover from dead executor mid-loop
                 if not executor.is_alive and self._pool is not None:
+                    logger.warning("Executor died at iteration %d, recovering from pool", iteration)
                     executor.stop()
                     self._pool.discard(executor)
                     executor = self._pool.acquire()
                     executor.llm_query_handler = _make_llm_callback(iteration)
                     executor.setup_context(wrapped_documents)
                 elif not executor.is_alive:
+                    logger.error("Executor died at iteration %d with no pool, aborting", iteration)
                     answer = "[Executor died — cannot continue]"
                     query_result = QueryResult(
                         answer=answer,

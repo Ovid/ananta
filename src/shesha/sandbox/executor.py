@@ -1,6 +1,7 @@
 """Docker container executor for sandboxed code execution."""
 
 import json
+import logging
 import struct
 import time
 from collections.abc import Callable
@@ -13,6 +14,8 @@ from docker.errors import DockerException
 from docker.models.containers import Container
 
 from shesha.security.containers import DEFAULT_SECURITY, ContainerSecurityConfig
+
+logger = logging.getLogger(__name__)
 
 
 class ProtocolError(Exception):
@@ -83,6 +86,7 @@ class ContainerExecutor:
 
     def start(self) -> None:
         """Start a container for execution."""
+        logger.debug("Starting container (image=%s, memory=%s)", self.image, self.memory_limit)
         self._raw_buffer = b""  # Clear raw stream buffer
         self._content_buffer = b""  # Clear content buffer
         try:
@@ -107,6 +111,7 @@ class ContainerExecutor:
 
     def stop(self) -> None:
         """Stop and remove the container."""
+        logger.debug("Stopping container")
         if self._socket is not None:
             self._socket.close()
             self._socket = None

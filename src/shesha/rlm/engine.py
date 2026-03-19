@@ -1118,7 +1118,7 @@ class RLMEngine:
             # Max iterations reached — ask LLM for one last answer
             fallback_messages = messages + [
                 {
-                    "role": "assistant",
+                    "role": "user",
                     "content": "Please provide a final answer to the user's question "
                     "based on the information provided.",
                 }

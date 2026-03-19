@@ -3170,6 +3170,58 @@ class TestMaxIterationsFallback:
         assert result.answer == "The answer is 42 based on my analysis."
         assert mock_llm.complete.call_count == 3
 
+    @patch("shesha.rlm.engine.ContainerExecutor")
+    @patch("shesha.rlm.engine.LLMClient")
+    def test_max_iterations_fallback_uses_user_role(
+        self,
+        mock_llm_cls: MagicMock,
+        mock_executor_cls: MagicMock,
+    ):
+        """Fallback message must use 'user' role to avoid consecutive assistant msgs."""
+        mock_llm = MagicMock()
+        responses = [
+            MagicMock(
+                content='```repl\nprint("exploring")\n```',
+                prompt_tokens=100,
+                completion_tokens=50,
+                total_tokens=150,
+            ),
+            MagicMock(
+                content="The final answer.",
+                prompt_tokens=100,
+                completion_tokens=50,
+                total_tokens=150,
+            ),
+        ]
+        mock_llm.complete.side_effect = responses
+        mock_llm_cls.return_value = mock_llm
+
+        mock_executor = MagicMock()
+        mock_executor.is_alive = True
+        mock_executor.execute.return_value = MagicMock(
+            status="ok",
+            stdout="output",
+            stderr="",
+            error=None,
+            final_answer=None,
+            final_var=None,
+            vars=None,
+        )
+        mock_executor_cls.return_value = mock_executor
+
+        engine = RLMEngine(model="test-model", max_iterations=1)
+        engine.query(documents=["Doc"], question="What?")
+
+        # The fallback call is the last complete() call
+        fallback_call = mock_llm.complete.call_args_list[-1]
+        fallback_messages = fallback_call.kwargs.get(
+            "messages", fallback_call.args[0] if fallback_call.args else None
+        )
+        last_msg = fallback_messages[-1]
+        assert last_msg["role"] == "user", (
+            f"Fallback message role should be 'user', got '{last_msg['role']}'"
+        )
+
 
 class TestAllowBackgroundKnowledge:
     """Tests for allow_background_knowledge parameter on query()."""

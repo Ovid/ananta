@@ -944,6 +944,27 @@ class TestCheckRepoForUpdates:
 
                 assert result.status == "updates_available"
 
+    def test_returns_unchanged_when_both_shas_none(self, tmp_path: Path):
+        """Both SHAs None should return unchanged, not false updates_available."""
+        with patch("shesha.shesha.docker"), patch("shesha.shesha.ContainerPool"):
+            with patch("shesha.shesha.RepoIngester") as mock_ingester_cls:
+                mock_ingester = MagicMock()
+                mock_ingester_cls.return_value = mock_ingester
+
+                mock_ingester.get_source_url.return_value = "https://github.com/org/repo"
+                mock_ingester.is_local_path.return_value = False
+                mock_ingester.get_saved_sha.return_value = None
+                mock_ingester.get_remote_sha.return_value = None
+                mock_ingester.resolve_token.return_value = None
+                mock_ingester.get_saved_path.return_value = None
+
+                shesha = Shesha(model="test-model", storage_path=tmp_path)
+                shesha.storage.create_project("my-project")
+
+                result = shesha.check_repo_for_updates("my-project")
+
+                assert result.status == "unchanged"
+
     def test_raises_when_project_not_found(self, tmp_path: Path):
         """check_repo_for_updates raises ProjectNotFoundError for non-existent project."""
         with patch("shesha.shesha.docker"), patch("shesha.shesha.ContainerPool"):

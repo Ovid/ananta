@@ -458,6 +458,14 @@ class Shesha:
 
         project = self.get_project(name)
 
+        if saved_sha is None and current_sha is None:
+            # Neither side has SHA tracking — can't detect changes, treat as unchanged
+            return RepoProjectResult(
+                project=project,
+                status="unchanged",
+                files_ingested=len(self._storage.list_documents(name)),
+            )
+
         if current_sha is None and saved_sha is not None:
             logger.warning(
                 "Could not determine current SHA for '%s' — treating as updates_available",

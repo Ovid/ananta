@@ -341,7 +341,7 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Status:** Fixed
 - **Status reason:** Added _finalized state flag to IncrementalTraceWriter with public `finalized` property. write_step() and finalize() are no-ops after finalization. Removed redundant `trace_finalized` guard from RLMEngine.query() — writer now owns its own state invariant.
 - **Status date:** 2026-03-19 06:12 UTC
-- **Status commit:** PENDING
+- **Status commit:** cfad664
 
 ### [F-16] analysis/shortcut.py creates LLMClient directly
 - **Category:** 3 (Tight coupling)

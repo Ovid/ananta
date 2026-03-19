@@ -166,6 +166,57 @@ class TestDockerAvailability:
                 shesha.start()
                 mock_set.assert_called_once_with(mock_pool)
 
+    def test_start_starts_pool_before_publishing_to_engine(self, tmp_path: Path):
+        """start() calls pool.start() before set_pool() so a failed start
+        doesn't leave the engine holding a broken pool reference."""
+        from shesha.sandbox.pool import ContainerPool
+
+        mock_pool = MagicMock(spec=ContainerPool)
+        call_order: list[str] = []
+        mock_pool.start.side_effect = lambda: call_order.append("pool.start")
+
+        with (
+            patch("shesha.shesha.docker"),
+            patch("shesha.shesha.ContainerPool", return_value=mock_pool),
+        ):
+            shesha = Shesha(model="test-model", storage_path=tmp_path)
+            original_set_pool = shesha._rlm_engine.set_pool
+
+            def tracked_set_pool(pool):
+                call_order.append("set_pool")
+                original_set_pool(pool)
+
+            with patch.object(shesha._rlm_engine, "set_pool", side_effect=tracked_set_pool):
+                shesha.start()
+
+        assert call_order == ["pool.start", "set_pool"]
+
+    def test_stop_clears_engine_pool_before_stopping(self, tmp_path: Path):
+        """stop() clears engine pool reference before pool.stop() so in-flight
+        queries see pool=None rather than a stopped pool."""
+        from shesha.sandbox.pool import ContainerPool
+
+        mock_pool = MagicMock(spec=ContainerPool)
+        call_order: list[str] = []
+        mock_pool.stop.side_effect = lambda: call_order.append("pool.stop")
+
+        with (
+            patch("shesha.shesha.docker"),
+            patch("shesha.shesha.ContainerPool", return_value=mock_pool),
+        ):
+            shesha = Shesha(model="test-model", storage_path=tmp_path)
+            shesha.start()
+            original_set_pool = shesha._rlm_engine.set_pool
+
+            def tracked_set_pool(pool):
+                call_order.append(f"set_pool({pool})")
+                original_set_pool(pool)
+
+            with patch.object(shesha._rlm_engine, "set_pool", side_effect=tracked_set_pool):
+                shesha.stop()
+
+        assert call_order == ["set_pool(None)", "pool.stop"]
+
 
 class TestShesha:
     """Tests for Shesha class."""

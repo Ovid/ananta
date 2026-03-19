@@ -778,9 +778,12 @@ class RLMEngine:
 
             return llm_query_callback
 
-        # Acquire executor from pool or create standalone
-        if self._pool is not None:
-            executor = self._pool.acquire()
+        # Acquire executor from pool or create standalone.
+        # Capture pool in a local so the finally block is immune to
+        # concurrent set_pool(None) from Shesha.stop().
+        pool = self._pool
+        if pool is not None:
+            executor = pool.acquire()
             executor.llm_query_handler = _make_llm_callback(0)
             owns_executor = False
         else:
@@ -974,11 +977,11 @@ class RLMEngine:
                     return query_result
 
                 # Recover from dead executor mid-loop
-                if not executor.is_alive and self._pool is not None:
+                if not executor.is_alive and pool is not None:
                     logger.warning("Executor died at iteration %d, recovering from pool", iteration)
                     executor.stop()
-                    self._pool.discard(executor)
-                    executor = self._pool.acquire()
+                    pool.discard(executor)
+                    executor = pool.acquire()
                     executor.llm_query_handler = _make_llm_callback(iteration)
                     executor.setup_context(wrapped_documents)
                 elif not executor.is_alive:
@@ -1070,6 +1073,6 @@ class RLMEngine:
                     # Executor is broken (e.g., socket closed after protocol error).
                     # Stop it and discard from pool — don't return a broken executor.
                     executor.stop()
-                    self._pool.discard(executor)  # type: ignore[union-attr]
+                    pool.discard(executor)
                 else:
-                    self._pool.release(executor)  # type: ignore[union-attr]
+                    pool.release(executor)

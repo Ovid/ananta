@@ -348,8 +348,8 @@ class Shesha:
             image=self._config.sandbox_image,
             memory_limit=f"{self._config.container_memory_mb}m",
         )
-        self._rlm_engine.set_pool(self._pool)
         self._pool.start()
+        self._rlm_engine.set_pool(self._pool)
 
     def stop(self) -> None:
         """Stop the container pool."""
@@ -357,8 +357,8 @@ class Shesha:
             return
         self._stopped = True
         if self._pool is not None:
-            self._pool.stop()
             self._rlm_engine.set_pool(None)
+            self._pool.stop()
 
     def __enter__(self) -> "Shesha":
         """Context manager entry."""

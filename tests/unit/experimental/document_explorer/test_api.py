@@ -373,6 +373,38 @@ class TestUploadAtomicity:
             assert pid not in items, f"Orphaned topic entry for {pid}"
 
 
+class TestUploadSizeLimit:
+    def test_upload_exceeding_size_limit_returns_413(
+        self,
+        client: TestClient,
+    ) -> None:
+        """Uploads exceeding MAX_UPLOAD_BYTES are rejected with 413."""
+        from shesha.experimental.document_explorer.api import MAX_UPLOAD_BYTES
+
+        oversized = b"x" * (MAX_UPLOAD_BYTES + 1)
+        resp = client.post(
+            "/api/documents/upload",
+            files=[("files", ("big.txt", oversized, "text/plain"))],
+        )
+        assert resp.status_code == 413
+
+    def test_upload_at_size_limit_succeeds(
+        self,
+        client: TestClient,
+        mock_shesha: MagicMock,
+    ) -> None:
+        """Uploads exactly at the limit should succeed."""
+        from shesha.experimental.document_explorer.api import MAX_UPLOAD_BYTES
+
+        mock_shesha.create_project.return_value = MagicMock()
+        at_limit = b"x" * MAX_UPLOAD_BYTES
+        resp = client.post(
+            "/api/documents/upload",
+            files=[("files", ("ok.txt", at_limit, "text/plain"))],
+        )
+        assert resp.status_code == 200
+
+
 class TestDeleteDocument:
     def test_delete_removes_from_topics(
         self,

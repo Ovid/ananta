@@ -28,6 +28,9 @@ from shesha.experimental.document_explorer.schemas import (
 from shesha.experimental.document_explorer.topics import _slugify
 from shesha.experimental.document_explorer.websockets import websocket_handler
 from shesha.experimental.shared.app_factory import create_app
+
+# Maximum upload size per file (50 MB).
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 from shesha.experimental.shared.routes import create_item_router, create_shared_router
 from shesha.models import ParsedDocument
 
@@ -167,6 +170,12 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                 upload_dir.mkdir(parents=True, exist_ok=True)
                 created_upload_dirs.append(upload_dir)
                 content = await file.read()
+                if len(content) > MAX_UPLOAD_BYTES:
+                    raise HTTPException(
+                        413,
+                        f"File '{file.filename}' exceeds the "
+                        f"{MAX_UPLOAD_BYTES // (1024 * 1024)} MB upload limit",
+                    )
 
                 ext = Path(file.filename).suffix
                 original_path = upload_dir / f"original{ext}"

@@ -3,12 +3,15 @@
 import threading
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from shesha.analysis.shortcut import (
     _SYSTEM_PROMPT,
     ShortcutResult,
     query_with_shortcut,
     try_answer_from_analysis,
 )
+from shesha.llm.exceptions import PermanentError
 from shesha.rlm.engine import QueryResult
 from shesha.rlm.trace import TokenUsage, Trace
 
@@ -177,6 +180,28 @@ class TestTryAnswerFromAnalysis:
             )
 
         assert result is None
+
+    def test_permanent_error_propagates(self):
+        """PermanentError (e.g. auth failure) must not be swallowed."""
+        classifier_response = MagicMock()
+        classifier_response.content = "ANALYSIS_OK"
+        classifier_response.prompt_tokens = 5
+        classifier_response.completion_tokens = 1
+
+        with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+            classifier_client = MagicMock()
+            classifier_client.complete.return_value = classifier_response
+            answer_client = MagicMock()
+            answer_client.complete.side_effect = PermanentError("Invalid API key")
+            mock_cls.side_effect = [classifier_client, answer_client]
+
+            with pytest.raises(PermanentError, match="Invalid API key"):
+                try_answer_from_analysis(
+                    question="What does this do?",
+                    analysis_context="Some analysis",
+                    model="test-model",
+                    api_key="bad-key",
+                )
 
 
 class TestQueryWithShortcut:

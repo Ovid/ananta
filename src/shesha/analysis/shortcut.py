@@ -153,6 +153,8 @@ def try_answer_from_analysis(
 
     try:
         response = client.complete([{"role": "user", "content": user_content}])
+    except PermanentError:
+        raise  # Auth failures should surface immediately
     except Exception:
         return None  # Graceful fallback to full RLM query
 

@@ -151,3 +151,71 @@ class TestContainerPool:
         assert overflow is mock_executor
         # 1 pool start + 1 overflow = 2 ContainerExecutor constructions
         assert mock_executor_cls.call_count == 2
+
+    @patch("shesha.sandbox.pool.ContainerExecutor")
+    def test_stop_during_overflow_cleans_up_container(self, mock_executor_cls: MagicMock):
+        """stop() during overflow container startup raises and cleans up.
+
+        When the pool is exhausted and acquire() starts an overflow container
+        outside the lock, a concurrent stop() sets _started=False. The
+        re-acquired lock must detect this, stop the overflow container, and
+        raise RuntimeError rather than adding it to _in_use.
+        """
+        startup_started = threading.Event()
+        stop_done = threading.Event()
+
+        pool_executor = MagicMock()
+        overflow_executor = MagicMock()
+
+        def slow_start() -> None:
+            startup_started.set()
+            # Block until stop() has completed
+            assert stop_done.wait(timeout=2), "stop() never completed"
+
+        overflow_executor.start.side_effect = slow_start
+
+        call_count = 0
+
+        def make_executor(**kwargs: object) -> MagicMock:
+            nonlocal call_count
+            call_count += 1
+            if call_count <= 1:
+                return pool_executor
+            return overflow_executor
+
+        mock_executor_cls.side_effect = make_executor
+
+        pool = ContainerPool(size=1, image="shesha-sandbox")
+        pool.start()
+
+        # Drain the pool
+        pool.acquire()
+
+        # Thread: acquire when exhausted → triggers overflow
+        acquire_error: list[Exception] = []
+
+        def acquire_overflow() -> None:
+            try:
+                pool.acquire()
+            except Exception as e:
+                acquire_error.append(e)
+
+        t = threading.Thread(target=acquire_overflow)
+        t.start()
+
+        # Wait for overflow start() to begin (lock is released)
+        assert startup_started.wait(timeout=2), "overflow start() never called"
+
+        # Stop the pool while overflow is starting
+        pool.stop()
+        stop_done.set()
+
+        t.join(timeout=3)
+
+        # acquire() should have raised RuntimeError
+        assert len(acquire_error) == 1
+        assert isinstance(acquire_error[0], RuntimeError)
+        assert "stopped" in str(acquire_error[0])
+
+        # The overflow container should have been stopped
+        overflow_executor.stop.assert_called_once()

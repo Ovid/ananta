@@ -393,6 +393,58 @@ class TestFileListing:
             assert files == []
 
 
+class TestCorruptMetadata:
+    """Tests for corrupt _repo_meta.json handling."""
+
+    def test_save_sha_with_corrupt_json_recovers(self, ingester: RepoIngester, tmp_path: Path):
+        """save_sha() falls back to empty dict when JSON is corrupt."""
+        repo_path = tmp_path / "repos" / "my-project"
+        repo_path.mkdir(parents=True)
+        meta_path = repo_path / "_repo_meta.json"
+        meta_path.write_text("NOT VALID JSON{{{")
+
+        ingester.save_sha("my-project", "abc123")
+
+        data = json.loads(meta_path.read_text())
+        assert data["head_sha"] == "abc123"
+
+    def test_save_source_url_with_corrupt_json_recovers(
+        self, ingester: RepoIngester, tmp_path: Path
+    ):
+        """save_source_url() falls back to empty dict when JSON is corrupt."""
+        repo_path = tmp_path / "repos" / "my-project"
+        repo_path.mkdir(parents=True)
+        meta_path = repo_path / "_repo_meta.json"
+        meta_path.write_text("CORRUPT")
+
+        ingester.save_source_url("my-project", "https://example.com")
+
+        data = json.loads(meta_path.read_text())
+        assert data["source_url"] == "https://example.com"
+
+    def test_get_saved_sha_with_corrupt_json_returns_none(
+        self, ingester: RepoIngester, tmp_path: Path
+    ):
+        """get_saved_sha() returns None when JSON is corrupt."""
+        repo_path = tmp_path / "repos" / "my-project"
+        repo_path.mkdir(parents=True)
+        meta_path = repo_path / "_repo_meta.json"
+        meta_path.write_text("CORRUPT")
+
+        assert ingester.get_saved_sha("my-project") is None
+
+    def test_get_source_url_with_corrupt_json_returns_none(
+        self, ingester: RepoIngester, tmp_path: Path
+    ):
+        """get_source_url() returns None when JSON is corrupt."""
+        repo_path = tmp_path / "repos" / "my-project"
+        repo_path.mkdir(parents=True)
+        meta_path = repo_path / "_repo_meta.json"
+        meta_path.write_text("CORRUPT")
+
+        assert ingester.get_source_url("my-project") is None
+
+
 class TestSourceURLTracking:
     """Tests for source URL tracking functionality."""
 

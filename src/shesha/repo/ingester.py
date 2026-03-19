@@ -185,18 +185,22 @@ class RepoIngester:
         env["GIT_ALLOW_PROTOCOL"] = RepoIngester._GIT_SAFE_PROTOCOLS
         return env, Path(path)
 
+    def _load_meta(self, meta_path: Path) -> dict[str, str]:
+        """Load repo metadata JSON, returning {} on missing or corrupt file."""
+        if not meta_path.exists():
+            return {}
+        try:
+            return json.loads(meta_path.read_text())  # type: ignore[no-any-return]
+        except json.JSONDecodeError:
+            return {}  # Corrupt file — start fresh
+
     def save_sha(self, project_id: str, sha: str) -> None:
         """Save the HEAD SHA for a project."""
         repo_path = self._repo_path(project_id)
         repo_path.mkdir(parents=True, exist_ok=True)
         meta_path = repo_path / "_repo_meta.json"
 
-        # Load existing metadata or start fresh
-        if meta_path.exists():
-            data = json.loads(meta_path.read_text())
-        else:
-            data = {}
-
+        data = self._load_meta(meta_path)
         data["head_sha"] = sha
         meta_path.write_text(json.dumps(data))
 
@@ -206,30 +210,21 @@ class RepoIngester:
         repo_path.mkdir(parents=True, exist_ok=True)
         meta_path = repo_path / "_repo_meta.json"
 
-        # Load existing metadata or start fresh
-        if meta_path.exists():
-            data = json.loads(meta_path.read_text())
-        else:
-            data = {}
-
+        data = self._load_meta(meta_path)
         data["source_url"] = url
         meta_path.write_text(json.dumps(data))
 
     def get_source_url(self, project_id: str) -> str | None:
         """Get the saved source URL for a project."""
         meta_path = self._repo_path(project_id) / "_repo_meta.json"
-        if not meta_path.exists():
-            return None
-        data = json.loads(meta_path.read_text())
+        data = self._load_meta(meta_path)
         url = data.get("source_url")
         return str(url) if url is not None else None
 
     def get_saved_sha(self, project_id: str) -> str | None:
         """Get the saved HEAD SHA for a project."""
         meta_path = self._repo_path(project_id) / "_repo_meta.json"
-        if not meta_path.exists():
-            return None
-        data = json.loads(meta_path.read_text())
+        data = self._load_meta(meta_path)
         sha = data.get("head_sha")
         return str(sha) if sha is not None else None
 

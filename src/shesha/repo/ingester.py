@@ -479,6 +479,10 @@ class RepoIngester:
 
             if is_update:
                 storage.swap_docs(staging_name, name)
+                # swap_docs moves docs but may leave the staging project shell;
+                # delete it so _staging_* entries don't accumulate.
+                if storage.project_exists(staging_name):
+                    storage.delete_project(staging_name)
 
         except Exception:
             if is_update:

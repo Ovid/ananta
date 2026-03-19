@@ -203,6 +203,35 @@ class TestIngestUpdate:
         assert "new.py" in docs
         assert "old.py" not in docs
 
+    def test_ingest_update_deletes_staging_project_after_swap(
+        self, ingester: RepoIngester, storage: FilesystemStorage, parser_registry: MagicMock
+    ):
+        """Successful update deletes the staging project after swap_docs."""
+        storage.create_project("test-project")
+        storage.store_document("test-project", _make_parsed_doc("old.py", "old"))
+
+        repo_path = ingester.repos_dir / "test-project"
+        repo_path.mkdir(parents=True)
+
+        mock_parser = MagicMock()
+        mock_parser.parse.return_value = _make_parsed_doc("new.py", "new")
+        parser_registry.find_parser.return_value = mock_parser
+        ingester.list_files_from_path = MagicMock(return_value=["new.py"])
+
+        ingester.ingest(
+            storage=storage,
+            parser_registry=parser_registry,
+            url="/fake/repo",
+            name="test-project",
+            path=None,
+            is_update=True,
+        )
+
+        # No _staging_* projects should remain
+        all_projects = storage.list_projects()
+        staging = [p for p in all_projects if p.startswith("_staging_")]
+        assert staging == [], f"Orphaned staging projects: {staging}"
+
     def test_ingest_update_cleans_up_staging_on_failure(
         self, ingester: RepoIngester, storage: FilesystemStorage, parser_registry: MagicMock
     ):

@@ -33,6 +33,18 @@ from shesha.experimental.shared.routes import create_item_router, create_shared_
 from shesha.models import RepoProjectResult
 
 
+import re as _re
+
+
+def _sanitize_ingest_error(exc: RepoIngestError) -> str:
+    """Return user-safe error message with internal filesystem paths stripped."""
+    msg = str(exc)
+    # Strip quoted or unquoted absolute paths (e.g. '/var/lib/shesha/repos/...')
+    msg = _re.sub(r"'/?(?:[\w./-]+/){2,}[\w.-]+'", "'<path>'", msg)
+    msg = _re.sub(r"(?<!\w)/?(?:[\w./-]+/){2,}[\w.-]+", "<path>", msg)
+    return msg
+
+
 def _resolve_code_project_ids(state: CodeExplorerState, topic_name: str) -> list[str]:
     """Resolve a topic name to project IDs for trace aggregation.
 
@@ -96,7 +108,7 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
         try:
             repo_result = state.shesha.create_project_from_repo(body.url)
         except RepoIngestError as exc:
-            raise HTTPException(422, detail=str(exc)) from exc
+            raise HTTPException(422, detail=_sanitize_ingest_error(exc)) from exc
         project_id = repo_result.project.project_id
 
         if body.topic:
@@ -143,7 +155,7 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
         try:
             repo_result = state.shesha.create_project_from_repo(source_url, name=project_id)
         except RepoIngestError as exc:
-            raise HTTPException(422, detail=str(exc)) from exc
+            raise HTTPException(422, detail=_sanitize_ingest_error(exc)) from exc
 
         # Cache the result if updates are available so apply-updates can use it
         if repo_result.status == "updates_available":
@@ -174,7 +186,7 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
             try:
                 repo_result = state.shesha.create_project_from_repo(source_url, name=project_id)
             except RepoIngestError as exc:
-                raise HTTPException(422, detail=str(exc)) from exc
+                raise HTTPException(422, detail=_sanitize_ingest_error(exc)) from exc
 
             if repo_result.status != "updates_available":
                 raise HTTPException(409, f"No updates available for project '{project_id}'")
@@ -182,7 +194,7 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
         try:
             updated = repo_result.apply_updates()
         except RepoIngestError as exc:
-            raise HTTPException(422, detail=str(exc)) from exc
+            raise HTTPException(422, detail=_sanitize_ingest_error(exc)) from exc
 
         return UpdateStatus(
             status=updated.status,

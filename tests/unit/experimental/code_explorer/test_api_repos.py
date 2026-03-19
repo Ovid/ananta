@@ -261,6 +261,25 @@ class TestAddRepo:
         data = resp.json()
         assert "detail" in data
 
+    def test_add_repo_error_does_not_leak_internal_paths(
+        self, client: TestClient, mock_shesha: MagicMock
+    ) -> None:
+        """RepoIngestError with git stderr must not leak internal filesystem paths."""
+        # Simulate git stderr that includes internal paths
+        stderr_msg = (
+            "fatal: could not create work tree dir "
+            "'/var/lib/shesha/repos/myrepo': Permission denied"
+        )
+        mock_shesha.create_project_from_repo.side_effect = RepoIngestError(
+            "https://github.com/owner/myrepo",
+            RuntimeError(stderr_msg),
+        )
+
+        resp = client.post("/api/repos", json={"url": "https://github.com/owner/myrepo"})
+        assert resp.status_code == 422
+        detail = resp.json()["detail"]
+        assert "/var/lib/shesha/repos" not in detail
+
 
 # ---- GET /api/repos/{id} ----
 

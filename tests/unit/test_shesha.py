@@ -102,6 +102,18 @@ class TestDockerAvailability:
             assert "DOCKER_HOST" in error_msg
             assert "Podman" in error_msg or "podman" in error_msg
 
+    def test_init_registers_atexit_cleanup(self, tmp_path: Path):
+        """__init__ registers an atexit handler that calls stop()."""
+        with patch("shesha.shesha.atexit") as mock_atexit:
+            shesha = Shesha(model="test-model", storage_path=tmp_path)
+            mock_atexit.register.assert_called_once()
+
+            # The registered function should call stop() on the instance
+            cleanup_fn = mock_atexit.register.call_args[0][0]
+            with patch.object(shesha, "stop") as mock_stop:
+                cleanup_fn()
+                mock_stop.assert_called_once()
+
     def test_stop_without_start_is_safe(self, tmp_path: Path):
         """stop() works safely even if start() was never called (no pool)."""
         shesha = Shesha(model="test-model", storage_path=tmp_path)

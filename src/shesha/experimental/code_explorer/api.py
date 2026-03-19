@@ -155,8 +155,11 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
         if not source_url:
             raise HTTPException(400, f"Project '{project_id}' has no source URL")
 
+        saved_path = state.shesha.repo_ingester.get_saved_path(project_id)
         try:
-            repo_result = state.shesha.create_project_from_repo(source_url, name=project_id)
+            repo_result = state.shesha.create_project_from_repo(
+                source_url, name=project_id, path=saved_path
+            )
         except RepoIngestError as exc:
             raise HTTPException(422, detail=_sanitize_ingest_error(exc)) from exc
 
@@ -191,8 +194,11 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
             if not source_url:
                 raise HTTPException(400, f"Project '{project_id}' has no source URL")
 
+            saved_path = state.shesha.repo_ingester.get_saved_path(project_id)
             try:
-                repo_result = state.shesha.create_project_from_repo(source_url, name=project_id)
+                repo_result = state.shesha.create_project_from_repo(
+                    source_url, name=project_id, path=saved_path
+                )
             except RepoIngestError as exc:
                 raise HTTPException(422, detail=_sanitize_ingest_error(exc)) from exc
 

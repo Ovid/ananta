@@ -636,6 +636,7 @@ class TestApplyUpdates:
             is_local=False,
             source_exists=True,
         )
+        mock_shesha.repo_ingester.get_saved_path.return_value = None
         project = MagicMock()
         project.project_id = "custom-name"
         mock_shesha.create_project_from_repo.return_value = RepoProjectResult(
@@ -647,7 +648,34 @@ class TestApplyUpdates:
         client.post("/api/repos/custom-name/check-updates")
 
         mock_shesha.create_project_from_repo.assert_called_once_with(
-            "https://github.com/owner/myrepo", name="custom-name"
+            "https://github.com/owner/myrepo", name="custom-name", path=None
+        )
+
+    def test_check_updates_passes_saved_subdirectory_path(
+        self, client: TestClient, mock_shesha: MagicMock
+    ) -> None:
+        """check-updates preserves subdirectory scope from saved path."""
+        mock_shesha.get_project_info.return_value = ProjectInfo(
+            project_id="scoped-repo",
+            source_url="https://github.com/owner/monorepo",
+            is_local=False,
+            source_exists=True,
+        )
+        mock_shesha.repo_ingester.get_saved_path.return_value = "packages/core"
+        project = MagicMock()
+        project.project_id = "scoped-repo"
+        mock_shesha.create_project_from_repo.return_value = RepoProjectResult(
+            project=project,
+            status="unchanged",
+            files_ingested=3,
+        )
+
+        client.post("/api/repos/scoped-repo/check-updates")
+
+        mock_shesha.create_project_from_repo.assert_called_once_with(
+            "https://github.com/owner/monorepo",
+            name="scoped-repo",
+            path="packages/core",
         )
 
     def test_apply_updates_self_heal_passes_project_id_as_name(
@@ -660,6 +688,7 @@ class TestApplyUpdates:
             is_local=False,
             source_exists=True,
         )
+        mock_shesha.repo_ingester.get_saved_path.return_value = None
         project = MagicMock()
         project.project_id = "custom-name"
         check_result = RepoProjectResult(
@@ -677,5 +706,38 @@ class TestApplyUpdates:
         client.post("/api/repos/custom-name/apply-updates")
 
         mock_shesha.create_project_from_repo.assert_called_once_with(
-            "https://github.com/owner/myrepo", name="custom-name"
+            "https://github.com/owner/myrepo", name="custom-name", path=None
+        )
+
+    def test_apply_updates_self_heal_passes_saved_subdirectory_path(
+        self, client: TestClient, mock_shesha: MagicMock
+    ) -> None:
+        """apply-updates self-heal preserves subdirectory scope from saved path."""
+        mock_shesha.get_project_info.return_value = ProjectInfo(
+            project_id="scoped-repo",
+            source_url="https://github.com/owner/monorepo",
+            is_local=False,
+            source_exists=True,
+        )
+        mock_shesha.repo_ingester.get_saved_path.return_value = "packages/core"
+        project = MagicMock()
+        project.project_id = "scoped-repo"
+        check_result = RepoProjectResult(
+            project=project,
+            status="updates_available",
+            files_ingested=10,
+            _apply_updates_fn=lambda: RepoProjectResult(
+                project=project,
+                status="created",
+                files_ingested=20,
+            ),
+        )
+        mock_shesha.create_project_from_repo.return_value = check_result
+
+        client.post("/api/repos/scoped-repo/apply-updates")
+
+        mock_shesha.create_project_from_repo.assert_called_once_with(
+            "https://github.com/owner/monorepo",
+            name="scoped-repo",
+            path="packages/core",
         )

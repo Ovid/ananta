@@ -34,8 +34,8 @@ from shesha.rlm.verification import (
     build_verification_code,
     parse_verification_output,
 )
-from shesha.sandbox.base import SandboxExecutor
-from shesha.sandbox.executor import ContainerExecutor, ExecutionResult, SubcallContentError
+from shesha.sandbox.base import ExecutionResult, SandboxExecutor
+from shesha.sandbox.executor import ContainerExecutor, SubcallContentError
 from shesha.sandbox.pool import ContainerPool
 from shesha.storage.base import StorageBackend
 

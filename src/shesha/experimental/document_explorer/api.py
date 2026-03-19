@@ -169,11 +169,14 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
 
                 project_id = _make_project_id(file.filename)
 
-                # Save original file
-                upload_dir = state.uploads_dir / project_id
-                upload_dir.mkdir(parents=True, exist_ok=True)
-                created_upload_dirs.append(upload_dir)
-                content = await file.read()
+                # Validate extension before reading body — only needs filename,
+                # avoids allocating memory for files we'll reject anyway.
+                ext = Path(file.filename).suffix.lower()
+                if not is_supported_extension(file.filename):
+                    raise HTTPException(422, f"Unsupported file type: {ext}")
+
+                # Cap read to avoid memory exhaustion from oversized uploads.
+                content = await file.read(MAX_UPLOAD_BYTES + 1)
                 if len(content) > MAX_UPLOAD_BYTES:
                     raise HTTPException(
                         413,
@@ -181,9 +184,10 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                         f"{MAX_UPLOAD_BYTES // (1024 * 1024)} MB upload limit",
                     )
 
-                ext = Path(file.filename).suffix
-                if not is_supported_extension(file.filename):
-                    raise HTTPException(422, f"Unsupported file type: {ext}")
+                # Save original file
+                upload_dir = state.uploads_dir / project_id
+                upload_dir.mkdir(parents=True, exist_ok=True)
+                created_upload_dirs.append(upload_dir)
 
                 original_path = upload_dir / f"original{ext}"
                 original_path.write_bytes(content)

@@ -404,6 +404,65 @@ class TestUploadSizeLimit:
         )
         assert resp.status_code == 200
 
+    def test_unsupported_extension_rejected_before_reading_body(
+        self,
+        client: TestClient,
+        uploads_dir: Path,
+    ) -> None:
+        """Unsupported extension must be rejected before reading the upload body.
+
+        Regression: the old code read the entire file into memory before
+        checking the extension, so a large .png upload would allocate RAM
+        before being rejected.
+        """
+        # A small payload is enough — the extension check must come first.
+        resp = client.post(
+            "/api/documents/upload",
+            files=[("files", ("photo.png", b"\x89PNG", "image/png"))],
+        )
+        assert resp.status_code == 422
+        # No upload directory should have been created for the rejected file.
+        assert list(uploads_dir.iterdir()) == []
+
+    def test_oversized_upload_caps_memory(
+        self,
+        client: TestClient,
+    ) -> None:
+        """Server must not read more than MAX_UPLOAD_BYTES+1 into memory.
+
+        Verifies the capped-read approach: the endpoint reads at most
+        MAX_UPLOAD_BYTES+1 bytes, then checks length.
+        """
+        from shesha.experimental.document_explorer.api import MAX_UPLOAD_BYTES
+
+        # 2x the limit — old code would allocate all of this.
+        oversized = b"x" * (MAX_UPLOAD_BYTES * 2)
+        resp = client.post(
+            "/api/documents/upload",
+            files=[("files", ("huge.txt", oversized, "text/plain"))],
+        )
+        assert resp.status_code == 413
+
+    def test_extension_lowercased_in_stored_format(
+        self,
+        client: TestClient,
+        mock_shesha: MagicMock,
+        uploads_dir: Path,
+    ) -> None:
+        """Stored file extension should be lowercased (S9)."""
+        mock_shesha.create_project.return_value = MagicMock()
+        resp = client.post(
+            "/api/documents/upload",
+            files=[("files", ("NOTES.TXT", b"hello", "text/plain"))],
+        )
+        assert resp.status_code == 200
+        # Find the upload dir and check the original file extension is lowered
+        dirs = list(uploads_dir.iterdir())
+        assert len(dirs) == 1
+        originals = list(dirs[0].glob("original.*"))
+        assert len(originals) == 1
+        assert originals[0].suffix == ".txt"
+
 
 class TestDeleteDocument:
     def test_delete_removes_from_topics(

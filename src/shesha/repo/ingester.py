@@ -450,7 +450,7 @@ class RepoIngester:
             if is_local:
                 repo_path = Path(url).expanduser()
             else:
-                repo_path = self.repos_dir / name
+                repo_path = self._repo_path(name)
 
             files = self.list_files_from_path(repo_path, subdir=path)
             files_ingested = 0

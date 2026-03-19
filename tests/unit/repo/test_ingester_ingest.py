@@ -446,3 +446,40 @@ class TestIngestSavesMetadata:
             )
 
         assert ingester.get_source_url("test-project") == "https://github.com/org/test-project"
+
+
+class TestIngestRepoPathConsistency:
+    """ingest() must use _repo_path() (safe_path) for remote repo path construction."""
+
+    def test_ingest_remote_calls_repo_path_for_path_construction(
+        self, ingester: RepoIngester, storage: FilesystemStorage, parser_registry: MagicMock
+    ):
+        """Remote URL must use _repo_path() to construct repo_path, not raw join.
+
+        We distinguish the two by making _repo_path return a sentinel path and
+        checking list_files_from_path receives that sentinel instead of the
+        raw repos_dir / name path.
+        """
+        name = "test-project"
+        sentinel_path = ingester.repos_dir / "_sentinel_safe"
+        sentinel_path.mkdir(parents=True)
+
+        parser_registry.find_parser.return_value = None
+        ingester.list_files_from_path = MagicMock(return_value=[])
+
+        with patch.object(ingester, "_repo_path", return_value=sentinel_path):
+            ingester.ingest(
+                storage=storage,
+                parser_registry=parser_registry,
+                url="https://github.com/org/test-project",
+                name=name,
+                path=None,
+                is_update=False,
+            )
+
+        call_args = ingester.list_files_from_path.call_args
+        actual_path = call_args[0][0]
+        assert actual_path == sentinel_path, (
+            f"Expected _repo_path sentinel {sentinel_path}, got {actual_path} "
+            f"(raw repos_dir / name = {ingester.repos_dir / name})"
+        )

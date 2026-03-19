@@ -547,7 +547,9 @@ class TestApplyUpdates:
         project = MagicMock()
         project.project_id = "custom-name"
         mock_shesha.create_project_from_repo.return_value = RepoProjectResult(
-            project=project, status="unchanged", files_ingested=5,
+            project=project,
+            status="unchanged",
+            files_ingested=5,
         )
 
         client.post("/api/repos/custom-name/check-updates")
@@ -573,7 +575,9 @@ class TestApplyUpdates:
             status="updates_available",
             files_ingested=10,
             _apply_updates_fn=lambda: RepoProjectResult(
-                project=project, status="created", files_ingested=20,
+                project=project,
+                status="created",
+                files_ingested=20,
             ),
         )
         mock_shesha.create_project_from_repo.return_value = check_result

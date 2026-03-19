@@ -185,7 +185,15 @@ class RepoIngester:
         repo_path = self._repo_path(project_id)
         repo_path.mkdir(parents=True, exist_ok=True)
         meta_path = repo_path / "_repo_meta.json"
-        meta_path.write_text(json.dumps({"head_sha": sha}))
+
+        # Load existing metadata or start fresh
+        if meta_path.exists():
+            data = json.loads(meta_path.read_text())
+        else:
+            data = {}
+
+        data["head_sha"] = sha
+        meta_path.write_text(json.dumps(data))
 
     def save_source_url(self, project_id: str, url: str) -> None:
         """Save the source URL for a project."""

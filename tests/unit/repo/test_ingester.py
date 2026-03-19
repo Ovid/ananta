@@ -261,6 +261,18 @@ class TestSHATracking:
         data = json.loads(meta_path.read_text())
         assert data["head_sha"] == "abc123def456"
 
+    def test_save_sha_preserves_existing_metadata(
+        self, ingester: RepoIngester, tmp_path: Path
+    ):
+        """save_sha() preserves existing keys like source_url."""
+        ingester.save_source_url("my-project", "https://example.com/repo")
+        ingester.save_sha("my-project", "abc123def456")
+
+        meta_path = tmp_path / "repos" / "my-project" / "_repo_meta.json"
+        data = json.loads(meta_path.read_text())
+        assert data["head_sha"] == "abc123def456"
+        assert data["source_url"] == "https://example.com/repo"
+
     def test_get_saved_sha(self, ingester: RepoIngester, tmp_path: Path):
         """get_saved_sha() returns stored SHA."""
         (tmp_path / "repos" / "my-project").mkdir(parents=True)

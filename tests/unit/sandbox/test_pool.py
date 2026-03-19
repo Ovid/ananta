@@ -135,9 +135,7 @@ class TestContainerPool:
         assert overflow_result[0] is overflow_executor
 
     @patch("shesha.sandbox.pool.ContainerExecutor")
-    def test_overflow_container_created_on_pool_exhaustion(
-        self, mock_executor_cls: MagicMock
-    ):
+    def test_overflow_container_created_on_pool_exhaustion(self, mock_executor_cls: MagicMock):
         """When pool is exhausted, acquire() creates an overflow container."""
         mock_executor = MagicMock()
         mock_executor_cls.return_value = mock_executor

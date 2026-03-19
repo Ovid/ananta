@@ -153,8 +153,9 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
 
     @router.post("/repos/{project_id}/apply-updates")
     def apply_updates(project_id: str) -> UpdateStatus:
-        if project_id in pending_updates:
-            repo_result = pending_updates.pop(project_id)
+        repo_result = pending_updates.pop(project_id, None)
+        if repo_result is not None:
+            pass  # Use cached result from check-updates
         else:
             # Self-heal: re-derive update state when cache is empty
             # (e.g., after server restart between check and apply).
@@ -167,7 +168,10 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
             if not source_url:
                 raise HTTPException(400, f"Project '{project_id}' has no source URL")
 
-            repo_result = state.shesha.create_project_from_repo(source_url, name=project_id)
+            try:
+                repo_result = state.shesha.create_project_from_repo(source_url, name=project_id)
+            except RepoIngestError as exc:
+                raise HTTPException(422, detail=str(exc)) from exc
 
             if repo_result.status != "updates_available":
                 raise HTTPException(409, f"No updates available for project '{project_id}'")

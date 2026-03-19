@@ -534,6 +534,25 @@ class TestApplyUpdates:
         resp = client.post("/api/repos/owner-myrepo/apply-updates")
         assert resp.status_code == 409
 
+    def test_apply_updates_self_heal_clone_error_returns_422(
+        self, client: TestClient, mock_shesha: MagicMock
+    ) -> None:
+        """apply-updates self-heal returns 422 when clone fails."""
+        mock_shesha.get_project_info.return_value = ProjectInfo(
+            project_id="owner-myrepo",
+            source_url="https://github.com/owner/myrepo",
+            is_local=False,
+            source_exists=True,
+        )
+        mock_shesha.create_project_from_repo.side_effect = RepoIngestError(
+            "https://github.com/owner/myrepo",
+            RuntimeError("network timeout"),
+        )
+
+        resp = client.post("/api/repos/owner-myrepo/apply-updates")
+        assert resp.status_code == 422
+        assert "detail" in resp.json()
+
     def test_check_updates_passes_project_id_as_name(
         self, client: TestClient, mock_shesha: MagicMock
     ) -> None:

@@ -51,6 +51,16 @@ class TestParseArgs:
         args = parse_args(["--model", "gpt-4o"])
         assert args.model == "gpt-4o"
 
+    def test_default_bind_is_localhost(self) -> None:
+        """Default bind address is 127.0.0.1."""
+        args = parse_args([])
+        assert args.bind == "127.0.0.1"
+
+    def test_custom_bind(self) -> None:
+        """--bind overrides the default."""
+        args = parse_args(["--bind", "0.0.0.0"])
+        assert args.bind == "0.0.0.0"
+
 
 class TestMain:
     """Tests for main() startup logic."""
@@ -137,7 +147,7 @@ class TestMain:
 
         main()
 
-        mock_uvicorn.run.assert_called_once_with(sentinel_app, host="0.0.0.0", port=9999)
+        mock_uvicorn.run.assert_called_once_with(sentinel_app, host="127.0.0.1", port=9999)
 
     @patch("shesha.experimental.code_explorer.__main__.parse_args")
     @patch("shesha.experimental.code_explorer.__main__.uvicorn")

@@ -335,6 +335,43 @@ class TestUploadAtomicity:
         # All upload dirs should be cleaned up
         assert list(uploads_dir.iterdir()) == []
 
+    def test_batch_upload_rollback_removes_topic_associations(
+        self,
+        state: DocumentExplorerState,
+        mock_shesha: MagicMock,
+        topic_mgr: DocumentTopicManager,
+        uploads_dir: Path,
+    ) -> None:
+        """Batch upload rollback removes topic associations for cleaned-up projects."""
+        topic_mgr.create("MyTopic")
+        call_count = [0]
+        created_pids: list[str] = []
+
+        def store_side_effect(project_id, doc, **kwargs):
+            call_count[0] += 1
+            created_pids.append(project_id)
+            if call_count[0] == 2:
+                raise RuntimeError("disk full on second file")
+
+        mock_shesha.create_project.return_value = MagicMock()
+        mock_shesha.storage.store_document.side_effect = store_side_effect
+        app = create_api(state)
+        client = TestClient(app, raise_server_exceptions=False)
+
+        resp = client.post(
+            "/api/documents/upload",
+            data={"topic": "MyTopic"},
+            files=[
+                ("files", ("first.txt", b"Hello", "text/plain")),
+                ("files", ("second.txt", b"World", "text/plain")),
+            ],
+        )
+        assert resp.status_code == 500
+        # Topic associations should be cleaned up — no orphaned references
+        for pid in created_pids:
+            items = topic_mgr.list_items("MyTopic")
+            assert pid not in items, f"Orphaned topic entry for {pid}"
+
 
 class TestDeleteDocument:
     def test_delete_removes_from_topics(

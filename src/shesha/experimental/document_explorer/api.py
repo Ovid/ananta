@@ -216,6 +216,10 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
             # Roll back all projects and upload dirs created so far
             for pid in created_projects:
                 try:
+                    state.topic_mgr.remove_item_from_all(pid)
+                except Exception:
+                    pass  # Best-effort cleanup — original error takes priority
+                try:
                     state.shesha.delete_project(pid)
                 except Exception:
                     pass  # Best-effort cleanup — original error takes priority

@@ -118,6 +118,21 @@ class Shesha:
         """The storage backend used by this instance."""
         return self._storage
 
+    @property
+    def rlm_engine(self) -> RLMEngine:
+        """The RLM engine used by this instance."""
+        return self._rlm_engine
+
+    @property
+    def parser_registry(self) -> ParserRegistry:
+        """The parser registry used by this instance."""
+        return self._parser_registry
+
+    @property
+    def repo_ingester(self) -> RepoIngester:
+        """The repo ingester used by this instance."""
+        return self._repo_ingester
+
     @staticmethod
     def _check_docker_available() -> None:
         """Verify Docker daemon is running. Raises RuntimeError if not."""

@@ -126,7 +126,7 @@ class TestDockerAvailability:
             shesha = Shesha(model="test-model", storage_path=tmp_path)
             shesha.start()
 
-            with patch.object(shesha._rlm_engine, "set_pool") as mock_set:
+            with patch.object(shesha.rlm_engine, "set_pool") as mock_set:
                 shesha.stop()
                 mock_set.assert_called_once_with(None)
 
@@ -162,7 +162,7 @@ class TestDockerAvailability:
         ):
             shesha = Shesha(model="test-model", storage_path=tmp_path)
 
-            with patch.object(shesha._rlm_engine, "set_pool") as mock_set:
+            with patch.object(shesha.rlm_engine, "set_pool") as mock_set:
                 shesha.start()
                 mock_set.assert_called_once_with(mock_pool)
 
@@ -180,13 +180,13 @@ class TestDockerAvailability:
             patch("shesha.shesha.ContainerPool", return_value=mock_pool),
         ):
             shesha = Shesha(model="test-model", storage_path=tmp_path)
-            original_set_pool = shesha._rlm_engine.set_pool
+            original_set_pool = shesha.rlm_engine.set_pool
 
             def tracked_set_pool(pool):
                 call_order.append("set_pool")
                 original_set_pool(pool)
 
-            with patch.object(shesha._rlm_engine, "set_pool", side_effect=tracked_set_pool):
+            with patch.object(shesha.rlm_engine, "set_pool", side_effect=tracked_set_pool):
                 shesha.start()
 
         assert call_order == ["pool.start", "set_pool"]
@@ -206,13 +206,13 @@ class TestDockerAvailability:
         ):
             shesha = Shesha(model="test-model", storage_path=tmp_path)
             shesha.start()
-            original_set_pool = shesha._rlm_engine.set_pool
+            original_set_pool = shesha.rlm_engine.set_pool
 
             def tracked_set_pool(pool):
                 call_order.append(f"set_pool({pool})")
                 original_set_pool(pool)
 
-            with patch.object(shesha._rlm_engine, "set_pool", side_effect=tracked_set_pool):
+            with patch.object(shesha.rlm_engine, "set_pool", side_effect=tracked_set_pool):
                 shesha.stop()
 
         assert call_order == ["set_pool(None)", "pool.stop"]
@@ -265,7 +265,7 @@ class TestShesha:
         shesha.register_parser(mock_parser)
 
         # The parser should now be in the registry
-        assert mock_parser in shesha._parser_registry._parsers
+        assert mock_parser in shesha.parser_registry._parsers
 
     def test_stop_after_restart_stops_pool(self, tmp_path: Path):
         """Stop after start-stop-start cycle should stop the pool."""
@@ -302,7 +302,7 @@ class TestShesha:
         ):
             shesha = Shesha(model="test-model", storage_path=tmp_path)
 
-            with patch.object(shesha._rlm_engine, "set_pool") as mock_set:
+            with patch.object(shesha.rlm_engine, "set_pool") as mock_set:
                 shesha.start()
                 mock_set.assert_called_once_with(mock_pool)
 
@@ -326,7 +326,7 @@ class TestShesha:
                 mock_ingester.is_local_path.return_value = False
 
                 shesha = Shesha(model="test-model", storage_path=tmp_path)
-                shesha._storage.create_project("to-delete")
+                shesha.storage.create_project("to-delete")
 
                 shesha.delete_project("to-delete")
 
@@ -343,7 +343,7 @@ class TestShesha:
                 mock_ingester.is_local_path.return_value = True
 
                 shesha = Shesha(model="test-model", storage_path=tmp_path)
-                shesha._storage.create_project("local-project")
+                shesha.storage.create_project("local-project")
 
                 shesha.delete_project("local-project")
 
@@ -360,7 +360,7 @@ class TestShesha:
                 mock_ingester.is_local_path.return_value = False
 
                 shesha = Shesha(model="test-model", storage_path=tmp_path)
-                shesha._storage.create_project("to-delete")
+                shesha.storage.create_project("to-delete")
 
                 shesha.delete_project("to-delete", cleanup_repo=False)
 
@@ -385,7 +385,7 @@ class TestCreateProjectFromRepo:
 
                 # ingest() creates the project and returns result
                 def fake_ingest(**kwargs):
-                    shesha._storage.create_project("my-project")
+                    shesha.storage.create_project("my-project")
                     return IngestResult(files_ingested=1)
 
                 mock_ingester.ingest.side_effect = fake_ingest
@@ -411,7 +411,7 @@ class TestCreateProjectFromRepo:
                 mock_ingester.get_remote_sha.return_value = "abc123"
 
                 shesha = Shesha(model="test-model", storage_path=tmp_path)
-                shesha._storage.create_project("my-project")
+                shesha.storage.create_project("my-project")
 
                 result = shesha.create_project_from_repo(
                     url="https://github.com/org/repo",
@@ -432,7 +432,7 @@ class TestCreateProjectFromRepo:
                 mock_ingester.get_remote_sha.return_value = None
 
                 shesha = Shesha(model="test-model", storage_path=tmp_path)
-                shesha._storage.create_project("my-project")
+                shesha.storage.create_project("my-project")
 
                 result = shesha.create_project_from_repo(
                     url="https://github.com/org/repo",
@@ -457,7 +457,7 @@ class TestCreateProjectFromRepo:
                 mock_ingester.get_remote_sha.return_value = None
 
                 shesha = Shesha(model="test-model", storage_path=tmp_path)
-                shesha._storage.create_project("my-project")
+                shesha.storage.create_project("my-project")
 
                 with caplog.at_level(logging.WARNING, logger="shesha.shesha"):
                     result = shesha.create_project_from_repo(
@@ -480,7 +480,7 @@ class TestCreateProjectFromRepo:
                 mock_ingester.get_remote_sha.return_value = "def456"
 
                 shesha = Shesha(model="test-model", storage_path=tmp_path)
-                shesha._storage.create_project("my-project")
+                shesha.storage.create_project("my-project")
 
                 result = shesha.create_project_from_repo(
                     url="https://github.com/org/repo",
@@ -504,7 +504,7 @@ class TestCreateProjectFromRepo:
                 mock_ingester.repos_dir = tmp_path / "repos"
 
                 shesha = Shesha(model="test-model", storage_path=tmp_path)
-                shesha._storage.create_project("local-project")
+                shesha.storage.create_project("local-project")
 
                 result = shesha.create_project_from_repo(
                     url="/path/to/local/repo",
@@ -534,7 +534,7 @@ class TestCreateProjectFromRepo:
                 shesha = Shesha(model="test-model", storage_path=tmp_path)
 
                 def fake_ingest(**kwargs):
-                    shesha._storage.create_project("my-project")
+                    shesha.storage.create_project("my-project")
                     return IngestResult(files_ingested=0)
 
                 mock_ingester.ingest.side_effect = fake_ingest
@@ -564,7 +564,7 @@ class TestCreateProjectFromRepo:
                 shesha = Shesha(model="test-model", storage_path=tmp_path)
 
                 def fake_ingest(**kwargs):
-                    shesha._storage.create_project("my-project")
+                    shesha.storage.create_project("my-project")
                     return IngestResult(files_ingested=0)
 
                 mock_ingester.ingest.side_effect = fake_ingest
@@ -639,7 +639,7 @@ class TestAtomicIngestion:
                 mock_ingester.repos_dir = tmp_path / "repos"
 
                 shesha = Shesha(model="test-model", storage_path=tmp_path)
-                shesha._storage.create_project("update-project")
+                shesha.storage.create_project("update-project")
 
                 result = shesha.create_project_from_repo(
                     url="/path/to/local/repo",
@@ -668,7 +668,7 @@ class TestAtomicIngestion:
                 mock_ingester.repos_dir = tmp_path / "repos"
 
                 shesha = Shesha(model="test-model", storage_path=tmp_path)
-                shesha._storage.create_project("orphan-project")
+                shesha.storage.create_project("orphan-project")
 
                 result = shesha.create_project_from_repo(
                     url="/path/to/local/repo",
@@ -702,10 +702,10 @@ class TestAtomicIngestion:
                 mock_ingester.repos_dir = tmp_path / "repos"
 
                 shesha = Shesha(model="test-model", storage_path=tmp_path)
-                shesha._storage.create_project("my-project")
+                shesha.storage.create_project("my-project")
 
                 # Create a user project whose name matches the old staging pattern
-                shesha._storage.create_project("_staging_my-project")
+                shesha.storage.create_project("_staging_my-project")
 
                 from shesha.models import ParsedDocument
 
@@ -717,7 +717,7 @@ class TestAtomicIngestion:
                     char_count=8,
                     parse_warnings=[],
                 )
-                shesha._storage.store_document("my-project", original_doc)
+                shesha.storage.store_document("my-project", original_doc)
 
                 result = shesha.create_project_from_repo(
                     url="/path/to/local/repo",
@@ -726,7 +726,7 @@ class TestAtomicIngestion:
 
                 assert result.status == "updates_available"
 
-                with patch.object(shesha._parser_registry, "find_parser") as mock_find:
+                with patch.object(shesha.parser_registry, "find_parser") as mock_find:
                     mock_parser = MagicMock()
                     mock_parser.parse.return_value = MagicMock(
                         name="file.py",
@@ -741,7 +741,7 @@ class TestAtomicIngestion:
                     result.apply_updates()
 
                 # The user's unrelated project must still exist
-                assert shesha._storage.project_exists("_staging_my-project")
+                assert shesha.storage.project_exists("_staging_my-project")
 
     def test_update_passes_custom_storage_to_ingest(self, tmp_path: Path):
         """Updates pass the custom storage backend to ingest()."""
@@ -801,7 +801,7 @@ class TestAtomicIngestion:
                 mock_ingester.repos_dir = tmp_path / "repos"
 
                 shesha = Shesha(model="test-model", storage_path=tmp_path)
-                shesha._storage.create_project("flag-project")
+                shesha.storage.create_project("flag-project")
 
                 result = shesha.create_project_from_repo(
                     url="/path/to/local/repo",
@@ -835,7 +835,7 @@ class TestIngestRepoErrorHandling:
                 shesha = Shesha(model="test-model", storage_path=tmp_path)
 
                 def fake_ingest(**kwargs):
-                    shesha._storage.create_project("parse-err-project")
+                    shesha.storage.create_project("parse-err-project")
                     return IngestResult(
                         files_ingested=0,
                         files_skipped=1,
@@ -916,7 +916,7 @@ class TestCheckRepoForUpdates:
                 mock_ingester.resolve_token.return_value = None
 
                 shesha = Shesha(model="test-model", storage_path=tmp_path)
-                shesha._storage.create_project("my-project")
+                shesha.storage.create_project("my-project")
 
                 result = shesha.check_repo_for_updates("my-project")
 
@@ -938,7 +938,7 @@ class TestCheckRepoForUpdates:
                 mock_ingester.resolve_token.return_value = None
 
                 shesha = Shesha(model="test-model", storage_path=tmp_path)
-                shesha._storage.create_project("my-project")
+                shesha.storage.create_project("my-project")
 
                 result = shesha.check_repo_for_updates("my-project")
 
@@ -965,7 +965,7 @@ class TestCheckRepoForUpdates:
                 mock_ingester.get_source_url.return_value = None
 
                 shesha = Shesha(model="test-model", storage_path=tmp_path)
-                shesha._storage.create_project("my-project")
+                shesha.storage.create_project("my-project")
 
                 with pytest.raises(RepoError) as exc_info:
                     shesha.check_repo_for_updates("my-project")
@@ -988,7 +988,7 @@ class TestCheckRepoForUpdates:
                 mock_ingester.resolve_token.return_value = None
 
                 shesha = Shesha(model="test-model", storage_path=tmp_path)
-                shesha._storage.create_project("my-project")
+                shesha.storage.create_project("my-project")
 
                 result = shesha.check_repo_for_updates("my-project")
 
@@ -1012,7 +1012,7 @@ class TestGetProjectInfo:
                 mock_ingester.is_local_path.return_value = False
 
                 shesha = Shesha(model="test-model", storage_path=tmp_path)
-                shesha._storage.create_project("my-project")
+                shesha.storage.create_project("my-project")
 
                 info = shesha.get_project_info("my-project")
 
@@ -1035,7 +1035,7 @@ class TestGetProjectInfo:
                 mock_ingester.is_local_path.return_value = True
 
                 shesha = Shesha(model="test-model", storage_path=tmp_path)
-                shesha._storage.create_project("local-project")
+                shesha.storage.create_project("local-project")
 
                 info = shesha.get_project_info("local-project")
 
@@ -1053,7 +1053,7 @@ class TestGetProjectInfo:
                 mock_ingester.is_local_path.return_value = True
 
                 shesha = Shesha(model="test-model", storage_path=tmp_path)
-                shesha._storage.create_project("missing-project")
+                shesha.storage.create_project("missing-project")
 
                 info = shesha.get_project_info("missing-project")
 
@@ -1194,8 +1194,8 @@ class TestGetProjectInfoWithAnalysis:
         from shesha.models import RepoAnalysis
 
         shesha_instance.create_project("info-current")
-        shesha_instance._repo_ingester.save_sha("info-current", "sha123")
-        shesha_instance._repo_ingester.save_source_url("info-current", "/fake")
+        shesha_instance.repo_ingester.save_sha("info-current", "sha123")
+        shesha_instance.repo_ingester.save_source_url("info-current", "/fake")
 
         analysis = RepoAnalysis(
             version="1",
@@ -1216,8 +1216,8 @@ class TestGetProjectInfoWithAnalysis:
         from shesha.models import RepoAnalysis
 
         shesha_instance.create_project("info-stale")
-        shesha_instance._repo_ingester.save_sha("info-stale", "new_sha")
-        shesha_instance._repo_ingester.save_source_url("info-stale", "/fake")
+        shesha_instance.repo_ingester.save_sha("info-stale", "new_sha")
+        shesha_instance.repo_ingester.save_source_url("info-stale", "/fake")
 
         analysis = RepoAnalysis(
             version="1",
@@ -1257,8 +1257,8 @@ class TestAnalysisStatus:
             external_dependencies=[],
         )
         shesha_instance._storage.store_analysis("current-analysis", analysis)
-        shesha_instance._repo_ingester.save_sha("current-analysis", "abc123")
-        shesha_instance._repo_ingester.save_source_url("current-analysis", "/fake/path")
+        shesha_instance.repo_ingester.save_sha("current-analysis", "abc123")
+        shesha_instance.repo_ingester.save_source_url("current-analysis", "/fake/path")
 
         status = shesha_instance.get_analysis_status("current-analysis")
         assert status == "current"
@@ -1277,8 +1277,8 @@ class TestAnalysisStatus:
             external_dependencies=[],
         )
         shesha_instance._storage.store_analysis("stale-analysis", analysis)
-        shesha_instance._repo_ingester.save_sha("stale-analysis", "new_sha_456")
-        shesha_instance._repo_ingester.save_source_url("stale-analysis", "/fake/path")
+        shesha_instance.repo_ingester.save_sha("stale-analysis", "new_sha_456")
+        shesha_instance.repo_ingester.save_source_url("stale-analysis", "/fake/path")
 
         status = shesha_instance.get_analysis_status("stale-analysis")
         assert status == "stale"
@@ -1342,7 +1342,7 @@ class TestGenerateAnalysis:
 
         # Create a project
         shesha_instance.create_project("gen-analysis")
-        shesha_instance._repo_ingester.save_sha("gen-analysis", "sha123")
+        shesha_instance.repo_ingester.save_sha("gen-analysis", "sha123")
 
         # Mock the generator
         mock_analysis = RepoAnalysis(

@@ -44,7 +44,7 @@ def test_query_exits_when_cancel_event_set():
 
     mock_pool = MagicMock()
     mock_pool.acquire.return_value = mock_executor
-    engine._pool = mock_pool
+    engine.set_pool(mock_pool)
 
     result = engine.query(
         documents=["test doc"],
@@ -71,7 +71,7 @@ def test_query_returns_interrupted_status_in_trace():
     mock_executor.is_alive = True
     mock_pool = MagicMock()
     mock_pool.acquire.return_value = mock_executor
-    engine._pool = mock_pool
+    engine.set_pool(mock_pool)
 
     result = engine.query(
         documents=["test doc"],

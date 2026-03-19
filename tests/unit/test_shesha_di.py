@@ -21,9 +21,7 @@ def _make_mock_storage() -> MagicMock:
 
 def _make_mock_engine() -> MagicMock:
     """Create a mock RLMEngine."""
-    mock = create_autospec(RLMEngine, instance=True)
-    mock._pool = None
-    return mock
+    return create_autospec(RLMEngine, instance=True)
 
 
 def _make_mock_registry() -> ParserRegistry:
@@ -210,12 +208,12 @@ class TestVerifyCitationsWiring:
             model="test-model", verify_citations=False, storage_path=str(tmp_path)
         )
         shesha = Shesha(config=config)
-        assert shesha._rlm_engine.verify_citations is False
+        assert shesha.rlm_engine.verify_citations is False
 
     def test_verify_citations_default_true(self, tmp_path: Path):
         """Shesha passes verify_citations=True (default) to engine."""
         shesha = Shesha(model="test-model", storage_path=tmp_path)
-        assert shesha._rlm_engine.verify_citations is True
+        assert shesha.rlm_engine.verify_citations is True
 
 
 class TestVerifyWiring:
@@ -227,7 +225,7 @@ class TestVerifyWiring:
 
         config = SheshaConfig(model="test-model", verify=True)
         shesha = Shesha(config=config, storage=_make_mock_storage())
-        assert shesha._rlm_engine.verify is True
+        assert shesha.rlm_engine.verify is True
 
     def test_verify_default_false(self, tmp_path: Path) -> None:
         """verify defaults to False in RLMEngine."""
@@ -235,7 +233,7 @@ class TestVerifyWiring:
 
         config = SheshaConfig(model="test-model")
         shesha = Shesha(config=config, storage=_make_mock_storage())
-        assert shesha._rlm_engine.verify is False
+        assert shesha.rlm_engine.verify is False
 
 
 class TestStorageProperty:
@@ -262,22 +260,22 @@ class TestDefaultBehaviorUnchanged:
 
         shesha = Shesha(model="test-model", storage_path=tmp_path)
 
-        assert isinstance(shesha._storage, FilesystemStorage)
+        assert isinstance(shesha.storage, FilesystemStorage)
 
     def test_default_creates_rlm_engine(self, tmp_path: Path):
         """Without DI, Shesha creates RLMEngine."""
         shesha = Shesha(model="test-model", storage_path=tmp_path)
 
-        assert isinstance(shesha._rlm_engine, RLMEngine)
+        assert isinstance(shesha.rlm_engine, RLMEngine)
 
     def test_default_creates_parser_registry(self, tmp_path: Path):
         """Without DI, Shesha creates a default parser registry."""
         shesha = Shesha(model="test-model", storage_path=tmp_path)
 
-        assert isinstance(shesha._parser_registry, ParserRegistry)
+        assert isinstance(shesha.parser_registry, ParserRegistry)
 
     def test_default_creates_repo_ingester(self, tmp_path: Path):
         """Without DI, Shesha creates RepoIngester."""
         shesha = Shesha(model="test-model", storage_path=tmp_path)
 
-        assert isinstance(shesha._repo_ingester, RepoIngester)
+        assert isinstance(shesha.repo_ingester, RepoIngester)

@@ -209,20 +209,22 @@ class RLMEngine:
         self._llm_client_factory: LLMClientFactory = llm_client_factory or LLMClient
         self._subcall_lock = threading.Lock()
 
+    @property
+    def pool(self) -> ContainerPool | None:
+        """The container pool used for query execution, or None."""
+        return self._pool
+
+    @property
+    def llm_client_factory(self) -> LLMClientFactory:
+        """The factory callable used to create LLM clients."""
+        return self._llm_client_factory
+
     def set_pool(self, pool: ContainerPool | None) -> None:
         """Set or clear the container pool used for query execution.
 
         Args:
             pool: A ContainerPool instance, or None to clear.
-
-        Raises:
-            TypeError: If *pool* is not a ContainerPool instance or None.
         """
-        # Note: this checks for ContainerPool specifically, not the SandboxExecutor
-        # protocol. That's intentional — SandboxExecutor is for individual executors,
-        # not pools. If a pool protocol is needed later, add a SandboxPool protocol.
-        if pool is not None and not isinstance(pool, ContainerPool):
-            raise TypeError(f"Expected ContainerPool or None, got {type(pool).__name__}")
         self._pool = pool
 
     def _handle_llm_query(

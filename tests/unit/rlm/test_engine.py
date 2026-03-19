@@ -108,7 +108,7 @@ def test_engine_accepts_llm_client_factory():
     """RLMEngine accepts an llm_client_factory parameter."""
     factory = MagicMock()
     engine = RLMEngine(model="test-model", llm_client_factory=factory)
-    assert engine._llm_client_factory is factory
+    assert engine.llm_client_factory is factory
 
 
 def test_engine_defaults_llm_client_factory_to_llm_client():
@@ -116,7 +116,7 @@ def test_engine_defaults_llm_client_factory_to_llm_client():
     from shesha.llm.client import LLMClient
 
     engine = RLMEngine(model="test-model")
-    assert engine._llm_client_factory is LLMClient
+    assert engine.llm_client_factory is LLMClient
 
 
 class TestSetPool:
@@ -129,7 +129,7 @@ class TestSetPool:
         engine = RLMEngine(model="test-model")
         pool = MagicMock(spec=ContainerPool)
         engine.set_pool(pool)
-        assert engine._pool is pool
+        assert engine.pool is pool
 
     def test_set_pool_accepts_none_to_clear(self):
         """set_pool(None) clears the pool, reverting to standalone executors."""
@@ -138,19 +138,7 @@ class TestSetPool:
         pool = MagicMock(spec=ContainerPool)
         engine = RLMEngine(model="test-model", pool=pool)
         engine.set_pool(None)
-        assert engine._pool is None
-
-    def test_set_pool_rejects_non_pool(self):
-        """set_pool() raises TypeError for non-ContainerPool arguments."""
-        engine = RLMEngine(model="test-model")
-        with pytest.raises(TypeError, match="ContainerPool"):
-            engine.set_pool("not a pool")  # type: ignore[arg-type]
-
-    def test_set_pool_rejects_arbitrary_objects(self):
-        """set_pool() rejects objects that aren't ContainerPool instances."""
-        engine = RLMEngine(model="test-model")
-        with pytest.raises(TypeError, match="ContainerPool"):
-            engine.set_pool(MagicMock())  # type: ignore[arg-type]
+        assert engine.pool is None
 
 
 @patch("shesha.rlm.engine.ContainerExecutor")

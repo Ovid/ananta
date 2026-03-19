@@ -34,6 +34,7 @@ from shesha.rlm.verification import (
     build_verification_code,
     parse_verification_output,
 )
+from shesha.sandbox.base import SandboxExecutor
 from shesha.sandbox.executor import ContainerExecutor, ExecutionResult, SubcallContentError
 from shesha.sandbox.pool import ContainerPool
 from shesha.storage.base import StorageBackend
@@ -466,7 +467,7 @@ class RLMEngine:
     def _execute_code_blocks(
         self,
         code_blocks: list[str],
-        executor: ContainerExecutor,
+        executor: SandboxExecutor,
         trace: Trace,
         iteration: int,
         token_usage: TokenUsage,
@@ -562,7 +563,7 @@ class RLMEngine:
     def _resolve_final_var(
         self,
         var_name: str,
-        executor: ContainerExecutor,
+        executor: SandboxExecutor,
     ) -> str | None:
         """Resolve a FINAL_VAR variable from the sandbox.
 
@@ -577,7 +578,7 @@ class RLMEngine:
     def _run_verifications(
         self,
         final_answer: str,
-        executor: ContainerExecutor,
+        executor: SandboxExecutor,
         documents: list[str],
         doc_names: list[str],
         trace: Trace,

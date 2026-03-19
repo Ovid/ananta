@@ -4,6 +4,7 @@ import logging
 import threading
 from collections import deque
 
+from shesha.sandbox.base import SandboxExecutor
 from shesha.sandbox.executor import ContainerExecutor
 
 logger = logging.getLogger(__name__)
@@ -22,8 +23,8 @@ class ContainerPool:
         self.size = size
         self.image = image
         self.memory_limit = memory_limit
-        self._available: deque[ContainerExecutor] = deque()
-        self._in_use: set[ContainerExecutor] = set()
+        self._available: deque[SandboxExecutor] = deque()
+        self._in_use: set[SandboxExecutor] = set()
         self._lock = threading.Lock()
         self._started = False
 
@@ -54,7 +55,7 @@ class ContainerPool:
             self._in_use.clear()
             self._started = False
 
-    def acquire(self) -> ContainerExecutor:
+    def acquire(self) -> SandboxExecutor:
         """Acquire an executor from the pool."""
         with self._lock:
             if not self._started:
@@ -76,14 +77,14 @@ class ContainerPool:
             self._in_use.add(executor)
             return executor
 
-    def release(self, executor: ContainerExecutor) -> None:
+    def release(self, executor: SandboxExecutor) -> None:
         """Release an executor back to the pool."""
         with self._lock:
             if executor in self._in_use:
                 self._in_use.remove(executor)
                 self._available.append(executor)
 
-    def discard(self, executor: ContainerExecutor) -> None:
+    def discard(self, executor: SandboxExecutor) -> None:
         """Remove an executor from _in_use without returning it to _available.
 
         Use this for broken executors that should not be reused.

@@ -331,6 +331,10 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** `ContainerPool.acquire()` returns the concrete `ContainerExecutor` class. There is no executor protocol/interface, preventing substitution of mock executors for testing or non-Docker backends.
 - **Evidence:** `sandbox/pool.py:51` (`def acquire(self) -> ContainerExecutor`)
 - **Found by:** Coupling
+- **Status:** Fixed
+- **Status reason:** Added SandboxExecutor protocol in sandbox/base.py. ContainerPool and RLMEngine now use the protocol type instead of concrete ContainerExecutor for parameters and return types.
+- **Status date:** 2026-03-19 06:44 UTC
+- **Status commit:** <pending>
 
 ### [F-15] IncrementalTraceWriter temporal coupling
 - **Category:** 27 (Temporal coupling)

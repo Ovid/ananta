@@ -450,6 +450,11 @@ class Shesha:
         path: str | None,
     ) -> RepoProjectResult:
         """Handle create_project_from_repo for existing project."""
+        # Preserve original subdirectory scope when the caller doesn't
+        # supply a path (e.g. create_project_from_repo with path=None).
+        if path is None:
+            path = self._repo_ingester.get_saved_path(name)
+
         saved_sha = self._repo_ingester.get_saved_sha(name)
         if self._repo_ingester.is_local_path(url):
             current_sha = self._repo_ingester.get_sha_from_path(Path(url).expanduser())

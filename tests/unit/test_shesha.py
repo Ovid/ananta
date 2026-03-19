@@ -516,6 +516,39 @@ class TestCreateProjectFromRepo:
 
                 assert result.status == "updates_available"
 
+    def test_preserves_saved_path_when_caller_passes_none(self, tmp_path: Path):
+        """When create_project_from_repo is called with path=None for a project
+        that was originally created with a subdirectory scope, the apply_updates
+        closure should use the saved path, not None."""
+        with patch("shesha.shesha.docker"), patch("shesha.shesha.ContainerPool"):
+            with patch("shesha.shesha.RepoIngester") as mock_ingester_cls:
+                mock_ingester = MagicMock()
+                mock_ingester_cls.return_value = mock_ingester
+
+                mock_ingester.is_local_path.return_value = False
+                mock_ingester.get_saved_sha.return_value = "abc123"
+                mock_ingester.get_remote_sha.return_value = "def456"
+                mock_ingester.get_saved_path.return_value = "src/"
+                mock_ingester.repos_dir = tmp_path / "repos"
+
+                shesha = Shesha(model="test-model", storage_path=tmp_path)
+                shesha.storage.create_project("scoped-project")
+
+                # Caller passes path=None (the default)
+                result = shesha.create_project_from_repo(
+                    url="https://github.com/org/repo",
+                    name="scoped-project",
+                )
+
+                assert result.status == "updates_available"
+
+                mock_ingester.ingest.return_value = IngestResult(files_ingested=2)
+                result.apply_updates()
+
+                # Verify ingest was called with the saved path, not None
+                call_kwargs = mock_ingester.ingest.call_args[1]
+                assert call_kwargs["path"] == "src/"
+
     def test_apply_updates_skips_pull_for_local_repos(self, tmp_path: Path):
         """apply_updates() should not call pull() for local repositories."""
         with patch("shesha.shesha.docker"), patch("shesha.shesha.ContainerPool"):

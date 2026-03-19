@@ -105,6 +105,9 @@ def classify_query(
         return (True, 0, 0)  # Graceful fallback — allow shortcut attempt
 
     tokens = (response.prompt_tokens, response.completion_tokens)
+    # Exact match on stripped LLM output. Case-insensitive or prefix matching
+    # is unnecessary — the LLM is prompted with these exact tokens, and the
+    # final fallback (line below) handles any unparseable output gracefully.
     label = response.content.strip()
     if label == _SENTINEL:
         return (False, *tokens)

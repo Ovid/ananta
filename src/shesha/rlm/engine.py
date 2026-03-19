@@ -217,6 +217,9 @@ class RLMEngine:
         Raises:
             TypeError: If *pool* is not a ContainerPool instance or None.
         """
+        # Note: this checks for ContainerPool specifically, not the SandboxExecutor
+        # protocol. That's intentional — SandboxExecutor is for individual executors,
+        # not pools. If a pool protocol is needed later, add a SandboxPool protocol.
         if pool is not None and not isinstance(pool, ContainerPool):
             raise TypeError(f"Expected ContainerPool or None, got {type(pool).__name__}")
         self._pool = pool
@@ -534,6 +537,8 @@ class RLMEngine:
                     )
                 break
             elif result.final_var is not None:
+                # `or ""` is equivalent to `if is not None` here since
+                # final_value is str | None — both yield "" for None.
                 final_answer = result.final_value or ""
                 step = trace.add_step(
                     type=StepType.FINAL_ANSWER,

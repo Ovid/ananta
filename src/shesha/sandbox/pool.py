@@ -30,6 +30,8 @@ class ContainerPool:
 
     def start(self) -> None:
         """Start the pool and warm up containers."""
+        # Note: _started check is not under self._lock. This is fine because
+        # start() is only called from the single-threaded Shesha.start() path.
         if self._started:
             return
         logger.info("Starting container pool (size=%d, image=%s)", self.size, self.image)

@@ -59,6 +59,12 @@ class IncrementalTraceWriter:
         self.suppress_errors = suppress_errors
         self.path: Path | None = None
         self._max_iteration: int = 0
+        self._finalized: bool = False
+
+    @property
+    def finalized(self) -> bool:
+        """Whether finalize() has been called."""
+        return self._finalized
 
     def start(self, project_id: str, context: QueryContext) -> Path | None:
         """Create trace file and write the header line.
@@ -107,7 +113,7 @@ class IncrementalTraceWriter:
         Args:
             step: The trace step to write.
         """
-        if self.path is None:
+        if self.path is None or self._finalized:
             return
 
         try:
@@ -146,8 +152,9 @@ class IncrementalTraceWriter:
             execution_time: Total execution time in seconds.
             status: Query status (success, max_iterations, interrupted).
         """
-        if self.path is None:
+        if self.path is None or self._finalized:
             return
+        self._finalized = True
 
         try:
             summary = {

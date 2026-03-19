@@ -713,7 +713,6 @@ class RLMEngine:
         inc_writer = (
             IncrementalTraceWriter(storage, suppress_errors=True) if storage is not None else None
         )
-        trace_finalized = False
         if inc_writer is not None and project_id is not None:
             trace_id = str(uuid.uuid4())
             context = QueryContext(
@@ -731,10 +730,8 @@ class RLMEngine:
                 inc_writer.write_step(step)
 
         def _finalize_trace_and_cleanup(answer: str, status: str) -> None:
-            nonlocal trace_finalized
-            if trace_finalized or inc_writer is None:
+            if inc_writer is None or inc_writer.finalized:
                 return
-            trace_finalized = True
             inc_writer.finalize(
                 answer=answer,
                 token_usage=token_usage,

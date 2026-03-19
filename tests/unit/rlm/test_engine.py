@@ -1667,6 +1667,77 @@ class TestDeadExecutorPoolStopped:
         assert "died" in result.answer.lower() or "executor" in result.answer.lower()
 
 
+class TestPostLoopFinalVarRetryTrace:
+    """Tests for trace/callback emission on post-loop FINAL_VAR retry."""
+
+    @patch("shesha.rlm.engine.ContainerExecutor")
+    def test_post_loop_retry_emits_trace_step_and_progress(
+        self, mock_executor_cls: MagicMock
+    ):
+        """When a FINAL_VAR fails initially but is resolved in the post-loop
+        retry, a FINAL_ANSWER trace step and on_progress callback must be emitted."""
+        mock_llm = MagicMock()
+        # Response contains code block with FINAL_VAR, plus a second block
+        # that defines the variable.
+        mock_llm.complete.side_effect = [
+            MagicMock(
+                content=(
+                    '```repl\nFINAL_VAR("result")\n```\n\n'
+                    '```repl\nresult = "found it"\n```'
+                ),
+                prompt_tokens=100,
+                completion_tokens=50,
+                total_tokens=150,
+            ),
+        ]
+
+        mock_executor = MagicMock()
+        # First execute: FINAL_VAR("result") — var not found yet
+        exec_result_1 = MagicMock(
+            status="ok", stdout="", stderr="", error=None,
+            final_answer=None, final_var="result", final_value=None, vars=None,
+        )
+        # In-block _resolve_final_var — fails
+        resolve_fail = MagicMock(
+            status="error", stdout="", stderr="NameError", error="NameError",
+        )
+        # Second execute: defines variable
+        exec_result_2 = MagicMock(
+            status="ok", stdout="", stderr="", error=None,
+            final_answer=None, final_var=None, final_value=None, vars=None,
+        )
+        # Post-loop _resolve_final_var — succeeds
+        resolve_ok = MagicMock(status="ok", stdout="found it\n")
+
+        mock_executor.execute.side_effect = [
+            exec_result_1, resolve_fail, exec_result_2, resolve_ok,
+        ]
+        mock_executor.is_alive = True
+        mock_executor_cls.return_value = mock_executor
+
+        on_progress = MagicMock()
+        engine = RLMEngine(model="test-model", llm_client_factory=MagicMock(return_value=mock_llm))
+        result = engine.query(
+            documents=["Doc content"],
+            question="What?",
+            on_progress=on_progress,
+        )
+
+        assert result.answer == "found it"
+        # Trace should have a FINAL_ANSWER step with post_loop_var_retry source
+        final_steps = [
+            s for s in result.trace.steps if s.type == StepType.FINAL_ANSWER
+        ]
+        assert len(final_steps) == 1
+        assert final_steps[0].metadata.get("source") == "post_loop_var_retry"
+        # on_progress should have been called with FINAL_ANSWER
+        progress_calls = [
+            c for c in on_progress.call_args_list
+            if c[0][0] == StepType.FINAL_ANSWER
+        ]
+        assert len(progress_calls) == 1
+
+
 class TestResolveFinalVar:
     """Tests for _resolve_final_var edge cases."""
 

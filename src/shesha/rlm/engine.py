@@ -603,6 +603,21 @@ class RLMEngine:
             if resolved is not None and resolved != "":
                 final_answer = resolved
                 failed_final_var = None
+                step = trace.add_step(
+                    type=StepType.FINAL_ANSWER,
+                    content=final_answer,
+                    iteration=iteration,
+                    metadata={"source": "post_loop_var_retry"},
+                )
+                if on_step:
+                    on_step(step)
+                if on_progress:
+                    on_progress(
+                        StepType.FINAL_ANSWER,
+                        iteration,
+                        final_answer,
+                        copy.copy(token_usage),
+                    )
 
         return _CodeBlockResult(
             final_answer=final_answer,

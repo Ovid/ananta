@@ -442,10 +442,11 @@ class TestCreateProjectFromRepo:
 
                 assert result.status == "unchanged"
 
-    def test_updates_available_logs_warning_when_remote_sha_is_none(
+    def test_check_failed_when_remote_sha_is_none(
         self, tmp_path: Path, caplog: pytest.LogCaptureFixture
     ):
-        """When saved_sha exists but remote SHA is None (network failure), log a warning."""
+        """When saved_sha exists but remote SHA is None (network failure),
+        return check_failed instead of updates_available."""
         import logging
 
         with patch("shesha.shesha.docker"), patch("shesha.shesha.ContainerPool"):
@@ -466,7 +467,7 @@ class TestCreateProjectFromRepo:
                         name="my-project",
                     )
 
-                assert result.status == "updates_available"
+                assert result.status == "check_failed"
                 assert any("Could not determine current SHA" in r.message for r in caplog.records)
 
     def test_updates_available_when_sha_differs(self, tmp_path: Path):

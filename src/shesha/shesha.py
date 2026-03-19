@@ -468,8 +468,13 @@ class Shesha:
 
         if current_sha is None and saved_sha is not None:
             logger.warning(
-                "Could not determine current SHA for '%s' — treating as updates_available",
+                "Could not determine current SHA for '%s' — check failed",
                 name,
+            )
+            return RepoProjectResult(
+                project=project,
+                status="check_failed",
+                files_ingested=len(self._storage.list_documents(name)),
             )
 
         if saved_sha is not None and saved_sha == current_sha:

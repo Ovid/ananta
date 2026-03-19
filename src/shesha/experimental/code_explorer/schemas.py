@@ -74,5 +74,5 @@ class AnalysisResponse(BaseModel):
 
 
 class UpdateStatus(BaseModel):
-    status: str  # "unchanged", "updates_available"
+    status: str  # "unchanged", "updates_available", "check_failed"
     files_ingested: int

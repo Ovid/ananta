@@ -114,6 +114,43 @@ class TestListRepos:
         assert data[1]["file_count"] == 2
 
 
+# ---- project_id validation ----
+
+
+class TestProjectIdValidation:
+    """I4: All {project_id} routes must reject unsafe IDs."""
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "/api/repos/{pid}",
+            "/api/repos/{pid}/check-updates",
+            "/api/repos/{pid}/apply-updates",
+            "/api/repos/{pid}/analyze",
+            "/api/repos/{pid}/analysis",
+        ],
+    )
+    @pytest.mark.parametrize(
+        "bad_id",
+        [".hidden", "-leading-dash", "has spaces"],
+    )
+    def test_rejects_unsafe_project_id(
+        self, client: TestClient, path: str, bad_id: str
+    ) -> None:
+        """Routes return 400 for project_ids that fail _SAFE_ID_RE."""
+        url = path.replace("{pid}", bad_id)
+        if "/check-updates" in path or "/apply-updates" in path or "/analyze" in path:
+            resp = client.post(url)
+        else:
+            resp = client.get(url)
+        assert resp.status_code == 400, f"{url} should return 400, got {resp.status_code}"
+
+    def test_delete_rejects_unsafe_project_id(self, client: TestClient) -> None:
+        """DELETE /api/repos/{project_id} returns 400 for unsafe IDs."""
+        resp = client.delete("/api/repos/.hidden")
+        assert resp.status_code == 400
+
+
 # ---- GET /api/repos/uncategorized ----
 
 

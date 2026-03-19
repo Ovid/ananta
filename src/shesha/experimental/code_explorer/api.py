@@ -36,6 +36,15 @@ from shesha.experimental.shared.routes import create_item_router, create_shared_
 from shesha.models import RepoProjectResult
 
 
+_SAFE_ID_RE = _re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
+
+
+def _validate_project_id(project_id: str) -> None:
+    """Raise 400 if *project_id* contains path-traversal or unsafe characters."""
+    if not _SAFE_ID_RE.match(project_id):
+        raise HTTPException(400, f"Invalid project id: {project_id!r}")
+
+
 def _sanitize_ingest_error(exc: RepoIngestError) -> str:
     """Return user-safe error message with internal filesystem paths stripped."""
     msg = str(exc)
@@ -129,6 +138,7 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
 
     @router.get("/repos/{project_id}")
     def get_repo(project_id: str) -> RepoInfo:
+        _validate_project_id(project_id)
         try:
             return _build_repo_info(project_id)
         except ProjectNotFoundError:
@@ -136,6 +146,7 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
 
     @router.delete("/repos/{project_id}")
     def delete_repo(project_id: str) -> dict[str, str]:
+        _validate_project_id(project_id)
         try:
             state.shesha.get_project_info(project_id)
         except ProjectNotFoundError:
@@ -146,6 +157,7 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
 
     @router.post("/repos/{project_id}/check-updates")
     def check_updates(project_id: str) -> UpdateStatus:
+        _validate_project_id(project_id)
         try:
             info = state.shesha.get_project_info(project_id)
         except ProjectNotFoundError:
@@ -178,6 +190,7 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
 
     @router.post("/repos/{project_id}/apply-updates")
     def apply_updates(project_id: str) -> UpdateStatus:
+        _validate_project_id(project_id)
         with _pending_lock:
             repo_result = _pending_updates.pop(project_id, None)
         if repo_result is not None:
@@ -219,6 +232,7 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
 
     @router.post("/repos/{project_id}/analyze")
     def generate_analysis(project_id: str) -> AnalysisResponse:
+        _validate_project_id(project_id)
         try:
             analysis = state.shesha.generate_analysis(project_id)
         except ProjectNotFoundError:
@@ -227,6 +241,7 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
 
     @router.get("/repos/{project_id}/analysis")
     def get_analysis(project_id: str) -> AnalysisResponse:
+        _validate_project_id(project_id)
         try:
             analysis = state.shesha.get_analysis(project_id)
         except ProjectNotFoundError:

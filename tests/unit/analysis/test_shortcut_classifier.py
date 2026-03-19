@@ -131,6 +131,24 @@ class TestClassifyQuery:
                     api_key="test-key",
                 )
 
+    def test_returns_false_for_need_deeper_with_trailing_punctuation(self):
+        """NEED_DEEPER with trailing punctuation should still be recognized."""
+        for suffix in [".", "!", ".\n"]:
+            mock_response = MagicMock()
+            mock_response.content = f"NEED_DEEPER{suffix}"
+            mock_response.prompt_tokens = 10
+            mock_response.completion_tokens = 5
+
+            with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+                mock_cls.return_value.complete.return_value = mock_response
+                result = classify_query(
+                    question="Any question",
+                    model="test-model",
+                    api_key="test-key",
+                )
+
+            assert result[0] is False, f"NEED_DEEPER{suffix!r} should return False"
+
     def test_returns_true_on_unparseable_output(self):
         """Unparseable LLM output -> True (graceful fallback)."""
         mock_response = MagicMock()

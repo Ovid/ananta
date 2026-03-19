@@ -112,7 +112,7 @@ def classify_query(
     # is unnecessary — the LLM is prompted with these exact tokens, and the
     # final fallback (line below) handles any unparseable output gracefully.
     label = response.content.strip()
-    if label == _SENTINEL:
+    if label.startswith(_SENTINEL):
         return (False, *tokens)
     if label == _CLASSIFIER_OK:
         return (True, *tokens)

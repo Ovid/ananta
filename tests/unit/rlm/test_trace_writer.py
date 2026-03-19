@@ -366,6 +366,40 @@ class TestIncrementalTraceWriter:
         finally:
             writer.path.chmod(0o644)
 
+    def test_finalize_retryable_after_suppressed_write_failure(
+        self, storage: FilesystemStorage, context: QueryContext
+    ) -> None:
+        """finalize() can retry after a suppressed write failure."""
+        from shesha.rlm.trace_writer import IncrementalTraceWriter
+
+        writer = IncrementalTraceWriter(storage, suppress_errors=True)
+        writer.start("test-project", context)
+
+        # Force write failure by making file read-only
+        writer.path.chmod(0o444)
+        writer.finalize(
+            answer="42",
+            token_usage=TokenUsage(prompt_tokens=100, completion_tokens=50),
+            execution_time=1.5,
+            status="success",
+        )
+        # File should NOT have summary yet
+        writer.path.chmod(0o644)
+        lines_before = writer.path.read_text().strip().split("\n")
+        assert all(json.loads(line)["type"] != "summary" for line in lines_before)
+
+        # Retry should succeed — _finalized must not block it
+        writer.finalize(
+            answer="42",
+            token_usage=TokenUsage(prompt_tokens=100, completion_tokens=50),
+            execution_time=1.5,
+            status="success",
+        )
+        lines_after = writer.path.read_text().strip().split("\n")
+        summary = json.loads(lines_after[-1])
+        assert summary["type"] == "summary"
+        assert summary["answer"] == "42"
+
     def test_write_step_after_finalize_is_noop(
         self, storage: FilesystemStorage, context: QueryContext
     ) -> None:

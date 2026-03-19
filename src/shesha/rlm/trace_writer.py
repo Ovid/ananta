@@ -154,7 +154,6 @@ class IncrementalTraceWriter:
         """
         if self.path is None or self._finalized:
             return
-        self._finalized = True
 
         try:
             summary = {
@@ -170,6 +169,7 @@ class IncrementalTraceWriter:
             }
             with self.path.open("a") as f:
                 f.write(json.dumps(summary) + "\n")
+            self._finalized = True
         except Exception as e:
             if self.suppress_errors:
                 logger.warning(f"Failed to finalize incremental trace: {e}")

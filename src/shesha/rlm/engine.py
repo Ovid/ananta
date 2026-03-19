@@ -170,6 +170,7 @@ class _CodeBlockResult:
     final_answer: str | None
     all_output: list[str]
     exec_results: list[ExecutionResult]
+    failed_final_var: str | None = None
 
 
 class RLMEngine:
@@ -482,6 +483,7 @@ class RLMEngine:
         all_output: list[str] = []
         exec_results: list[ExecutionResult] = []
         final_answer: str | None = None
+        failed_final_var: str | None = None
 
         for code in code_blocks:
             exec_start = time.time()
@@ -545,7 +547,8 @@ class RLMEngine:
                     # bare-text FINAL_VAR retry in the main query loop).
                     resolved = self._resolve_final_var(result.final_var, executor)
                 if resolved is None:
-                    # Variable truly not found — don't return empty answer
+                    # Variable truly not found — record for retry guidance
+                    failed_final_var = result.final_var
                     break
                 final_answer = resolved
                 step = trace.add_step(
@@ -568,6 +571,7 @@ class RLMEngine:
             final_answer=final_answer,
             all_output=all_output,
             exec_results=exec_results,
+            failed_final_var=failed_final_var,
         )
 
     def _resolve_final_var(
@@ -922,7 +926,7 @@ class RLMEngine:
                 # If code blocks didn't produce a final answer, check for
                 # bare FINAL in the same response. Now that code blocks have
                 # executed, any variables they defined exist in the sandbox.
-                var_lookup_failed: str | None = None
+                var_lookup_failed: str | None = cb_result.failed_final_var
                 if final_answer is None and bare_final is not None:
                     final_type, final_value = bare_final
                     if final_type == "final_var":

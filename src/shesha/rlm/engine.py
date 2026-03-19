@@ -155,9 +155,7 @@ def find_final_answer(text: str) -> tuple[str, str] | None:
         # Pass 1b: FINAL(x) on a single line, possibly followed by
         # commentary on subsequent lines.  Uses MULTILINE (no DOTALL)
         # so '.' stops at newlines — captures only the first line.
-        line_match = re.search(
-            r"^\s*FINAL\((.*)\)\s*$", stripped, re.MULTILINE
-        )
+        line_match = re.search(r"^\s*FINAL\((.*)\)\s*$", stripped, re.MULTILINE)
         if line_match:
             content = line_match.group(1).strip()
         else:
@@ -1039,7 +1037,9 @@ class RLMEngine:
                         executor = pool.acquire()
                     except RuntimeError:
                         # Pool was stopped (e.g. shutdown during in-flight query)
-                        logger.error("Pool stopped during recovery at iteration %d, aborting", iteration)
+                        logger.error(
+                            "Pool stopped during recovery at iteration %d, aborting", iteration
+                        )
                         answer = "[Executor died — cannot continue]"
                         query_result = QueryResult(
                             answer=answer,

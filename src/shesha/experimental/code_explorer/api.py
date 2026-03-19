@@ -12,6 +12,7 @@ live on a local router.
 from __future__ import annotations
 
 import collections
+import re as _re
 import threading
 from dataclasses import asdict
 from pathlib import Path
@@ -33,9 +34,6 @@ from shesha.experimental.code_explorer.websockets import websocket_handler
 from shesha.experimental.shared.app_factory import create_app
 from shesha.experimental.shared.routes import create_item_router, create_shared_router
 from shesha.models import RepoProjectResult
-
-
-import re as _re
 
 
 def _sanitize_ingest_error(exc: RepoIngestError) -> str:
@@ -74,10 +72,8 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
     # apply-updates can call the stored apply_updates() method.
     # Protected by a lock since sync FastAPI handlers run in a thread pool.
     _pending_lock = threading.Lock()
-    _pending_updates: collections.OrderedDict[str, RepoProjectResult] = (
-        collections.OrderedDict()
-    )
-    _MAX_PENDING = 100  # Bound growth — oldest entries evicted when full
+    _pending_updates: collections.OrderedDict[str, RepoProjectResult] = collections.OrderedDict()
+    _max_pending = 100  # Bound growth — oldest entries evicted when full
 
     def _build_repo_info(pid: str) -> RepoInfo:
         """Build a RepoInfo for a project_id."""
@@ -169,7 +165,7 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
             with _pending_lock:
                 _pending_updates[project_id] = repo_result
                 # Evict oldest entries if cache is full
-                while len(_pending_updates) > _MAX_PENDING:
+                while len(_pending_updates) > _max_pending:
                     _pending_updates.popitem(last=False)
 
         return UpdateStatus(

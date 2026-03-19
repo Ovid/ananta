@@ -32,11 +32,11 @@ from shesha.experimental.document_explorer.schemas import (
 from shesha.experimental.document_explorer.topics import _slugify
 from shesha.experimental.document_explorer.websockets import websocket_handler
 from shesha.experimental.shared.app_factory import create_app
+from shesha.experimental.shared.routes import create_item_router, create_shared_router
+from shesha.models import ParsedDocument
 
 # Maximum upload size per file (50 MB).
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
-from shesha.experimental.shared.routes import create_item_router, create_shared_router
-from shesha.models import ParsedDocument
 
 _SAFE_ID_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
 
@@ -183,9 +183,7 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
 
                 ext = Path(file.filename).suffix
                 if not is_supported_extension(file.filename):
-                    raise HTTPException(
-                        422, f"Unsupported file type: {ext}"
-                    )
+                    raise HTTPException(422, f"Unsupported file type: {ext}")
 
                 original_path = upload_dir / f"original{ext}"
                 original_path.write_bytes(content)

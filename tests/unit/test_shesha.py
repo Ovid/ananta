@@ -420,8 +420,8 @@ class TestCreateProjectFromRepo:
 
                 assert result.status == "unchanged"
 
-    def test_updates_available_when_both_shas_none(self, tmp_path: Path):
-        """When SHA resolution fails (both None), treat as updates_available, not unchanged."""
+    def test_unchanged_when_both_shas_none(self, tmp_path: Path):
+        """When both saved and remote SHAs are None, treat as unchanged."""
         with patch("shesha.shesha.docker"), patch("shesha.shesha.ContainerPool"):
             with patch("shesha.shesha.RepoIngester") as mock_ingester_cls:
                 mock_ingester = MagicMock()
@@ -430,6 +430,7 @@ class TestCreateProjectFromRepo:
                 mock_ingester.is_local_path.return_value = False
                 mock_ingester.get_saved_sha.return_value = None
                 mock_ingester.get_remote_sha.return_value = None
+                mock_ingester.get_saved_path.return_value = None
 
                 shesha = Shesha(model="test-model", storage_path=tmp_path)
                 shesha.storage.create_project("my-project")
@@ -439,7 +440,7 @@ class TestCreateProjectFromRepo:
                     name="my-project",
                 )
 
-                assert result.status == "updates_available"
+                assert result.status == "unchanged"
 
     def test_updates_available_logs_warning_when_remote_sha_is_none(
         self, tmp_path: Path, caplog: pytest.LogCaptureFixture

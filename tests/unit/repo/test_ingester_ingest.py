@@ -290,6 +290,52 @@ class TestIngestUpdate:
             assert result.files_ingested == 1
 
 
+class TestIngestUpdateStagingCleanupFailure:
+    """Tests that staging cleanup failure after swap doesn't block metadata save."""
+
+    def test_staging_cleanup_failure_still_saves_sha(
+        self, ingester: RepoIngester, storage: FilesystemStorage, parser_registry: MagicMock
+    ):
+        """When staging delete fails after successful swap, SHA is still saved."""
+        storage.create_project("test-project")
+        storage.store_document("test-project", _make_parsed_doc("old.py", "old"))
+
+        repo_path = ingester.repos_dir / "test-project"
+        repo_path.mkdir(parents=True)
+
+        mock_parser = MagicMock()
+        mock_parser.parse.return_value = _make_parsed_doc("new.py", "new")
+        parser_registry.find_parser.return_value = mock_parser
+        ingester.list_files_from_path = MagicMock(return_value=["new.py"])
+
+        original_delete = storage.delete_project
+
+        def failing_delete(name: str) -> None:
+            if name.startswith("_staging_"):
+                raise OSError("disk error during cleanup")
+            original_delete(name)
+
+        with (
+            patch.object(storage, "delete_project", side_effect=failing_delete),
+            patch.object(ingester, "get_sha_from_path", return_value="abc123"),
+        ):
+            result = ingester.ingest(
+                storage=storage,
+                parser_registry=parser_registry,
+                url="https://github.com/org/repo",
+                name="test-project",
+                path=None,
+                is_update=True,
+            )
+
+        # Swap succeeded — docs should be updated
+        assert result.files_ingested == 1
+        # SHA must be saved despite cleanup failure
+        assert ingester.get_saved_sha("test-project") == "abc123"
+        # Source URL must be saved despite cleanup failure
+        assert ingester.get_source_url("test-project") == "https://github.com/org/repo"
+
+
 class TestIngestSavesMetadata:
     """Tests that ingest() persists SHA and source URL."""
 

@@ -1667,6 +1667,23 @@ class TestDeadExecutorPoolStopped:
         assert "died" in result.answer.lower() or "executor" in result.answer.lower()
 
 
+class TestResolveFinalVar:
+    """Tests for _resolve_final_var edge cases."""
+
+    @patch("shesha.rlm.engine.ContainerExecutor")
+    def test_empty_string_is_valid_answer(self, mock_executor_cls: MagicMock):
+        """A variable holding an empty string is a valid answer, not None."""
+        engine = RLMEngine(model="test-model", llm_client_factory=MagicMock())
+        mock_executor = MagicMock()
+        # print(var) returns empty string
+        mock_executor.execute.return_value = MagicMock(status="ok", stdout="")
+
+        result = engine._resolve_final_var("my_var", mock_executor)
+        # Empty string should be returned as a valid value, not None
+        assert result is not None
+        assert result == ""
+
+
 class TestEngineTraceWriterSuppression:
     """Tests for engine trace writer suppress_errors configuration."""
 

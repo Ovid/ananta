@@ -62,11 +62,14 @@ def create_app(
 
     app = FastAPI(title=title, lifespan=lifespan)
 
-    # CORS — allow all origins during development
+    # CORS — allow all origins during development.
+    # allow_credentials intentionally omitted: no cookies/auth headers are
+    # used, and combining credentials=True with wildcard origins causes
+    # Starlette to reflect the request Origin, enabling any page to make
+    # credentialed cross-origin requests.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
-        allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )

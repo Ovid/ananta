@@ -623,8 +623,7 @@ class RLMEngine:
         """
         result = executor.execute(f"print({var_name})", timeout=self.execution_timeout)
         if result.status == "ok":
-            value = result.stdout.strip()
-            return value if value else None
+            return result.stdout.strip()
         return None
 
     def _run_verifications(
@@ -898,7 +897,7 @@ class RLMEngine:
                         final_type, final_value = bare_final
                         if final_type == "final_var":
                             bare_answer = self._resolve_final_var(final_value, executor)
-                            if bare_answer is None:
+                            if not bare_answer:
                                 # Variable not found — retry instead of
                                 # returning the variable name as the answer
                                 messages.append({"role": "assistant", "content": response.content})
@@ -970,7 +969,7 @@ class RLMEngine:
                     final_type, final_value = bare_final
                     if final_type == "final_var":
                         resolved = self._resolve_final_var(final_value, executor)
-                        if resolved is not None:
+                        if resolved:
                             final_answer = resolved
                         else:
                             # Variable not found — record name so a helpful

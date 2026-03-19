@@ -145,10 +145,9 @@ def try_answer_from_analysis(
     factory = llm_client_factory or LLMClient
     client = factory(model=model, system_prompt=_SYSTEM_PROMPT, api_key=api_key)
 
-    if boundary is not None:
-        wrapped = wrap_untrusted(analysis_context, boundary)
-    else:
-        wrapped = f"<untrusted_document_content>\n{analysis_context}\n</untrusted_document_content>"
+    if boundary is None:
+        boundary = generate_boundary()
+    wrapped = wrap_untrusted(analysis_context, boundary)
     user_content = f"{wrapped}\n\nQuestion: {question}"
 
     try:

@@ -148,6 +148,32 @@ class TestTryAnswerFromAnalysis:
         assert "_END" in user_content
         assert "Overview: A web framework..." in user_content
 
+    def test_generates_dynamic_boundary_when_none(self):
+        """When boundary=None, a random boundary is generated instead of
+        falling back to static <untrusted_document_content> tags."""
+        mock_response = MagicMock()
+        mock_response.content = "Some answer"
+
+        with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+            mock_client = mock_cls.return_value
+            mock_client.complete.return_value = mock_response
+            try_answer_from_analysis(
+                question="What does this do?",
+                analysis_context="Overview: test content",
+                model="test-model",
+                api_key="test-key",
+                boundary=None,
+            )
+
+        call_args = mock_client.complete.call_args
+        messages = call_args[0][0]
+        user_content = messages[0]["content"]
+        # Should NOT contain static tags
+        assert "<untrusted_document_content>" not in user_content
+        # Should contain dynamic boundary markers
+        assert "_BEGIN" in user_content
+        assert "_END" in user_content
+
     def test_returns_stripped_answer(self):
         """Answer is stripped of leading/trailing whitespace."""
         mock_response = MagicMock()

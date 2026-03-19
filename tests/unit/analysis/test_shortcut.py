@@ -76,6 +76,25 @@ class TestTryAnswerFromAnalysis:
 
         assert result is None
 
+    def test_returns_none_when_need_deeper_with_trailing_punctuation(self):
+        """NEED_DEEPER with trailing punctuation still returns None."""
+        for suffix in [".", "!", ".\n", ". ", ".\nI need more context."]:
+            mock_response = MagicMock()
+            mock_response.content = f"NEED_DEEPER{suffix}"
+            mock_response.prompt_tokens = 50
+            mock_response.completion_tokens = 10
+
+            with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+                mock_cls.return_value.complete.return_value = mock_response
+                result = try_answer_from_analysis(
+                    question="Any question",
+                    analysis_context="Some analysis",
+                    model="test-model",
+                    api_key="test-key",
+                )
+
+            assert result is None, f"NEED_DEEPER{suffix!r} should return None"
+
     def test_returns_none_when_analysis_context_is_none(self):
         """No analysis context -> None immediately, no LLM call."""
         with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:

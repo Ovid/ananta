@@ -154,7 +154,7 @@ def try_answer_from_analysis(
         return None  # Graceful fallback to full RLM query
 
     answer = response.content.strip()
-    if answer == _SENTINEL:
+    if answer.startswith(_SENTINEL):
         return None
 
     return (

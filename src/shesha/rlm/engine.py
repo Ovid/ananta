@@ -139,28 +139,39 @@ def find_final_answer(text: str) -> tuple[str, str] | None:
             return ("final_var", var_name)
         return ("final", var_name)
 
-    # Check FINAL pattern — greedy match to handle nested parentheses,
-    # no quote requirement (aligned with reference RLM rlm/utils/parsing.py:58)
-    final_pattern = r"^\s*FINAL\((.*)\)\s*$"
+    # Two-pass FINAL detection.  The old greedy regex FINAL\((.*)\)\s*$
+    # with re.MULTILINE silently truncated answers when a nested ')'
+    # sat at end-of-line — the regex treated it as the FINAL closer.
+    #
+    # Pass 1: require closing ')' at end of *string* (not line).
+    # This correctly handles FINAL(content with (nested) parens).
+    final_pattern = r"^\s*FINAL\((.*)\)\s*\Z"
     match = re.search(final_pattern, stripped, re.MULTILINE | re.DOTALL)
     if match:
         content = match.group(1).strip()
-        # Heuristic: if the content is a bare Python identifier (valid variable
-        # name, no quotes, no spaces, no operators), the LLM almost certainly
-        # meant to reference a sandbox variable — not return the identifier
-        # itself as a literal answer. Treat it as a variable reference so the
-        # engine retrieves the actual value from the sandbox.
-        #
-        # Examples:
-        #   FINAL(final_answer) → ("final_var", "final_answer")  # variable ref
-        #   FINAL("the answer")  → ("final", "the answer")       # quotes stripped
-        #   FINAL(42)            → ("final", "42")                # literal
-        #   FINAL(x + y)         → ("final", "x + y")            # literal
-        if _is_python_identifier(content):
-            return ("final_var", content)
-        return ("final", _strip_string_quotes(content))
+    else:
+        # Pass 2: FINAL( with no matching close paren — the LLM wrote
+        # the entire answer after FINAL( without a closing ')'.
+        # Take everything after the opening paren.
+        anchor = re.search(r"^\s*FINAL\(", stripped, re.MULTILINE)
+        if not anchor:
+            return None
+        content = stripped[anchor.end() :].strip()
 
-    return None
+    # Heuristic: if the content is a bare Python identifier (valid variable
+    # name, no quotes, no spaces, no operators), the LLM almost certainly
+    # meant to reference a sandbox variable — not return the identifier
+    # itself as a literal answer. Treat it as a variable reference so the
+    # engine retrieves the actual value from the sandbox.
+    #
+    # Examples:
+    #   FINAL(final_answer) → ("final_var", "final_answer")  # variable ref
+    #   FINAL("the answer")  → ("final", "the answer")       # quotes stripped
+    #   FINAL(42)            → ("final", "42")                # literal
+    #   FINAL(x + y)         → ("final", "x + y")            # literal
+    if _is_python_identifier(content):
+        return ("final_var", content)
+    return ("final", _strip_string_quotes(content))
 
 
 @dataclass

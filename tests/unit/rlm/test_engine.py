@@ -2458,6 +2458,33 @@ class TestFindFinalAnswerInText:
         result = find_final_answer("FINAL(The answer is 42)")
         assert result == ("final", "The answer is 42")
 
+    def test_find_final_answer_nested_paren_at_end_of_line_not_truncated(self):
+        """FINAL(...) with nested parens at end-of-line must not truncate.
+
+        Regression: greedy regex with re.MULTILINE matched ')' in
+        '(point-by-point)' at end-of-line as the FINAL closer,
+        silently dropping everything after it.  The actual bug: the
+        LLM writes FINAL( with no matching close paren, and the
+        content contains (nested) at end of a line, causing the regex
+        to treat that ) as the FINAL closer.
+        """
+        from shesha.rlm.engine import find_final_answer
+
+        # Mimics the real trace: FINAL( opens, content has (point-by-point)
+        # at end of a line, then more content follows with NO closing paren
+        # for FINAL.
+        text = (
+            "FINAL(# Analysis\n\n"
+            "## Section (point-by-point)\n\n"
+            "1) First item verified.\n"
+            "2) Second item confirmed.\n"
+        )
+        result = find_final_answer(text)
+        assert result is not None
+        assert result[0] == "final"
+        # The full content must include the numbered items AFTER (point-by-point)
+        assert "Second item confirmed." in result[1]
+
     @patch("shesha.rlm.engine.ContainerExecutor")
     @patch("shesha.rlm.engine.LLMClient")
     def test_engine_resolves_bare_final_identifier_from_sandbox(

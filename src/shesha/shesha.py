@@ -358,6 +358,7 @@ class Shesha:
         self._stopped = True
         if self._pool is not None:
             self._pool.stop()
+            self._rlm_engine.set_pool(None)
 
     def __enter__(self) -> "Shesha":
         """Context manager entry."""

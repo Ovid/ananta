@@ -3,18 +3,15 @@
 from __future__ import annotations
 
 import threading
-from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from shesha.llm.client import LLMClient
+from shesha.llm.client import LLMClient, LLMClientFactory
 from shesha.rlm.boundary import generate_boundary, wrap_untrusted
 
 if TYPE_CHECKING:
     from shesha.project import Project
     from shesha.rlm.engine import ProgressCallback, QueryResult
-
-LLMClientFactory = Callable[..., LLMClient]
 
 
 @dataclass

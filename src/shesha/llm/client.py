@@ -1,6 +1,7 @@
 """LLM client wrapper using LiteLLM."""
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -107,3 +108,7 @@ class LLMClient:
                 raise PermanentError(str(e)) from e
 
         return retry_with_backoff(_do_request, self.retry_config)
+
+
+# Factory callable that creates LLMClient-compatible objects.
+LLMClientFactory = Callable[..., LLMClient]

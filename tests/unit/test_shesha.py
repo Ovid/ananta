@@ -114,6 +114,22 @@ class TestDockerAvailability:
                 cleanup_fn()
                 mock_stop.assert_called_once()
 
+    def test_stop_clears_pool_on_engine(self, tmp_path: Path):
+        """stop() clears the pool reference on the engine for defensive cleanup."""
+        from shesha.sandbox.pool import ContainerPool
+
+        mock_pool = MagicMock(spec=ContainerPool)
+        with (
+            patch("shesha.shesha.docker"),
+            patch("shesha.shesha.ContainerPool", return_value=mock_pool),
+        ):
+            shesha = Shesha(model="test-model", storage_path=tmp_path)
+            shesha.start()
+
+            with patch.object(shesha._rlm_engine, "set_pool") as mock_set:
+                shesha.stop()
+                mock_set.assert_called_once_with(None)
+
     def test_stop_without_start_is_safe(self, tmp_path: Path):
         """stop() works safely even if start() was never called (no pool)."""
         shesha = Shesha(model="test-model", storage_path=tmp_path)

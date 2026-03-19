@@ -13,7 +13,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from shesha.llm.client import LLMClient
+from shesha.llm.client import LLMClient, LLMClientFactory
 from shesha.models import QueryContext
 from shesha.prompts import PromptLoader
 from shesha.rlm.boundary import generate_boundary, wrap_untrusted
@@ -40,9 +40,6 @@ from shesha.sandbox.pool import ContainerPool
 from shesha.storage.base import StorageBackend
 
 logger = logging.getLogger(__name__)
-
-# Factory callable that creates LLMClient-compatible objects.
-LLMClientFactory = Callable[..., LLMClient]
 
 # Callback type for progress notifications
 ProgressCallback = Callable[[StepType, int, str, TokenUsage], None]

@@ -118,9 +118,9 @@ class TestClassifyQuery:
 
     def test_raises_permanent_error(self):
         """PermanentError (auth failure) propagates instead of being swallowed."""
-        from shesha.llm.exceptions import PermanentError
-
         import pytest
+
+        from shesha.llm.exceptions import PermanentError
 
         with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
             mock_cls.return_value.complete.side_effect = PermanentError("invalid key")

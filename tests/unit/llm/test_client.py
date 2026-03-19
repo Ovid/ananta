@@ -78,7 +78,6 @@ class TestLLMClient:
         assert "timeout" in call_kwargs
         assert call_kwargs["timeout"] > 0
 
-
     @patch("shesha.llm.client.litellm")
     def test_complete_returns_empty_string_when_content_is_none(self, mock_litellm: MagicMock):
         """LLMClient returns empty string when API returns content=None."""

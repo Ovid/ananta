@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock
 
 from shesha.analysis import AnalysisGenerator
+from shesha.models import RepoAnalysis, coerce_to_str_list
 
 
 class TestAnalysisPromptLoading:
@@ -59,7 +60,6 @@ class TestAnalysisGeneration:
 
     def test_generate_returns_repo_analysis(self):
         """generate() returns a RepoAnalysis object."""
-        from shesha.models import RepoAnalysis
 
         # Mock the shesha instance and project
         mock_shesha = MagicMock()
@@ -217,7 +217,6 @@ class TestAnalysisGeneration:
 
     def test_to_str_list_fallback_uses_json_not_repr(self):
         """coerce_to_str_list fallback produces JSON, not Python repr, for dicts without 'name'."""
-        from shesha.models import coerce_to_str_list
 
         items = [
             "plain_string",

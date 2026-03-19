@@ -2,11 +2,14 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from shesha.analysis.shortcut import (
     _CLASSIFIER_PROMPT,
     classify_query,
     try_answer_from_analysis,
 )
+from shesha.llm.exceptions import PermanentError, TransientError
 
 
 class TestClassifyQuery:
@@ -104,8 +107,6 @@ class TestClassifyQuery:
 
     def test_returns_true_on_transient_exception(self):
         """Transient LLM exception -> True (graceful fallback, allow shortcut attempt)."""
-        from shesha.llm.exceptions import TransientError
-
         with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
             mock_cls.return_value.complete.side_effect = TransientError("timeout")
             result = classify_query(
@@ -118,10 +119,6 @@ class TestClassifyQuery:
 
     def test_raises_permanent_error(self):
         """PermanentError (auth failure) propagates instead of being swallowed."""
-        import pytest
-
-        from shesha.llm.exceptions import PermanentError
-
         with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
             mock_cls.return_value.complete.side_effect = PermanentError("invalid key")
             with pytest.raises(PermanentError):

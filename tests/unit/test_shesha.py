@@ -1,15 +1,20 @@
 """Tests for main Shesha class."""
 
+import logging
+import os
 import re
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from docker.errors import DockerException
 
 from shesha import Shesha
 from shesha.exceptions import ProjectNotFoundError, RepoError, RepoIngestError
-from shesha.models import RepoProjectResult
+from shesha.models import AnalysisComponent, ParsedDocument, RepoAnalysis, RepoProjectResult
 from shesha.repo.ingester import IngestResult
+from shesha.sandbox.pool import ContainerPool
+from shesha.storage.base import StorageBackend
 from shesha.storage.filesystem import FilesystemStorage
 
 
@@ -27,7 +32,6 @@ class TestDockerAvailability:
 
         Construction should succeed without Docker for ingest-only workflows.
         """
-        from docker.errors import DockerException
 
         with patch("shesha.shesha.docker") as mock_docker:
             mock_docker.from_env.side_effect = DockerException("Connection refused")
@@ -44,7 +48,6 @@ class TestDockerAvailability:
 
     def test_start_checks_docker_and_creates_pool(self, tmp_path: Path):
         """start() checks Docker and creates the container pool."""
-        from shesha.sandbox.pool import ContainerPool
 
         mock_pool = MagicMock(spec=ContainerPool)
         with (
@@ -66,7 +69,6 @@ class TestDockerAvailability:
 
     def test_start_raises_clear_error_when_docker_not_running(self, tmp_path: Path):
         """start() raises clear error when Docker is not running."""
-        from docker.errors import DockerException
 
         with patch("shesha.shesha.docker") as mock_docker:
             shesha = Shesha(model="test-model", storage_path=tmp_path)
@@ -85,7 +87,6 @@ class TestDockerAvailability:
 
     def test_start_raises_helpful_error_when_socket_not_found(self, tmp_path: Path):
         """start() raises helpful error mentioning Podman when socket not found."""
-        from docker.errors import DockerException
 
         with patch("shesha.shesha.docker") as mock_docker:
             shesha = Shesha(model="test-model", storage_path=tmp_path)
@@ -116,7 +117,6 @@ class TestDockerAvailability:
 
     def test_stop_clears_pool_on_engine(self, tmp_path: Path):
         """stop() clears the pool reference on the engine for defensive cleanup."""
-        from shesha.sandbox.pool import ContainerPool
 
         mock_pool = MagicMock(spec=ContainerPool)
         with (
@@ -138,7 +138,6 @@ class TestDockerAvailability:
 
     def test_start_retries_after_pool_start_failure(self, tmp_path: Path):
         """If pool.start() raises, subsequent start() should retry, not return early."""
-        from shesha.sandbox.pool import ContainerPool
 
         call_count = 0
 
@@ -166,7 +165,6 @@ class TestDockerAvailability:
 
     def test_start_is_idempotent(self, tmp_path: Path):
         """Calling start() twice creates only one pool."""
-        from shesha.sandbox.pool import ContainerPool
 
         with (
             patch("shesha.shesha.docker"),
@@ -197,7 +195,6 @@ class TestDockerAvailability:
     def test_start_starts_pool_before_publishing_to_engine(self, tmp_path: Path):
         """start() calls pool.start() before set_pool() so a failed start
         doesn't leave the engine holding a broken pool reference."""
-        from shesha.sandbox.pool import ContainerPool
 
         mock_pool = MagicMock(spec=ContainerPool)
         call_order: list[str] = []
@@ -222,7 +219,6 @@ class TestDockerAvailability:
     def test_stop_clears_engine_pool_before_stopping(self, tmp_path: Path):
         """stop() clears engine pool reference before pool.stop() so in-flight
         queries see pool=None rather than a stopped pool."""
-        from shesha.sandbox.pool import ContainerPool
 
         mock_pool = MagicMock(spec=ContainerPool)
         call_order: list[str] = []
@@ -299,7 +295,6 @@ class TestShesha:
 
     def test_stop_after_restart_stops_pool(self, tmp_path: Path):
         """Stop after start-stop-start cycle should stop the pool."""
-        from shesha.sandbox.pool import ContainerPool
 
         mock_pool = MagicMock(spec=ContainerPool)
         with (
@@ -338,10 +333,8 @@ class TestShesha:
 
     def test_shesha_uses_config_load_by_default(self, tmp_path: Path):
         """Shesha uses SheshaConfig.load() by default, picking up env vars."""
-        import os
-        from unittest.mock import patch as mock_patch
 
-        with mock_patch.dict(os.environ, {"SHESHA_MAX_ITERATIONS": "99"}):
+        with patch.dict(os.environ, {"SHESHA_MAX_ITERATIONS": "99"}):
             shesha = Shesha(storage_path=tmp_path)
             assert shesha.rlm_engine.max_iterations == 99
 
@@ -477,7 +470,6 @@ class TestCreateProjectFromRepo:
     ):
         """When saved_sha exists but remote SHA is None (network failure),
         return check_failed instead of updates_available."""
-        import logging
 
         with patch("shesha.shesha.docker"), patch("shesha.shesha.ContainerPool"):
             with patch("shesha.shesha.RepoIngester") as mock_ingester_cls:
@@ -668,7 +660,6 @@ class TestCreateProjectFromRepo:
 
     def test_raises_for_non_git_local_path(self, tmp_path: Path):
         """create_project_from_repo raises RepoIngestError for non-git local dirs."""
-        from shesha.exceptions import RepoIngestError
 
         with patch("shesha.shesha.docker"), patch("shesha.shesha.ContainerPool"):
             with patch("shesha.shesha.RepoIngester") as mock_ingester_cls:
@@ -795,8 +786,6 @@ class TestAtomicIngestion:
                 # Create a user project whose name matches the old staging pattern
                 shesha.storage.create_project("_staging_my-project")
 
-                from shesha.models import ParsedDocument
-
                 original_doc = ParsedDocument(
                     name="original.txt",
                     content="original",
@@ -833,7 +822,6 @@ class TestAtomicIngestion:
 
     def test_update_passes_custom_storage_to_ingest(self, tmp_path: Path):
         """Updates pass the custom storage backend to ingest()."""
-        from shesha.storage.base import StorageBackend
 
         real_storage = FilesystemStorage(root_path=tmp_path)
 
@@ -1324,7 +1312,6 @@ class TestGetProjectInfoWithAnalysis:
 
     def test_get_project_info_analysis_status_current(self, shesha_instance):
         """get_project_info shows 'current' when analysis matches SHA."""
-        from shesha.models import RepoAnalysis
 
         shesha_instance.create_project("info-current")
         shesha_instance.repo_ingester.save_sha("info-current", "sha123")
@@ -1346,7 +1333,6 @@ class TestGetProjectInfoWithAnalysis:
 
     def test_get_project_info_analysis_status_stale(self, shesha_instance):
         """get_project_info shows 'stale' when analysis SHA differs from current."""
-        from shesha.models import RepoAnalysis
 
         shesha_instance.create_project("info-stale")
         shesha_instance.repo_ingester.save_sha("info-stale", "new_sha")
@@ -1378,7 +1364,6 @@ class TestAnalysisStatus:
 
     def test_get_analysis_status_current(self, shesha_instance: Shesha, tmp_path: Path):
         """get_analysis_status returns 'current' when analysis matches HEAD."""
-        from shesha.models import RepoAnalysis
 
         shesha_instance.create_project("current-analysis")
         analysis = RepoAnalysis(
@@ -1398,7 +1383,6 @@ class TestAnalysisStatus:
 
     def test_get_analysis_status_stale(self, shesha_instance: Shesha, tmp_path: Path):
         """get_analysis_status returns 'stale' when analysis SHA differs from HEAD."""
-        from shesha.models import RepoAnalysis
 
         shesha_instance.create_project("stale-analysis")
         analysis = RepoAnalysis(
@@ -1420,7 +1404,6 @@ class TestAnalysisStatus:
         self, shesha_instance: Shesha, tmp_path: Path
     ):
         """get_analysis_status returns 'stale' when saved SHA is None but analysis exists."""
-        from shesha.models import RepoAnalysis
 
         shesha_instance.create_project("unknown-sha")
         analysis = RepoAnalysis(
@@ -1448,7 +1431,6 @@ class TestGetAnalysis:
 
     def test_get_analysis_returns_stored_analysis(self, shesha_instance: Shesha):
         """get_analysis returns the stored analysis."""
-        from shesha.models import AnalysisComponent, RepoAnalysis
 
         shesha_instance.create_project("get-analysis-project")
         comp = AnalysisComponent(
@@ -1492,7 +1474,6 @@ class TestGenerateAnalysis:
 
     def test_generate_analysis_stores_result(self, shesha_instance):
         """generate_analysis stores the generated analysis."""
-        from shesha.models import RepoAnalysis
 
         # Create a project
         shesha_instance.create_project("gen-analysis")
@@ -1521,7 +1502,6 @@ class TestGenerateAnalysis:
 
     def test_generate_analysis_returns_analysis(self, shesha_instance):
         """generate_analysis returns the generated RepoAnalysis."""
-        from shesha.models import RepoAnalysis
 
         shesha_instance.create_project("return-analysis")
 

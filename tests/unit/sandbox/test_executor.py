@@ -2,12 +2,25 @@
 
 import json
 import struct
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import MagicMock, patch
 
 import pytest
+from docker.errors import DockerException
 
-from shesha.sandbox.executor import ContainerExecutor, ExecutionResult
+from shesha.sandbox.executor import (
+    DEFAULT_SEND_TIMEOUT,
+    MAX_BUFFER_SIZE,
+    MAX_MESSAGE_SIZE,
+    MAX_PAYLOAD_SIZE,
+    MAX_READ_DURATION,
+    ContainerExecutor,
+    ExecutionResult,
+    ProtocolError,
+    SubcallContentError,
+)
 from shesha.security.containers import ContainerSecurityConfig
 
 
@@ -16,7 +29,6 @@ class TestProtocolError:
 
     def test_protocol_error_exists(self):
         """ProtocolError is importable from executor module."""
-        from shesha.sandbox.executor import ProtocolError
 
         err = ProtocolError("test message")
         assert str(err) == "test message"
@@ -27,14 +39,12 @@ class TestSubcallContentError:
 
     def test_subcall_content_error_exists(self):
         """SubcallContentError is importable from executor module."""
-        from shesha.sandbox.executor import SubcallContentError
 
         err = SubcallContentError("content too large")
         assert str(err) == "content too large"
 
     def test_subcall_content_error_is_exception(self):
         """SubcallContentError is a proper Exception subclass."""
-        from shesha.sandbox.executor import SubcallContentError
 
         assert issubclass(SubcallContentError, Exception)
 
@@ -44,19 +54,16 @@ class TestProtocolLimits:
 
     def test_max_buffer_size_exists(self):
         """MAX_BUFFER_SIZE constant is defined."""
-        from shesha.sandbox.executor import MAX_BUFFER_SIZE
 
         assert MAX_BUFFER_SIZE == 10 * 1024 * 1024  # 10 MB
 
     def test_max_message_size_exists(self):
         """MAX_MESSAGE_SIZE constant is defined."""
-        from shesha.sandbox.executor import MAX_MESSAGE_SIZE
 
         assert MAX_MESSAGE_SIZE == 10 * 1024 * 1024  # 10 MB
 
     def test_max_read_duration_exists(self):
         """MAX_READ_DURATION constant is defined."""
-        from shesha.sandbox.executor import MAX_READ_DURATION
 
         assert MAX_READ_DURATION == 300  # 5 minutes
 
@@ -208,7 +215,6 @@ class TestConnectionClose:
 
     def test_read_message_raises_on_connection_close_before_length_prefix(self):
         """_read_message raises ProtocolError when connection closes before length prefix."""
-        from shesha.sandbox.executor import ProtocolError
 
         mock_socket = MagicMock()
 
@@ -235,7 +241,6 @@ class TestConnectionClose:
 
     def test_read_message_raises_on_connection_close_mid_payload(self):
         """_read_message raises ProtocolError when connection closes mid-payload."""
-        from shesha.sandbox.executor import ProtocolError
 
         mock_socket = MagicMock()
 
@@ -268,7 +273,6 @@ class TestBufferLimits:
 
     def test_read_message_raises_on_oversized_content_buffer(self):
         """_read_message raises ProtocolError when content buffer exceeds limit."""
-        from shesha.sandbox.executor import MAX_BUFFER_SIZE, ProtocolError
 
         mock_socket = MagicMock()
         # Send Docker frames with data that would exceed MAX_BUFFER_SIZE
@@ -397,7 +401,6 @@ class TestContainerExecutor:
         docker.errors.DockerException), the error message should clearly explain
         that Docker Desktop needs to be started.
         """
-        from docker.errors import DockerException
 
         # Simulate Docker daemon not running
         mock_docker.from_env.side_effect = DockerException(
@@ -406,8 +409,6 @@ class TestContainerExecutor:
         )
 
         executor = ContainerExecutor()
-
-        import pytest
 
         with pytest.raises(RuntimeError) as exc_info:
             executor.start()
@@ -463,11 +464,6 @@ class TestMessageSizeLimit:
 
     def test_read_message_raises_on_oversized_message(self):
         """_read_message raises ProtocolError when message exceeds MAX_MESSAGE_SIZE."""
-        from shesha.sandbox.executor import (
-            MAX_MESSAGE_SIZE,
-            ContainerExecutor,
-            ProtocolError,
-        )
 
         mock_socket = MagicMock()
 
@@ -503,7 +499,6 @@ class TestReadDeadline:
 
     def test_read_message_raises_on_deadline_exceeded(self):
         """_read_message raises ProtocolError when total time exceeds deadline."""
-        from shesha.sandbox.executor import ContainerExecutor, ProtocolError
 
         mock_socket = MagicMock()
 
@@ -549,7 +544,6 @@ class TestReadDeadline:
 
         A malicious container could drip data slowly to keep the inner loop spinning.
         """
-        from shesha.sandbox.executor import ContainerExecutor, ProtocolError
 
         mock_socket = MagicMock()
 
@@ -594,7 +588,6 @@ class TestExecuteProtocolHandling:
 
     def test_execute_returns_error_result_on_protocol_error(self):
         """execute() returns error ExecutionResult when ProtocolError occurs."""
-        from shesha.sandbox.executor import ContainerExecutor, ProtocolError
 
         executor = ContainerExecutor()
         executor._socket = MagicMock()
@@ -609,7 +602,6 @@ class TestExecuteProtocolHandling:
 
     def test_execute_stops_container_on_protocol_error(self):
         """execute() stops the container when ProtocolError occurs."""
-        from shesha.sandbox.executor import ContainerExecutor, ProtocolError
 
         executor = ContainerExecutor()
         executor._socket = MagicMock()
@@ -623,7 +615,6 @@ class TestExecuteProtocolHandling:
 
     def test_execute_handles_malformed_llm_query_as_protocol_error(self):
         """execute() treats llm_query missing required fields as protocol violation."""
-        from shesha.sandbox.executor import ContainerExecutor
 
         executor = ContainerExecutor()
         executor._socket = MagicMock()
@@ -643,7 +634,6 @@ class TestExecuteProtocolHandling:
 
     def test_execute_returns_error_when_socket_is_none(self):
         """execute() returns error result when called after stop() (no socket)."""
-        from shesha.sandbox.executor import ContainerExecutor
 
         executor = ContainerExecutor()
         # Simulate stopped state - socket is None
@@ -661,8 +651,6 @@ class TestSubcallContentErrorHandling:
 
     def test_execute_sends_error_response_on_subcall_content_error(self):
         """execute() sends error field to sandbox when handler raises SubcallContentError."""
-
-        from shesha.sandbox.executor import SubcallContentError
 
         executor = ContainerExecutor()
         executor._socket = MagicMock()
@@ -707,8 +695,6 @@ class TestSubcallContentErrorHandling:
 
     def test_execute_does_not_stop_container_on_subcall_content_error(self):
         """SubcallContentError does not kill the container — user error."""
-
-        from shesha.sandbox.executor import SubcallContentError
 
         executor = ContainerExecutor()
         executor._socket = MagicMock()
@@ -854,7 +840,6 @@ class TestIsAlive:
 
     def test_is_alive_false_after_protocol_error(self):
         """is_alive returns False after ProtocolError kills executor."""
-        from shesha.sandbox.executor import ProtocolError
 
         executor = ContainerExecutor()
         executor._socket = MagicMock()
@@ -887,7 +872,6 @@ class TestSendTimeout:
 
     def test_send_message_uses_default_timeout(self):
         """_send_message uses default timeout when none specified."""
-        from shesha.sandbox.executor import DEFAULT_SEND_TIMEOUT
 
         executor = ContainerExecutor()
         mock_socket = MagicMock()
@@ -907,7 +891,6 @@ class TestPayloadSizeLimit:
 
     def test_send_message_rejects_oversized_payload(self):
         """_send_message raises ProtocolError when payload exceeds MAX_PAYLOAD_SIZE."""
-        from shesha.sandbox.executor import MAX_PAYLOAD_SIZE, ProtocolError
 
         executor = ContainerExecutor()
         mock_socket = MagicMock()
@@ -923,7 +906,6 @@ class TestPayloadSizeLimit:
 
     def test_max_payload_size_constant_exists(self):
         """MAX_PAYLOAD_SIZE constant is defined."""
-        from shesha.sandbox.executor import MAX_PAYLOAD_SIZE
 
         assert MAX_PAYLOAD_SIZE == 50 * 1024 * 1024  # 50 MB
 
@@ -952,7 +934,6 @@ class TestSendMessageSocketErrors:
 
     def test_send_message_wraps_os_error_as_protocol_error(self):
         """_send_message wraps OSError from sendall as ProtocolError."""
-        from shesha.sandbox.executor import ProtocolError
 
         executor = ContainerExecutor()
         mock_socket = MagicMock()
@@ -964,7 +945,6 @@ class TestSendMessageSocketErrors:
 
     def test_send_message_wraps_timeout_error_as_protocol_error(self):
         """_send_message wraps TimeoutError from sendall as ProtocolError."""
-        from shesha.sandbox.executor import ProtocolError
 
         executor = ContainerExecutor()
         mock_socket = MagicMock()
@@ -991,7 +971,6 @@ class TestSendMessageSocketErrors:
 
     def test_send_message_restores_timeout_on_error(self):
         """_send_message restores the previous timeout even when sendall fails."""
-        from shesha.sandbox.executor import ProtocolError
 
         executor = ContainerExecutor()
         mock_socket = MagicMock()
@@ -1013,7 +992,6 @@ class TestEffectiveDeadline:
 
     def test_read_message_deadline_respects_execution_timeout(self):
         """_read_message deadline is bounded by timeout parameter, not just MAX_READ_DURATION."""
-        from shesha.sandbox.executor import ContainerExecutor, ProtocolError
 
         mock_socket = MagicMock()
 
@@ -1091,7 +1069,6 @@ class TestBatchedLlmQuery:
 
     def test_execute_batch_runs_concurrently(self):
         """execute() dispatches batch prompts concurrently, not sequentially."""
-        import threading
 
         executor = ContainerExecutor()
         executor._socket = MagicMock()
@@ -1205,7 +1182,6 @@ class TestBatchExecution:
 
     def test_execute_batch_caps_thread_count(self):
         """_execute_batch caps max_workers to avoid unbounded thread creation."""
-        from concurrent.futures import ThreadPoolExecutor
 
         executor = ContainerExecutor()
         executor.llm_query_handler = lambda inst, cont: "ok"
@@ -1293,7 +1269,6 @@ class TestResetNamespace:
 
     def test_reset_namespace_sends_reset_action(self):
         """reset_namespace() sends {"action": "reset"} to container."""
-        from shesha.sandbox.executor import ContainerExecutor
 
         executor = ContainerExecutor()
 
@@ -1304,7 +1279,6 @@ class TestResetNamespace:
 
     def test_reset_namespace_returns_response(self):
         """reset_namespace() returns the response from the container."""
-        from shesha.sandbox.executor import ContainerExecutor
 
         executor = ContainerExecutor()
 

@@ -8,7 +8,9 @@ import pytest
 
 from shesha import Shesha
 from shesha.exceptions import RepoIngestError
+from shesha.parser import create_default_registry
 from shesha.repo.ingester import RepoIngester
+from shesha.storage.filesystem import FilesystemStorage
 
 
 @pytest.fixture
@@ -52,10 +54,8 @@ class TestLocalPathRestriction:
 
     def test_rejects_local_path_when_disabled(self, sample_git_repo: Path, tmp_path: Path):
         """ingest() raises when allow_local_paths=False and URL is a local path."""
-        from shesha.storage.filesystem import FilesystemStorage
 
         storage = FilesystemStorage(root_path=tmp_path / "storage")
-        from shesha.parser import create_default_registry
 
         registry = create_default_registry()
         ingester = RepoIngester(storage_path=tmp_path, allow_local_paths=False)
@@ -72,10 +72,8 @@ class TestLocalPathRestriction:
 
     def test_allows_local_path_by_default(self, sample_git_repo: Path, tmp_path: Path):
         """ingest() works for local paths with default settings."""
-        from shesha.storage.filesystem import FilesystemStorage
 
         storage = FilesystemStorage(root_path=tmp_path / "storage")
-        from shesha.parser import create_default_registry
 
         registry = create_default_registry()
         ingester = RepoIngester(storage_path=tmp_path)

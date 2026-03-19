@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from textual.widgets import Static
 
+from shesha.analysis.shortcut import ShortcutResult
 from shesha.rlm.engine import QueryResult
 from shesha.rlm.trace import StepType, TokenUsage, Trace
 from shesha.tui.app import SheshaTUI
@@ -582,7 +583,6 @@ class TestAnalysisShortcutTokenDisplay:
 
     async def test_shortcut_answer_updates_token_count(self) -> None:
         """When shortcut answers a query, token counts appear in the info bar."""
-        from shesha.analysis.shortcut import ShortcutResult
 
         project = MagicMock()
         app = SheshaTUI(
@@ -616,7 +616,6 @@ class TestAnalysisShortcutTokenDisplay:
 
     async def test_shortcut_answer_records_tokens_in_session(self) -> None:
         """Shortcut session stats include token counts, matching normal query path."""
-        from shesha.analysis.shortcut import ShortcutResult
 
         project = MagicMock()
         app = SheshaTUI(
@@ -646,7 +645,6 @@ class TestAnalysisShortcutTokenDisplay:
 
     async def test_shortcut_answer_shows_thought_time(self) -> None:
         """Shortcut answer displays 'Thought for N seconds' above the response."""
-        from shesha.analysis.shortcut import ShortcutResult
 
         project = MagicMock()
         app = SheshaTUI(
@@ -687,7 +685,6 @@ class TestAnalysisShortcutHistoryContext:
 
     async def test_shortcut_receives_history_prefix(self) -> None:
         """When conversation history exists, shortcut question includes it."""
-        from shesha.analysis.shortcut import ShortcutResult
 
         project = MagicMock()
         app = SheshaTUI(

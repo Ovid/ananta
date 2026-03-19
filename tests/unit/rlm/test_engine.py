@@ -1,13 +1,19 @@
 """Tests for RLM engine."""
 
+import concurrent.futures
 import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from shesha.rlm.engine import QueryResult, RLMEngine, extract_code_blocks
+from shesha.llm.client import LLMClient
+from shesha.rlm.engine import QueryResult, RLMEngine, extract_code_blocks, find_final_answer
 from shesha.rlm.trace import StepType, TokenUsage, Trace
+from shesha.rlm.verification import Citation, VerificationResult
+from shesha.sandbox.executor import ExecutionResult, SubcallContentError
+from shesha.sandbox.pool import ContainerPool
+from shesha.storage.filesystem import FilesystemStorage
 
 
 def test_extract_code_blocks_finds_repl():
@@ -58,7 +64,6 @@ def test_query_result_verification_defaults_none():
 
 def test_query_result_accepts_verification():
     """QueryResult accepts optional verification param."""
-    from shesha.rlm.verification import Citation, VerificationResult
 
     vr = VerificationResult(
         citations=[Citation(doc_id=0, found=True)],
@@ -113,7 +118,6 @@ def test_engine_accepts_llm_client_factory():
 
 def test_engine_defaults_llm_client_factory_to_llm_client():
     """RLMEngine defaults llm_client_factory to LLMClient."""
-    from shesha.llm.client import LLMClient
 
     engine = RLMEngine(model="test-model")
     assert engine.llm_client_factory is LLMClient
@@ -124,7 +128,6 @@ class TestSetPool:
 
     def test_set_pool_assigns_pool(self):
         """set_pool() stores the pool for use during queries."""
-        from shesha.sandbox.pool import ContainerPool
 
         engine = RLMEngine(model="test-model")
         pool = MagicMock(spec=ContainerPool)
@@ -133,7 +136,6 @@ class TestSetPool:
 
     def test_set_pool_accepts_none_to_clear(self):
         """set_pool(None) clears the pool, reverting to standalone executors."""
-        from shesha.sandbox.pool import ContainerPool
 
         pool = MagicMock(spec=ContainerPool)
         engine = RLMEngine(model="test-model", pool=pool)
@@ -445,7 +447,6 @@ class TestRLMEngine:
         mock_llm_cls: MagicMock,
     ):
         """When pool is provided, engine acquires executor from pool instead of creating one."""
-        from shesha.sandbox.pool import ContainerPool
 
         mock_llm = MagicMock()
         mock_llm.complete.return_value = MagicMock(
@@ -481,7 +482,6 @@ class TestRLMEngine:
         mock_llm_cls: MagicMock,
     ):
         """Engine resets executor namespace before releasing back to pool."""
-        from shesha.sandbox.pool import ContainerPool
 
         mock_llm = MagicMock()
         mock_llm.complete.return_value = MagicMock(
@@ -549,7 +549,6 @@ class TestRLMEngine:
         mock_llm_cls: MagicMock,
     ):
         """Engine raises SubcallContentError when subcall content exceeds limit."""
-        from shesha.sandbox.executor import SubcallContentError
 
         # Create engine with small limit for testing
         engine = RLMEngine(model="test-model", max_subcall_content_chars=1000)
@@ -618,7 +617,6 @@ class TestRLMEngine:
         mock_llm_cls: MagicMock,
     ):
         """Size limit applies to instruction when content is empty (single-arg form)."""
-        from shesha.sandbox.executor import SubcallContentError
 
         engine = RLMEngine(model="test-model", max_subcall_content_chars=1000)
         trace = Trace()
@@ -1305,7 +1303,6 @@ class TestCallbackIterationCapture:
         Bug: callback captured `current_iteration` by reference, so by the time
         it was called, the value could have advanced to a later iteration.
         """
-        from shesha.sandbox.pool import ContainerPool
 
         captured_iterations: list[int] = []
 
@@ -1386,8 +1383,6 @@ class TestCallbackIterationCapture:
         mock_llm_cls: MagicMock,
     ) -> None:
         """After dead executor recovery, the new callback uses the current iteration."""
-        from shesha.sandbox.executor import ExecutionResult
-        from shesha.sandbox.pool import ContainerPool
 
         captured_iterations: list[int] = []
 
@@ -1468,7 +1463,6 @@ class TestDeadExecutorNoPool:
         mock_executor_cls: MagicMock,
     ):
         """Engine makes only 1 LLM call, not 20, when executor dies without pool."""
-        from shesha.sandbox.executor import ExecutionResult
 
         mock_llm = MagicMock()
         mock_llm.complete.return_value = MagicMock(
@@ -1509,7 +1503,6 @@ class TestDeadExecutorNoPool:
         mock_executor_cls: MagicMock,
     ):
         """Early exit answer is distinct from max iterations message."""
-        from shesha.sandbox.executor import ExecutionResult
 
         mock_llm = MagicMock()
         mock_llm.complete.return_value = MagicMock(
@@ -1553,8 +1546,6 @@ class TestDeadExecutorWithPool:
         mock_llm_cls: MagicMock,
     ) -> None:
         """Dead executor is stopped before being discarded from pool."""
-        from shesha.sandbox.executor import ExecutionResult
-        from shesha.sandbox.pool import ContainerPool
 
         mock_llm = MagicMock()
         call_count = 0
@@ -1626,8 +1617,6 @@ class TestDeadExecutorPoolStopped:
         mock_llm_cls: MagicMock,
     ) -> None:
         """If pool.acquire() raises RuntimeError (pool stopped), abort gracefully."""
-        from shesha.sandbox.executor import ExecutionResult
-        from shesha.sandbox.pool import ContainerPool
 
         mock_llm = MagicMock()
         mock_llm.complete.return_value = MagicMock(
@@ -1853,7 +1842,6 @@ class TestEngineTraceWriterSuppression:
         tmp_path: Path,
     ) -> None:
         """Engine creates IncrementalTraceWriter with suppress_errors=True."""
-        from shesha.storage.filesystem import FilesystemStorage
 
         storage = FilesystemStorage(root_path=tmp_path)
         storage.create_project("test-project")
@@ -1900,7 +1888,6 @@ class TestEngineTraceWriterSuppression:
         tmp_path: Path,
     ) -> None:
         """Engine creates TraceWriter with suppress_errors=True for cleanup."""
-        from shesha.storage.filesystem import FilesystemStorage
 
         storage = FilesystemStorage(root_path=tmp_path)
         storage.create_project("test-project")
@@ -1950,7 +1937,6 @@ class TestEngineTraceWriting:
         tmp_path: Path,
     ) -> None:
         """Query writes trace file when storage is provided."""
-        from shesha.storage.filesystem import FilesystemStorage
 
         storage = FilesystemStorage(root_path=tmp_path)
         storage.create_project("test-project")
@@ -1994,7 +1980,6 @@ class TestEngineTraceWriting:
         tmp_path: Path,
     ) -> None:
         """Query writes trace steps incrementally, not just at the end."""
-        from shesha.storage.filesystem import FilesystemStorage
 
         storage = FilesystemStorage(root_path=tmp_path)
         storage.create_project("test-project")
@@ -2049,7 +2034,6 @@ class TestEngineTraceWriting:
         tmp_path: Path,
     ) -> None:
         """If query is interrupted by exception, partial trace is still written."""
-        from shesha.storage.filesystem import FilesystemStorage
 
         storage = FilesystemStorage(root_path=tmp_path)
         storage.create_project("test-project")
@@ -2121,7 +2105,6 @@ class TestEngineMaxTracesConfig:
         tmp_path: Path,
     ) -> None:
         """Engine passes max_traces_per_project to cleanup_old_traces."""
-        from shesha.storage.filesystem import FilesystemStorage
 
         storage = FilesystemStorage(root_path=tmp_path)
         storage.create_project("test-project")
@@ -2400,8 +2383,6 @@ class TestHandleLlmQueryThreadSafety:
         threads call _handle_llm_query simultaneously. Trace steps and
         token counts must be consistent.
         """
-        import concurrent.futures
-        from unittest.mock import MagicMock
 
         mock_response = MagicMock(
             content="answer",
@@ -2518,7 +2499,6 @@ class TestFindFinalAnswerInText:
 
     def test_find_final_answer_bare_final(self):
         """Detects bare FINAL("answer") outside code blocks, strips quotes."""
-        from shesha.rlm.engine import find_final_answer
 
         text = 'FINAL("human being")'
         result = find_final_answer(text)
@@ -2526,7 +2506,6 @@ class TestFindFinalAnswerInText:
 
     def test_find_final_answer_bare_final_var(self):
         """Detects bare FINAL_VAR(var_name) outside code blocks."""
-        from shesha.rlm.engine import find_final_answer
 
         text = "FINAL_VAR(my_answer)"
         result = find_final_answer(text)
@@ -2534,7 +2513,6 @@ class TestFindFinalAnswerInText:
 
     def test_find_final_answer_returns_none_for_no_match(self):
         """Returns None when no FINAL pattern is present."""
-        from shesha.rlm.engine import find_final_answer
 
         text = "Let me continue exploring the data."
         result = find_final_answer(text)
@@ -2542,7 +2520,6 @@ class TestFindFinalAnswerInText:
 
     def test_find_final_answer_ignores_inside_repl_block(self):
         """Does NOT match FINAL inside a ```repl block (handled by executor)."""
-        from shesha.rlm.engine import find_final_answer
 
         text = '```repl\nFINAL("answer")\n```'
         result = find_final_answer(text)
@@ -2550,7 +2527,6 @@ class TestFindFinalAnswerInText:
 
     def test_find_final_answer_with_leading_whitespace(self):
         """FINAL at start of line with whitespace is detected, strips quotes."""
-        from shesha.rlm.engine import find_final_answer
 
         text = '  FINAL("the answer")'
         result = find_final_answer(text)
@@ -2558,7 +2534,6 @@ class TestFindFinalAnswerInText:
 
     def test_find_final_answer_strips_quotes_from_var(self):
         """FINAL_VAR with quoted variable name strips quotes."""
-        from shesha.rlm.engine import find_final_answer
 
         text = 'FINAL_VAR("my_var")'
         result = find_final_answer(text)
@@ -2566,7 +2541,6 @@ class TestFindFinalAnswerInText:
 
     def test_find_final_var_non_identifier_treated_as_literal(self):
         """FINAL_VAR with non-identifier content falls back to literal."""
-        from shesha.rlm.engine import find_final_answer
 
         # Dotted expression — not a valid identifier, must not become final_var
         result = find_final_answer("FINAL_VAR(foo.bar)")
@@ -2574,56 +2548,48 @@ class TestFindFinalAnswerInText:
 
     def test_find_final_var_expression_treated_as_literal(self):
         """FINAL_VAR(x + y) with operators falls back to literal."""
-        from shesha.rlm.engine import find_final_answer
 
         result = find_final_answer("FINAL_VAR(x + y)")
         assert result == ("final", "x + y")
 
     def test_find_final_var_keyword_treated_as_literal(self):
         """FINAL_VAR(True) with Python keyword falls back to literal."""
-        from shesha.rlm.engine import find_final_answer
 
         result = find_final_answer("FINAL_VAR(True)")
         assert result == ("final", "True")
 
     def test_find_final_var_valid_identifier_still_works(self):
         """FINAL_VAR(valid_name) with a valid identifier stays as final_var."""
-        from shesha.rlm.engine import find_final_answer
 
         result = find_final_answer("FINAL_VAR(my_answer)")
         assert result == ("final_var", "my_answer")
 
     def test_find_final_answer_unquoted_content(self):
         """FINAL(bare text) without quotes is detected (reference RLM compat)."""
-        from shesha.rlm.engine import find_final_answer
 
         result = find_final_answer("FINAL(42)")
         assert result == ("final", "42")
 
     def test_find_final_answer_single_quoted_content(self):
         """FINAL('single quoted') strips quotes (reference RLM compat)."""
-        from shesha.rlm.engine import find_final_answer
 
         result = find_final_answer("FINAL('hello world')")
         assert result == ("final", "hello world")
 
     def test_find_final_answer_nested_parentheses(self):
         """FINAL with nested parens uses greedy match (reference RLM compat)."""
-        from shesha.rlm.engine import find_final_answer
 
         result = find_final_answer("FINAL(func(arg1, arg2))")
         assert result == ("final", "func(arg1, arg2)")
 
     def test_find_final_answer_not_mid_line(self):
         """FINAL mid-line (not at start) should NOT match."""
-        from shesha.rlm.engine import find_final_answer
 
         result = find_final_answer("The result is FINAL(42)")
         assert result is None
 
     def test_find_final_answer_multiline_content(self):
         """FINAL with multiline content is captured."""
-        from shesha.rlm.engine import find_final_answer
 
         text = "FINAL(This is a\nmultiline answer)"
         result = find_final_answer(text)
@@ -2645,7 +2611,6 @@ class TestFindFinalAnswerInText:
         literal string "final_answer" instead of the 38K-char report the
         LLM had stored in the `final_answer` variable.
         """
-        from shesha.rlm.engine import find_final_answer
 
         # Single identifier — should be treated as variable reference
         result = find_final_answer("FINAL(final_answer)")
@@ -2653,56 +2618,48 @@ class TestFindFinalAnswerInText:
 
     def test_find_final_answer_bare_identifier_with_underscores(self):
         """FINAL(my_var_name) is treated as a variable reference."""
-        from shesha.rlm.engine import find_final_answer
 
         result = find_final_answer("FINAL(my_report)")
         assert result == ("final_var", "my_report")
 
     def test_find_final_answer_bare_identifier_simple(self):
         """FINAL(result) with a simple identifier is a variable reference."""
-        from shesha.rlm.engine import find_final_answer
 
         result = find_final_answer("FINAL(result)")
         assert result == ("final_var", "result")
 
     def test_find_final_answer_strips_surrounding_double_quotes(self):
         """FINAL("text") strips surrounding double quotes."""
-        from shesha.rlm.engine import find_final_answer
 
         result = find_final_answer('FINAL("The answer is 42")')
         assert result == ("final", "The answer is 42")
 
     def test_find_final_answer_strips_surrounding_single_quotes(self):
         """FINAL('text') strips surrounding single quotes."""
-        from shesha.rlm.engine import find_final_answer
 
         result = find_final_answer("FINAL('The answer is 42')")
         assert result == ("final", "The answer is 42")
 
     def test_find_final_answer_unescapes_newlines_in_quoted_string(self):
         r"""FINAL("line1\nline2") unescapes \n to real newlines."""
-        from shesha.rlm.engine import find_final_answer
 
         result = find_final_answer(r'FINAL("line1\nline2")')
         assert result == ("final", "line1\nline2")
 
     def test_find_final_answer_number_stays_literal(self):
         """FINAL(42) with a number stays as a literal (not a valid identifier)."""
-        from shesha.rlm.engine import find_final_answer
 
         result = find_final_answer("FINAL(42)")
         assert result == ("final", "42")
 
     def test_find_final_answer_expression_stays_literal(self):
         """FINAL(x + y) with operators stays as a literal."""
-        from shesha.rlm.engine import find_final_answer
 
         result = find_final_answer("FINAL(x + y)")
         assert result == ("final", "x + y")
 
     def test_find_final_answer_sentence_stays_literal(self):
         """FINAL(The answer is 42) with spaces stays as a literal."""
-        from shesha.rlm.engine import find_final_answer
 
         result = find_final_answer("FINAL(The answer is 42)")
         assert result == ("final", "The answer is 42")
@@ -2717,7 +2674,6 @@ class TestFindFinalAnswerInText:
         content contains (nested) at end of a line, causing the regex
         to treat that ) as the FINAL closer.
         """
-        from shesha.rlm.engine import find_final_answer
 
         # Mimics the real trace: FINAL( opens, content has (point-by-point)
         # at end of a line, then more content follows with NO closing paren
@@ -2736,21 +2692,18 @@ class TestFindFinalAnswerInText:
 
     def test_find_final_answer_bare_final_paren_returns_none(self):
         """Bare FINAL( with no content should return None, not empty answer."""
-        from shesha.rlm.engine import find_final_answer
 
         result = find_final_answer("FINAL(")
         assert result is None
 
     def test_find_final_answer_bare_final_paren_whitespace_returns_none(self):
         """FINAL( followed by only whitespace should return None."""
-        from shesha.rlm.engine import find_final_answer
 
         result = find_final_answer("FINAL(   \n  )")
         assert result is None
 
     def test_find_final_answer_with_trailing_commentary(self):
         """FINAL(answer) followed by commentary on next line extracts cleanly."""
-        from shesha.rlm.engine import find_final_answer
 
         text = "FINAL(The answer)\nSome commentary"
         result = find_final_answer(text)

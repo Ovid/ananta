@@ -576,9 +576,10 @@ class RLMEngine:
                     # bare-text FINAL_VAR retry in the main query loop).
                     resolved = self._resolve_final_var(result.final_var, executor)
                 if resolved is None:
-                    # Variable truly not found — record for retry guidance
+                    # Variable not found yet — record for retry but keep
+                    # executing later blocks which may define the variable.
                     failed_final_var = result.final_var
-                    break
+                    continue
                 final_answer = resolved
                 step = trace.add_step(
                     type=StepType.FINAL_ANSWER,
@@ -596,6 +597,14 @@ class RLMEngine:
                         copy.copy(token_usage),
                     )
                 break
+
+        # If a FINAL_VAR failed but later blocks executed (and may have
+        # defined the variable), retry resolution before reporting failure.
+        if failed_final_var and final_answer is None:
+            resolved = self._resolve_final_var(failed_final_var, executor)
+            if resolved is not None and resolved != "":
+                final_answer = resolved
+                failed_final_var = None
 
         return _CodeBlockResult(
             final_answer=final_answer,
@@ -616,7 +625,8 @@ class RLMEngine:
         """
         result = executor.execute(f"print({var_name})", timeout=self.execution_timeout)
         if result.status == "ok":
-            return result.stdout.strip()
+            value = result.stdout.strip()
+            return value if value else None
         return None
 
     def _run_verifications(

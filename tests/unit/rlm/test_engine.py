@@ -1095,7 +1095,20 @@ class TestRLMEngine:
             final_value=None,
             vars=None,
         )
-        mock_executor.execute.side_effect = [exec_result_1, resolve_result, exec_result_2]
+        # Post-loop re-resolution also fails (var still undefined after
+        # single code block), then outer loop retries with guidance.
+        resolve_result_2 = MagicMock(
+            status="error",
+            stdout="",
+            stderr="NameError: name 'missing_var' is not defined",
+            error="NameError",
+        )
+        mock_executor.execute.side_effect = [
+            exec_result_1,
+            resolve_result,
+            resolve_result_2,
+            exec_result_2,
+        ]
         mock_executor.is_alive = True
         mock_executor_cls.return_value = mock_executor
 
@@ -1169,7 +1182,19 @@ class TestCodeBlockFinalVarRetryGuidance:
             final_value=None,
             vars=None,
         )
-        mock_executor.execute.side_effect = [exec_result_1, resolve_result, exec_result_2]
+        # Post-loop re-resolution also fails (var still undefined)
+        resolve_result_2 = MagicMock(
+            status="error",
+            stdout="",
+            stderr="NameError: name 'missing_var' is not defined",
+            error="NameError",
+        )
+        mock_executor.execute.side_effect = [
+            exec_result_1,
+            resolve_result,
+            resolve_result_2,
+            exec_result_2,
+        ]
         mock_executor.is_alive = True
         mock_executor_cls.return_value = mock_executor
 
@@ -2769,21 +2794,26 @@ class TestFindFinalAnswerInText:
 
     @patch("shesha.rlm.engine.ContainerExecutor")
     @patch("shesha.rlm.engine.LLMClient")
-    def test_engine_returns_empty_string_var_not_literal_name(
+    def test_engine_retries_when_var_resolves_to_empty_string(
         self,
         mock_llm_cls: MagicMock,
         mock_executor_cls: MagicMock,
     ):
-        """FINAL(var) where var is defined as empty string returns empty string.
+        """FINAL(var) where var is empty should trigger retry, not return empty answer.
 
         The variable exists (status="ok") but its printed representation is
-        empty. The engine should return the empty string, not fall back to
-        the literal identifier name.
+        empty. The engine should treat this as "not found" and retry.
         """
         mock_llm = MagicMock()
         mock_llm.complete.side_effect = [
             MagicMock(
                 content="FINAL(empty_var)",
+                prompt_tokens=100,
+                completion_tokens=50,
+                total_tokens=150,
+            ),
+            MagicMock(
+                content='FINAL("real answer")',
                 prompt_tokens=100,
                 completion_tokens=50,
                 total_tokens=150,
@@ -2813,8 +2843,8 @@ class TestFindFinalAnswerInText:
             question="What is the answer?",
         )
 
-        # Should return empty string (the variable's value), not "empty_var"
-        assert result.answer == ""
+        # Should retry and get the real answer, not return empty string
+        assert result.answer == "real answer"
 
     @patch("shesha.rlm.engine.ContainerExecutor")
     @patch("shesha.rlm.engine.LLMClient")

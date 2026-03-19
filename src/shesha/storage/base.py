@@ -83,6 +83,11 @@ class StorageBackend(Protocol):
     def swap_docs(self, source_project_id: str, target_project_id: str) -> None:
         """Replace target project's docs with source project's docs.
 
+        Implementations must move or copy docs from source to target and
+        remove orphaned target docs.  The source **project shell** (empty
+        project entry) may or may not be deleted — callers must handle
+        cleanup of the source project independently.
+
         Backends like FilesystemStorage override this with an atomic
         rename-based swap.  Backends that don't override can delegate to
         ``default_swap_docs`` for a non-atomic copy-and-delete fallback.

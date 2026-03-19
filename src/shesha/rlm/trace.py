@@ -93,6 +93,7 @@ class Trace:
                     iteration=step.iteration,
                     tokens_used=step.tokens_used,
                     duration_ms=step.duration_ms,
+                    metadata=step.metadata,
                 )
             )
         return Trace(steps=redacted_steps)

@@ -182,6 +182,11 @@ def query_with_shortcut(
 
     Returns a ``ShortcutResult`` when the shortcut answered the question,
     or a ``QueryResult`` when the full RLM engine was used.
+
+    Note: ``llm_client_factory`` is only used for the shortcut LLM call.
+    The RLM fallback uses the engine's own factory (set at construction).
+    This is intentional — the shortcut is a single lightweight call while
+    the engine manages its own LLM lifecycle.
     """
     if analysis_context:
         boundary = generate_boundary()

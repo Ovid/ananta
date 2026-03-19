@@ -85,12 +85,13 @@ class StorageBackend(Protocol):
 
         Implementations must move or copy docs from source to target and
         remove orphaned target docs.  The source **project shell** (empty
-        project entry) may or may not be deleted — callers must handle
-        cleanup of the source project independently.
+        project entry after doc removal) may or may not be deleted by the
+        implementation — callers must handle cleanup independently.
 
-        Backends like FilesystemStorage override this with an atomic
-        rename-based swap.  Backends that don't override can delegate to
-        ``default_swap_docs`` for a non-atomic copy-and-delete fallback.
+        - ``FilesystemStorage`` does an atomic rename-based swap and does
+          **not** delete the source project shell.
+        - ``default_swap_docs`` does a non-atomic copy-and-delete and
+          **does** delete the source project.
         """
         ...
 

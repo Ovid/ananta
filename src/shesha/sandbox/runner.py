@@ -211,8 +211,9 @@ def main() -> None:
                     result["return_value"] = None  # Not JSON serializable
                 elif isinstance(rv, FinalVar):
                     result["final_var"] = rv.var_name
+                    value = NAMESPACE.get(rv.var_name)
                     result["final_value"] = (
-                        str(NAMESPACE[rv.var_name]) if rv.var_name in NAMESPACE else None
+                        str(value) if rv.var_name in NAMESPACE and value is not None else None
                     )
                     result["return_value"] = None  # Not JSON serializable
                 _write_message(real_stdout_buf, result)

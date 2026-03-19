@@ -543,6 +543,43 @@ class TestFinalVarMissingVariable:
         assert result["final_value"] == "hello world"
 
 
+    def test_final_var_none_valued_variable_returns_none(self) -> None:
+        """FINAL_VAR for a variable holding Python None must return None,
+        not the string 'None'."""
+        import sys
+
+        from shesha.sandbox.runner import main
+
+        stdin_data = b"".join(
+            [
+                frame_message(
+                    {
+                        "action": "execute",
+                        "code": "my_var = None\nFINAL_VAR('my_var')",
+                    }
+                ),
+            ]
+        )
+        stdin_buf = io.BytesIO(stdin_data)
+        stdout_buf = io.BytesIO()
+
+        old_stdin = sys.stdin
+        old_stdout = sys.stdout
+        try:
+            sys.stdin = _MockStdio(stdin_buf)
+            sys.stdout = _MockStdio(stdout_buf)
+            main()
+        finally:
+            sys.stdin = old_stdin
+            sys.stdout = old_stdout
+
+        messages = parse_messages(stdout_buf.getvalue())
+        result = messages[0]
+        assert result["final_var"] == "my_var"
+        # None-valued variable should be treated like missing, not "None" string
+        assert result["final_value"] is None
+
+
 class TestLengthPrefixHelpers:
     """Tests for length-prefix protocol helpers."""
 

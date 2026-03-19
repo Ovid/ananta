@@ -3,6 +3,7 @@
 import atexit
 import logging
 import re
+import threading
 import weakref
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
@@ -102,6 +103,7 @@ class Shesha:
 
         # Track if stopped to avoid double-cleanup
         self._stopped = False
+        self._start_lock = threading.Lock()
 
         # Register cleanup on exit using weak reference
         weak_self = weakref.ref(self)
@@ -355,28 +357,30 @@ class Shesha:
 
     def start(self) -> None:
         """Check Docker availability, create the container pool, and start it."""
-        if self._pool is not None and not self._stopped:
-            return
-        logger.info("Starting Shesha (model=%s)", self._config.model)
-        self._check_docker_available()
-        self._stopped = False
-        pool = ContainerPool(
-            size=self._config.pool_size,
-            image=self._config.sandbox_image,
-            memory_limit=f"{self._config.container_memory_mb}m",
-        )
-        pool.start()
-        self._pool = pool
-        self._rlm_engine.set_pool(pool)
+        with self._start_lock:
+            if self._pool is not None and not self._stopped:
+                return
+            logger.info("Starting Shesha (model=%s)", self._config.model)
+            self._check_docker_available()
+            self._stopped = False
+            pool = ContainerPool(
+                size=self._config.pool_size,
+                image=self._config.sandbox_image,
+                memory_limit=f"{self._config.container_memory_mb}m",
+            )
+            pool.start()
+            self._pool = pool
+            self._rlm_engine.set_pool(pool)
 
     def stop(self) -> None:
         """Stop the container pool."""
-        if self._stopped:
-            return
-        self._stopped = True
-        if self._pool is not None:
-            self._rlm_engine.set_pool(None)
-            self._pool.stop()
+        with self._start_lock:
+            if self._stopped:
+                return
+            self._stopped = True
+            if self._pool is not None:
+                self._rlm_engine.set_pool(None)
+                self._pool.stop()
 
     def __enter__(self) -> "Shesha":
         """Context manager entry."""

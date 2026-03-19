@@ -223,14 +223,16 @@ class RepoIngester:
     def get_source_url(self, project_id: str) -> str | None:
         """Get the saved source URL for a project."""
         meta_path = self._repo_path(project_id) / "_repo_meta.json"
-        data = self._load_meta(meta_path)
+        with self._meta_lock:
+            data = self._load_meta(meta_path)
         url = data.get("source_url")
         return str(url) if url is not None else None
 
     def get_saved_sha(self, project_id: str) -> str | None:
         """Get the saved HEAD SHA for a project."""
         meta_path = self._repo_path(project_id) / "_repo_meta.json"
-        data = self._load_meta(meta_path)
+        with self._meta_lock:
+            data = self._load_meta(meta_path)
         sha = data.get("head_sha")
         return str(sha) if sha is not None else None
 
@@ -241,7 +243,8 @@ class RepoIngester:
     def get_saved_path(self, project_id: str) -> str | None:
         """Get the saved subdirectory scope for a project."""
         meta_path = self._repo_path(project_id) / "_repo_meta.json"
-        data = self._load_meta(meta_path)
+        with self._meta_lock:
+            data = self._load_meta(meta_path)
         p = data.get("path")
         return str(p) if p is not None else None
 

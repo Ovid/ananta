@@ -470,6 +470,79 @@ class TestLlmQueryBatched:
         assert messages[1]["stdout"] == "True\n"
 
 
+class TestFinalVarMissingVariable:
+    """Tests for FINAL_VAR with missing sandbox variables."""
+
+    def test_final_var_missing_variable_returns_none_not_empty(self) -> None:
+        """FINAL_VAR for a missing variable must send None, not empty string."""
+        import sys
+
+        from shesha.sandbox.runner import main
+
+        stdin_data = b"".join(
+            [
+                frame_message(
+                    {
+                        "action": "execute",
+                        "code": "FINAL_VAR('nonexistent_var')",
+                    }
+                ),
+            ]
+        )
+        stdin_buf = io.BytesIO(stdin_data)
+        stdout_buf = io.BytesIO()
+
+        old_stdin = sys.stdin
+        old_stdout = sys.stdout
+        try:
+            sys.stdin = _MockStdio(stdin_buf)
+            sys.stdout = _MockStdio(stdout_buf)
+            main()
+        finally:
+            sys.stdin = old_stdin
+            sys.stdout = old_stdout
+
+        messages = parse_messages(stdout_buf.getvalue())
+        result = messages[0]
+        assert result["final_var"] == "nonexistent_var"
+        # Must be None so the engine can detect missing variable and retry
+        assert result["final_value"] is None
+
+    def test_final_var_existing_variable_returns_value(self) -> None:
+        """FINAL_VAR for an existing variable returns its string value."""
+        import sys
+
+        from shesha.sandbox.runner import main
+
+        stdin_data = b"".join(
+            [
+                frame_message(
+                    {
+                        "action": "execute",
+                        "code": "my_result = 'hello world'\nFINAL_VAR('my_result')",
+                    }
+                ),
+            ]
+        )
+        stdin_buf = io.BytesIO(stdin_data)
+        stdout_buf = io.BytesIO()
+
+        old_stdin = sys.stdin
+        old_stdout = sys.stdout
+        try:
+            sys.stdin = _MockStdio(stdin_buf)
+            sys.stdout = _MockStdio(stdout_buf)
+            main()
+        finally:
+            sys.stdin = old_stdin
+            sys.stdout = old_stdout
+
+        messages = parse_messages(stdout_buf.getvalue())
+        result = messages[0]
+        assert result["final_var"] == "my_result"
+        assert result["final_value"] == "hello world"
+
+
 class TestLengthPrefixHelpers:
     """Tests for length-prefix protocol helpers."""
 

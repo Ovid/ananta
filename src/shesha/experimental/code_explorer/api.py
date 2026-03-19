@@ -11,6 +11,8 @@ live on a local router.
 
 from __future__ import annotations
 
+import collections
+import threading
 from dataclasses import asdict
 from pathlib import Path
 
@@ -70,7 +72,12 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
 
     # Cache of pending update results keyed by project_id, so that
     # apply-updates can call the stored apply_updates() method.
-    pending_updates: dict[str, RepoProjectResult] = {}
+    # Protected by a lock since sync FastAPI handlers run in a thread pool.
+    _pending_lock = threading.Lock()
+    _pending_updates: collections.OrderedDict[str, RepoProjectResult] = (
+        collections.OrderedDict()
+    )
+    _MAX_PENDING = 100  # Bound growth — oldest entries evicted when full
 
     def _build_repo_info(pid: str) -> RepoInfo:
         """Build a RepoInfo for a project_id."""
@@ -159,7 +166,11 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
 
         # Cache the result if updates are available so apply-updates can use it
         if repo_result.status == "updates_available":
-            pending_updates[project_id] = repo_result
+            with _pending_lock:
+                _pending_updates[project_id] = repo_result
+                # Evict oldest entries if cache is full
+                while len(_pending_updates) > _MAX_PENDING:
+                    _pending_updates.popitem(last=False)
 
         return UpdateStatus(
             status=repo_result.status,
@@ -168,7 +179,8 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
 
     @router.post("/repos/{project_id}/apply-updates")
     def apply_updates(project_id: str) -> UpdateStatus:
-        repo_result = pending_updates.pop(project_id, None)
+        with _pending_lock:
+            repo_result = _pending_updates.pop(project_id, None)
         if repo_result is not None:
             pass  # Use cached result from check-updates
         else:

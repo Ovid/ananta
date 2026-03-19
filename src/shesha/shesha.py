@@ -261,7 +261,8 @@ class Shesha:
 
         current_sha = self._repo_ingester.get_saved_sha(project_id)
         if current_sha is None:
-            return "current"
+            # No SHA on record — analysis may be arbitrarily stale
+            return "stale"
 
         if analysis.head_sha == current_sha:
             return "current"

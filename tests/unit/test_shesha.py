@@ -1388,6 +1388,27 @@ class TestAnalysisStatus:
         status = shesha_instance.get_analysis_status("stale-analysis")
         assert status == "stale"
 
+    def test_get_analysis_status_stale_when_sha_unknown(
+        self, shesha_instance: Shesha, tmp_path: Path
+    ):
+        """get_analysis_status returns 'stale' when saved SHA is None but analysis exists."""
+        from shesha.models import RepoAnalysis
+
+        shesha_instance.create_project("unknown-sha")
+        analysis = RepoAnalysis(
+            version="1",
+            generated_at="2026-02-06T10:30:00Z",
+            head_sha="abc123",
+            overview="Test",
+            components=[],
+            external_dependencies=[],
+        )
+        shesha_instance.storage.store_analysis("unknown-sha", analysis)
+        # No SHA saved — get_saved_sha will return None
+
+        status = shesha_instance.get_analysis_status("unknown-sha")
+        assert status == "stale"
+
     def test_get_analysis_status_nonexistent_project_raises(self, shesha_instance: Shesha):
         """get_analysis_status raises for nonexistent project."""
         with pytest.raises(ProjectNotFoundError, match="does not exist"):

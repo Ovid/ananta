@@ -140,7 +140,7 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
         if not source_url:
             raise HTTPException(400, f"Project '{project_id}' has no source URL")
 
-        repo_result = state.shesha.create_project_from_repo(source_url)
+        repo_result = state.shesha.create_project_from_repo(source_url, name=project_id)
 
         # Cache the result if updates are available so apply-updates can use it
         if repo_result.status == "updates_available":
@@ -167,7 +167,9 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
             if not source_url:
                 raise HTTPException(400, f"Project '{project_id}' has no source URL")
 
-            repo_result = state.shesha.create_project_from_repo(source_url)
+            repo_result = state.shesha.create_project_from_repo(
+                source_url, name=project_id
+            )
 
             if repo_result.status != "updates_available":
                 raise HTTPException(409, f"No updates available for project '{project_id}'")

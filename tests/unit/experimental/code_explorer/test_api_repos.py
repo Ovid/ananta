@@ -533,3 +533,53 @@ class TestApplyUpdates:
 
         resp = client.post("/api/repos/owner-myrepo/apply-updates")
         assert resp.status_code == 409
+
+    def test_check_updates_passes_project_id_as_name(
+        self, client: TestClient, mock_shesha: MagicMock
+    ) -> None:
+        """check-updates passes name=project_id so the correct project is checked."""
+        mock_shesha.get_project_info.return_value = ProjectInfo(
+            project_id="custom-name",
+            source_url="https://github.com/owner/myrepo",
+            is_local=False,
+            source_exists=True,
+        )
+        project = MagicMock()
+        project.project_id = "custom-name"
+        mock_shesha.create_project_from_repo.return_value = RepoProjectResult(
+            project=project, status="unchanged", files_ingested=5,
+        )
+
+        client.post("/api/repos/custom-name/check-updates")
+
+        mock_shesha.create_project_from_repo.assert_called_once_with(
+            "https://github.com/owner/myrepo", name="custom-name"
+        )
+
+    def test_apply_updates_self_heal_passes_project_id_as_name(
+        self, client: TestClient, mock_shesha: MagicMock
+    ) -> None:
+        """apply-updates self-heal passes name=project_id to re-derive correctly."""
+        mock_shesha.get_project_info.return_value = ProjectInfo(
+            project_id="custom-name",
+            source_url="https://github.com/owner/myrepo",
+            is_local=False,
+            source_exists=True,
+        )
+        project = MagicMock()
+        project.project_id = "custom-name"
+        check_result = RepoProjectResult(
+            project=project,
+            status="updates_available",
+            files_ingested=10,
+            _apply_updates_fn=lambda: RepoProjectResult(
+                project=project, status="created", files_ingested=20,
+            ),
+        )
+        mock_shesha.create_project_from_repo.return_value = check_result
+
+        client.post("/api/repos/custom-name/apply-updates")
+
+        mock_shesha.create_project_from_repo.assert_called_once_with(
+            "https://github.com/owner/myrepo", name="custom-name"
+        )

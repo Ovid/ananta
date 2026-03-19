@@ -124,6 +124,15 @@ class BaseTopicManager:
                 names.append(meta["name"])
         return sorted(names)
 
+    def resolve(self, name: str) -> str | None:
+        """Resolve a topic name to its first project_id, or None."""
+        try:
+            meta, _path = self._resolve(name)
+        except ValueError:
+            return None
+        items = meta["items"]
+        return items[0] if items else None
+
     # ------------------------------------------------------------------
     # Item references
     # ------------------------------------------------------------------

@@ -147,6 +147,26 @@ class TestCreateAndListTopics:
         assert "Research" in mgr.list_topics()
 
 
+class TestResolve:
+    """I6: BaseTopicManager must provide resolve() for shared routes/websockets."""
+
+    def test_resolve_returns_first_item(self, tmp_path: Path) -> None:
+        mgr = BaseTopicManager(tmp_path)
+        mgr.create("Reports")
+        mgr.add_item("Reports", "proj-1")
+        mgr.add_item("Reports", "proj-2")
+        assert mgr.resolve("Reports") == "proj-1"
+
+    def test_resolve_returns_none_for_missing_topic(self, tmp_path: Path) -> None:
+        mgr = BaseTopicManager(tmp_path)
+        assert mgr.resolve("nonexistent") is None
+
+    def test_resolve_returns_none_for_empty_topic(self, tmp_path: Path) -> None:
+        mgr = BaseTopicManager(tmp_path)
+        mgr.create("Empty")
+        assert mgr.resolve("Empty") is None
+
+
 class TestAddAndListItems:
     def test_add_item_to_topic(self, tmp_path: Path) -> None:
         mgr = BaseTopicManager(tmp_path)

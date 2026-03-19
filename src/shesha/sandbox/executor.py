@@ -286,6 +286,16 @@ class ContainerExecutor:
                 return_value=None,
                 error=f"Protocol error: invalid UTF-8 from container: {e}",
             )
+        except RuntimeError as e:
+            # Container was stopped externally (e.g., pool.stop() during
+            # in-flight query). Return error so the engine can recover.
+            return ExecutionResult(
+                status="error",
+                stdout="",
+                stderr="",
+                return_value=None,
+                error=f"Executor stopped: {e}",
+            )
 
     _MAX_BATCH_WORKERS = 32
 

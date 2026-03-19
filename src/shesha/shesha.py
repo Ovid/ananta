@@ -442,6 +442,12 @@ class Shesha:
 
         project = self.get_project(name)
 
+        if current_sha is None and saved_sha is not None:
+            logger.warning(
+                "Could not determine current SHA for '%s' — treating as updates_available",
+                name,
+            )
+
         if saved_sha is not None and saved_sha == current_sha:
             return RepoProjectResult(
                 project=project,

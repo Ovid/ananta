@@ -579,3 +579,62 @@ class TestTopicDocumentRoutes:
         resp = client.delete("/api/topics/Research/items/doc-1")
         assert resp.status_code == 200
         assert "doc-1" not in topic_mgr.list_items("Research")
+
+
+class TestDownloadDocument:
+    """Tests for GET /documents/{doc_id}/download."""
+
+    def _setup_upload(
+        self, uploads_dir: Path, doc_id: str, filename: str, content: bytes = b"data"
+    ) -> None:
+        """Create upload dir with meta.json and original file."""
+        doc_dir = uploads_dir / doc_id
+        doc_dir.mkdir(parents=True, exist_ok=True)
+        ext = Path(filename).suffix
+        (doc_dir / f"original{ext}").write_bytes(content)
+        (doc_dir / "meta.json").write_text(json.dumps({"filename": filename}))
+
+    def test_download_returns_file(
+        self, client: TestClient, uploads_dir: Path
+    ) -> None:
+        self._setup_upload(uploads_dir, "doc-abc12345", "report.pdf")
+        resp = client.get("/api/documents/doc-abc12345/download")
+        assert resp.status_code == 200
+        assert resp.content == b"data"
+
+    def test_download_sanitizes_quotes_in_filename(
+        self, client: TestClient, uploads_dir: Path
+    ) -> None:
+        """Filenames with " are sanitized to prevent header injection."""
+        self._setup_upload(uploads_dir, "doc-abc12345", 'bad"name.pdf')
+        resp = client.get("/api/documents/doc-abc12345/download")
+        assert resp.status_code == 200
+        cd = resp.headers["content-disposition"]
+        # The sanitized filename should replace " with _
+        assert "bad_name.pdf" in cd
+
+    def test_download_sanitizes_newlines_in_filename(
+        self, client: TestClient, uploads_dir: Path
+    ) -> None:
+        """Filenames with \\r\\n are sanitized to prevent header injection."""
+        self._setup_upload(uploads_dir, "doc-abc12345", "bad\r\nname.pdf")
+        resp = client.get("/api/documents/doc-abc12345/download")
+        assert resp.status_code == 200
+        cd = resp.headers["content-disposition"]
+        assert "\r" not in cd
+        assert "\n" not in cd
+
+    def test_download_sanitizes_semicolons_in_filename(
+        self, client: TestClient, uploads_dir: Path
+    ) -> None:
+        """Filenames with ; are sanitized to prevent header injection."""
+        self._setup_upload(uploads_dir, "doc-abc12345", "bad;name.pdf")
+        resp = client.get("/api/documents/doc-abc12345/download")
+        assert resp.status_code == 200
+        cd = resp.headers["content-disposition"]
+        # The raw filename portion should not contain unescaped semicolons
+        assert "bad_name.pdf" in cd
+
+    def test_download_404_missing_doc(self, client: TestClient) -> None:
+        resp = client.get("/api/documents/doc-nosuch00/download")
+        assert resp.status_code == 404

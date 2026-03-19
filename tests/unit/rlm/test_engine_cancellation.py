@@ -40,7 +40,16 @@ def test_query_exits_when_cancel_event_set():
 
     mock_executor = MagicMock()
     mock_executor.is_alive = True
-    mock_executor.execute.return_value = MagicMock(status="ok", output="", final_answer=None)
+    mock_executor.execute.return_value = MagicMock(
+        status="ok",
+        stdout="",
+        stderr="",
+        error=None,
+        final_answer=None,
+        final_var=None,
+        final_value=None,
+        vars=None,
+    )
 
     mock_pool = MagicMock()
     mock_pool.acquire.return_value = mock_executor

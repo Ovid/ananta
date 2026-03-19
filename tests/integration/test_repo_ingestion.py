@@ -122,7 +122,7 @@ class TestRepoIngestion:
                 name="sample-project",
             )
 
-            docs = shesha._storage.load_all_documents("sample-project")
+            docs = shesha.storage.load_all_documents("sample-project")
             main_doc = next(d for d in docs if "main.py" in d.name)
 
             assert "=== FILE:" in main_doc.content

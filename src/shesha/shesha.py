@@ -477,7 +477,18 @@ class Shesha:
                 files_ingested=len(self._storage.list_documents(name)),
             )
 
-        if saved_sha is not None and saved_sha == current_sha:
+        if saved_sha is None:
+            # No saved SHA (e.g. SHA save failed during initial ingest, or
+            # project predates SHA tracking).  We can't tell if anything
+            # changed, so treat as unchanged rather than triggering a
+            # potentially expensive re-ingest on every check.
+            return RepoProjectResult(
+                project=project,
+                status="unchanged",
+                files_ingested=len(self._storage.list_documents(name)),
+            )
+
+        if saved_sha == current_sha:
             return RepoProjectResult(
                 project=project,
                 status="unchanged",

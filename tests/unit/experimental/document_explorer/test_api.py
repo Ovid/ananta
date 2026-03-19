@@ -21,6 +21,15 @@ class TestMakeProjectId:
         # Format: slug-xxxxxxxx
         assert re.fullmatch(r"[a-z0-9]+-[a-f0-9]{8}", pid), f"unexpected format: {pid}"
 
+    def test_same_filename_produces_different_ids(self) -> None:
+        """Safety-net for F-18: same filename currently yields different IDs
+        because datetime is included in the hash. This documents the current
+        (broken) behavior so the fix can verify idempotency."""
+        id1 = _make_project_id("report.pdf")
+        id2 = _make_project_id("report.pdf")
+        # Currently different due to timestamp in hash — fix should make equal
+        assert id1 != id2
+
 
 @pytest.fixture
 def mock_shesha() -> MagicMock:

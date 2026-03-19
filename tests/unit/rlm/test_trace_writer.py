@@ -365,3 +365,69 @@ class TestIncrementalTraceWriter:
             )
         finally:
             writer.path.chmod(0o644)
+
+    def test_write_step_after_finalize_is_noop(
+        self, storage: FilesystemStorage, context: QueryContext
+    ) -> None:
+        """write_step() after finalize() should not append to the trace file.
+
+        Safety-net test for F-15: verifies temporal coupling behavior so that
+        adding state enforcement doesn't silently change semantics.
+        """
+        from shesha.rlm.trace_writer import IncrementalTraceWriter
+
+        writer = IncrementalTraceWriter(storage)
+        writer.start("test-project", context)
+
+        step = Trace().add_step(StepType.CODE_GENERATED, "code", iteration=0)
+        writer.write_step(step)
+
+        writer.finalize(
+            answer="42",
+            token_usage=TokenUsage(prompt_tokens=100, completion_tokens=50),
+            execution_time=1.5,
+            status="success",
+        )
+
+        lines_after_finalize = writer.path.read_text().strip().split("\n")
+        assert len(lines_after_finalize) == 3  # header + step + summary
+
+        # Currently write_step after finalize still appends (no enforcement).
+        # This test documents that behavior so the fix can change it safely.
+        late_step = Trace().add_step(StepType.CODE_OUTPUT, "late", iteration=1)
+        writer.write_step(late_step)
+
+        lines_after_late = writer.path.read_text().strip().split("\n")
+        # Currently 4 lines (no enforcement), fix should make this stay at 3
+        assert len(lines_after_late) == 4
+
+    def test_finalize_after_finalize_appends_duplicate(
+        self, storage: FilesystemStorage, context: QueryContext
+    ) -> None:
+        """Calling finalize() twice currently appends a duplicate summary.
+
+        Safety-net test for F-15: documents current behavior.
+        """
+        from shesha.rlm.trace_writer import IncrementalTraceWriter
+
+        writer = IncrementalTraceWriter(storage)
+        writer.start("test-project", context)
+
+        writer.finalize(
+            answer="first",
+            token_usage=TokenUsage(),
+            execution_time=1.0,
+            status="success",
+        )
+        writer.finalize(
+            answer="second",
+            token_usage=TokenUsage(),
+            execution_time=2.0,
+            status="success",
+        )
+
+        lines = writer.path.read_text().strip().split("\n")
+        # Currently 3 lines: header + 2 summaries (no enforcement)
+        assert len(lines) == 3
+        summaries = [json.loads(l) for l in lines if json.loads(l)["type"] == "summary"]
+        assert len(summaries) == 2

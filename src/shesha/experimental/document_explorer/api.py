@@ -291,7 +291,9 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
             if not originals:
                 raise HTTPException(404, f"Original file not found for '{doc_id}'")
             original_path = originals[0]
-        return FileResponse(original_path, filename=filename)
+        # Sanitize filename to prevent Content-Disposition header injection
+        safe_filename = re.sub(r'["\r\n;]', "_", filename)
+        return FileResponse(original_path, filename=safe_filename)
 
     return router
 

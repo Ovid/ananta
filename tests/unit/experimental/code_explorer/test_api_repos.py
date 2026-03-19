@@ -573,6 +573,29 @@ class TestApplyUpdates:
         resp = client.post("/api/repos/owner-myrepo/apply-updates")
         assert resp.status_code == 409
 
+    def test_apply_updates_check_failed_returns_503(
+        self, client: TestClient, mock_shesha: MagicMock
+    ) -> None:
+        """apply-updates returns 503 when re-check fails (network error)."""
+        mock_shesha.get_project_info.return_value = ProjectInfo(
+            project_id="owner-myrepo",
+            source_url="https://github.com/owner/myrepo",
+            is_local=False,
+            source_exists=True,
+        )
+
+        project = MagicMock()
+        project.project_id = "owner-myrepo"
+
+        mock_shesha.create_project_from_repo.return_value = RepoProjectResult(
+            project=project,
+            status="check_failed",
+            files_ingested=10,
+        )
+
+        resp = client.post("/api/repos/owner-myrepo/apply-updates")
+        assert resp.status_code == 503
+
     def test_apply_updates_self_heal_clone_error_returns_422(
         self, client: TestClient, mock_shesha: MagicMock
     ) -> None:
@@ -741,3 +764,15 @@ class TestApplyUpdates:
             name="scoped-repo",
             path="packages/core",
         )
+
+
+class TestSanitizeIngestError:
+    """Tests for _sanitize_ingest_error path stripping."""
+
+    def test_strips_short_path(self) -> None:
+        """Short paths like /tmp/repo should be sanitized, not leaked."""
+        from shesha.experimental.code_explorer.api import _sanitize_ingest_error
+
+        exc = RepoIngestError("/tmp/repo", RuntimeError("fail"))
+        result = _sanitize_ingest_error(exc)
+        assert "/tmp/repo" not in result

@@ -505,14 +505,17 @@ class RepoIngester:
                     pass  # Swap succeeded; orphaned staging shell is harmless
 
         except Exception:
-            if is_update:
-                if storage.project_exists(staging_name):
-                    storage.delete_project(staging_name)
-            else:
-                if storage.project_exists(name):
-                    storage.delete_project(name)
-                if not is_local:
-                    self.delete_repo(name)
+            try:
+                if is_update:
+                    if storage.project_exists(staging_name):
+                        storage.delete_project(staging_name)
+                else:
+                    if storage.project_exists(name):
+                        storage.delete_project(name)
+                    if not is_local:
+                        self.delete_repo(name)
+            except Exception:
+                pass  # Cleanup failure must not mask the original error
             raise
 
         # Save metadata — failure here must not mask a successful ingest.

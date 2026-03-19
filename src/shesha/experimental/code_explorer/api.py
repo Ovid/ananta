@@ -39,9 +39,9 @@ from shesha.models import RepoProjectResult
 def _sanitize_ingest_error(exc: RepoIngestError) -> str:
     """Return user-safe error message with internal filesystem paths stripped."""
     msg = str(exc)
-    # Strip quoted or unquoted absolute paths (e.g. '/var/lib/shesha/repos/...')
-    msg = _re.sub(r"'/?(?:[\w./-]+/){2,}[\w.-]+'", "'<path>'", msg)
-    msg = _re.sub(r"(?<!\w)/?(?:[\w./-]+/){2,}[\w.-]+", "<path>", msg)
+    # Strip quoted or unquoted absolute paths (e.g. '/tmp/repo', '/var/lib/...')
+    msg = _re.sub(r"'/?(?:[\w./-]+/){1,}[\w.-]+'", "'<path>'", msg)
+    msg = _re.sub(r"(?<!\w)/?(?:[\w./-]+/){1,}[\w.-]+", "<path>", msg)
     return msg
 
 
@@ -202,6 +202,10 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
             except RepoIngestError as exc:
                 raise HTTPException(422, detail=_sanitize_ingest_error(exc)) from exc
 
+            if repo_result.status == "check_failed":
+                raise HTTPException(
+                    503, f"Could not check for updates on project '{project_id}'"
+                )
             if repo_result.status != "updates_available":
                 raise HTTPException(409, f"No updates available for project '{project_id}'")
 

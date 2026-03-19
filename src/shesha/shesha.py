@@ -441,7 +441,7 @@ class Shesha:
 
         project = self.get_project(name)
 
-        if saved_sha == current_sha:
+        if saved_sha is not None and saved_sha == current_sha:
             return RepoProjectResult(
                 project=project,
                 status="unchanged",

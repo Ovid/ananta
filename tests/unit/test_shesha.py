@@ -353,6 +353,27 @@ class TestCreateProjectFromRepo:
 
                 assert result.status == "unchanged"
 
+    def test_updates_available_when_both_shas_none(self, tmp_path: Path):
+        """When SHA resolution fails (both None), treat as updates_available, not unchanged."""
+        with patch("shesha.shesha.docker"), patch("shesha.shesha.ContainerPool"):
+            with patch("shesha.shesha.RepoIngester") as mock_ingester_cls:
+                mock_ingester = MagicMock()
+                mock_ingester_cls.return_value = mock_ingester
+
+                mock_ingester.is_local_path.return_value = False
+                mock_ingester.get_saved_sha.return_value = None
+                mock_ingester.get_remote_sha.return_value = None
+
+                shesha = Shesha(model="test-model", storage_path=tmp_path)
+                shesha._storage.create_project("my-project")
+
+                result = shesha.create_project_from_repo(
+                    url="https://github.com/org/repo",
+                    name="my-project",
+                )
+
+                assert result.status == "updates_available"
+
     def test_updates_available_when_sha_differs(self, tmp_path: Path):
         """create_project_from_repo returns updates_available when SHAs differ."""
         with patch("shesha.shesha.docker"), patch("shesha.shesha.ContainerPool"):

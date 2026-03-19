@@ -538,7 +538,7 @@ class Shesha:
         project = self.get_project(name)
         return RepoProjectResult(
             project=project,
-            status="created",
+            status="updated" if is_update else "created",
             files_ingested=result.files_ingested,
             files_skipped=result.files_skipped,
             warnings=result.warnings,

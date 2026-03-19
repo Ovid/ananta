@@ -264,8 +264,10 @@ class TestShesha:
 
         shesha.register_parser(mock_parser)
 
-        # The parser should now be in the registry
-        assert mock_parser in shesha.parser_registry._parsers
+        # The parser should now be findable through the public API.
+        # Use a file extension no built-in parser handles so it matches
+        # our mock (whose can_parse returns True for everything).
+        assert shesha.parser_registry.find_parser(Path("test.xyz123")) is mock_parser
 
     def test_stop_after_restart_stops_pool(self, tmp_path: Path):
         """Stop after start-stop-start cycle should stop the pool."""
@@ -685,7 +687,7 @@ class TestAtomicIngestion:
 
                 updated = result.apply_updates()
 
-                assert updated.status == "created"
+                assert updated.status == "updated"
                 assert updated.files_ingested == 2
                 assert updated.files_skipped == 1
                 assert updated.warnings == ["skipped binary"]
@@ -1252,7 +1254,7 @@ class TestGetProjectInfoWithAnalysis:
             components=[],
             external_dependencies=[],
         )
-        shesha_instance._storage.store_analysis("info-current", analysis)
+        shesha_instance.storage.store_analysis("info-current", analysis)
 
         info = shesha_instance.get_project_info("info-current")
 
@@ -1274,7 +1276,7 @@ class TestGetProjectInfoWithAnalysis:
             components=[],
             external_dependencies=[],
         )
-        shesha_instance._storage.store_analysis("info-stale", analysis)
+        shesha_instance.storage.store_analysis("info-stale", analysis)
 
         info = shesha_instance.get_project_info("info-stale")
 
@@ -1303,7 +1305,7 @@ class TestAnalysisStatus:
             components=[],
             external_dependencies=[],
         )
-        shesha_instance._storage.store_analysis("current-analysis", analysis)
+        shesha_instance.storage.store_analysis("current-analysis", analysis)
         shesha_instance.repo_ingester.save_sha("current-analysis", "abc123")
         shesha_instance.repo_ingester.save_source_url("current-analysis", "/fake/path")
 
@@ -1323,7 +1325,7 @@ class TestAnalysisStatus:
             components=[],
             external_dependencies=[],
         )
-        shesha_instance._storage.store_analysis("stale-analysis", analysis)
+        shesha_instance.storage.store_analysis("stale-analysis", analysis)
         shesha_instance.repo_ingester.save_sha("stale-analysis", "new_sha_456")
         shesha_instance.repo_ingester.save_source_url("stale-analysis", "/fake/path")
 
@@ -1361,7 +1363,7 @@ class TestGetAnalysis:
             components=[comp],
             external_dependencies=[],
         )
-        shesha_instance._storage.store_analysis("get-analysis-project", analysis)
+        shesha_instance.storage.store_analysis("get-analysis-project", analysis)
 
         result = shesha_instance.get_analysis("get-analysis-project")
         assert result is not None
@@ -1408,7 +1410,7 @@ class TestGenerateAnalysis:
 
             assert result.overview == "Generated analysis"
             # Verify it was stored
-            stored = shesha_instance._storage.load_analysis("gen-analysis")
+            stored = shesha_instance.storage.load_analysis("gen-analysis")
             assert stored is not None
             assert stored.overview == "Generated analysis"
 

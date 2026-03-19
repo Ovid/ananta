@@ -376,6 +376,7 @@ class SheshaTUI(App[None]):
 
         def run() -> QueryResult | None:
             try:
+                engine = self._project.rlm_engine
                 result = query_with_shortcut(
                     project=self._project,
                     question=question_with_history,
@@ -384,6 +385,7 @@ class SheshaTUI(App[None]):
                     api_key=self._api_key,
                     on_progress=on_progress,
                     cancel_event=my_cancel_event,
+                    llm_client_factory=engine.llm_client_factory if engine else None,
                 )
             except Exception as exc:
                 if self._query_id == my_query_id:
@@ -512,8 +514,8 @@ class SheshaTUI(App[None]):
         elapsed = time.time() - self._query_start_time
         self._stop_query()
 
-        self._cumulative_prompt_tokens += prompt_tokens
-        self._cumulative_completion_tokens += completion_tokens
+        self._cumulative_prompt_tokens = self._baseline_prompt_tokens + prompt_tokens
+        self._cumulative_completion_tokens = self._baseline_completion_tokens + completion_tokens
         info_bar = self.query_one(InfoBar)
         info_bar.update_tokens(self._cumulative_prompt_tokens, self._cumulative_completion_tokens)
         info_bar.update_done(elapsed, 0)

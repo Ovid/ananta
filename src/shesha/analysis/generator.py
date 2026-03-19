@@ -46,7 +46,7 @@ class AnalysisGenerator:
         """The callable used to retrieve a project's HEAD SHA."""
         return self._get_project_sha
 
-    def _load_prompt(self, name: str) -> str:
+    def load_prompt(self, name: str) -> str:
         """Load a prompt template from the prompts directory.
 
         Args:
@@ -103,7 +103,7 @@ class AnalysisGenerator:
             RepoAnalysis with the generated analysis.
         """
         project = self._get_project(project_id)
-        prompt = self._load_prompt("generate")
+        prompt = self.load_prompt("generate")
 
         result = project.query(prompt)
         data = self._extract_json(result.answer)

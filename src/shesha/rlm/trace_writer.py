@@ -174,6 +174,9 @@ class IncrementalTraceWriter:
             self._finalized = True
         except Exception as e:
             if self.suppress_errors:
+                # Mark as finalized even on failure to prevent a later
+                # safety-net call from overwriting with "[interrupted]".
+                self._finalized = True
                 logger.warning(f"Failed to finalize incremental trace: {e}")
                 return
             raise TraceWriteError(f"Failed to finalize incremental trace: {e}") from e

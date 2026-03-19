@@ -403,10 +403,14 @@ class TestIncrementalTraceWriter:
         finally:
             writer.path.chmod(0o644)
 
-    def test_finalize_retryable_after_suppressed_write_failure(
+    def test_finalize_marks_finalized_after_suppressed_write_failure(
         self, storage: FilesystemStorage, context: QueryContext
     ) -> None:
-        """finalize() can retry after a suppressed write failure."""
+        """finalize() marks as finalized even after suppressed write failure.
+
+        This prevents a later safety-net call (e.g., the finally block
+        in the engine) from overwriting with "[interrupted]".
+        """
         from shesha.rlm.trace_writer import IncrementalTraceWriter
 
         writer = IncrementalTraceWriter(storage, suppress_errors=True)
@@ -420,22 +424,21 @@ class TestIncrementalTraceWriter:
             execution_time=1.5,
             status="success",
         )
-        # File should NOT have summary yet
         writer.path.chmod(0o644)
-        lines_before = writer.path.read_text().strip().split("\n")
-        assert all(json.loads(line)["type"] != "summary" for line in lines_before)
 
-        # Retry should succeed — _finalized must not block it
+        # Should be marked as finalized despite the write failure
+        assert writer.finalized
+
+        # A second call (simulating the finally block) should be a no-op
         writer.finalize(
-            answer="42",
-            token_usage=TokenUsage(prompt_tokens=100, completion_tokens=50),
-            execution_time=1.5,
-            status="success",
+            answer="[interrupted]",
+            token_usage=TokenUsage(),
+            execution_time=0.0,
+            status="interrupted",
         )
-        lines_after = writer.path.read_text().strip().split("\n")
-        summary = json.loads(lines_after[-1])
-        assert summary["type"] == "summary"
-        assert summary["answer"] == "42"
+        # No summary line should have been written at all
+        lines = writer.path.read_text().strip().split("\n")
+        assert all(json.loads(line)["type"] != "summary" for line in lines)
 
     def test_write_step_after_finalize_is_noop(
         self, storage: FilesystemStorage, context: QueryContext

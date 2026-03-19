@@ -54,12 +54,24 @@ class RepoIngester:
         "bitbucket.org": "BITBUCKET_TOKEN",
     }
 
-    def __init__(self, storage_path: Path | str) -> None:
-        """Initialize with storage path for cloned repos."""
+    def __init__(
+        self,
+        storage_path: Path | str,
+        allow_local_paths: bool = True,
+    ) -> None:
+        """Initialize with storage path for cloned repos.
+
+        Args:
+            storage_path: Path to store cloned repos and metadata.
+            allow_local_paths: Whether to allow ingesting from local paths.
+                Defaults to True for CLI/library use. Web explorers should
+                set this to False to prevent unauthorized filesystem reads.
+        """
         self.storage_path = Path(storage_path)
         self.repos_dir = self.storage_path / "repos"
         self.repos_dir.mkdir(parents=True, exist_ok=True)
         self._meta_lock = threading.Lock()
+        self._allow_local_paths = allow_local_paths
 
     def _repo_path(self, project_id: str) -> Path:
         """Get safe path for a project's repo directory."""
@@ -455,6 +467,8 @@ class RepoIngester:
         """
         staging_name = f"_staging_{name}_{uuid.uuid4().hex[:8]}" if is_update else name
         is_local = self.is_local_path(url)
+        if is_local and not self._allow_local_paths:
+            raise RepoIngestError(url, RuntimeError("Local path ingestion is disabled"))
 
         try:
             if not is_update:

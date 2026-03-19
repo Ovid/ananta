@@ -334,7 +334,7 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Status:** Fixed
 - **Status reason:** Added SandboxExecutor protocol in sandbox/base.py. ContainerPool and RLMEngine now use the protocol type instead of concrete ContainerExecutor for parameters and return types.
 - **Status date:** 2026-03-19 06:44 UTC
-- **Status commit:** <pending>
+- **Status commit:** f76ffee
 
 ### [F-15] IncrementalTraceWriter temporal coupling
 - **Category:** 27 (Temporal coupling)

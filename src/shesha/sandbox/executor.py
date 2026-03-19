@@ -4,9 +4,7 @@ import json
 import logging
 import struct
 import time
-from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
 from typing import Any
 
 import docker
@@ -38,22 +36,9 @@ MAX_PAYLOAD_SIZE = 50 * 1024 * 1024  # 50 MB max outgoing payload
 DEFAULT_SEND_TIMEOUT = 30  # 30 seconds for send operations
 
 
-@dataclass
-class ExecutionResult:
-    """Result of code execution in sandbox."""
+from shesha.sandbox.base import ExecutionResult, LLMQueryHandler
 
-    status: str
-    stdout: str
-    stderr: str
-    return_value: Any
-    error: str | None
-    final_answer: str | None = None
-    final_var: str | None = None
-    final_value: str | None = None
-    vars: dict[str, str] | None = None
-
-
-LLMQueryHandler = Callable[[str, str], str]  # (instruction, content) -> response
+__all__ = ["ContainerExecutor", "ExecutionResult", "LLMQueryHandler"]
 
 
 class ContainerExecutor:

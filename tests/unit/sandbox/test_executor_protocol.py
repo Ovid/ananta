@@ -34,6 +34,18 @@ class TestSandboxExecutorProtocol:
         # llm_query_handler is declared as a protocol attribute
         assert "llm_query_handler" in SandboxExecutor.__protocol_attrs__
 
+    def test_base_module_owns_shared_types(self) -> None:
+        """ExecutionResult and LLMQueryHandler should be defined in base.py, not imported from executor.py."""
+        import inspect
+
+        from shesha.sandbox.base import ExecutionResult, LLMQueryHandler
+
+        # They should be defined in base.py, not re-exported from executor.py
+        assert inspect.getmodule(ExecutionResult).__name__ == "shesha.sandbox.base"  # type: ignore[union-attr]
+        assert inspect.getmodule(LLMQueryHandler) is None or "executor" not in str(
+            inspect.getmodule(LLMQueryHandler)
+        )
+
     def test_pool_type_annotations_use_protocol(self) -> None:
         """ContainerPool should use SandboxExecutor in its type annotations."""
         # Check acquire return type

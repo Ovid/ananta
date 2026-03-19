@@ -55,6 +55,10 @@ class TestRepoIngester:
         assert not ingester.is_local_path("https://github.com/org/repo")
         assert not ingester.is_local_path("git@github.com:org/repo.git")
 
+    def test_file_protocol_not_in_safe_protocols(self):
+        """file:// must not be allowed — it bypasses is_local_path() checks."""
+        assert "file" not in RepoIngester._GIT_SAFE_PROTOCOLS.split(":")
+
     def test_detect_host_github(self, ingester: RepoIngester):
         """detect_host identifies GitHub URLs."""
         assert ingester.detect_host("https://github.com/org/repo") == "github.com"

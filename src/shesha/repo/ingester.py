@@ -63,8 +63,9 @@ class RepoIngester:
         """Get safe path for a project's repo directory."""
         return safe_path(self.repos_dir, project_id)
 
-    # Only allow safe git transport protocols — blocks ext:: which enables RCE
-    _GIT_SAFE_PROTOCOLS = "https:ssh:git:file"
+    # Only allow safe git transport protocols — blocks ext:: (RCE) and
+    # file:// (bypasses is_local_path() check, enabling local filesystem reads).
+    _GIT_SAFE_PROTOCOLS = "https:ssh:git"
 
     @staticmethod
     def _no_prompt_env() -> dict[str, str]:

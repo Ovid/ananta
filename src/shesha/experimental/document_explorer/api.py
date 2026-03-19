@@ -20,7 +20,11 @@ from shesha.experimental.document_explorer.dependencies import (
     DocumentExplorerState,
     get_topic_session,
 )
-from shesha.experimental.document_explorer.extractors import extract_text, get_page_count
+from shesha.experimental.document_explorer.extractors import (
+    extract_text,
+    get_page_count,
+    is_supported_extension,
+)
 from shesha.experimental.document_explorer.schemas import (
     DocumentInfo,
     DocumentUploadResponse,
@@ -178,6 +182,11 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                     )
 
                 ext = Path(file.filename).suffix
+                if not is_supported_extension(file.filename):
+                    raise HTTPException(
+                        422, f"Unsupported file type: {ext}"
+                    )
+
                 original_path = upload_dir / f"original{ext}"
                 original_path.write_bytes(content)
 

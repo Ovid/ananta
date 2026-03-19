@@ -1066,6 +1066,8 @@ class RLMEngine:
             if owns_executor:
                 executor.stop()
             else:
+                # owns_executor is False only when pool was not None at acquire
+                assert pool is not None
                 executor.llm_query_handler = None
                 try:
                     executor.reset_namespace()

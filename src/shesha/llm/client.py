@@ -86,8 +86,9 @@ class LLMClient:
                     response.usage.prompt_tokens,
                     response.usage.completion_tokens,
                 )
+                raw_content = response.choices[0].message.content
                 return LLMResponse(
-                    content=response.choices[0].message.content,
+                    content=raw_content if raw_content is not None else "",
                     prompt_tokens=response.usage.prompt_tokens,
                     completion_tokens=response.usage.completion_tokens,
                     total_tokens=response.usage.total_tokens,

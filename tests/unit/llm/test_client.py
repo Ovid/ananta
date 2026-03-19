@@ -79,6 +79,20 @@ class TestLLMClient:
         assert call_kwargs["timeout"] > 0
 
 
+    @patch("shesha.llm.client.litellm")
+    def test_complete_returns_empty_string_when_content_is_none(self, mock_litellm: MagicMock):
+        """LLMClient returns empty string when API returns content=None."""
+        mock_litellm.completion.return_value = MagicMock(
+            choices=[MagicMock(message=MagicMock(content=None))],
+            usage=MagicMock(prompt_tokens=10, completion_tokens=0, total_tokens=10),
+        )
+
+        client = LLMClient(model="gpt-4")
+        response = client.complete(messages=[{"role": "user", "content": "Hi"}])
+
+        assert response.content == ""
+
+
 class TestLLMClientRetry:
     """Tests for LLM client retry integration."""
 

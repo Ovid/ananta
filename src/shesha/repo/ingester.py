@@ -8,6 +8,7 @@ import shutil
 import stat
 import subprocess
 import tempfile
+import threading
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -58,6 +59,7 @@ class RepoIngester:
         self.storage_path = Path(storage_path)
         self.repos_dir = self.storage_path / "repos"
         self.repos_dir.mkdir(parents=True, exist_ok=True)
+        self._meta_lock = threading.Lock()
 
     def _repo_path(self, project_id: str) -> Path:
         """Get safe path for a project's repo directory."""
@@ -199,25 +201,24 @@ class RepoIngester:
         except json.JSONDecodeError:
             return {}  # Corrupt file — start fresh
 
-    def save_sha(self, project_id: str, sha: str) -> None:
-        """Save the HEAD SHA for a project."""
+    def _save_meta_field(self, project_id: str, key: str, value: str) -> None:
+        """Save a single field to _repo_meta.json under a lock."""
         repo_path = self._repo_path(project_id)
         repo_path.mkdir(parents=True, exist_ok=True)
         meta_path = repo_path / "_repo_meta.json"
 
-        data = self._load_meta(meta_path)
-        data["head_sha"] = sha
-        meta_path.write_text(json.dumps(data))
+        with self._meta_lock:
+            data = self._load_meta(meta_path)
+            data[key] = value
+            meta_path.write_text(json.dumps(data))
+
+    def save_sha(self, project_id: str, sha: str) -> None:
+        """Save the HEAD SHA for a project."""
+        self._save_meta_field(project_id, "head_sha", sha)
 
     def save_source_url(self, project_id: str, url: str) -> None:
         """Save the source URL for a project."""
-        repo_path = self._repo_path(project_id)
-        repo_path.mkdir(parents=True, exist_ok=True)
-        meta_path = repo_path / "_repo_meta.json"
-
-        data = self._load_meta(meta_path)
-        data["source_url"] = url
-        meta_path.write_text(json.dumps(data))
+        self._save_meta_field(project_id, "source_url", url)
 
     def get_source_url(self, project_id: str) -> str | None:
         """Get the saved source URL for a project."""
@@ -235,13 +236,7 @@ class RepoIngester:
 
     def save_path(self, project_id: str, path: str) -> None:
         """Save the subdirectory scope for a project."""
-        repo_path = self._repo_path(project_id)
-        repo_path.mkdir(parents=True, exist_ok=True)
-        meta_path = repo_path / "_repo_meta.json"
-
-        data = self._load_meta(meta_path)
-        data["path"] = path
-        meta_path.write_text(json.dumps(data))
+        self._save_meta_field(project_id, "path", path)
 
     def get_saved_path(self, project_id: str) -> str | None:
         """Get the saved subdirectory scope for a project."""

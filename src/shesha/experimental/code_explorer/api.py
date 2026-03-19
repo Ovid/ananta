@@ -203,9 +203,7 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
                 raise HTTPException(422, detail=_sanitize_ingest_error(exc)) from exc
 
             if repo_result.status == "check_failed":
-                raise HTTPException(
-                    503, f"Could not check for updates on project '{project_id}'"
-                )
+                raise HTTPException(503, f"Could not check for updates on project '{project_id}'")
             if repo_result.status != "updates_available":
                 raise HTTPException(409, f"No updates available for project '{project_id}'")
 

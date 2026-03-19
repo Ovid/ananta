@@ -542,7 +542,6 @@ class TestFinalVarMissingVariable:
         assert result["final_var"] == "my_result"
         assert result["final_value"] == "hello world"
 
-
     def test_final_var_none_valued_variable_returns_none(self) -> None:
         """FINAL_VAR for a variable holding Python None must return None,
         not the string 'None'."""

@@ -303,6 +303,38 @@ class TestUploadAtomicity:
 
         state.topic_mgr.add_item = original_add  # type: ignore[assignment]
 
+    def test_batch_upload_cleans_up_earlier_files_on_later_failure(
+        self,
+        state: DocumentExplorerState,
+        mock_shesha: MagicMock,
+        uploads_dir: Path,
+    ) -> None:
+        """If file 2 of 2 fails at store_document, file 1's project is also cleaned up."""
+        call_count = [0]
+
+        def store_side_effect(project_id, doc, **kwargs):
+            call_count[0] += 1
+            if call_count[0] == 2:
+                raise RuntimeError("disk full on second file")
+
+        mock_shesha.create_project.return_value = MagicMock()
+        mock_shesha.storage.store_document.side_effect = store_side_effect
+        app = create_api(state)
+        client = TestClient(app, raise_server_exceptions=False)
+
+        resp = client.post(
+            "/api/documents/upload",
+            files=[
+                ("files", ("first.txt", b"Hello", "text/plain")),
+                ("files", ("second.txt", b"World", "text/plain")),
+            ],
+        )
+        assert resp.status_code == 500
+        # Both projects should be cleaned up — not just the second one
+        assert mock_shesha.delete_project.call_count == 2
+        # All upload dirs should be cleaned up
+        assert list(uploads_dir.iterdir()) == []
+
 
 class TestDeleteDocument:
     def test_delete_removes_from_topics(

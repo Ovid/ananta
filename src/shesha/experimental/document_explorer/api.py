@@ -153,48 +153,46 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                 raise HTTPException(422, str(exc)) from exc
 
         results: list[DocumentUploadResponse] = []
-        for file in files:
-            if not file.filename:
-                continue
+        created_projects: list[str] = []
+        created_upload_dirs: list[Path] = []
+        try:
+            for file in files:
+                if not file.filename:
+                    continue
 
-            project_id = _make_project_id(file.filename)
+                project_id = _make_project_id(file.filename)
 
-            # Save original file
-            upload_dir = state.uploads_dir / project_id
-            upload_dir.mkdir(parents=True, exist_ok=True)
-            content = await file.read()
+                # Save original file
+                upload_dir = state.uploads_dir / project_id
+                upload_dir.mkdir(parents=True, exist_ok=True)
+                created_upload_dirs.append(upload_dir)
+                content = await file.read()
 
-            ext = Path(file.filename).suffix
-            original_path = upload_dir / f"original{ext}"
-            original_path.write_bytes(content)
+                ext = Path(file.filename).suffix
+                original_path = upload_dir / f"original{ext}"
+                original_path.write_bytes(content)
 
-            # Extract text
-            try:
-                text = extract_text(original_path)
-            except ValueError as exc:
-                shutil.rmtree(upload_dir)
-                raise HTTPException(422, str(exc)) from exc
+                # Extract text
+                try:
+                    text = extract_text(original_path)
+                except ValueError as exc:
+                    raise HTTPException(422, str(exc)) from exc
 
-            # Compute page/sheet/slide count where applicable
-            page_count = get_page_count(original_path)
+                # Compute page/sheet/slide count where applicable
+                page_count = get_page_count(original_path)
 
-            # Save upload metadata
-            meta = {
-                "filename": file.filename,
-                "content_type": file.content_type or "application/octet-stream",
-                "size": len(content),
-                "upload_date": datetime.now(UTC).isoformat(),
-                "page_count": page_count,
-            }
-            (upload_dir / "meta.json").write_text(json.dumps(meta, indent=2))
+                # Save upload metadata
+                meta = {
+                    "filename": file.filename,
+                    "content_type": file.content_type or "application/octet-stream",
+                    "size": len(content),
+                    "upload_date": datetime.now(UTC).isoformat(),
+                    "page_count": page_count,
+                }
+                (upload_dir / "meta.json").write_text(json.dumps(meta, indent=2))
 
-            # Create Shesha project, store document, and add to topic.
-            # If any step fails, clean up everything created so far for
-            # this file to avoid orphaned uploads/projects.
-            project_created = False
-            try:
                 state.shesha.create_project(project_id)
-                project_created = True
+                created_projects.append(project_id)
                 doc = ParsedDocument(
                     name=file.filename,
                     content=text,
@@ -206,22 +204,25 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
 
                 if topic:
                     state.topic_mgr.add_item(topic, project_id)
-            except Exception:
-                if project_created:
-                    try:
-                        state.shesha.delete_project(project_id)
-                    except Exception:
-                        pass  # Best-effort cleanup
-                shutil.rmtree(upload_dir, ignore_errors=True)
-                raise
 
-            results.append(
-                DocumentUploadResponse(
-                    project_id=project_id,
-                    filename=file.filename,
-                    status="created",
+                results.append(
+                    DocumentUploadResponse(
+                        project_id=project_id,
+                        filename=file.filename,
+                        status="created",
+                    )
                 )
-            )
+        except Exception:
+            # Roll back all projects and upload dirs created so far
+            for pid in created_projects:
+                try:
+                    state.shesha.delete_project(pid)
+                except Exception:
+                    pass  # Best-effort cleanup — original error takes priority
+            for udir in created_upload_dirs:
+                shutil.rmtree(udir, ignore_errors=True)
+            raise
+
         return results
 
     @router.get("/documents/{doc_id}")

@@ -59,11 +59,15 @@ class RepoIngester:
         """Get safe path for a project's repo directory."""
         return safe_path(self.repos_dir, project_id)
 
+    # Only allow safe git transport protocols — blocks ext:: which enables RCE
+    _GIT_SAFE_PROTOCOLS = "https:ssh:git:file"
+
     @staticmethod
     def _no_prompt_env() -> dict[str, str]:
         """Return env dict with GIT_TERMINAL_PROMPT=0 to prevent interactive prompts."""
         env = os.environ.copy()
         env["GIT_TERMINAL_PROMPT"] = "0"
+        env["GIT_ALLOW_PROTOCOL"] = RepoIngester._GIT_SAFE_PROTOCOLS
         return env
 
     def is_local_path(self, url: str) -> bool:
@@ -178,6 +182,7 @@ class RepoIngester:
         env["GIT_ASKPASS"] = path
         env["GIT_TOKEN"] = token
         env["GIT_TERMINAL_PROMPT"] = "0"
+        env["GIT_ALLOW_PROTOCOL"] = RepoIngester._GIT_SAFE_PROTOCOLS
         return env, Path(path)
 
     def save_sha(self, project_id: str, sha: str) -> None:
@@ -481,8 +486,11 @@ class RepoIngester:
                 storage.swap_docs(staging_name, name)
                 # swap_docs moves docs but may leave the staging project shell;
                 # delete it so _staging_* entries don't accumulate.
-                if storage.project_exists(staging_name):
-                    storage.delete_project(staging_name)
+                try:
+                    if storage.project_exists(staging_name):
+                        storage.delete_project(staging_name)
+                except Exception:
+                    pass  # Swap succeeded; orphaned staging shell is harmless
 
         except Exception:
             if is_update:

@@ -659,6 +659,37 @@ class TestTokenInGetRemoteSha:
             assert env["GIT_TERMINAL_PROMPT"] == "0"
 
 
+class TestGitProtocolAllowlist:
+    """Tests for GIT_ALLOW_PROTOCOL restriction to block ext:: RCE."""
+
+    def test_no_prompt_env_sets_allow_protocol(self, ingester: RepoIngester):
+        """_no_prompt_env() restricts git protocols to safe set."""
+        env = ingester._no_prompt_env()
+        assert "GIT_ALLOW_PROTOCOL" in env
+        allowed = set(env["GIT_ALLOW_PROTOCOL"].split(":"))
+        assert {"https", "ssh", "git", "file"} == allowed
+
+    def test_create_askpass_sets_allow_protocol(self, ingester: RepoIngester):
+        """_create_askpass() restricts git protocols to safe set."""
+        env, askpass_path = ingester._create_askpass("test-token")
+        try:
+            assert "GIT_ALLOW_PROTOCOL" in env
+            allowed = set(env["GIT_ALLOW_PROTOCOL"].split(":"))
+            assert {"https", "ssh", "git", "file"} == allowed
+        finally:
+            askpass_path.unlink(missing_ok=True)
+
+    def test_clone_env_has_allow_protocol(self, ingester: RepoIngester):
+        """clone() subprocess env includes GIT_ALLOW_PROTOCOL."""
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stderr="")
+            ingester.clone("https://github.com/org/repo", "my-project")
+
+            call_kwargs = mock_run.call_args[1]
+            env = call_kwargs.get("env", {})
+            assert "GIT_ALLOW_PROTOCOL" in env
+
+
 class TestNoPromptEnv:
     """Tests for GIT_TERMINAL_PROMPT=0 in non-token paths."""
 

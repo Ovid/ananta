@@ -1010,7 +1010,20 @@ class RLMEngine:
                     logger.warning("Executor died at iteration %d, recovering from pool", iteration)
                     executor.stop()
                     pool.discard(executor)
-                    executor = pool.acquire()
+                    try:
+                        executor = pool.acquire()
+                    except RuntimeError:
+                        # Pool was stopped (e.g. shutdown during in-flight query)
+                        logger.error("Pool stopped during recovery at iteration %d, aborting", iteration)
+                        answer = "[Executor died — cannot continue]"
+                        query_result = QueryResult(
+                            answer=answer,
+                            trace=trace,
+                            token_usage=token_usage,
+                            execution_time=time.time() - start_time,
+                        )
+                        _finalize_trace_and_cleanup(answer, "executor_died")
+                        return query_result
                     executor.llm_query_handler = _make_llm_callback(iteration)
                     executor.setup_context(wrapped_documents)
                 elif not executor.is_alive:

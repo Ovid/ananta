@@ -1592,6 +1592,56 @@ class TestDeadExecutorWithPool:
         mock_pool.discard.assert_called_once_with(dead_executor)
 
 
+class TestDeadExecutorPoolStopped:
+    """Test that pool.acquire() RuntimeError during recovery is handled gracefully."""
+
+    @patch("shesha.rlm.engine.LLMClient")
+    def test_pool_acquire_raises_runtime_error_aborts_gracefully(
+        self,
+        mock_llm_cls: MagicMock,
+    ) -> None:
+        """If pool.acquire() raises RuntimeError (pool stopped), abort gracefully."""
+        from shesha.sandbox.executor import ExecutionResult
+        from shesha.sandbox.pool import ContainerPool
+
+        mock_llm = MagicMock()
+        mock_llm.complete.return_value = MagicMock(
+            content='```repl\nprint("boom")\n```',
+            prompt_tokens=100,
+            completion_tokens=50,
+            total_tokens=150,
+        )
+        mock_llm_cls.return_value = mock_llm
+
+        dead_executor = MagicMock()
+        dead_executor.is_alive = True
+
+        def kill_on_execute(code, timeout=30):
+            dead_executor.is_alive = False
+            return ExecutionResult(
+                status="error",
+                stdout="",
+                stderr="",
+                return_value=None,
+                error="Protocol error",
+            )
+
+        dead_executor.execute.side_effect = kill_on_execute
+
+        mock_pool = MagicMock(spec=ContainerPool)
+        # First acquire returns the dead executor; recovery acquire raises
+        mock_pool.acquire.side_effect = [
+            dead_executor,
+            RuntimeError("Cannot acquire from a stopped pool"),
+        ]
+
+        engine = RLMEngine(model="test-model", pool=mock_pool)
+        result = engine.query(documents=["doc"], question="Q?")
+
+        # Should abort gracefully, not propagate RuntimeError
+        assert "died" in result.answer.lower() or "executor" in result.answer.lower()
+
+
 class TestEngineTraceWriterSuppression:
     """Tests for engine trace writer suppress_errors configuration."""
 

@@ -118,7 +118,7 @@ class IncrementalTraceWriter:
 
         try:
             self._max_iteration = max(self._max_iteration, step.iteration)
-            step_data = {
+            step_data: dict[str, object] = {
                 "type": "step",
                 "step_type": step.type.value,
                 "iteration": step.iteration,
@@ -129,6 +129,8 @@ class IncrementalTraceWriter:
                 "tokens_used": step.tokens_used,
                 "duration_ms": step.duration_ms,
             }
+            if step.metadata:
+                step_data["metadata"] = step.metadata
             with self.path.open("a") as f:
                 f.write(json.dumps(step_data) + "\n")
         except Exception as e:

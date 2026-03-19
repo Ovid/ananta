@@ -540,6 +540,7 @@ class RLMEngine:
                     type=StepType.FINAL_ANSWER,
                     content=final_answer,
                     iteration=iteration,
+                    metadata={"source": "code_block"},
                 )
                 if on_step:
                     on_step(step)
@@ -568,6 +569,7 @@ class RLMEngine:
                     type=StepType.FINAL_ANSWER,
                     content=final_answer,
                     iteration=iteration,
+                    metadata={"source": "code_block_var"},
                 )
                 if on_step:
                     on_step(step)
@@ -895,6 +897,7 @@ class RLMEngine:
                             type=StepType.FINAL_ANSWER,
                             content=bare_answer,
                             iteration=iteration,
+                            metadata={"source": f"bare_{final_type}"},
                         )
                         _write_step(step)
                         if on_progress:
@@ -958,6 +961,7 @@ class RLMEngine:
                             type=StepType.FINAL_ANSWER,
                             content=final_answer,
                             iteration=iteration,
+                            metadata={"source": f"bare_{final_type}_after_code"},
                         )
                         _write_step(step)
                         if on_progress:
@@ -1074,6 +1078,7 @@ class RLMEngine:
                 type=StepType.FINAL_ANSWER,
                 content=f"[max-iter fallback] {answer}",
                 iteration=self.max_iterations - 1,
+                metadata={"source": "max_iterations_fallback"},
             )
             _write_step(step)
 

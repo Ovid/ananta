@@ -148,6 +148,43 @@ class TestIncrementalTraceWriter:
         assert step_data["content"] == "print('hi')"
         assert step_data["tokens_used"] == 50
 
+    def test_write_step_includes_metadata_when_present(
+        self, storage: FilesystemStorage, context: QueryContext
+    ) -> None:
+        """write_step() includes metadata dict in JSONL when set on step."""
+        from shesha.rlm.trace_writer import IncrementalTraceWriter
+
+        writer = IncrementalTraceWriter(storage)
+        writer.start("test-project", context)
+
+        step = Trace().add_step(
+            StepType.FINAL_ANSWER,
+            "the answer",
+            iteration=0,
+            metadata={"source": "bare_final"},
+        )
+        writer.write_step(step)
+
+        lines = writer.path.read_text().strip().split("\n")
+        step_data = json.loads(lines[1])
+        assert step_data["metadata"] == {"source": "bare_final"}
+
+    def test_write_step_omits_metadata_when_none(
+        self, storage: FilesystemStorage, context: QueryContext
+    ) -> None:
+        """write_step() omits metadata key from JSONL when not set."""
+        from shesha.rlm.trace_writer import IncrementalTraceWriter
+
+        writer = IncrementalTraceWriter(storage)
+        writer.start("test-project", context)
+
+        step = Trace().add_step(StepType.CODE_GENERATED, "print('hi')", iteration=0)
+        writer.write_step(step)
+
+        lines = writer.path.read_text().strip().split("\n")
+        step_data = json.loads(lines[1])
+        assert "metadata" not in step_data
+
     def test_multiple_steps_appended_in_order(
         self, storage: FilesystemStorage, context: QueryContext
     ) -> None:

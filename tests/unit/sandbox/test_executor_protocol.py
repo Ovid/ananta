@@ -35,7 +35,7 @@ class TestSandboxExecutorProtocol:
         assert "llm_query_handler" in SandboxExecutor.__protocol_attrs__
 
     def test_base_module_owns_shared_types(self) -> None:
-        """ExecutionResult and LLMQueryHandler should be defined in base.py, not imported from executor.py."""
+        """ExecutionResult and LLMQueryHandler should be defined in base.py."""
         import inspect
 
         from shesha.sandbox.base import ExecutionResult, LLMQueryHandler

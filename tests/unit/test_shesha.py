@@ -343,7 +343,7 @@ class TestShesha:
 
         with mock_patch.dict(os.environ, {"SHESHA_MAX_ITERATIONS": "99"}):
             shesha = Shesha(storage_path=tmp_path)
-            assert shesha._config.max_iterations == 99
+            assert shesha.rlm_engine.max_iterations == 99
 
     def test_delete_project_cleans_up_remote_repo(self, tmp_path: Path):
         """delete_project removes cloned repo for remote projects by default."""

@@ -537,9 +537,17 @@ class RLMEngine:
                     )
                 break
             elif result.final_var is not None:
-                # `or ""` is equivalent to `if is not None` here since
-                # final_value is str | None — both yield "" for None.
-                final_answer = result.final_value or ""
+                resolved = result.final_value
+                if resolved is None:
+                    # Sandbox returned the variable name but not its value.
+                    # Try resolving it explicitly; if that also fails, let
+                    # the loop continue so the model can retry (matching the
+                    # bare-text FINAL_VAR retry in the main query loop).
+                    resolved = self._resolve_final_var(result.final_var, executor)
+                if resolved is None:
+                    # Variable truly not found — don't return empty answer
+                    break
+                final_answer = resolved
                 step = trace.add_step(
                     type=StepType.FINAL_ANSWER,
                     content=final_answer,

@@ -1050,6 +1050,77 @@ class TestRLMEngine:
 
         assert result.answer == "The computed answer"
 
+    @patch("shesha.rlm.engine.ContainerExecutor")
+    def test_engine_retries_when_code_block_final_var_value_is_none(
+        self,
+        mock_executor_cls: MagicMock,
+    ):
+        """When executor returns final_var with final_value=None, engine retries
+        via _resolve_final_var rather than returning an empty answer."""
+        mock_llm = MagicMock()
+        # First call: model writes FINAL_VAR in code block
+        # Second call: model writes FINAL with literal answer after retry
+        mock_llm.complete.side_effect = [
+            MagicMock(
+                content='```repl\nFINAL_VAR("missing_var")\n```',
+                prompt_tokens=100,
+                completion_tokens=50,
+                total_tokens=150,
+            ),
+            MagicMock(
+                content='```repl\nFINAL("fallback answer")\n```',
+                prompt_tokens=100,
+                completion_tokens=50,
+                total_tokens=150,
+            ),
+        ]
+        mock_factory = MagicMock(return_value=mock_llm)
+
+        mock_executor = MagicMock()
+        # First execute: FINAL_VAR code block — var not found
+        # (final_var set but final_value is None)
+        exec_result_1 = MagicMock(
+            status="ok",
+            stdout="",
+            stderr="",
+            error=None,
+            final_answer=None,
+            final_var="missing_var",
+            final_value=None,
+            vars=None,
+        )
+        # _resolve_final_var calls execute(print(missing_var)) — fails
+        resolve_result = MagicMock(
+            status="error",
+            stdout="",
+            stderr="NameError: name 'missing_var' is not defined",
+            error="NameError",
+        )
+        # Second execute: FINAL with literal
+        exec_result_2 = MagicMock(
+            status="ok",
+            stdout="",
+            stderr="",
+            error=None,
+            final_answer="fallback answer",
+            final_var=None,
+            final_value=None,
+            vars=None,
+        )
+        mock_executor.execute.side_effect = [exec_result_1, resolve_result, exec_result_2]
+        mock_executor.is_alive = True
+        mock_executor_cls.return_value = mock_executor
+
+        engine = RLMEngine(model="test-model", llm_client_factory=mock_factory)
+        result = engine.query(
+            documents=["Doc content"],
+            question="What?",
+        )
+
+        # Should NOT be empty — should have retried and got "fallback answer"
+        assert result.answer == "fallback answer"
+        assert result.answer != ""
+
 
 class TestIterationQueryReminder:
     """Tests for query reminder appended to iteration messages."""

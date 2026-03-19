@@ -253,7 +253,48 @@ class TestQueryWithShortcut:
                 cancel_event=cancel,
             )
 
-        project.query.assert_called_once_with("Q", on_progress=progress, cancel_event=cancel)
+        project.query.assert_called_once_with("ctx\n\nQ", on_progress=progress, cancel_event=cancel)
+
+    def test_rlm_fallback_prepends_analysis_context_to_question(self):
+        """When shortcut declines, project.query() receives the analysis
+        context prepended to the question — matching pre-refactor behavior."""
+        project = self._make_project()
+
+        with patch(
+            "shesha.analysis.shortcut.try_answer_from_analysis",
+            return_value=None,
+        ):
+            query_with_shortcut(
+                project=project,
+                question="What does module X do?",
+                analysis_context="Overview: A web framework.",
+                model="test-model",
+                api_key="key",
+            )
+
+        call_args = project.query.call_args
+        question_sent = call_args[0][0]
+        assert question_sent.startswith("Overview: A web framework.")
+        assert "What does module X do?" in question_sent
+
+    def test_rlm_fallback_without_analysis_context_passes_question_unchanged(self):
+        """Without analysis context, project.query() receives the original question."""
+        project = self._make_project()
+
+        with patch(
+            "shesha.analysis.shortcut.try_answer_from_analysis",
+        ):
+            query_with_shortcut(
+                project=project,
+                question="What does module X do?",
+                analysis_context=None,
+                model="test-model",
+                api_key="key",
+            )
+
+        call_args = project.query.call_args
+        question_sent = call_args[0][0]
+        assert question_sent == "What does module X do?"
 
     def test_shortcut_result_is_dataclass(self):
         """ShortcutResult is a proper dataclass with expected fields."""

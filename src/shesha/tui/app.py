@@ -346,20 +346,14 @@ class SheshaTUI(App[None]):
         prefix = self._session.format_history_prefix()
         question_with_history = f"{prefix}{question}" if prefix else question
 
-        # Full question adds analysis context for the RLM path
-        if self._analysis_context:
-            full_question = f"{self._analysis_context}\n\n{question_with_history}"
-        else:
-            full_question = question_with_history
-
         self._worker_handle = self.run_worker(
-            self._make_query_runner(full_question, question, question_with_history),
+            self._make_query_runner(question, question_with_history),
             thread=True,
             exit_on_error=False,
         )
 
     def _make_query_runner(
-        self, full_question: str, display_question: str, question_with_history: str = ""
+        self, display_question: str, question_with_history: str = ""
     ) -> Callable[[], QueryResult | None]:
         """Return a callable that runs the query (for worker thread).
 
@@ -384,7 +378,7 @@ class SheshaTUI(App[None]):
             try:
                 result = query_with_shortcut(
                     project=self._project,
-                    question=question_with_history or full_question,
+                    question=question_with_history,
                     analysis_context=self._analysis_context if self._model else None,
                     model=self._model or "",
                     api_key=self._api_key,

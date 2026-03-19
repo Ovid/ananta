@@ -197,4 +197,7 @@ def query_with_shortcut(
                 completion_tokens=completion_tokens,
             )
 
-    return project.query(question, on_progress=on_progress, cancel_event=cancel_event)
+    # Prepend analysis context for the RLM engine (the shortcut received it
+    # separately; the engine needs it in the question text).
+    rlm_question = f"{analysis_context}\n\n{question}" if analysis_context else question
+    return project.query(rlm_question, on_progress=on_progress, cancel_event=cancel_event)

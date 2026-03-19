@@ -233,6 +233,23 @@ class RepoIngester:
         sha = data.get("head_sha")
         return str(sha) if sha is not None else None
 
+    def save_path(self, project_id: str, path: str) -> None:
+        """Save the subdirectory scope for a project."""
+        repo_path = self._repo_path(project_id)
+        repo_path.mkdir(parents=True, exist_ok=True)
+        meta_path = repo_path / "_repo_meta.json"
+
+        data = self._load_meta(meta_path)
+        data["path"] = path
+        meta_path.write_text(json.dumps(data))
+
+    def get_saved_path(self, project_id: str) -> str | None:
+        """Get the saved subdirectory scope for a project."""
+        meta_path = self._repo_path(project_id) / "_repo_meta.json"
+        data = self._load_meta(meta_path)
+        p = data.get("path")
+        return str(p) if p is not None else None
+
     def get_remote_sha(self, url: str, token: str | None = None) -> str | None:
         """Get the HEAD SHA from remote repository."""
         cmd = ["git", "ls-remote", url, "HEAD"]
@@ -514,6 +531,9 @@ class RepoIngester:
             else:
                 save_url = url
             self.save_source_url(name, save_url)
+
+            if path is not None:
+                self.save_path(name, path)
         except Exception as exc:
             logger.warning("Failed to save repo metadata for '%s': %s", name, exc)
 

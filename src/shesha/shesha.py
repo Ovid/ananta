@@ -345,7 +345,8 @@ class Shesha:
             )
 
         token = self._repo_ingester.resolve_token(url, None)
-        return self._handle_existing_project(url, project_id, token, None)
+        saved_path = self._repo_ingester.get_saved_path(project_id)
+        return self._handle_existing_project(url, project_id, token, saved_path)
 
     def register_parser(self, parser: "DocumentParser") -> None:
         """Register a custom document parser."""

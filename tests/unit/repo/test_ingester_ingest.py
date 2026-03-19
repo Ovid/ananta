@@ -447,6 +447,50 @@ class TestIngestSavesMetadata:
 
         assert ingester.get_source_url("test-project") == "https://github.com/org/test-project"
 
+    def test_ingest_saves_subdirectory_path(
+        self, ingester: RepoIngester, storage: FilesystemStorage, parser_registry: MagicMock
+    ):
+        """ingest() saves the subdirectory path for later retrieval."""
+        repo_path = ingester.repos_dir / "test-project"
+        repo_path.mkdir(parents=True)
+
+        parser_registry.find_parser.return_value = None
+        ingester.list_files_from_path = MagicMock(return_value=[])
+
+        with patch.object(ingester, "get_sha_from_path", return_value=None):
+            ingester.ingest(
+                storage=storage,
+                parser_registry=parser_registry,
+                url="https://github.com/org/test-project",
+                name="test-project",
+                path="src/",
+                is_update=False,
+            )
+
+        assert ingester.get_saved_path("test-project") == "src/"
+
+    def test_ingest_does_not_save_path_when_none(
+        self, ingester: RepoIngester, storage: FilesystemStorage, parser_registry: MagicMock
+    ):
+        """ingest() does not save path when it is None."""
+        repo_path = ingester.repos_dir / "test-project"
+        repo_path.mkdir(parents=True)
+
+        parser_registry.find_parser.return_value = None
+        ingester.list_files_from_path = MagicMock(return_value=[])
+
+        with patch.object(ingester, "get_sha_from_path", return_value=None):
+            ingester.ingest(
+                storage=storage,
+                parser_registry=parser_registry,
+                url="https://github.com/org/test-project",
+                name="test-project",
+                path=None,
+                is_update=False,
+            )
+
+        assert ingester.get_saved_path("test-project") is None
+
 
 class TestIngestRepoPathConsistency:
     """ingest() must use _repo_path() (safe_path) for remote repo path construction."""

@@ -475,6 +475,31 @@ class TestSourceURLTracking:
         assert ingester.get_source_url("nonexistent") is None
 
 
+class TestSubdirPathTracking:
+    """Tests for subdirectory path persistence in _repo_meta.json."""
+
+    def test_save_path_stores_subdir(self, tmp_path: Path):
+        """save_path persists the subdirectory scope."""
+        ingester = RepoIngester(tmp_path)
+        ingester.save_path("my-project", "src/")
+        assert ingester.get_saved_path("my-project") == "src/"
+
+    def test_get_saved_path_returns_none_when_not_set(self, tmp_path: Path):
+        """get_saved_path returns None when no path has been saved."""
+        ingester = RepoIngester(tmp_path)
+        assert ingester.get_saved_path("nonexistent") is None
+
+    def test_save_path_coexists_with_sha_and_url(self, tmp_path: Path):
+        """path field doesn't clobber existing sha/url metadata."""
+        ingester = RepoIngester(tmp_path)
+        ingester.save_sha("my-project", "abc123")
+        ingester.save_source_url("my-project", "https://example.com")
+        ingester.save_path("my-project", "lib/")
+        assert ingester.get_saved_sha("my-project") == "abc123"
+        assert ingester.get_source_url("my-project") == "https://example.com"
+        assert ingester.get_saved_path("my-project") == "lib/"
+
+
 class TestDeleteRepo:
     """Tests for delete_repo functionality."""
 

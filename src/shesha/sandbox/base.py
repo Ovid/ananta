@@ -17,6 +17,7 @@ class ExecutionResult:
     final_answer: str | None = None
     final_var: str | None = None
     final_value: str | None = None
+    partial_answer: str | None = None
     vars: dict[str, str] | None = None
 
 

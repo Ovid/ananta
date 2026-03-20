@@ -240,6 +240,7 @@ class ContainerExecutor:
                     final_answer=result.get("final_answer"),
                     final_var=result.get("final_var"),
                     final_value=result.get("final_value"),
+                    partial_answer=result.get("partial_answer"),
                     vars=result.get("vars"),
                 )
         except ProtocolError as e:

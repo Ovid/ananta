@@ -4,7 +4,7 @@ import io
 import json
 import struct
 
-from shesha.sandbox.runner import NAMESPACE, execute_code
+from shesha.sandbox.runner import BUILTINS_SET, NAMESPACE, execute_code
 
 
 def frame_message(data: dict) -> bytes:
@@ -654,3 +654,67 @@ class TestLengthPrefixHelpers:
 
         result2 = _read_message(stream)
         assert result2 == msg2
+
+
+def test_partial_in_builtins_set():
+    """PARTIAL and PartialAnswer must be in BUILTINS_SET so SHOW_VARS excludes them."""
+    assert "PARTIAL" in BUILTINS_SET
+    assert "PartialAnswer" in BUILTINS_SET
+
+
+class TestPartialAnswer:
+    """Tests for PARTIAL() callable in the sandbox protocol."""
+
+    def test_partial_produces_partial_answer_in_result(self) -> None:
+        """PARTIAL('text') in sandbox sets result['partial_answer']."""
+        import sys
+
+        from shesha.sandbox.runner import main
+
+        stdin_data = b"".join([
+            frame_message({"action": "execute", "code": "PARTIAL('Found 7 titles but no dates')"}),
+        ])
+        stdin_buf = io.BytesIO(stdin_data)
+        stdout_buf = io.BytesIO()
+
+        old_stdin = sys.stdin
+        old_stdout = sys.stdout
+        try:
+            sys.stdin = _MockStdio(stdin_buf)
+            sys.stdout = _MockStdio(stdout_buf)
+            main()
+        finally:
+            sys.stdin = old_stdin
+            sys.stdout = old_stdout
+
+        messages = parse_messages(stdout_buf.getvalue())
+        result = messages[0]
+        assert result["partial_answer"] == "Found 7 titles but no dates"
+        assert result["return_value"] is None
+
+    def test_partial_callable_after_reset(self) -> None:
+        """PARTIAL remains callable after namespace reset."""
+        import sys
+
+        from shesha.sandbox.runner import main
+
+        stdin_data = b"".join([
+            frame_message({"action": "reset"}),
+            frame_message({"action": "execute", "code": "print(callable(PARTIAL))"}),
+        ])
+        stdin_buf = io.BytesIO(stdin_data)
+        stdout_buf = io.BytesIO()
+
+        old_stdin = sys.stdin
+        old_stdout = sys.stdout
+        try:
+            sys.stdin = _MockStdio(stdin_buf)
+            sys.stdout = _MockStdio(stdout_buf)
+            main()
+        finally:
+            sys.stdin = old_stdin
+            sys.stdout = old_stdout
+
+        messages = parse_messages(stdout_buf.getvalue())
+        assert messages[1]["status"] == "ok"
+        assert messages[1]["stdout"] == "True\n"

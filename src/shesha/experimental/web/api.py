@@ -14,6 +14,7 @@ from __future__ import annotations
 import threading
 import uuid
 from collections.abc import Awaitable, Callable
+from dataclasses import replace
 from pathlib import Path
 
 import arxiv
@@ -31,6 +32,8 @@ from shesha.experimental.web.dependencies import AppState
 from shesha.experimental.web.schemas import (
     PaperAdd,
     PaperInfo,
+    PaperRename,
+    PaperReorder,
     SearchResult,
 )
 from shesha.experimental.web.session import WebConversationSession
@@ -73,6 +76,13 @@ def _create_arxiv_router(state: AppState) -> APIRouter:
     def list_papers(name: str) -> list[PaperInfo]:
         project_id = resolve_topic_or_404(state, name)
         doc_names = state.topic_mgr.storage.list_documents(project_id)
+
+        # Apply custom ordering if stored
+        doc_order = state.topic_mgr.get_doc_order(project_id)
+        if doc_order is not None:
+            order_map = {name: i for i, name in enumerate(doc_order)}
+            doc_names = sorted(doc_names, key=lambda d: order_map.get(d, len(doc_order)))
+
         papers: list[PaperInfo] = []
         for doc_name in doc_names:
             meta = state.cache.get_meta(doc_name)
@@ -147,6 +157,41 @@ def _create_arxiv_router(state: AppState) -> APIRouter:
         project_id = resolve_topic_or_404(state, name)
         state.topic_mgr.storage.delete_document(project_id, arxiv_id)
         return {"status": "removed", "arxiv_id": arxiv_id}
+
+    @router.put("/api/topics/{name}/papers/order")
+    def reorder_papers(name: str, body: PaperReorder) -> dict[str, str]:
+        project_id = resolve_topic_or_404(state, name)
+        existing = set(state.topic_mgr.storage.list_documents(project_id))
+        requested = set(body.arxiv_ids)
+        if existing != requested:
+            raise HTTPException(
+                422,
+                f"arxiv_ids must contain exactly the same papers "
+                f"(got {len(body.arxiv_ids)}, expected {len(existing)})",
+            )
+        state.topic_mgr.set_doc_order(project_id, body.arxiv_ids)
+        return {"status": "reordered", "topic": name}
+
+    @router.patch("/api/papers/{arxiv_id}", response_model=PaperInfo)
+    def rename_paper(arxiv_id: str, body: PaperRename) -> PaperInfo:
+        new_name = body.new_name.strip()
+        if not new_name:
+            raise HTTPException(422, "Title cannot be empty")
+        meta = state.cache.get_meta(arxiv_id)
+        if meta is None:
+            raise HTTPException(404, f"Paper '{arxiv_id}' not found")
+        updated = replace(meta, title=new_name)
+        state.cache.store_meta(updated)
+        return PaperInfo(
+            arxiv_id=updated.arxiv_id,
+            title=updated.title,
+            authors=updated.authors,
+            abstract=updated.abstract,
+            category=updated.primary_category,
+            date=updated.published.strftime("%Y-%m-%d"),
+            arxiv_url=updated.arxiv_url,
+            source_type=updated.source_type,
+        )
 
     @router.get("/api/papers/tasks/{task_id}")
     def download_task_status(task_id: str) -> dict[str, object]:

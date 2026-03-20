@@ -636,3 +636,68 @@ class TestDownloadDocument:
     def test_download_404_missing_doc(self, client: TestClient) -> None:
         resp = client.get("/api/documents/doc-nosuch00/download")
         assert resp.status_code == 404
+
+
+class TestRenameDocument:
+    def _setup_doc(self, uploads_dir: Path, doc_id: str, filename: str) -> None:
+        """Create upload dir with meta.json."""
+        doc_dir = uploads_dir / doc_id
+        doc_dir.mkdir(parents=True, exist_ok=True)
+        (doc_dir / "meta.json").write_text(
+            json.dumps(
+                {
+                    "filename": filename,
+                    "content_type": "application/pdf",
+                    "size": 1024,
+                    "upload_date": "2026-03-20T12:00:00Z",
+                    "page_count": 5,
+                }
+            )
+        )
+
+    def test_rename_updates_filename(self, client: TestClient, uploads_dir: Path) -> None:
+        self._setup_doc(uploads_dir, "report-a3f2", "report.pdf")
+        resp = client.patch(
+            "/api/documents/report-a3f2",
+            json={"new_name": "quarterly-report.pdf"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["filename"] == "quarterly-report.pdf"
+        # Verify meta.json was updated
+        meta = json.loads((uploads_dir / "report-a3f2" / "meta.json").read_text())
+        assert meta["filename"] == "quarterly-report.pdf"
+
+    def test_rename_returns_full_document_info(self, client: TestClient, uploads_dir: Path) -> None:
+        self._setup_doc(uploads_dir, "report-a3f2", "report.pdf")
+        resp = client.patch(
+            "/api/documents/report-a3f2",
+            json={"new_name": "new-name.pdf"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["project_id"] == "report-a3f2"
+        assert data["content_type"] == "application/pdf"
+        assert data["size"] == 1024
+
+    def test_rename_nonexistent_returns_404(self, client: TestClient) -> None:
+        resp = client.patch(
+            "/api/documents/nosuch-doc0",
+            json={"new_name": "new.pdf"},
+        )
+        assert resp.status_code == 404
+
+    def test_rename_empty_name_returns_422(self, client: TestClient, uploads_dir: Path) -> None:
+        self._setup_doc(uploads_dir, "report-a3f2", "report.pdf")
+        resp = client.patch(
+            "/api/documents/report-a3f2",
+            json={"new_name": "  "},
+        )
+        assert resp.status_code == 422
+
+    def test_rename_validates_doc_id(self, client: TestClient) -> None:
+        resp = client.patch(
+            "/api/documents/..%2F..%2Fetc",
+            json={"new_name": "evil.pdf"},
+        )
+        assert resp.status_code == 400

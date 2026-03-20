@@ -16,13 +16,16 @@ from shesha.models import ProjectInfo, RepoProjectResult
 
 
 @pytest.fixture
-def mock_shesha() -> MagicMock:
+def mock_shesha(tmp_path: Path) -> MagicMock:
     """Create a mock Shesha instance."""
     shesha = MagicMock()
     shesha.list_projects.return_value = []
     # Use a real MagicMock for _storage to allow list_documents calls
     shesha.storage = MagicMock()
     shesha.storage.list_documents.return_value = []
+    # Return a real Path so _build_repo_info's display-name lookup doesn't
+    # produce a MagicMock string.  Individual tests can override this.
+    shesha.storage.get_project_dir.return_value = tmp_path / "default_project_dir"
     return shesha
 
 
@@ -811,3 +814,86 @@ class TestSanitizeIngestError:
         exc = RepoIngestError("/tmp/repo", RuntimeError("fail"))
         result = _sanitize_ingest_error(exc)
         assert "/tmp/repo" not in result
+
+
+# ---- PATCH /api/repos/{id} (rename) ----
+
+
+class TestRenameRepo:
+    def test_rename_sets_display_name(
+        self, client: TestClient, mock_shesha: MagicMock, tmp_path: Path
+    ) -> None:
+        project_dir = tmp_path / "projects" / "owner-myrepo"
+        project_dir.mkdir(parents=True)
+        mock_shesha.storage.get_project_dir.return_value = project_dir
+        mock_shesha.get_project_info.return_value = ProjectInfo(
+            project_id="owner-myrepo",
+            source_url="https://github.com/owner/myrepo",
+            is_local=False,
+            source_exists=True,
+            analysis_status="missing",
+        )
+        mock_shesha.storage.list_documents.return_value = ["f1.py"]
+
+        resp = client.patch(
+            "/api/repos/owner-myrepo",
+            json={"new_name": "My Cool Repo"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["display_name"] == "My Cool Repo"
+
+    def test_rename_persists_display_name(
+        self, client: TestClient, mock_shesha: MagicMock, tmp_path: Path
+    ) -> None:
+        project_dir = tmp_path / "projects" / "owner-myrepo"
+        project_dir.mkdir(parents=True)
+        mock_shesha.storage.get_project_dir.return_value = project_dir
+        mock_shesha.get_project_info.return_value = ProjectInfo(
+            project_id="owner-myrepo",
+            source_url="https://github.com/owner/myrepo",
+            is_local=False,
+            source_exists=True,
+            analysis_status="missing",
+        )
+        mock_shesha.storage.list_documents.return_value = ["f1.py"]
+
+        client.patch("/api/repos/owner-myrepo", json={"new_name": "My Repo"})
+
+        # GET should return the display_name
+        resp = client.get("/api/repos/owner-myrepo")
+        assert resp.status_code == 200
+        assert resp.json()["display_name"] == "My Repo"
+
+    def test_rename_nonexistent_returns_404(
+        self, client: TestClient, mock_shesha: MagicMock
+    ) -> None:
+        mock_shesha.get_project_info.side_effect = ProjectNotFoundError("nonexistent")
+        resp = client.patch(
+            "/api/repos/nonexistent",
+            json={"new_name": "New Name"},
+        )
+        assert resp.status_code == 404
+
+    def test_rename_empty_name_returns_422(
+        self, client: TestClient, mock_shesha: MagicMock
+    ) -> None:
+        mock_shesha.get_project_info.return_value = ProjectInfo(
+            project_id="owner-myrepo",
+            source_url="https://github.com/owner/myrepo",
+            is_local=False,
+            source_exists=True,
+            analysis_status="missing",
+        )
+        resp = client.patch(
+            "/api/repos/owner-myrepo",
+            json={"new_name": "  "},
+        )
+        assert resp.status_code == 422
+
+    def test_rename_validates_project_id(self, client: TestClient) -> None:
+        resp = client.patch(
+            "/api/repos/.hidden",
+            json={"new_name": "New Name"},
+        )
+        assert resp.status_code == 400

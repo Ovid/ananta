@@ -36,6 +36,7 @@ __all__ = [
     "ModelUpdate",
     "RepoAdd",
     "RepoInfo",
+    "RepoRename",
     "TopicCreate",
     "TopicInfo",
     "TopicRename",
@@ -56,11 +57,16 @@ class RepoAdd(BaseModel):
     topic: str | None = None
 
 
+class RepoRename(BaseModel):
+    new_name: str
+
+
 class RepoInfo(BaseModel):
     project_id: str
     source_url: str
     file_count: int
     analysis_status: str | None  # "current", "stale", "missing"
+    display_name: str | None = None
 
 
 class AnalysisResponse(BaseModel):

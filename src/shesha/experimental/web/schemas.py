@@ -33,6 +33,8 @@ __all__ = [
     "ModelUpdate",
     "PaperAdd",
     "PaperInfo",
+    "PaperReorder",
+    "PaperRename",
     "SearchResult",
     "TopicCreate",
     "TopicInfo",
@@ -71,6 +73,14 @@ class SearchResult(BaseModel):
     date: str
     arxiv_url: str
     in_topics: list[str] = []
+
+
+class PaperRename(BaseModel):
+    new_name: str
+
+
+class PaperReorder(BaseModel):
+    arxiv_ids: list[str]
 
 
 class DownloadTaskStatus(BaseModel):

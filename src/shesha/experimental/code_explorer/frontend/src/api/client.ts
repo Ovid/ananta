@@ -20,6 +20,11 @@ export const api = {
       request<{ status: string; project_id: string }>(`/repos/${encodeURIComponent(id)}`, {
         method: 'DELETE',
       }),
+    rename: (id: string, newName: string) =>
+      request<RepoInfo>(`/repos/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ new_name: newName }),
+      }),
     checkUpdates: (id: string) =>
       request<UpdateStatus>(`/repos/${encodeURIComponent(id)}/check-updates`, {
         method: 'POST',

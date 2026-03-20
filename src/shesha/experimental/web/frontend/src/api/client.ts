@@ -16,6 +16,18 @@ export const api = {
       `/papers/tasks/${taskId}`,
     ),
     search: (q: string) => request<SearchResult[]>(`/papers/search?q=${encodeURIComponent(q)}`),
+    rename: (arxivId: string, newName: string) => request<PaperInfo>(
+      `/papers/${encodeURIComponent(arxivId)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ new_name: newName }),
+      },
+    ),
+    reorder: (topicName: string, arxivIds: string[]) => request<{ status: string }>(
+      `/topics/${encodeURIComponent(topicName)}/papers/order`, {
+        method: 'PUT',
+        body: JSON.stringify({ arxiv_ids: arxivIds }),
+      },
+    ),
   },
   // Arxiv-specific: arxiv search
   search: (params: { q: string; author?: string; category?: string; sort_by?: string; start?: number }) => {

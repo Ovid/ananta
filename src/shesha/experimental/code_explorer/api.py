@@ -28,6 +28,7 @@ from shesha.experimental.code_explorer.schemas import (
     AnalysisResponse,
     RepoAdd,
     RepoInfo,
+    RepoRename,
     UpdateStatus,
 )
 from shesha.experimental.code_explorer.websockets import websocket_handler
@@ -90,11 +91,19 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
         info = state.shesha.get_project_info(pid)
         # TODO: Replace with a public Shesha API method when available
         doc_count = len(state.shesha.storage.list_documents(pid))
+        display_name: str | None = None
+        try:
+            dn_path = state.shesha.storage.get_project_dir(pid) / "_display_name.txt"
+            if dn_path.exists():
+                display_name = dn_path.read_text().strip() or None
+        except Exception:
+            pass  # Display name is optional; missing/unreadable is OK
         return RepoInfo(
             project_id=pid,
             source_url=info.source_url or "",
             file_count=doc_count,
             analysis_status=info.analysis_status,
+            display_name=display_name,
         )
 
     @router.get("/repos")
@@ -144,6 +153,20 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
             return _build_repo_info(project_id)
         except ProjectNotFoundError:
             raise HTTPException(404, f"Project '{project_id}' not found")
+
+    @router.patch("/repos/{project_id}")
+    def rename_repo(project_id: str, body: RepoRename) -> RepoInfo:
+        _validate_project_id(project_id)
+        new_name = body.new_name.strip()
+        if not new_name:
+            raise HTTPException(422, "Display name cannot be empty")
+        try:
+            state.shesha.get_project_info(project_id)
+        except ProjectNotFoundError:
+            raise HTTPException(404, f"Project '{project_id}' not found")
+        dn_path = state.shesha.storage.get_project_dir(project_id) / "_display_name.txt"
+        dn_path.write_text(new_name)
+        return _build_repo_info(project_id)
 
     @router.delete("/repos/{project_id}")
     def delete_repo(project_id: str) -> dict[str, str]:

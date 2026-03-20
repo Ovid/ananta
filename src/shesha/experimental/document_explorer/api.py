@@ -27,6 +27,7 @@ from shesha.experimental.document_explorer.extractors import (
 )
 from shesha.experimental.document_explorer.schemas import (
     DocumentInfo,
+    DocumentRename,
     DocumentUploadResponse,
 )
 from shesha.experimental.document_explorer.topics import _slugify
@@ -285,6 +286,27 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
         # Remove Shesha project
         state.shesha.delete_project(doc_id)
         return {"status": "deleted", "project_id": doc_id}
+
+    @router.patch("/documents/{doc_id:path}")
+    def rename_document(doc_id: str, body: DocumentRename) -> DocumentInfo:
+        _validate_doc_id(doc_id)
+        new_name = body.new_name.strip()
+        if not new_name:
+            raise HTTPException(422, "new_name must not be empty or whitespace")
+        meta = _read_upload_meta(state.uploads_dir, doc_id)
+        if meta is None:
+            raise HTTPException(404, f"Document '{doc_id}' not found")
+        meta["filename"] = new_name
+        meta_path = state.uploads_dir / doc_id / "meta.json"
+        meta_path.write_text(json.dumps(meta, indent=2))
+        return DocumentInfo(
+            project_id=doc_id,
+            filename=meta.get("filename", ""),
+            content_type=meta.get("content_type", ""),
+            size=meta.get("size", 0),
+            upload_date=meta.get("upload_date", ""),
+            page_count=meta.get("page_count"),
+        )
 
     @router.get("/documents/{doc_id}/download")
     def download_document(doc_id: str) -> FileResponse:

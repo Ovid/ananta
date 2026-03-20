@@ -3400,7 +3400,7 @@ class TestGaveUpFlag:
         """QueryResult.gave_up is False when RLM returns FINAL(...)."""
         mock_llm = mock_llm_cls.return_value
         mock_llm.complete.return_value = MagicMock(
-            content='FINAL(The answer is 42)',
+            content="FINAL(The answer is 42)",
             prompt_tokens=10,
             completion_tokens=5,
             total_tokens=15,
@@ -3419,7 +3419,7 @@ class TestGaveUpFlag:
         """QueryResult.gave_up is True when RLM returns bare PARTIAL(...)."""
         mock_llm = mock_llm_cls.return_value
         mock_llm.complete.return_value = MagicMock(
-            content='PARTIAL(Found 7 titles but no dates)',
+            content="PARTIAL(Found 7 titles but no dates)",
             prompt_tokens=10,
             completion_tokens=5,
             total_tokens=15,

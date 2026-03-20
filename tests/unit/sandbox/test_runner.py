@@ -671,9 +671,13 @@ class TestPartialAnswer:
 
         from shesha.sandbox.runner import main
 
-        stdin_data = b"".join([
-            frame_message({"action": "execute", "code": "PARTIAL('Found 7 titles but no dates')"}),
-        ])
+        stdin_data = b"".join(
+            [
+                frame_message(
+                    {"action": "execute", "code": "PARTIAL('Found 7 titles but no dates')"}
+                ),
+            ]
+        )
         stdin_buf = io.BytesIO(stdin_data)
         stdout_buf = io.BytesIO()
 
@@ -698,10 +702,12 @@ class TestPartialAnswer:
 
         from shesha.sandbox.runner import main
 
-        stdin_data = b"".join([
-            frame_message({"action": "reset"}),
-            frame_message({"action": "execute", "code": "print(callable(PARTIAL))"}),
-        ])
+        stdin_data = b"".join(
+            [
+                frame_message({"action": "reset"}),
+                frame_message({"action": "execute", "code": "print(callable(PARTIAL))"}),
+            ]
+        )
         stdin_buf = io.BytesIO(stdin_data)
         stdout_buf = io.BytesIO()
 

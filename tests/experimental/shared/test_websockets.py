@@ -110,7 +110,6 @@ class TestHandleQueryDocIdValidation:
         # Should have reached the storage layer (validation passed)
         assert state.shesha.storage.get_document.call_count >= 1
 
-
     @pytest.mark.asyncio
     async def test_accepts_old_style_arxiv_ids_with_slash(self) -> None:
         """Old-style arXiv IDs like cs/9808001v1 must pass validation."""

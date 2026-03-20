@@ -145,9 +145,7 @@ def find_final_answer(text: str) -> tuple[str, str] | None:
     else:
         # Multi-line PARTIAL with closing ')' at end of string
         partial_pattern = r"^\s*PARTIAL\((.*)\)\s*\Z"
-        partial_match = re.search(
-            partial_pattern, stripped, re.MULTILINE | re.DOTALL
-        )
+        partial_match = re.search(partial_pattern, stripped, re.MULTILINE | re.DOTALL)
         if partial_match:
             partial_content = partial_match.group(1).strip()
             if partial_content:

@@ -270,9 +270,7 @@ class TestArxivSearcher:
 
         mock_client = MagicMock()
         mock_arxiv.Client.return_value = mock_client
-        mock_client.results.return_value = iter(
-            [_mock_arxiv_result(arxiv_id="cs/9808001v1")]
-        )
+        mock_client.results.return_value = iter([_mock_arxiv_result(arxiv_id="cs/9808001v1")])
 
         searcher = ArxivSearcher()
         results = searcher.search("chess")

@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - CLI: `shesha-web` → `ananta-web`, `shesha-code` → `ananta-code`, `shesha-document-explorer` → `ananta-document-explorer`
   - Environment variables: `SHESHA_*` → `ANANTA_*`
   - Data directories: `shesha_data` → `ananta_data`, `~/.shesha/` → `~/.ananta/`, `~/.shesha-arxiv/` → `~/.ananta-arxiv/`
-  - Docker image: `shesha-sandbox` → `ananta-sandbox`
+  - Docker image: `shesha-sandbox` → `ananta-sandbox` — rebuild required: `docker build -t ananta-sandbox src/ananta/sandbox/`
 - Changelog rewritten with versioned sections for all 13 previously unversioned branch merges (v0.10.0–v0.21.1), with keepachangelog 1.1.0 comparison links
 - CLAUDE.md versioning section updated: `/release` is now the only sanctioned merge path, keepachangelog 1.1.0 format enforced, auto-increment version rules documented
 

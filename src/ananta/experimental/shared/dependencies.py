@@ -9,6 +9,7 @@ from ananta import Ananta
 from ananta.config import AnantaConfig
 from ananta.experimental.shared.session import WebConversationSession
 from ananta.experimental.shared.topics import BaseTopicManager
+from ananta.migration import check_legacy_directory
 from ananta.repo.ingester import RepoIngester
 from ananta.storage.filesystem import FilesystemStorage
 
@@ -42,6 +43,10 @@ def create_app_state(
 ) -> BaseExplorerState:
     """Initialize all components and return shared state."""
     data_dir = data_dir or Path.home() / ".ananta" / app_name
+
+    legacy_shared = Path.home() / ".shesha" / app_name
+    check_legacy_directory(legacy_shared, data_dir, f".shesha/{app_name}", f".ananta/{app_name}")
+
     ananta_data = data_dir / "ananta_data"
     topics_dir = data_dir / "topics"
     ananta_data.mkdir(parents=True, exist_ok=True)

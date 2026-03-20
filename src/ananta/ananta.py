@@ -18,6 +18,7 @@ from ananta.exceptions import (
     RepoError,
     RepoIngestError,
 )
+from ananta.migration import check_legacy_directory
 from ananta.models import ProjectInfo, RepoProjectResult
 from ananta.parser import create_default_registry
 from ananta.parser.registry import ParserRegistry
@@ -360,6 +361,12 @@ class Ananta:
         with self._start_lock:
             if self._pool is not None and not self._stopped:
                 return
+
+            storage_path = Path(self._config.storage_path)
+            if storage_path.name == "ananta_data":
+                legacy = storage_path.parent / "shesha_data"
+                check_legacy_directory(legacy, storage_path, "shesha_data", "ananta_data")
+
             logger.info("Starting Ananta (model=%s)", self._config.model)
             self._check_docker_available()
             self._stopped = False

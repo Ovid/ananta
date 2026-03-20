@@ -10,6 +10,7 @@ from ananta.config import AnantaConfig
 from ananta.experimental.arxiv.cache import PaperCache
 from ananta.experimental.arxiv.search import ArxivSearcher
 from ananta.experimental.arxiv.topics import TopicManager
+from ananta.migration import check_legacy_directory
 from ananta.storage.filesystem import FilesystemStorage
 
 
@@ -31,6 +32,10 @@ def create_app_state(
 ) -> AppState:
     """Initialize all components and return shared state."""
     data_dir = data_dir or Path.home() / ".ananta-arxiv"
+
+    legacy_arxiv = Path.home() / ".shesha-arxiv"
+    check_legacy_directory(legacy_arxiv, data_dir, ".shesha-arxiv", ".ananta-arxiv")
+
     ananta_data = data_dir / "ananta_data"
     cache_dir = data_dir / "paper-cache"
     ananta_data.mkdir(parents=True, exist_ok=True)

@@ -89,12 +89,12 @@ export default function ChatArea({
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // Auto-resize textarea on input change
+  // Auto-resize textarea on input change (floor at 2.25rem / 36px = h-9)
   useEffect(() => {
     const el = textareaRef.current
     if (!el) return
-    el.style.height = 'auto'
-    el.style.height = el.scrollHeight + 'px'
+    el.style.height = '0'
+    el.style.height = Math.max(36, el.scrollHeight) + 'px'
   }, [input])
 
   // Load history when topic changes
@@ -286,9 +286,8 @@ export default function ChatArea({
               : !hasDocuments ? emptySelectionMessage
               : placeholder
             }
-            rows={1}
-            style={{ maxHeight: '6rem' }}
-            className="flex-1 min-h-9 bg-surface-2 border border-border rounded px-3 py-1.5 text-sm leading-6 text-text-primary resize-none overflow-y-auto focus:outline-none focus:border-accent disabled:opacity-50"
+            style={{ height: '36px', maxHeight: '6rem' }}
+            className="flex-1 bg-surface-2 border border-border rounded px-3 py-1.5 text-sm leading-5 text-text-primary resize-none overflow-y-auto focus:outline-none focus:border-accent disabled:opacity-50"
           />
           {thinking ? (
             <button

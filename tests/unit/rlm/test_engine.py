@@ -1772,7 +1772,7 @@ class TestResolveFinalVar:
         """I1: bare FINAL_VAR resolving to '' must be accepted, not retried."""
         mock_llm = MagicMock()
         mock_llm.complete.return_value = MagicMock(
-            content='FINAL_VAR(my_var)',
+            content="FINAL_VAR(my_var)",
             prompt_tokens=10,
             completion_tokens=10,
             total_tokens=20,
@@ -1815,8 +1815,14 @@ class TestResolveFinalVar:
         # Code block execution: no final answer
         mock_executor.execute.side_effect = [
             MagicMock(
-                status="ok", stdout="", stderr="", error=None,
-                final_answer=None, final_var=None, final_value=None, vars=None,
+                status="ok",
+                stdout="",
+                stderr="",
+                error=None,
+                final_answer=None,
+                final_var=None,
+                final_value=None,
+                vars=None,
             ),
             # _resolve_final_var for the bare FINAL_VAR
             MagicMock(status="ok", stdout=""),

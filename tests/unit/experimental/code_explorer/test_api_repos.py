@@ -134,9 +134,7 @@ class TestProjectIdValidation:
         "bad_id",
         [".hidden", "-leading-dash", "has spaces"],
     )
-    def test_rejects_unsafe_project_id(
-        self, client: TestClient, path: str, bad_id: str
-    ) -> None:
+    def test_rejects_unsafe_project_id(self, client: TestClient, path: str, bad_id: str) -> None:
         """Routes return 400 for project_ids that fail _SAFE_ID_RE."""
         url = path.replace("{pid}", bad_id)
         if "/check-updates" in path or "/apply-updates" in path or "/analyze" in path:

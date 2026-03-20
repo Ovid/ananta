@@ -1,3 +1,5 @@
+- I would like to drag docs/repos/papers onto their targets. I should also be
+  able to rename them.
 - What happens if we upload two files with the same name, but different
   contents? Right now, they get separated by project ID (I think) but all
   files should only have one canonical source.  This seems like a larger fix

@@ -594,9 +594,7 @@ class TestDownloadDocument:
         (doc_dir / f"original{ext}").write_bytes(content)
         (doc_dir / "meta.json").write_text(json.dumps({"filename": filename}))
 
-    def test_download_returns_file(
-        self, client: TestClient, uploads_dir: Path
-    ) -> None:
+    def test_download_returns_file(self, client: TestClient, uploads_dir: Path) -> None:
         self._setup_upload(uploads_dir, "doc-abc12345", "report.pdf")
         resp = client.get("/api/documents/doc-abc12345/download")
         assert resp.status_code == 200

@@ -90,28 +90,46 @@ make all                         # Format + lint + typecheck + test
 
 ## Changelog & Versioning
 
-**CHANGELOG.md must be updated with every user-visible change.**
+**CHANGELOG.md must be updated with every user-visible change.** Format: [keepachangelog 1.1.0](https://keepachangelog.com/en/1.1.0/).
 
 ### Adding Changelog Entries
 
-Add entries under `[Unreleased]` using these categories:
-- **Added** - New features
-- **Changed** - Changes to existing functionality
-- **Deprecated** - Features to be removed in future
-- **Removed** - Removed features
-- **Fixed** - Bug fixes
-- **Security** - Security-related changes
+Add entries under `[Unreleased]` using these categories (in this order):
+- **Added** — New features
+- **Changed** — Changes to existing functionality
+- **Deprecated** — Features to be removed in future
+- **Removed** — Removed features
+- **Fixed** — Bug fixes
+- **Security** — Security-related changes
+
+Omit empty categories. Entries should describe user-visible behavior changes, not implementation details.
+
+### Merging Feature Branches
+
+**Use `/release` to merge feature branches. Never use bare `git done`.**
+
+`/release` handles: changelog finalization, semantic version suggestion, `git done -y`, tagging, and push. It is the only sanctioned merge path for feature branches.
+
+### Version Auto-Increment Rules
+
+Version numbers are derived from git tags via `hatch-vcs`. The `/release` skill suggests versions based on changelog categories:
+
+**Pre-1.0 (current):**
+
+| Highest category present | Bump |
+|---|---|
+| Removed, or explicit breaking change | minor |
+| Added, Changed, Deprecated | minor |
+| Fixed, Security only | patch |
+
+**Post-1.0:** Removed/breaking → major. Otherwise same as above.
+
+Comparison links at the bottom of CHANGELOG.md are mandatory. Format:
+```
+[unreleased]: https://github.com/Ovid/shesha/compare/vLATEST...HEAD
+[X.Y.Z]: https://github.com/Ovid/shesha/compare/vPREVIOUS...vX.Y.Z
+```
 
 ### git
 
 CRITICAL: git commit messages MUST be plain text. Never do things similar to `git commit -m "$(cat <<'COMMITEOF'`
-
-### Release Workflow
-
-Version numbers are derived from git tags via `hatch-vcs`. To release:
-
-1. Move `[Unreleased]` entries to new version section: `[X.Y.Z] - YYYY-MM-DD`
-2. Add fresh `## [Unreleased]` section at top
-3. Commit the changelog update
-4. Create git tag: `git tag vX.Y.Z`
-5. Push with tags: `git push && git push --tags`

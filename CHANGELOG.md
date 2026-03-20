@@ -7,121 +7,407 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- RLM uses structured `PARTIAL()` callable instead of string-prefix detection for partial evidence answers
-- "More" button detects partial evidence via `gave_up` flag instead of parsing answer text
-
 ### Added
 
-- **Trace download endpoint** (`GET /api/topics/{name}/trace-download/{trace_id}`) returns raw JSONL trace files with correct `application/x-ndjson` content type and attachment disposition; uses iterate-and-match (no path construction from user input)
-- **"Allow background knowledge" toggle** in all explorer sidebars — lets the LLM supplement document content with its training knowledge; background knowledge sections are visually distinguished with a tinted block, left border, and "Background knowledge" label with ARIA accessibility support
-- **"More" button** in ChatArea for one-click deeper analysis across all explorers — sends a predefined prompt to verify, enhance, and re-present the previous analysis; requires at least one prior exchange
-- Document context menu now includes a "Delete" option with confirmation dialog (shared TopicSidebar component)
-- **Help panel** (`?` button) for Code Explorer and Document Explorer with customized quick-start guides, FAQs, and keyboard shortcuts
-- **Document Explorer** web application for uploading, organizing, and querying documents (PDF, Word, PowerPoint, Excel, RTF, plain text) via RLM
-- Code Explorer web application for exploring git repositories via RLM
-- Shared web infrastructure module (`shesha.experimental.shared`) for building experimental tools
-- Developer guide for extending the web tool ecosystem (`docs/extending-web-tools.md`)
-- **Code Explorer CLI entry point** — `shesha-code` command launches the code explorer web server with `--port`, `--data-dir`, `--model`, and `--no-browser` options
-- **Code Explorer module skeleton** — new `shesha.experimental.code_explorer` module with `CodeExplorerTopicManager` for lightweight repo grouping, `CodeExplorerState` dataclass and `create_app_state()` factory, and `__main__.py` CLI entry point stub
-- **Code Explorer WebSocket handler** — cross-project query handler that loads documents from multiple repos, merges per-project analysis as context, and records consulted project_ids in the global session
-- **Multi-source citation verification** — citations are now verified against CrossRef, OpenAlex, and Semantic Scholar in addition to arXiv, dramatically reducing false "unresolved" results for non-arXiv sources
-- **Fuzzy title matching** — Jaccard similarity with LLM fallback for ambiguous cases (0.50-0.85 range) reduces false positives from title changes between paper versions
-- **Topical relevance checking** — LLM-based batch check flags citations that exist but are clearly unrelated to the citing paper
-- **Source badges** — citation report shows where each citation was verified (arXiv, CrossRef, OpenAlex, S2)
-- **Email modal for polite-pool access** — optional email stored in browser localStorage gives faster API access to CrossRef and OpenAlex
-- **Inline paper citations** — LLM responses in arXiv Explorer now cite papers by arxiv ID with clickable links that open the paper detail view
-- **Shared ChatArea and ChatMessage components** — extracted parameterized versions to shared-ui package with `selectedDocuments`/`document_ids` naming, optional `renderAnswer` and `renderAnswerFooter` props for domain-specific customization
-- **Shared TopicSidebar component** — extracted parameterized TopicSidebar to shared-ui package with `loadDocuments`/`DocumentItem` abstraction, cross-topic selection scoping (All/None buttons only affect current topic), optional uncategorized docs section, and configurable add button
-- **Repo-to-topic context menu** — document rows in the Code Explorer sidebar now have an ellipsis menu to add repos to topics or remove them, enabling multi-topic assignment without re-adding
-- **Boundary marker rendering** — UNTRUSTED_CONTENT boundary markers that leak into RLM answers are now displayed as labeled blockquotes instead of raw tokens
-- **RLM context metadata** — document names are now included in context metadata so the RLM can reference files by name
-- **FallbackTextParser file headers** — non-code documents now include `=== FILE: name ===` headers matching CodeParser format, helping the RLM identify document boundaries
+- **`/release` skill** — Claude Code skill for merging feature branches with automatic semantic versioning, changelog finalization, `git done -y`, and git tagging
 
 ### Changed
 
-- Extracted `BaseTopicManager` into shared module; document and code explorer topic managers are now thin subclasses with generic `add_item`/`list_items` API
-- Consolidated shared dependencies, API routes, and WebSocket handler across explorers
-- On-disk topic format standardized to `"items"` key (breaking change for existing topic data)
-- Frontend topic-item routes unified to `/api/topics/{name}/items` (was `/documents` and `/repos`)
-- Refactored arxiv-explorer help panel to use shared HelpPanel component
-- Launcher scripts (`code-explorer.sh`, `arxiv-explorer.sh`, `document-explorer.sh`) now
-  validate all prerequisites and print a single actionable error report instead of failing
-  on the first missing dependency. `SHESHA_MODEL` is now required. Shared logic extracted
-  to `scripts/common.sh`.
-- Chat input area now auto-grows up to 4 lines as you type
-- User messages in chat are now rendered as markdown (headers, code blocks, lists)
-- Code explorer conversation history is now per-topic instead of global
-- Code Explorer API routes for traces, model, history, and context-budget now use shared router with callbacks
-- arXiv Explorer refactored to use shared web infrastructure module
-- "unresolved" citations now labeled "not found in databases" to clarify external sources were tried
-- LLM-tell phrases displayed in purple (was amber) for better visual distinction
-- Papers default to selected when clicking a topic name
+- Changelog rewritten with versioned sections for all 13 previously unversioned branch merges (v0.10.0–v0.21.1), with keepachangelog 1.1.0 comparison links
+- CLAUDE.md versioning section updated: `/release` is now the only sanctioned merge path, keepachangelog 1.1.0 format enforced, auto-increment version rules documented
+
+## [0.21.1] - 2026-03-20
 
 ### Fixed
 
-- Papers not auto-selected when clicking a topic (required expanding the paper list first)
+- Pending question and thinking indicator now scoped to their originating topic — switching topics no longer shows the previous topic's in-flight query state (question bubble, spinner, phase text) in the new topic's chat area
 
----
-
-_Previous entries:_
+## [0.21.0] - 2026-03-20
 
 ### Added
 
-- **Web citation checking** — citation verification now works in the web interface (Check Citations toolbar button), reusing the same extraction and arXiv verification logic as the TUI `/check` command
-- **Consulted papers display** — query answers now show which papers were used, with clickable links to paper detail view
-- **Document-only constraint** — system prompt now explicitly forbids the LLM from using training data, requiring answers based solely on provided documents
-- **Trace document IDs** — trace viewer summary shows which documents were included in each query
-- **Experimental web interface** for arXiv Explorer (`shesha-web` command)
-  - React frontend with dark/light theme
-  - FastAPI backend with REST API and WebSocket
-  - Topic management (create, rename, delete, switch)
-  - arXiv search with multi-topic paper picker
-  - Local paper search across all topics
-  - Query execution with live progress streaming
-  - Trace viewer with expandable step timeline
-  - Citation checking with streamed progress
-  - Context budget indicator (warns at 50% and 80%)
-  - Conversation history persisted per topic
-  - Markdown transcript export
-  - In-app help system
-- Real query cancellation via `threading.Event` in RLM engine
-- `ARXIV.md` setup guide for researchers
+- **`PARTIAL()` callable** — RLM can now call `PARTIAL("partial answer")` when it exhausts iterations without reaching `FINAL()`, reporting partial evidence instead of giving up silently
+  - Registered in sandbox runtime alongside `FINAL()`
+  - `gave_up` flag propagated through `QueryResult`, `ExchangeSchema`, session, and WebSocket responses
+  - More button becomes context-sensitive: shows a retry prompt when the previous answer was partial
+  - System prompts updated to instruct the RLM to use `PARTIAL()` on give-up
+- **Sidebar rename and reorder UI** — rename repos, documents, and papers via new API endpoints; drag-and-drop document reordering with backend support
+- **Consulted documents footer** shown in chat responses
+- `final_source` metadata in trace steps for answer provenance debugging
+- `SandboxExecutor` protocol in `sandbox/base.py` for executor abstraction (enables mock executors and non-Docker backends)
+- `resolve()` method on `BaseTopicManager` for shared routes/websockets
+- `allow_local_paths` flag on `RepoIngester` to explicitly control local path access
+- `--bind` CLI flag for experimental servers (default changed to `127.0.0.1`)
+- Logging added to core library modules (`rlm`, `sandbox`, `llm`, `storage`)
 
 ### Changed
 
-- **Web interface: paper sidebar redesign** — papers moved from top chip bar into collapsible lists under each topic in the sidebar, showing titles instead of arXiv IDs
-- Web interface: clicking a paper title opens full detail view (abstract, authors, metadata) in the main content area
-- Web interface: paper selection checkboxes with All/None toggle to scope queries to specific papers
-- TUI cancellation now uses real `cancel_event` instead of cosmetic query-ID bump
+- `RLMEngine` accepts an `LLMClient` factory instead of a concrete client — dependency injection for analysis/shortcut and engine
+- `AnalysisGenerator` narrowed to accept callables instead of concrete types
+- Shortcut decision logic extracted from TUI into `query_with_shortcut()` in the domain layer, making it reusable by other frontends
+- Repo ingestion extracted from the `Shesha` facade into dedicated methods
+- `LLMError` now inherits from `SheshaError` for consistent exception hierarchy
+- `IncrementalTraceWriter` enforces temporal coupling (steps must be added before finalization)
+- `save_sha()` now preserves existing metadata keys instead of overwriting
 
-### Added
+### Fixed
 
-- arXiv Explorer example (`examples/arxiv_explorer.py`) — interactive CLI for searching arXiv,
-  loading papers into topics, and querying them with Shesha. Features:
-  - `/search` with author, category, and keyword filtering
-  - `/load` papers by search result number or arXiv ID (source first, PDF fallback)
-  - `/check-citations` for automated citation verification against arXiv API with
-    LLM-tell phrase detection (always shown with AI disclaimer)
-  - `/history` for persistent topic management with creation dates and size on disk
-  - Central paper cache to avoid redundant downloads
+- `FINAL_VAR` on `None`-valued variable now returns `None` instead of the string `'None'`
+- `FINAL_VAR` for missing variables returns `None` instead of empty string
+- `print(None)` output treated as unresolved in `_resolve_final_var`
+- Bare-text `FINAL()` regex no longer truncates answers at nested parentheses on end-of-line
+- Empty `FINAL()` and `FINAL(x)` followed by trailing commentary now handled correctly
+- Code-block loop continues on failed `FINAL_VAR` lookup (with retry guidance) instead of returning empty answer
+- `PermanentError` from `try_answer_from_analysis` and `classify_query` now propagated instead of swallowed
+- Analysis context wrapped in untrusted boundary on RLM fallback path
+- Guard against `None` `message.content` from LiteLLM API responses
+- `RuntimeError` from `pool.stop()` during active query now caught in executor
+- `RuntimeError` from `pool.acquire()` caught in executor recovery path
+- Pool lock released during overflow container creation to prevent deadlock
+- Pool assigned only after `pool.start()` succeeds; safe lifecycle ordering
+- Thread-safety: `_meta_lock` added to metadata reads; `start_lock` added to `Shesha` to prevent duplicate pools
+- Thread-safety: lock added to `_repo_meta.json` read-modify-write; bounded cache for `pending_updates`
+- Trace marked as finalized even on suppressed write failure; `_finalized` flag set after successful write to allow retry
+- Trace `metadata` field preserved in `Trace.redacted()` steps
+- Subdirectory scope preserved when re-checking existing projects and during code explorer check/apply updates
+- Subdirectory path persisted in `_repo_meta.json` to prevent data expansion on update
+- `get_analysis_status` returns `stale` when SHA is unknown (instead of crashing)
+- Return `unchanged` when `saved_sha` is `None` but `current_sha` is valid
+- Return `check_failed` instead of `updates_available` on network failure
+- Self-healing `apply-updates` when in-memory `pending_updates` cache is empty (e.g., after server restart)
+- Staging project deleted after successful `swap_docs` to prevent orphan leak
+- TOCTOU race eliminated in apply-updates self-heal path
+- `RepoIngestError` caught in `check_updates` and `apply_updates` API endpoints
+- Corrupt `_repo_meta.json` handled gracefully in metadata read/write
+- Topic associations removed during batch upload rollback; batch upload rolls back all projects on partial failure
+- Upload cleanup on document upload failure
+- `NEED_DEEPER` sentinel detection uses `startswith` to handle trailing punctuation
+- Emit trace step and callbacks on post-loop `FINAL_VAR` retry
+- Preserve code-block `var_lookup_failed` over bare-text overwrite
+- CORS credentials, static boundary fallback, and empty-string final var fixes
+- `project_id` validated on code explorer API endpoints
+- Forward slashes allowed in `_SAFE_ID_RE` for old-style arXiv IDs (e.g., `hep-ph/9901234`)
+- Use `'user'` role in max-iterations fallback message
+- Textarea and buttons aligned to same height (36px / h-9) with bottom alignment
 
 ### Security
 
-- Replace static `<untrusted_document_content>` XML tags with per-query randomized boundary tokens (128-bit entropy) to prevent tag-escape prompt injection attacks
-- Restore REPL output wrapping removed in 937c183
-- Add wrapping to initial document context shown to the LLM
-- All five document-to-LLM paths now have untrusted content boundaries
+- Restrict git transport protocols to `https` and `ssh` only — block `ext::` (RCE vector), `git://` (SSRF), and `file://` (local filesystem reads)
+- Experimental servers bind to `127.0.0.1` by default instead of `0.0.0.0`
+- 50 MB per-file and 200 MB aggregate upload size limits
+- File extension validated before reading upload body and before writing to disk
+- Internal filesystem paths sanitized from API error responses
+- All exceptions caught in batch LLM subcalls to prevent information leakage
+- `allow_local_paths` flag on `RepoIngester` defaults to `False`
+
+## [0.20.0] - 2026-03-18
 
 ### Changed
 
-- arXiv Explorer now uses a Textual TUI instead of a readline-based REPL. All
-  commands (`/search`, `/load`, `/papers`, `/topic`, `/history`, `/check-citations`,
-  `/more`) are registered as TUI commands with auto-complete, markdown rendering,
-  and threaded execution for network operations. Topic management updates the
-  InfoBar in real time. Conversational queries are guarded against missing
-  topic/papers.
+- **RLMEngine.query() decomposed** — the ~515-line god method was split into four focused methods: `_execute_code_blocks()`, `_resolve_final_var()`, `_run_verifications()`, and a `_CodeBlockResult` dataclass
+- Replaced private API access (`_storage`, `_rlm_engine`, etc.) with public properties across module boundaries; added API boundary rule to CLAUDE.md
+- Extracted shared WebSocket `complete` response builder to reduce duplication across handlers
+- Context budget magic numbers extracted to named constants
+- All config fields now have environment variable mappings (`SHESHA_KEEP_RAW_FILES`, `SHESHA_CONTAINER_MEMORY_MB`, `SHESHA_EXECUTION_TIMEOUT_SEC`, `SHESHA_SANDBOX_IMAGE`, `SHESHA_MAX_OUTPUT_CHARS`, `SHESHA_VERIFY`)
+
+### Removed
+
+- Dead `TraceWriter.write_trace()` method
+- Unused `sanitize_filename` utility
+
+### Fixed
+
+- LLM API calls now have a default timeout (300s initially, then reduced to 120s) — previously could hang indefinitely
+- LLM call failures in executor subcall dispatch are now handled gracefully instead of crashing
+
+## [0.19.0] - 2026-03-18
+
+### Added
+
+- **Background Knowledge Toggle** — "Allow background knowledge" checkbox in the TopicSidebar lets users opt-in to LLM answers that draw on training data beyond the loaded documents
+  - New `system_augmented.md` prompt variant instructs the LLM to use background knowledge when enabled
+  - Background knowledge sections in responses are rendered with a visually distinct tinted block and ARIA role
+  - `splitAugmentedSections` utility parses background-knowledge markers from LLM output
+  - `bottomControls` slot added to TopicSidebar for explorer-specific controls
+  - Hint displayed below More button when background knowledge checkbox is off
+- **Documents-only Notice** — when background knowledge was allowed but the LLM answered purely from documents, a notice is shown
+- **Trace Download** — download button in TraceViewer downloads the raw JSONL trace file
+  - New `/topics/{name}/traces/{id}/download` endpoint returns JSONL with `Content-Disposition` header
+  - `downloadTrace()` method added to the shared API client
+- `allow_background_knowledge` field persisted per exchange in session history
+
+### Fixed
+
+- WebSocket `drain_queue` now guards against a closed WebSocket and uses `finally` for cleanup
+
+## [0.18.0] - 2026-03-18
+
+### Added
+
+- **More Button** for deeper analysis — a one-click "More" button in the shared ChatArea sends a predefined deeper-analysis prompt, with full accessibility support (ARIA attributes, keyboard activation, focus ring)
+- Property-based tests for More button using fast-check
+- Integration tests for More button across all three explorers
+- Frontend TypeScript type-checking as a dedicated Makefile target
+
+### Changed
+
+- `useWebSocket.send()` now returns a boolean indicating success
+- More button requires at least one prior exchange before becoming active
+- Textarea draft is preserved when More button is used
+
+### Fixed
+
+- Redundant `onKeyDown` handler on More button that could cause double-fire
+- Timestamp regex in tests now accepts both 12-hour and 24-hour locale formats
+
+### Security
+
+- Validate `document_ids` in WebSocket `_handle_query` using `_SAFE_ID_RE` and mask raw exception details in error messages
+
+## [0.17.0] - 2026-03-16
+
+### Added
+
+- **`BaseTopicManager`** — generic base class for topic management with `add_item`, `remove_item`, `list_items`, `get_topic_dir` methods; document and code explorer topic managers are now thin subclasses
+
+### Changed
+
+- **Shared explorer dependencies** — `BaseExplorerState` dataclass and `create_app_state()` factory extracted into `shared/dependencies.py`
+- **Shared item router** — `create_item_router()` factory generates unified topic CRUD and item-reference routes (`/api/topics/{name}/items`); URL paths changed from `/documents` and `/repos` to `/items`
+- **Shared multi-project WebSocket handler** — `handle_multi_project_query()` extracted; explorer WS handlers are now thin wrappers
+- Topic manager tests consolidated into a shared test module
+- Dead `GET /topics/{name}/items` route removed from shared item router
+
+### Fixed
+
+- Slug collisions in topic creation now return 422 instead of 409
+- Expanded topic documents reload when `refreshKey` changes, fixing stale sidebar after adding items
+- `GET /topics/{name}/items` returns full objects (DocumentInfo/RepoInfo) instead of bare project ID strings
+
+## [0.16.0] - 2026-03-06
+
+### Added
+
+- **Document Explorer** web application — upload documents (PDF, DOCX, PPTX, XLSX, RTF, and 30+ plain-text formats) into topics, then query them with the RLM engine via a chat interface
+  - Text extraction pipeline with format-specific extractors (pdfplumber, python-docx, python-pptx, openpyxl, striprtf)
+  - Multi-document cross-project queries via WebSocket
+  - Document detail modal with metadata display
+  - Consulted documents shown in answer footer
+  - Upload drag-and-drop area with keyboard accessibility
+  - Document context menu with View, Add to Topic, Remove from Topic, and Delete actions
+  - Docker container and launch script
+- **Shared HelpPanel component** — configurable slide-out panel with Quick Start, FAQ, and Keyboard Shortcuts sections; adopted by all three explorers
+  - Help button added to the shared `Header` component
+  - Close button has `aria-label` for accessibility
+- **Shared launcher script** (`scripts/common.sh`) — preflight validation shared across all explorer launch scripts; includes `--rebuild` flag
+  - BATS test suite for the shared launcher logic
+- Bug report link icon added to shared header
+- `/documents/{id}/topics` endpoint to list which topics contain a given document
+
+### Changed
+
+- Launcher scripts now validate Python >= 3.11 before proceeding
+- `Shesha._extract_repo_name()` sanitizes output to match `_SAFE_ID_RE` pattern
+- `project_id` hash suffix increased from 4 to 8 hex characters
+- `TopicSidebar` shows document actions button whenever any action callback is provided
+- Duplicate-named documents are prevented from being added to the same topic
+
+### Fixed
+
+- `stderr_filter` now handles `Traceback` lines and all exception types
+- Corrupt `topic.json` files are recovered on `create()` instead of silently returning
+- `_slugify` output normalized to ASCII
+- Topic names containing path separators rejected to prevent directory traversal
+- Upload endpoint returns 422 for invalid topic names before creating upload artifacts
+- Topic rename endpoints return 422 for validation errors instead of 500
+- `openpyxl` workbooks are explicitly closed to prevent file handle leaks
+- Python GC traceback noise on Ctrl-C shutdown is suppressed
+- Sidebar refreshes after document deletion
+- `UploadArea` event handlers properly `await` `handleFiles`
+- WebSocket handlers try all project IDs when resolving the RLM engine
+- `get_topic_dir()` exposed as public API instead of using private `_resolve()`
+- Context metadata built from actually loaded project IDs
+
+### Security
+
+- Document IDs validated against path traversal in REST and WebSocket handlers
+- `dangerouslySetInnerHTML` removed from `HelpPanel` in the arxiv explorer (XSS risk)
+- `aria-label` added to close buttons for accessibility
+
+## [0.15.0] - 2026-03-05
+
+### Added
+
+- **Auto-growing textarea** in chat input — expands as users type up to ~4 lines, then scrolls internally
+- **Per-topic chat history** for the code explorer — each topic now maintains its own conversation history and transcript
+- User messages now render as Markdown in the shared `ChatMessage` component
+
+### Changed
+
+- Code explorer frontend loads history from per-topic endpoints instead of the global route
+- Global `/api/history`, `/api/history` (DELETE), and `/api/export` routes removed from code explorer
+- Header logo now has rounded corners
+
+### Fixed
+
+- Textarea auto-resize uses standard `scrollHeight` pattern instead of a brittle custom implementation
+
+## [0.14.0] - 2026-02-28
+
+### Added
+
+- **Inline paper citations rendered as Markdown** — LLM answers in the arXiv explorer now render citation tags as clickable citation buttons via `react-markdown`
+- Shared `citations.tsx` utility extracted from duplicated logic
+
+### Fixed
+
+- Citation buttons no longer trigger form submission
+
+### Security
+
+- Disallow `<img>` elements in Markdown rendering to prevent IP exfiltration via attacker-influenced image URLs
+
+## [0.13.0] - 2026-02-18
+
+### Added
+
+- **`useAppState` hook** — extracted shared React state management into reusable hook for both arXiv and code explorers
+- **Repo-to-topic assignment context menu** in code explorer sidebar — right-click documents to add/remove from topics
+- **Boundary marker rendering** — leaked `UNTRUSTED_CONTENT` markers in LLM answers now rendered as labeled Markdown blockquotes instead of raw tokens
+- File headers added to `FallbackTextParser` output and document names injected into RLM context metadata
+- Callback parameters on `create_shared_router()` for tool-specific customization
+- `include_topic_crud` flag on shared router
+
+### Changed
+
+- arXiv Explorer frontend and WebSocket adapter refactored to use standardized field names
+- Both explorers refactored to use shared `useAppState` hook
+- arXiv and code explorer wired to use shared router with callbacks
+- Topic submenu rendered inline instead of as flyout
+
+### Fixed
+
+- Boundary marker regex uses backreference to ensure BEGIN and END tokens match
+- urllib3 connection pools closed in Docker client
+- Chat messages render as Markdown instead of plain text
+- Check-for-updates now detects and applies repo changes correctly
+- `document_ids` mapped to `paper_ids` in arXiv history endpoint
+
+## [0.12.0] - 2026-02-17
+
+### Added
+
+- **Code Explorer** — web application for exploring code repositories with RLM-powered analysis
+  - `shesha-code` CLI entry point (`--port`, `--data-dir`, `--no-browser`, `--model`)
+  - REST API: repo management, topic-repo references, analysis generation, global history
+  - WebSocket handler for cross-project queries with project ID scoping
+  - `CodeExplorerTopicManager` — topics as lightweight reference containers
+  - Repo detail component with inline analysis display
+  - Add-repo modal for importing repositories
+  - Docker deployment with Dockerfile, docker-compose.yml, and launch script
+- **Shared experimental infrastructure** (`src/shesha/experimental/shared/`)
+  - Generic FastAPI app factory with CORS, static files, WebSocket, and container pool lifespan
+  - Shared Pydantic schemas, REST routes, WebSocket query handler, conversation session
+  - Shared React frontend package with parameterized components (TopicSidebar, ChatArea, ChatMessage, Header, etc.)
+  - Generic API client, TypeScript types, hooks
+- Developer guide for extending web tools (`docs/extending-web-tools.md`)
+
+### Changed
+
+- arXiv Explorer backend and frontend refactored to use shared base classes and components
+- `FINAL()` system prompt expanded with explicit formatting guidance
+- Trace viewer renders step content as Markdown
+
+### Fixed
+
+- Stale project IDs handled gracefully in code explorer WebSocket handler
+- Wildcard `*` query treated as empty
+- Shared `AppShell` layout fixes arXiv horizontal scrollbar
+- WebSocket dispatch loop consolidated, fixing query task race condition
+- `FINAL()` arguments stripped of quotes and unescaped for proper Markdown rendering
+- Session factory injected into shared WebSocket handler to fix history split-brain bug
+
+## [0.11.0] - 2026-02-13
+
+### Added
+
+- **arXiv Explorer web interface** — React + TypeScript + Tailwind frontend with FastAPI backend
+  - REST API for topics, papers, search, traces, history, export, model info, and context budget
+  - WebSocket endpoint with async progress streaming for RLM queries
+  - Persistent `WebConversationSession` with JSON file storage
+  - Paper sidebar with collapsible lists, selection checkboxes, All/None toggle, paper detail view
+  - Resizable sidebar with drag handle
+  - KaTeX math rendering in paper abstracts and chat messages
+  - Search panel with arXiv and local search
+  - Trace viewer for inspecting RLM execution steps
+  - Dark/light theme toggle; connection loss banner with auto-reconnect
+  - `shesha-web` CLI command and `run-web.sh` launch script
+- **Cascading citation verification** — multi-source verification pipeline
+  - CrossRef, OpenAlex, and Semantic Scholar verifiers with rate limiting
+  - Jaccard-based fuzzy title matching; LLM-based topical relevance checker
+  - `CascadingVerifier` with per-citation WebSocket progress
+  - Email modal for CrossRef polite pool
+  - Citation report with source badges and severity levels
+- **Inline paper citations** — chat answers render references as clickable links to paper detail views
+- **Query cancellation** — `cancel_event` parameter on `RLMEngine.query()` allows mid-iteration interruption
+- **Docker deployment** — Dockerfile, docker-compose.yml, and launch script
+- `RateLimiter` utility, download progress modal, `consulted_papers` in query responses
+
+### Changed
+
+- Citation report redesigned with structured JSON, strict regex parsing, severity levels, and source badges
+- `RLMEngine.query()` accepts optional `cancel_event: threading.Event` parameter
+- TUI cancel button now triggers real query cancellation via `cancel_event`
+
+### Fixed
+
+- WebSocket handler catches query engine exceptions without leaking drain tasks
+- `get_event_loop()` replaced with `get_running_loop()` (deprecation fix)
+- HTML escaped in paper abstract/title before LaTeX rendering
+- Local search reports all topics for multi-topic papers
+- Cancel messages allowed during in-flight WebSocket queries
+- Old-style arXiv IDs supported in citation rendering
+- Papers persist across Docker container restarts
+
+## [0.10.0] - 2026-02-12
+
+### Added
+
+- **arXiv Explorer** — experimental tool for searching, downloading, and analyzing arXiv papers organized into topics
+  - Paper search with pagination and `--sort` flag
+  - Paper download with LaTeX source-first strategy, falling back to PDF
+  - Citation extraction from LaTeX/PDF sources with BibTeX parsing
+  - Citation verification against arXiv API with per-citation progress indicator
+  - LLM-tell detection — flags citations the LLM may have fabricated
+  - Topic management backed by Shesha projects
+  - Conversational queries against loaded papers using the RLM engine
+- **arXiv Explorer TUI** — full Textual-based terminal interface
+  - Commands: `/search`, `/more`, `/load`, `/papers`, `/topic`, `/history`, `/check-citations`
+  - Command group system with subcommand dispatch and auto-generated help
+  - Threaded command execution for long-running operations
+- **Randomized untrusted content boundaries** — per-query 128-bit hex boundary tokens replace static XML tags for prompt injection defense
+- Paper cache for local storage, `InfoBar.update_project_name()`, `TopicManager.rename()`, `shesha[arxiv]` optional dependency group
+
+### Changed
+
+- TUI `CommandRegistry` supports command groups with subcommand registration
+- RLM engine boundary is now per-query instead of shared engine state
+
+### Fixed
+
+- `FINAL(variable_name)` now retries with variable lookup instead of returning the raw variable name
+- LLM instructed to return natural-language/Markdown answers, not dicts or JSON
+- `TopicManager` wrote `_topic.json` to the wrong directory
+- `ArxivSearcher.close()` explicitly closes urllib3 connection pools
+- Timeout added to `urlopen` calls in paper download
+- Threading lock used for threaded command guard (race condition fix)
+- eprint field normalized to strip `arXiv:` prefix in BibTeX extraction
+- Topic delete uses equality check instead of substring match
+
+### Security
+
+- Randomized content boundaries replace static XML tags — papers cannot forge closing tags
+- Directory traversal prevented in `store_source_files`
 
 ## [0.9.0] - 2026-02-10
 
@@ -129,6 +415,10 @@ _Previous entries:_
 
 - Analysis shortcut classifier now includes few-shot examples and a "when in doubt, NEED_DEEPER" bias, reducing false ANALYSIS_OK classifications on terse or ambiguous queries (e.g. "SECURITY.md?", "I think that's out of date").
 - Analysis shortcut LLM now responds NEED_DEEPER when the analysis lacks information instead of answering with "the analysis does not mention X". Absence from the analysis no longer produces misleading non-answers.
+
+### Removed
+
+- Fast/deep execution mode toggle (`/fast`, `/deep` commands, `execution_mode` parameter, `--fast` CLI flag). Batch sub-LLM calls now always run concurrently. The sequential "deep" mode offered no quality benefit over concurrent execution.
 
 ### Fixed
 
@@ -140,18 +430,7 @@ _Previous entries:_
 - Analysis shortcut session transcript now includes token counts, matching the normal query path. Previously, `/write` transcripts omitted token usage for shortcut-answered questions.
 - `/write` command now warns before overwriting existing files (including case-insensitive collisions on macOS). Use `/write filename!` to force overwrite.
 
-### Removed
-
-- Fast/deep execution mode toggle (`/fast`, `/deep` commands, `execution_mode` parameter, `--fast` CLI flag). Batch sub-LLM calls now always run concurrently. The sequential "deep" mode offered no quality benefit over concurrent execution.
-
 ## [0.8.0] - 2026-02-10
-
-### Changed
-
-- Switched container-host protocol from newline-delimited JSON to 4-byte length-prefix framing; removes 1MB message size limit that caused executor crashes on large `llm_query()` payloads
-- Iteration feedback now sends per-code-block messages with code echo (matching reference RLM)
-- Per-iteration continuation prompt re-instructs model to use sub-LLMs via `iteration_continue.md`
-- Replaced inline reminder string with external prompt template
 
 ### Added
 
@@ -163,6 +442,13 @@ _Previous entries:_
 - Model name display in TUI info bar (date suffix stripped for readability)
 - `OutputArea.clear()` method for resetting conversation display
 - Mode indicator (`Mode: Fast` / `Mode: Deep`) in TUI info bar
+
+### Changed
+
+- Switched container-host protocol from newline-delimited JSON to 4-byte length-prefix framing; removes 1MB message size limit that caused executor crashes on large `llm_query()` payloads
+- Iteration feedback now sends per-code-block messages with code echo (matching reference RLM)
+- Per-iteration continuation prompt re-instructs model to use sub-LLMs via `iteration_continue.md`
+- Replaced inline reminder string with external prompt template
 
 ## [0.7.0] - 2026-02-09
 
@@ -281,7 +567,7 @@ _Previous entries:_
 - Enforce `<untrusted_document_content>` wrapping in code (`wrap_subcall_content()`), not just in prompt template files, closing a prompt injection defense gap for sub-LLM calls
 - Validate that `subcall.md` template contains required security tags at load time
 
-## [0.3.0] 2026-02-04
+## [0.3.0] - 2026-02-04
 
 ### Fixed
 
@@ -329,3 +615,27 @@ _Previous entries:_
 - Trace recording for debugging and analysis
 - Security hardening with untrusted content tagging
 - Network isolation with egress whitelist for LLM APIs
+
+[unreleased]: https://github.com/Ovid/shesha/compare/v0.21.1...HEAD
+[0.21.1]: https://github.com/Ovid/shesha/compare/v0.21.0...v0.21.1
+[0.21.0]: https://github.com/Ovid/shesha/compare/v0.20.0...v0.21.0
+[0.20.0]: https://github.com/Ovid/shesha/compare/v0.19.0...v0.20.0
+[0.19.0]: https://github.com/Ovid/shesha/compare/v0.18.0...v0.19.0
+[0.18.0]: https://github.com/Ovid/shesha/compare/v0.17.0...v0.18.0
+[0.17.0]: https://github.com/Ovid/shesha/compare/v0.16.0...v0.17.0
+[0.16.0]: https://github.com/Ovid/shesha/compare/v0.15.0...v0.16.0
+[0.15.0]: https://github.com/Ovid/shesha/compare/v0.14.0...v0.15.0
+[0.14.0]: https://github.com/Ovid/shesha/compare/v0.13.0...v0.14.0
+[0.13.0]: https://github.com/Ovid/shesha/compare/v0.12.0...v0.13.0
+[0.12.0]: https://github.com/Ovid/shesha/compare/v0.11.0...v0.12.0
+[0.11.0]: https://github.com/Ovid/shesha/compare/v0.10.0...v0.11.0
+[0.10.0]: https://github.com/Ovid/shesha/compare/v0.9.0...v0.10.0
+[0.9.0]: https://github.com/Ovid/shesha/compare/v0.8.0...v0.9.0
+[0.8.0]: https://github.com/Ovid/shesha/compare/v0.7.0...v0.8.0
+[0.7.0]: https://github.com/Ovid/shesha/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/Ovid/shesha/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/Ovid/shesha/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/Ovid/shesha/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/Ovid/shesha/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/Ovid/shesha/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/Ovid/shesha/releases/tag/v0.1.0

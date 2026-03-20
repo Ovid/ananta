@@ -1,4 +1,4 @@
-export type { TopicInfo, Exchange, ContextBudget, ModelInfo, WSMessage, DocumentItem } from '@shesha/shared-ui'
+export type { TopicInfo, Exchange, ContextBudget, ModelInfo, WSMessage, DocumentItem } from '@ananta/shared-ui'
 
 export interface DocumentInfo {
   project_id: string

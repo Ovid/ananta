@@ -28,13 +28,13 @@ export default function Header({
           </div>
         ) : (
           <img
-            src="/static/shesha.png"
-            alt="Shesha"
+            src="/static/ananta.png"
+            alt="Ananta"
             className="w-8 h-8 self-center rounded-md"
             onError={() => setLogoError(true)}
           />
         )}
-        <a href="https://github.com/Ovid/shesha" target="_blank" rel="noopener noreferrer" className="text-base font-bold text-text-primary hover:text-accent transition-colors">Shesha</a>
+        <a href="https://github.com/Ovid/ananta" target="_blank" rel="noopener noreferrer" className="text-base font-bold text-text-primary hover:text-accent transition-colors">Ananta</a>
         <span className="text-xs text-text-dim font-mono">{appName}</span>
         <span className="text-[10px] text-amber border border-amber/40 rounded-full px-2 py-0.5 font-medium">
           Experimental
@@ -64,7 +64,7 @@ export default function Header({
 
         {/* Bug report link */}
         <a
-          href="https://github.com/Ovid/shesha/issues"
+          href="https://github.com/Ovid/ananta/issues"
           target="_blank"
           rel="noopener noreferrer"
           className="tooltip-btn p-2 rounded hover:bg-surface-2 text-text-secondary transition-colors"

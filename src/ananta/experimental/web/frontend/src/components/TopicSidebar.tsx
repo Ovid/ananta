@@ -1,7 +1,7 @@
 import { useCallback, useRef, type CSSProperties, type ReactNode } from 'react'
 
-import { TopicSidebar as SharedTopicSidebar } from '@shesha/shared-ui'
-import type { TopicInfo, DocumentItem } from '@shesha/shared-ui'
+import { TopicSidebar as SharedTopicSidebar } from '@ananta/shared-ui'
+import type { TopicInfo, DocumentItem } from '@ananta/shared-ui'
 import { api } from '../api/client'
 import type { PaperInfo } from '../types'
 

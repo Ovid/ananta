@@ -39,4 +39,4 @@ export interface UpdateStatus {
 }
 
 // Re-export shared types that the app needs
-export type { TopicInfo, Exchange, ContextBudget, ModelInfo, WSMessage, DocumentItem } from '@shesha/shared-ui'
+export type { TopicInfo, Exchange, ContextBudget, ModelInfo, WSMessage, DocumentItem } from '@ananta/shared-ui'

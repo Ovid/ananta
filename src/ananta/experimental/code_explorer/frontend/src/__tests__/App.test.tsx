@@ -42,8 +42,8 @@ const defaultAppState = {
   setTokens: vi.fn(),
 }
 
-vi.mock('@shesha/shared-ui', async () => {
-  const actual = await vi.importActual('@shesha/shared-ui')
+vi.mock('@ananta/shared-ui', async () => {
+  const actual = await vi.importActual('@ananta/shared-ui')
   return {
     ...actual,
     useAppState: () => ({ ...defaultAppState }),
@@ -105,7 +105,7 @@ describe('App', () => {
   })
 
   it('renders connection lost banner when disconnected', async () => {
-    const sharedUi = await import('@shesha/shared-ui')
+    const sharedUi = await import('@ananta/shared-ui')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const spy = vi.spyOn(sharedUi as any, 'useAppState')
     spy.mockReturnValue({
@@ -212,7 +212,7 @@ describe('App - renderAnswerFooter (consulted repositories)', () => {
     vi.mocked(api.repos.listUncategorized).mockResolvedValue([])
     vi.mocked(api.history.get).mockResolvedValue({ exchanges })
 
-    const sharedUi = await import('@shesha/shared-ui')
+    const sharedUi = await import('@ananta/shared-ui')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const spy = vi.spyOn(sharedUi as any, 'useAppState')
     spy.mockReturnValue({ ...defaultAppState, activeTopic: 'test-topic', connected: true })
@@ -295,7 +295,7 @@ describe('App - renderAnswerFooter (consulted repositories)', () => {
 
 describe('App - More button integration', () => {
   it('renders More button in ChatArea when topic is active', async () => {
-    const sharedUi = await import('@shesha/shared-ui')
+    const sharedUi = await import('@ananta/shared-ui')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const spy = vi.spyOn(sharedUi as any, 'useAppState')
     spy.mockReturnValue({

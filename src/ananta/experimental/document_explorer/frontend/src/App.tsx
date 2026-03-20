@@ -11,7 +11,7 @@ import {
   ToastContainer,
   showToast,
   useAppState,
-} from '@shesha/shared-ui'
+} from '@ananta/shared-ui'
 import { api } from './api/client'
 import UploadArea from './components/UploadArea'
 import DocumentDetail from './components/DocumentDetail'
@@ -332,7 +332,7 @@ export default function App() {
             { q: 'What are the \u201cSources\u201d shown below answers?', a: 'They list which documents the LLM consulted to produce the answer. Click a source tag to view that document\u2019s details.' },
             { q: 'Can a document belong to multiple topics?', a: 'Yes. Open the document detail view to see which topics it belongs to and add or remove it from others.' },
             { q: 'What does the context budget indicator mean?', a: <>It estimates how much of the model{'\u2019'}s context window is used by your documents and conversation. Green ({'<'}50%), amber ({'<'}80%), red ({'\u2265'}80%).</> },
-            { q: 'Why do queries take so long?', a: 'Shesha uses a recursive approach: the LLM writes code to explore your documents, runs it, examines the output, and repeats. This takes multiple iterations.' },
+            { q: 'Why do queries take so long?', a: 'Ananta uses a recursive approach: the LLM writes code to explore your documents, runs it, examines the output, and repeats. This takes multiple iterations.' },
             { q: 'What does the "More" button do?', a: 'It asks the AI to verify and expand its previous analysis. It checks for completeness, accuracy, and relevance, then presents an updated report with any changes highlighted. Requires at least one prior exchange.' },
             { q: 'What does "Allow background knowledge" do?', a: 'By default, answers are based strictly on your documents \u2014 this reduces hallucinations but may leave gaps. When enabled, the AI supplements document content with its general knowledge. Background knowledge sections are visually marked so you can tell what comes from your documents versus the AI.' },
           ]}

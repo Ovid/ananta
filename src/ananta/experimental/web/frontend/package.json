@@ -11,7 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@shesha/shared-ui": "file:../../shared/frontend",
+    "@ananta/shared-ui": "file:../../shared/frontend",
     "@tailwindcss/vite": "^4.1.18",
     "@types/katex": "^0.16.8",
     "@types/node": "^24.10.1",

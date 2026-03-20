@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@source "../node_modules/@shesha/shared-ui/src";
+@source "../node_modules/@ananta/shared-ui/src";
 
 @theme {
   /* Dark mode (default) */

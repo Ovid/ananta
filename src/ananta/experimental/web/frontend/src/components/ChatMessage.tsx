@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import Markdown, { defaultUrlTransform } from 'react-markdown'
 
-import { ChatMessage as SharedChatMessage, stripBoundaryMarkers } from '@shesha/shared-ui'
+import { ChatMessage as SharedChatMessage, stripBoundaryMarkers } from '@ananta/shared-ui'
 import { preprocessCitations, buildCitationComponents } from '../utils/citations'
 import type { Exchange, PaperInfo } from '../types'
 

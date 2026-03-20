@@ -5,7 +5,7 @@ interface EmailModalProps {
   onSkip: () => void
 }
 
-const STORAGE_KEY = 'shesha-polite-email'
+const STORAGE_KEY = 'ananta-polite-email'
 
 export function getStoredEmail(): string | null {
   return localStorage.getItem(STORAGE_KEY)
@@ -16,11 +16,11 @@ export function storeEmail(email: string): void {
 }
 
 export function hasEmailDecision(): boolean {
-  return localStorage.getItem(STORAGE_KEY) !== null || localStorage.getItem('shesha-email-skipped') === 'true'
+  return localStorage.getItem(STORAGE_KEY) !== null || localStorage.getItem('ananta-email-skipped') === 'true'
 }
 
 export function markEmailSkipped(): void {
-  localStorage.setItem('shesha-email-skipped', 'true')
+  localStorage.setItem('ananta-email-skipped', 'true')
 }
 
 export default function EmailModal({ onSubmit, onSkip }: EmailModalProps) {

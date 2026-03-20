@@ -1,4 +1,4 @@
-import { request, sharedApi } from '@shesha/shared-ui'
+import { request, sharedApi } from '@ananta/shared-ui'
 import type { DocumentInfo } from '../types'
 
 export const api = {

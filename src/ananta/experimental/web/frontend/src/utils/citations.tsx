@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import type { Components } from 'react-markdown'
 
-import { mdComponents } from '@shesha/shared-ui'
+import { mdComponents } from '@ananta/shared-ui'
 import type { PaperInfo } from '../types'
 
 const CITATION_RE = /\[@arxiv:([^\]]+)\]/g

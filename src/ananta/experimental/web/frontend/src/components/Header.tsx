@@ -1,4 +1,4 @@
-import { Header as SharedHeader } from '@shesha/shared-ui'
+import { Header as SharedHeader } from '@ananta/shared-ui'
 
 interface ArxivHeaderProps {
   onSearchToggle: () => void

@@ -67,7 +67,7 @@ describe('HelpPanel', () => {
     render(<HelpPanel {...defaultProps} />)
     expect(screen.getByText(/experimental software/i)).toBeInTheDocument()
     const link = screen.getByRole('link', { name: 'report issues' })
-    expect(link).toHaveAttribute('href', 'https://github.com/Ovid/shesha/issues')
+    expect(link).toHaveAttribute('href', 'https://github.com/Ovid/ananta/issues')
     expect(link).toHaveAttribute('target', '_blank')
   })
 

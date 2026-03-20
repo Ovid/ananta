@@ -1,9 +1,9 @@
 import type {
   WSMessage as SharedWSMessage,
-} from '@shesha/shared-ui'
+} from '@ananta/shared-ui'
 
 // Re-export shared types directly — no more overrides
-export type { TopicInfo, TraceStep, TraceListItem, TraceFull, ContextBudget, ModelInfo, Exchange } from '@shesha/shared-ui'
+export type { TopicInfo, TraceStep, TraceListItem, TraceFull, ContextBudget, ModelInfo, Exchange } from '@ananta/shared-ui'
 
 // Arxiv WSMessage extends shared with citation-related message types.
 // The shared 'complete' message already includes document_ids.

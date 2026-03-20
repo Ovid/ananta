@@ -11,7 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@shesha/shared-ui": "file:../../shared/frontend",
+    "@ananta/shared-ui": "file:../../shared/frontend",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },

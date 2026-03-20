@@ -55,7 +55,7 @@ export default function HelpPanel({ onClose, quickStart, faq, shortcuts }: HelpP
 
         {/* Experimental notice */}
         <section className="bg-amber/5 border border-amber/20 rounded p-3 text-xs text-amber">
-          This is experimental software. Features may change or break. Please <a href="https://github.com/Ovid/shesha/issues" target="_blank" rel="noopener noreferrer" className="underline hover:text-amber/80">report issues</a>.
+          This is experimental software. Features may change or break. Please <a href="https://github.com/Ovid/ananta/issues" target="_blank" rel="noopener noreferrer" className="underline hover:text-amber/80">report issues</a>.
         </section>
       </div>
     </div>

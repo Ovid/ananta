@@ -1,12 +1,12 @@
 import { render, screen, act } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
 
-vi.mock('@shesha/shared-ui', async () => {
-  const actual = await vi.importActual<typeof import('@shesha/shared-ui')>('@shesha/shared-ui')
+vi.mock('@ananta/shared-ui', async () => {
+  const actual = await vi.importActual<typeof import('@ananta/shared-ui')>('@ananta/shared-ui')
   return { ...actual, showToast: vi.fn() }
 })
 
-import { TraceViewer } from '@shesha/shared-ui'
+import { TraceViewer } from '@ananta/shared-ui'
 
 const mockTrace = {
   trace_id: 't-1',

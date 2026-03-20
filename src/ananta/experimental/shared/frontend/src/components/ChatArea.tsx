@@ -85,7 +85,7 @@ export default function ChatArea({
   const [pendingTopic, setPendingTopic] = useState<string | null>(null)
   const [phase, setPhase] = useState('')
   const [showBanner, setShowBanner] = useState(() => {
-    return localStorage.getItem('shesha-welcome-dismissed') !== 'true'
+    return localStorage.getItem('ananta-welcome-dismissed') !== 'true'
   })
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -219,7 +219,7 @@ export default function ChatArea({
 
   const dismissBanner = () => {
     setShowBanner(false)
-    localStorage.setItem('shesha-welcome-dismissed', 'true')
+    localStorage.setItem('ananta-welcome-dismissed', 'true')
   }
 
   if (!topicName) {

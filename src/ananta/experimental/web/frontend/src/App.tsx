@@ -7,7 +7,7 @@ import DownloadProgress from './components/DownloadProgress'
 import CitationReport from './components/CitationReport'
 import EmailModal, { getStoredEmail, hasEmailDecision } from './components/EmailModal'
 import PaperDetail from './components/PaperDetail'
-import { AppShell, useAppState, StatusBar, ToastContainer, showToast, TraceViewer, HelpPanel } from '@shesha/shared-ui'
+import { AppShell, useAppState, StatusBar, ToastContainer, showToast, TraceViewer, HelpPanel } from '@ananta/shared-ui'
 import { api } from './api/client'
 import type { PaperInfo, PaperReport } from './types'
 
@@ -337,7 +337,7 @@ export default function App() {
           faq={[
             { q: 'How do I add papers to multiple topics?', a: 'Use the search panel\u2019s topic picker when adding papers. Each paper can belong to multiple topics.' },
             { q: 'What does the context budget indicator mean?', a: <>It estimates how much of the model{'\u2019'}s context window is used by your documents and conversation history. Green ({'<'}50%), amber ({'<'}80%), red ({'\u2265'}80%).</> },
-            { q: 'Why do queries take so long?', a: 'Shesha uses a recursive approach: the LLM writes code to explore your documents, runs it, examines the output, and repeats. This takes multiple iterations.' },
+            { q: 'Why do queries take so long?', a: 'Ananta uses a recursive approach: the LLM writes code to explore your documents, runs it, examines the output, and repeats. This takes multiple iterations.' },
             { q: 'Can I cancel a running query?', a: 'Yes, press Escape or click the cancel button while a query is running.' },
             { q: 'What is the citation check?', a: 'It verifies that claims in the LLM\u2019s answer are supported by the source documents. Results show which citations are verified, unverified, or missing.' },
             { q: 'How do I export my conversation?', a: 'Click the export button in the header to download a Markdown transcript of the current topic\u2019s conversation.' },

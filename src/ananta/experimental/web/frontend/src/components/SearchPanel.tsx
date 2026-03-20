@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../api/client'
-import { showToast } from '@shesha/shared-ui'
+import { showToast } from '@ananta/shared-ui'
 import type { SearchResult } from '../types'
 
 interface SearchPanelProps {

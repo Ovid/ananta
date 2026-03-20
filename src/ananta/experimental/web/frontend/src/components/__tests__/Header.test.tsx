@@ -12,10 +12,10 @@ const defaultProps = {
 }
 
 describe('Header', () => {
-  it('renders Shesha as a link to the GitHub repo in a new tab', () => {
+  it('renders Ananta as a link to the GitHub repo in a new tab', () => {
     render(<Header {...defaultProps} />)
-    const link = screen.getByRole('link', { name: 'Shesha' })
-    expect(link).toHaveAttribute('href', 'https://github.com/Ovid/shesha')
+    const link = screen.getByRole('link', { name: 'Ananta' })
+    expect(link).toHaveAttribute('href', 'https://github.com/Ovid/ananta')
     expect(link).toHaveAttribute('target', '_blank')
     expect(link).toHaveAttribute('rel', 'noopener noreferrer')
   })

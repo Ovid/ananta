@@ -11,12 +11,12 @@ describe('Header (shared)', () => {
     expect(screen.getByText('Test App')).toBeInTheDocument()
   })
 
-  it('renders Shesha as a link to the GitHub repo', () => {
+  it('renders Ananta as a link to the GitHub repo', () => {
     render(
       <Header appName="My App" isDark={false} onToggleTheme={() => {}} />
     )
-    const link = screen.getByRole('link', { name: 'Shesha' })
-    expect(link).toHaveAttribute('href', 'https://github.com/Ovid/shesha')
+    const link = screen.getByRole('link', { name: 'Ananta' })
+    expect(link).toHaveAttribute('href', 'https://github.com/Ovid/ananta')
     expect(link).toHaveAttribute('target', '_blank')
     expect(link).toHaveAttribute('rel', 'noopener noreferrer')
   })
@@ -75,8 +75,8 @@ describe('Header (shared)', () => {
     render(
       <Header appName="My App" isDark={false} onToggleTheme={() => {}} />
     )
-    const shesha = screen.getByRole('link', { name: 'Shesha' })
-    const titleGroup = shesha.parentElement!
+    const ananta = screen.getByRole('link', { name: 'Ananta' })
+    const titleGroup = ananta.parentElement!
     expect(titleGroup.className).toMatch(/items-baseline/)
   })
 
@@ -119,7 +119,7 @@ describe('Header (shared)', () => {
       <Header appName="My App" isDark={false} onToggleTheme={() => {}} />
     )
     const link = screen.getByRole('link', { name: 'Report a bug' })
-    expect(link).toHaveAttribute('href', 'https://github.com/Ovid/shesha/issues')
+    expect(link).toHaveAttribute('href', 'https://github.com/Ovid/ananta/issues')
     expect(link).toHaveAttribute('target', '_blank')
     expect(link).toHaveAttribute('rel', 'noopener noreferrer')
     expect(link).toHaveAttribute('data-tooltip', 'Report a bug')

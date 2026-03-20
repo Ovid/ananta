@@ -37,7 +37,7 @@
     },
     {
       "question": "Why do queries take so long?",
-      "answer": "Shesha uses Recursive Language Models: the LLM writes Python code to explore your documents, runs it in a Docker sandbox, examines the output, and repeats. This multi-step approach takes 1-3 minutes but produces more accurate results."
+      "answer": "Ananta uses Recursive Language Models: the LLM writes Python code to explore your documents, runs it in a Docker sandbox, examines the output, and repeats. This multi-step approach takes 1-3 minutes but produces more accurate results."
     },
     {
       "question": "Can I cancel a running query?",
@@ -53,7 +53,7 @@
     },
     {
       "question": "Why do papers take a while to download?",
-      "answer": "arXiv has rate limits. Shesha waits 3.1 seconds between downloads to avoid being blocked. LaTeX papers also need parsing which takes additional time."
+      "answer": "arXiv has rate limits. Ananta waits 3.1 seconds between downloads to avoid being blocked. LaTeX papers also need parsing which takes additional time."
     },
     {
       "question": "Can I change the LLM model?",

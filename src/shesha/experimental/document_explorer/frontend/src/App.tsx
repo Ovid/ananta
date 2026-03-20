@@ -137,6 +137,15 @@ export default function App() {
     setDocsVersion(v => v + 1)
   }, [])
 
+  const handleRenameDocument = useCallback(async (docId: string, newName: string) => {
+    await api.documents.rename(docId, newName)
+    setDocsVersion(v => v + 1)
+  }, [])
+
+  const handleReorderItems = useCallback(async (topicName: string, itemIds: string[]) => {
+    await api.topics.reorderItems(topicName, itemIds)
+  }, [])
+
   const loadHistory = useCallback(async (topic: string): Promise<Exchange[]> => {
     const data = await api.history.get(topic)
     return data.exchanges
@@ -234,6 +243,8 @@ export default function App() {
           addDocToTopic={handleAddDocToTopic}
           removeDocFromTopic={handleRemoveDocFromTopic}
           deleteDocument={handleDeleteDocument}
+          renameDocument={handleRenameDocument}
+          reorderItems={handleReorderItems}
           uncategorizedDocs={uncategorizedDocs}
           viewingDocumentId={viewingDoc?.project_id}
           style={{ width: sidebarWidth }}

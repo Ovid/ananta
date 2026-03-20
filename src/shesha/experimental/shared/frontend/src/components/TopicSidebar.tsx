@@ -1,4 +1,4 @@
-import { useState, useEffect, type CSSProperties, type MouseEvent, type ReactNode } from 'react'
+import { useState, useEffect, useRef, useCallback, type CSSProperties, type MouseEvent, type DragEvent, type ReactNode } from 'react'
 
 import { showToast } from './Toast'
 import ConfirmDialog from './ConfirmDialog'
@@ -21,6 +21,8 @@ export interface TopicSidebarProps {
   addDocToTopic?: (docId: string, topicName: string) => Promise<void>
   removeDocFromTopic?: (docId: string, topicName: string) => Promise<void>
   deleteDocument?: (docId: string) => Promise<void>
+  renameDocument?: (docId: string, newLabel: string) => Promise<void>
+  reorderItems?: (topicName: string, itemIds: string[]) => Promise<void>
   addButton?: ReactNode
   bottomControls?: ReactNode
   uncategorizedDocs?: DocumentItem[]
@@ -45,6 +47,8 @@ export default function TopicSidebar({
   addDocToTopic,
   removeDocFromTopic,
   deleteDocument,
+  renameDocument,
+  reorderItems,
   addButton,
   bottomControls,
   uncategorizedDocs,
@@ -63,6 +67,103 @@ export default function TopicSidebar({
   const [docMenuOpen, setDocMenuOpen] = useState<string | null>(null)
   const [docSubmenuOpen, setDocSubmenuOpen] = useState(false)
   const [deletingDoc, setDeletingDoc] = useState<DocumentItem | null>(null)
+  const [dropTarget, setDropTarget] = useState<string | null>(null)
+  const [renamingDoc, setRenamingDoc] = useState<string | null>(null)
+  const [renameDocValue, setRenameDocValue] = useState('')
+  const sidebarRef = useRef<HTMLElement>(null)
+
+  // Close menus when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: globalThis.MouseEvent) => {
+      if (sidebarRef.current && !sidebarRef.current.contains(e.target as Node)) {
+        setMenuOpen(null)
+        setDocMenuOpen(null)
+        setDocSubmenuOpen(false)
+      }
+      // Also close if clicking inside sidebar but not on a menu or its trigger
+      const target = e.target as HTMLElement
+      if (!target.closest('.absolute') && !target.closest('[title="Document actions"]') && !target.closest('button[class*="opacity-0"]')) {
+        setMenuOpen(null)
+        setDocMenuOpen(null)
+        setDocSubmenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const handleDocDragStart = useCallback((e: DragEvent<HTMLDivElement>, docId: string, topicName: string | null) => {
+    e.dataTransfer.setData('application/x-doc-id', docId)
+    e.dataTransfer.setData('application/x-source-topic', topicName ?? '')
+    e.dataTransfer.effectAllowed = 'move'
+  }, [])
+
+  const handleTopicDragOver = useCallback((e: DragEvent<HTMLDivElement>, topicName: string) => {
+    if (!addDocToTopic) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDropTarget(topicName)
+  }, [addDocToTopic])
+
+  const handleTopicDragLeave = useCallback(() => {
+    setDropTarget(null)
+  }, [])
+
+  const handleTopicDrop = useCallback(async (e: DragEvent<HTMLDivElement>, topicName: string) => {
+    e.preventDefault()
+    setDropTarget(null)
+    const docId = e.dataTransfer.getData('application/x-doc-id')
+    if (!docId || !addDocToTopic) return
+    try {
+      await addDocToTopic(docId, topicName)
+      showToast(`Added to ${topicName}`, 'success')
+    } catch {
+      showToast(`Failed to add to ${topicName}`, 'error')
+    }
+  }, [addDocToTopic])
+
+  const handleDocDrop = useCallback(async (e: DragEvent<HTMLDivElement>, targetDocId: string, topicName: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const draggedId = e.dataTransfer.getData('application/x-doc-id')
+    const sourceTopic = e.dataTransfer.getData('application/x-source-topic')
+    if (!draggedId || draggedId === targetDocId) return
+    // Only reorder within the same topic
+    if (sourceTopic !== topicName || !reorderItems) return
+    const docs = topicDocs[topicName]
+    if (!docs) return
+    const ids = docs.map(d => d.id)
+    const fromIdx = ids.indexOf(draggedId)
+    const toIdx = ids.indexOf(targetDocId)
+    if (fromIdx === -1 || toIdx === -1) return
+    // Move draggedId to the position of targetDocId
+    ids.splice(fromIdx, 1)
+    ids.splice(toIdx, 0, draggedId)
+    try {
+      await reorderItems(topicName, ids)
+      // Update local state immediately for responsiveness
+      const reordered = ids.map(id => docs.find(d => d.id === id)!).filter(Boolean)
+      setTopicDocs(prev => ({ ...prev, [topicName]: reordered }))
+    } catch {
+      showToast('Failed to reorder', 'error')
+    }
+  }, [reorderItems, topicDocs])
+
+  const handleDocRename = useCallback(async (docId: string) => {
+    if (!renameDocValue.trim() || !renameDocument) {
+      setRenamingDoc(null)
+      return
+    }
+    try {
+      await renameDocument(docId, renameDocValue.trim())
+      setRenamingDoc(null)
+      setTopicDocs({})
+      await refreshTopics()
+      onTopicsChange()
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Failed to rename document', 'error')
+    }
+  }, [renameDocValue, renameDocument, onTopicsChange]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const refreshTopics = async () => {
     try {
@@ -152,7 +253,7 @@ export default function TopicSidebar({
 
   const renderDocMenu = (doc: DocumentItem, topicName: string | null) => (
     <>
-      {(addDocToTopic || deleteDocument || removeDocFromTopic) && (
+      {(addDocToTopic || deleteDocument || removeDocFromTopic || renameDocument) && (
         <button
           title="Document actions"
           onClick={e => {
@@ -177,6 +278,19 @@ export default function TopicSidebar({
           >
             View
           </button>
+          {renameDocument && (
+            <button
+              className="block w-full text-left px-3 py-1.5 hover:bg-surface-1 text-text-secondary"
+              onClick={e => {
+                e.stopPropagation()
+                setRenamingDoc(doc.id)
+                setRenameDocValue(doc.label)
+                setDocMenuOpen(null)
+              }}
+            >
+              Rename
+            </button>
+          )}
           {addDocToTopic && (() => {
             const eligible = topics.filter(t => {
               const loaded = topicDocs[t.name]
@@ -280,6 +394,10 @@ export default function TopicSidebar({
       {docs.map(doc => (
         <div
           key={doc.id}
+          draggable={!!addDocToTopic}
+          onDragStart={e => handleDocDragStart(e, doc.id, topicName)}
+          onDragOver={reorderItems ? (e => { e.preventDefault(); e.stopPropagation() }) : undefined}
+          onDrop={reorderItems ? (e => handleDocDrop(e, doc.id, topicName)) : undefined}
           className={`group relative flex items-center gap-1 px-3 pl-7 py-1 text-xs cursor-pointer ${
             viewingDocumentId === doc.id
               ? 'bg-accent-dim text-accent'
@@ -302,17 +420,32 @@ export default function TopicSidebar({
             onClick={(e) => e.stopPropagation()}
             className="shrink-0 accent-accent"
           />
-          <span
-            className="truncate cursor-pointer hover:text-accent"
-            onClick={(e) => {
-              e.stopPropagation()
-              if (activeTopic !== topicName) onSelectTopic(topicName)
-              onDocumentClick(doc)
-            }}
-            title={doc.sublabel ? `${doc.label}\n${doc.sublabel}` : doc.label}
-          >
-            {doc.label}
-          </span>
+          {renamingDoc === doc.id ? (
+            <input
+              autoFocus
+              value={renameDocValue}
+              onChange={e => setRenameDocValue(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') handleDocRename(doc.id)
+                if (e.key === 'Escape') setRenamingDoc(null)
+              }}
+              onBlur={() => handleDocRename(doc.id)}
+              onClick={e => e.stopPropagation()}
+              className="flex-1 bg-surface-2 border border-border rounded px-1 py-0.5 text-xs text-text-primary focus:outline-none focus:border-accent"
+            />
+          ) : (
+            <span
+              className="truncate cursor-pointer hover:text-accent"
+              onClick={(e) => {
+                e.stopPropagation()
+                if (activeTopic !== topicName) onSelectTopic(topicName)
+                onDocumentClick(doc)
+              }}
+              title={doc.sublabel ? `${doc.label}\n${doc.sublabel}` : doc.label}
+            >
+              {doc.label}
+            </span>
+          )}
           {renderDocMenu(doc, topicName)}
         </div>
       ))}
@@ -320,7 +453,7 @@ export default function TopicSidebar({
   )
 
   return (
-    <aside className="border-r border-border bg-surface-1 flex flex-col shrink-0" style={style}>
+    <aside ref={sidebarRef} className="border-r border-border bg-surface-1 flex flex-col shrink-0" style={style}>
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-border">
         <div className="flex items-center gap-1">
@@ -362,8 +495,11 @@ export default function TopicSidebar({
                 activeTopic === t.name
                   ? 'bg-accent-dim text-accent border-l-2 border-accent'
                   : 'text-text-secondary hover:bg-surface-2'
-              }`}
+              }${dropTarget === t.name ? ' drop-target ring-2 ring-accent ring-inset' : ''}`}
               onClick={() => onSelectTopic(t.name)}
+              onDragOver={e => handleTopicDragOver(e, t.name)}
+              onDragLeave={handleTopicDragLeave}
+              onDrop={e => handleTopicDrop(e, t.name)}
             >
               {renamingTopic === t.name ? (
                 <input
@@ -453,6 +589,8 @@ export default function TopicSidebar({
             {uncategorizedDocs.map(doc => (
               <div
                 key={doc.id}
+                draggable={!!addDocToTopic}
+                onDragStart={e => handleDocDragStart(e, doc.id, null)}
                 className={`group relative flex items-center gap-1 px-3 pl-7 py-1 text-xs cursor-pointer ${
                   viewingDocumentId === doc.id
                     ? 'bg-accent-dim text-accent'
@@ -475,16 +613,31 @@ export default function TopicSidebar({
                   onClick={(e) => e.stopPropagation()}
                   className="shrink-0 accent-accent"
                 />
-                <span
-                  className="truncate cursor-pointer hover:text-accent"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onDocumentClick(doc)
-                  }}
-                  title={doc.sublabel ? `${doc.label}\n${doc.sublabel}` : doc.label}
-                >
-                  {doc.label}
-                </span>
+                {renamingDoc === doc.id ? (
+                  <input
+                    autoFocus
+                    value={renameDocValue}
+                    onChange={e => setRenameDocValue(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleDocRename(doc.id)
+                      if (e.key === 'Escape') setRenamingDoc(null)
+                    }}
+                    onBlur={() => handleDocRename(doc.id)}
+                    onClick={e => e.stopPropagation()}
+                    className="flex-1 bg-surface-2 border border-border rounded px-1 py-0.5 text-xs text-text-primary focus:outline-none focus:border-accent"
+                  />
+                ) : (
+                  <span
+                    className="truncate cursor-pointer hover:text-accent"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onDocumentClick(doc)
+                    }}
+                    title={doc.sublabel ? `${doc.label}\n${doc.sublabel}` : doc.label}
+                  >
+                    {doc.label}
+                  </span>
+                )}
                 {renderDocMenu(doc, null)}
               </div>
             ))}

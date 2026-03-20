@@ -70,6 +70,7 @@ vi.mock('../api/client', () => ({
 
 // Must import App after mocks are set up
 import App from '../App'
+import type { Exchange } from '../types'
 
 /** Flush pending microtasks (resolved promises / state updates) */
 async function flush() {
@@ -147,6 +148,7 @@ describe('App', () => {
       source_url: 'https://github.com/test/repo',
       file_count: 10,
       analysis_status: null,
+      display_name: null,
     }
 
     async function renderWithRepo() {
@@ -195,6 +197,99 @@ describe('App', () => {
 
       expect(api.repos.applyUpdates).not.toHaveBeenCalled()
     })
+  })
+})
+
+describe('App - renderAnswerFooter (consulted repositories)', () => {
+  const mockRepos = [
+    { project_id: 'repo-1', source_url: 'https://github.com/a/one', file_count: 5, analysis_status: null, display_name: 'Alpha Repo' },
+    { project_id: 'repo-2', source_url: 'https://github.com/b/two', file_count: 3, analysis_status: null, display_name: null },
+  ]
+
+  async function renderWithHistory(exchanges: Exchange[]) {
+    const { api } = await import('../api/client')
+    vi.mocked(api.repos.list).mockResolvedValue(mockRepos)
+    vi.mocked(api.repos.listUncategorized).mockResolvedValue([])
+    vi.mocked(api.history.get).mockResolvedValue({ exchanges })
+
+    const sharedUi = await import('@shesha/shared-ui')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const spy = vi.spyOn(sharedUi as any, 'useAppState')
+    spy.mockReturnValue({ ...defaultAppState, activeTopic: 'test-topic', connected: true })
+
+    render(<App />)
+    await flush()
+    return spy
+  }
+
+  it('shows "Repositories:" label with display names for consulted repos', async () => {
+    const spy = await renderWithHistory([
+      {
+        exchange_id: 'ex-1',
+        question: 'What does this do?',
+        answer: 'It does X.',
+        trace_id: null,
+        timestamp: '2026-03-20T10:00:00Z',
+        execution_time: 5,
+        tokens: { prompt: 100, completion: 50, total: 150 },
+        model: 'test-model',
+        document_ids: ['repo-1', 'repo-2'],
+      },
+    ])
+
+    expect(screen.getByText('Repositories:')).toBeInTheDocument()
+    expect(screen.getByText('Alpha Repo')).toBeInTheDocument()
+    // repo-2 has no display_name, should fall back to project_id
+    expect(screen.getByText('repo-2')).toBeInTheDocument()
+
+    spy.mockRestore()
+  })
+
+  it('does not render footer when document_ids is empty', async () => {
+    const spy = await renderWithHistory([
+      {
+        exchange_id: 'ex-2',
+        question: 'Hello',
+        answer: 'Hi.',
+        trace_id: null,
+        timestamp: '2026-03-20T10:00:00Z',
+        execution_time: 1,
+        tokens: { prompt: 10, completion: 5, total: 15 },
+        model: 'test-model',
+        document_ids: [],
+      },
+    ])
+
+    expect(screen.queryByText('Repositories:')).not.toBeInTheDocument()
+
+    spy.mockRestore()
+  })
+
+  it('clicking a repo badge opens the repo detail panel', async () => {
+    const { api } = await import('../api/client')
+    vi.mocked(api.repos.getAnalysis).mockRejectedValue(new Error('none'))
+
+    const spy = await renderWithHistory([
+      {
+        exchange_id: 'ex-3',
+        question: 'Explain',
+        answer: 'Sure.',
+        trace_id: null,
+        timestamp: '2026-03-20T10:00:00Z',
+        execution_time: 2,
+        tokens: { prompt: 50, completion: 25, total: 75 },
+        model: 'test-model',
+        document_ids: ['repo-1'],
+      },
+    ])
+
+    await userEvent.click(screen.getByText('Alpha Repo'))
+    await flush()
+
+    // RepoDetail panel should now be visible with the repo's source URL
+    expect(screen.getByText('https://github.com/a/one')).toBeInTheDocument()
+
+    spy.mockRestore()
   })
 })
 

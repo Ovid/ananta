@@ -2,9 +2,9 @@
 inclusion: always
 ---
 
-# Product: Shesha
+# Product: Ananta
 
-Shesha is a Python library for querying large document collections using Recursive Language Models (RLMs), based on arXiv:2512.24601. Instead of RAG-style snippet retrieval, the LLM writes and executes Python code in a sandboxed Docker container to actively explore documents, iterating until it finds a confident answer with citations.
+Ananta is a Python library for querying large document collections using Recursive Language Models (RLMs), based on arXiv:2512.24601. Instead of RAG-style snippet retrieval, the LLM writes and executes Python code in a sandboxed Docker container to actively explore documents, iterating until it finds a confident answer with citations.
 
 Core flow: User Query → RLM Engine → LLM generates Python code → Docker sandbox executes it → LLM sees output → repeats until `FINAL("answer")`.
 

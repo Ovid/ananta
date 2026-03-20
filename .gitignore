@@ -38,14 +38,14 @@ scratch/
 research/
 barsoom_data/
 .worktrees/
-src/shesha/_version.py
+src/ananta/_version.py
 /rlm/
 node_modules/
 /package.json
 /package-lock.json
 
-# Shesha runtime data
-shesha_data/
+# Ananta runtime data
+ananta_data/
 
 # OOLONG benchmark run artifacts
 /logs/

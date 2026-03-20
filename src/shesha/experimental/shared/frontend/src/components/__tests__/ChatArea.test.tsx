@@ -502,6 +502,28 @@ describe('ChatArea (shared) - More button click behavior', () => {
     const allText = document.body.textContent ?? ''
     expect(allText).toMatch(timePattern)
   })
+
+  it('sends RETRY_SEARCH_PROMPT when last exchange was a give-up', async () => {
+    const user = userEvent.setup()
+    const wsSend = vi.fn()
+    const giveUpExchange = {
+      ...sampleExchangeForHistory,
+      answer: 'I cannot answer this question based on the provided documents.\n\n**Partial findings:**\n- Found some titles',
+    }
+    await renderChatArea({
+      wsSend,
+      loadHistory: vi.fn().mockResolvedValue([giveUpExchange]),
+    })
+
+    await user.click(screen.getByRole('button', { name: /deeper analysis/i }))
+
+    expect(wsSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'query',
+        question: RETRY_SEARCH_PROMPT,
+      })
+    )
+  })
 })
 
 describe('ChatArea (shared) - More button accessibility', () => {

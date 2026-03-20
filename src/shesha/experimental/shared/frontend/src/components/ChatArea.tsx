@@ -97,8 +97,12 @@ export default function ChatArea({
     el.style.height = Math.max(36, el.scrollHeight) + 'px'
   }, [input])
 
-  // Load history when topic changes
+  // Load history when topic changes — clear in-flight query state so a
+  // pending question from the previous topic doesn't bleed into the new one.
   useEffect(() => {
+    setPendingQuestion(null)
+    setThinking(false)
+    setPhase('')
     if (!topicName) {
       setExchanges([])
       return

@@ -63,9 +63,12 @@ This is a clean break with no backwards-compatibility shims. Version becomes 1.0
 ### Documentation
 
 - README.md: title, logo (`images/ananta.png`), examples, "Who is Ananta?" section
-- CHANGELOG.md: new `[1.0.0]` section documenting the rename
+- CHANGELOG.md: new `[1.0.0]` section documenting the rename (fold [Unreleased] content into it)
 - CLAUDE.md: project description, paths
+- SECURITY.md: project name, class references
+- HANDOFF.md: delete (should never have been committed)
 - docs/ENVIRONMENT.md, DEVELOPMENT.md, OVERVIEW.md, extending-web-tools.md: references
+- arxiv-explorer/README.md, code-explorer/README.md: explorer documentation
 - prompts/README.md: env var references, `python -m shesha.prompts` → `python -m ananta.prompts`
 - .github/copilot-instructions.md: references
 

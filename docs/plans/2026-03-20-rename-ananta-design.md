@@ -12,15 +12,19 @@ This is a clean break with no backwards-compatibility shims. Version becomes 1.0
 
 - Directory: `src/shesha/` → `src/ananta/`
 - Main class: `Shesha` → `Ananta`
+- Config class: `SheshaConfig` → `AnantaConfig`
+- TUI class: `SheshaTUI` → `AnantaTUI`
 - Module file: `shesha.py` → `ananta.py`
 - Exceptions: `SheshaError` → `AnantaError`
+- Constants: `SHESHA_TEAL` → `ANANTA_TEAL`
+- App state attribute: `state.shesha` → `state.ananta`
 - All imports throughout `src/` and `tests/`
 - Test files: `test_shesha.py` → `test_ananta.py`, `test_shesha_di.py` → `test_ananta_di.py`
 
 ### Configuration
 
 - `pyproject.toml`: package name, entry points, build paths
-- Environment variables: `SHESHA_API_KEY` → `ANANTA_API_KEY`, `SHESHA_MODEL` → `ANANTA_MODEL`
+- All `SHESHA_*` environment variables → `ANANTA_*` (14 total: `API_KEY`, `MODEL`, `STORAGE_PATH`, `POOL_SIZE`, `CONTAINER_MEMORY_MB`, `EXECUTION_TIMEOUT_SEC`, `SANDBOX_IMAGE`, `MAX_ITERATIONS`, `MAX_OUTPUT_CHARS`, `VERIFY_CITATIONS`, `VERIFY`, `MAX_TRACES_PER_PROJECT`, `KEEP_RAW_FILES`, `PROMPTS_DIR`)
 
 ### CLI Entry Points
 
@@ -28,21 +32,28 @@ This is a clean break with no backwards-compatibility shims. Version becomes 1.0
 - `shesha-code` → `ananta-code`
 - `shesha-document-explorer` → `ananta-document-explorer`
 
-### Data Directory
+### Data & User Home Directories
 
 - `shesha_data/` → `ananta_data/`
-- Startup check: detect old `shesha_data/` directory and print migration message telling users to rename it
+- `~/.shesha-arxiv/` → `~/.ananta-arxiv/`
+- `~/.shesha/<app_name>/` → `~/.ananta/<app_name>/`
+- Startup check for each: detect old directory and print migration message telling users to rename it
 
 ### Shell Scripts & Docker
 
 - Launcher scripts: APP_NAME, APP_SLUG, marker files, log prefixes
 - Dockerfiles: ENTRYPOINT commands
 - docker-compose.yml: service names, environment variables
+- Sandbox Docker image: `shesha-sandbox` → `ananta-sandbox`
 
 ### Frontend
 
 - `@shesha/` scoped packages → `@ananta/`
 - package.json files updated
+
+### Examples
+
+- All files in `examples/` updated: imports, class references, env var references
 
 ### Documentation
 
@@ -50,7 +61,13 @@ This is a clean break with no backwards-compatibility shims. Version becomes 1.0
 - CHANGELOG.md: new `[1.0.0]` section documenting the rename
 - CLAUDE.md: project description, paths
 - docs/ENVIRONMENT.md, DEVELOPMENT.md, OVERVIEW.md: references
+- prompts/README.md: env var references
 - .github/copilot-instructions.md: references
+
+### oolong (research)
+
+- Python imports and env var references in runnable scripts: updated so they work
+- Research prose and analysis notes: left as-is (historical)
 
 ### NOT Renamed
 
@@ -58,7 +75,7 @@ This is a clean break with no backwards-compatibility shims. Version becomes 1.0
 - Historical plan doc filenames in `docs/plans/`
 - Architecture report filenames in `paad/`
 - Build artifacts (`.venv/`, `.mypy_cache/`, `htmlcov/` — regenerated)
-- `oolong/` research directory
+- Research prose in `oolong/` (only runnable code updated)
 - The repo directory itself on disk
 
 ## Version

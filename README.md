@@ -139,6 +139,23 @@ export ANANTA_MODEL="claude-sonnet-4-20250514"  # Default model
 
 Ananta also supports programmatic configuration, YAML config files, and per-provider API keys. See [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) for all options.
 
+## Migrating from Shesha
+
+If you used a previous version of this project (when it was called "Shesha"),
+run the migration script to rename your data directories:
+
+```bash
+python -m ananta.migrate
+```
+
+The script finds legacy directories, shows what it will rename, and asks for
+confirmation before making changes. After running it, update your environment
+variables from `SHESHA_*` to `ANANTA_*` and rebuild the sandbox container:
+
+```bash
+docker build -t ananta-sandbox src/ananta/sandbox/
+```
+
 ## Quick Start
 
 ```python

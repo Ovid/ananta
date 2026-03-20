@@ -1,3 +1,6 @@
+- Bug: Can't drag-and-drop uncategorized repos onto a topic in the code
+  explorer sidebar. "Ovid-tramp-freighter" in Uncategorized can't be
+  dragged onto the "PAAD" topic.
 - Consolidate frontend localStorage keys under a single top-level namespace
   key (e.g., `ananta-settings`) instead of four separate flat keys
   (`ananta-theme`, `ananta-welcome-dismissed`, `ananta-polite-email`,

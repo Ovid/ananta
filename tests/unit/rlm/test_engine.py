@@ -2717,6 +2717,58 @@ class TestFindFinalAnswerInText:
         assert result[0] == "final"
         assert result[1] == "The answer"
 
+    def test_find_final_answer_bare_partial(self):
+        """Detects bare PARTIAL(text) outside code blocks."""
+        result = find_final_answer("PARTIAL(Found 7 titles but no dates)")
+        assert result == ("partial", "Found 7 titles but no dates")
+
+    def test_find_final_answer_partial_strips_quotes(self):
+        """PARTIAL('quoted text') strips surrounding quotes."""
+        result = find_final_answer('PARTIAL("Some partial findings")')
+        assert result == ("partial", "Some partial findings")
+
+    def test_find_final_answer_partial_ignores_inside_repl_block(self):
+        """Does NOT match PARTIAL inside a ```repl block (handled by executor)."""
+        text = '```repl\nPARTIAL("partial findings")\n```'
+        result = find_final_answer(text)
+        assert result is None
+
+    def test_find_final_answer_partial_identifier_stays_literal(self):
+        """PARTIAL(findings) with a bare identifier is treated as literal text,
+        NOT as a variable reference. Unlike FINAL, PARTIAL has no VAR variant."""
+        result = find_final_answer("PARTIAL(findings)")
+        assert result == ("partial", "findings")
+
+    def test_find_final_answer_partial_multiline(self):
+        """PARTIAL with multiline content is captured."""
+        text = "PARTIAL(## Partial Findings\n\nFound some titles\n\n**Missing:** dates)"
+        result = find_final_answer(text)
+        assert result is not None
+        assert result[0] == "partial"
+        assert "Found some titles" in result[1]
+        assert "Missing" in result[1]
+
+    def test_find_final_answer_partial_with_leading_whitespace(self):
+        """PARTIAL at start of line with whitespace is detected."""
+        result = find_final_answer("  PARTIAL(partial text)")
+        assert result == ("partial", "partial text")
+
+    def test_find_final_answer_partial_not_mid_line(self):
+        """PARTIAL mid-line (not at start) should NOT match."""
+        result = find_final_answer("The result is PARTIAL(text)")
+        assert result is None
+
+    def test_find_final_answer_partial_empty_returns_none(self):
+        """Bare PARTIAL( with no content should return None."""
+        result = find_final_answer("PARTIAL(")
+        assert result is None
+
+    def test_find_final_answer_partial_takes_priority_over_final(self):
+        """When both PARTIAL and FINAL appear, PARTIAL should match first."""
+        text = "PARTIAL(partial text)\nFINAL(full answer)"
+        result = find_final_answer(text)
+        assert result == ("partial", "partial text")
+
     @patch("shesha.rlm.engine.ContainerExecutor")
     @patch("shesha.rlm.engine.LLMClient")
     def test_engine_resolves_bare_final_identifier_from_sandbox(

@@ -122,13 +122,42 @@ def find_final_answer(text: str) -> tuple[str, str] | None:
     numbers, expressions, and sentences are still treated as literal answers.
 
     Returns:
+        ("partial", answer_string) for PARTIAL(...) with literal content
         ("final", answer_string) for FINAL(...) with literal content
         ("final_var", variable_name) for FINAL_VAR(...) or FINAL(identifier)
         None if no pattern found
     """
-    # Strip code blocks so we don't match FINAL inside ```repl blocks
+    # Strip code blocks so we don't match FINAL/PARTIAL inside ```repl blocks
     # (those are handled by the executor)
     stripped = re.sub(r"```repl\s*\n.*?\n```", "", text, flags=re.DOTALL)
+
+    # Check PARTIAL first — no VAR variant, no identifier heuristic.
+    # Content is always treated as literal text.
+    #
+    # Pass order mirrors FINAL but single-line check comes first so
+    # PARTIAL(x)\nFINAL(y) doesn't greedily capture across both lines.
+    partial_line = re.search(r"^\s*PARTIAL\((.*)\)\s*$", stripped, re.MULTILINE)
+    if partial_line:
+        partial_content = partial_line.group(1).strip()
+        if partial_content:
+            return ("partial", _strip_string_quotes(partial_content))
+    else:
+        # Multi-line PARTIAL with closing ')' at end of string
+        partial_pattern = r"^\s*PARTIAL\((.*)\)\s*\Z"
+        partial_match = re.search(
+            partial_pattern, stripped, re.MULTILINE | re.DOTALL
+        )
+        if partial_match:
+            partial_content = partial_match.group(1).strip()
+            if partial_content:
+                return ("partial", _strip_string_quotes(partial_content))
+        else:
+            # No closing paren — take everything after PARTIAL(
+            partial_anchor = re.search(r"^\s*PARTIAL\(", stripped, re.MULTILINE)
+            if partial_anchor:
+                partial_content = stripped[partial_anchor.end() :].strip()
+                if partial_content:
+                    return ("partial", _strip_string_quotes(partial_content))
 
     # Check FINAL_VAR first (more specific pattern)
     final_var_pattern = r"^\s*FINAL_VAR\((.*?)\)"

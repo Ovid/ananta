@@ -37,6 +37,7 @@ def _make_query_result(answer: str = "42") -> MagicMock:
     result.answer = answer
     result.token_usage = TokenUsage(prompt_tokens=100, completion_tokens=50)
     result.execution_time = 1.5
+    result.gave_up = False
     return result
 
 

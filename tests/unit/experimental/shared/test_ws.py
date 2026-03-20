@@ -87,6 +87,7 @@ def test_ws_query_returns_complete(client: TestClient, mock_state: MagicMock) ->
     mock_result.token_usage = TokenUsage(prompt_tokens=100, completion_tokens=50)
     mock_result.execution_time = 1.5
     mock_result.trace = Trace(steps=[])
+    mock_result.gave_up = False
 
     mock_project = MagicMock()
     mock_project.rlm_engine.query.return_value = mock_result
@@ -223,6 +224,7 @@ def test_ws_build_context_called(mock_state: MagicMock) -> None:
     mock_result.token_usage = TokenUsage(prompt_tokens=10, completion_tokens=5)
     mock_result.execution_time = 0.5
     mock_result.trace = Trace(steps=[])
+    mock_result.gave_up = False
 
     mock_project = MagicMock()
     mock_project.rlm_engine.query.return_value = mock_result
@@ -310,6 +312,7 @@ def test_ws_session_factory_is_used(mock_state: MagicMock) -> None:
     mock_result.token_usage = TokenUsage(prompt_tokens=10, completion_tokens=5)
     mock_result.execution_time = 0.5
     mock_result.trace = Trace(steps=[])
+    mock_result.gave_up = False
 
     mock_project = MagicMock()
     mock_project.rlm_engine.query.return_value = mock_result
@@ -383,6 +386,7 @@ def test_ws_query_passes_allow_background_knowledge(
     mock_result.token_usage = TokenUsage(prompt_tokens=100, completion_tokens=50)
     mock_result.execution_time = 1.0
     mock_result.trace = Trace(steps=[])
+    mock_result.gave_up = False
 
     mock_project = MagicMock()
     mock_project.rlm_engine.query.return_value = mock_result
@@ -431,6 +435,7 @@ def test_ws_complete_includes_allow_background_knowledge_false(
     mock_result.token_usage = TokenUsage(prompt_tokens=10, completion_tokens=5)
     mock_result.execution_time = 0.5
     mock_result.trace = Trace(steps=[])
+    mock_result.gave_up = False
 
     mock_project = MagicMock()
     mock_project.rlm_engine.query.return_value = mock_result
@@ -541,7 +546,37 @@ class TestBuildCompleteResponse:
             "document_ids": ["doc-a", "doc-b"],
             "document_bytes": 1024,
             "allow_background_knowledge": True,
+            "gave_up": False,
         }
+
+    def test_includes_gave_up_field(self) -> None:
+        """Response includes gave_up field."""
+        usage = TokenUsage(prompt_tokens=10, completion_tokens=20)
+        resp = build_complete_response(
+            answer="Partial findings.",
+            trace_id="t-001",
+            token_usage=usage,
+            execution_time=1.5,
+            document_ids=["doc-a"],
+            document_bytes=512,
+            allow_background_knowledge=False,
+            gave_up=True,
+        )
+        assert resp["gave_up"] is True
+
+    def test_gave_up_defaults_to_false(self) -> None:
+        """gave_up defaults to False when not provided."""
+        usage = TokenUsage()
+        resp = build_complete_response(
+            answer="Full answer.",
+            trace_id=None,
+            token_usage=usage,
+            execution_time=0.5,
+            document_ids=[],
+            document_bytes=0,
+            allow_background_knowledge=False,
+        )
+        assert resp["gave_up"] is False
 
     def test_truncates_duration_ms(self) -> None:
         """duration_ms is truncated to int, not rounded."""

@@ -54,6 +54,7 @@ class WebConversationSession:
         model: str,
         document_ids: list[str] | None = None,
         allow_background_knowledge: bool = False,
+        gave_up: bool = False,
     ) -> dict[str, object]:
         exchange: dict[str, object] = {
             "exchange_id": str(uuid.uuid4()),
@@ -66,6 +67,7 @@ class WebConversationSession:
             "model": model,
             "document_ids": document_ids,
             "allow_background_knowledge": allow_background_knowledge,
+            "gave_up": gave_up,
         }
         self._exchanges.append(exchange)
         self._save()

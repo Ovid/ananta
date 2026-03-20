@@ -36,6 +36,7 @@ def mock_state() -> MagicMock:
     result.token_usage.completion_tokens = 5
     result.token_usage.total_tokens = 15
     result.execution_time = 1.5
+    result.gave_up = False
     project.rlm_engine.query.return_value = result
     state.shesha.get_project.return_value = project
     state.shesha.storage.list_traces.return_value = []

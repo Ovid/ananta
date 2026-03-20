@@ -44,3 +44,18 @@ def test_silent_when_new_dir_already_exists(
         check_legacy_directory(legacy, new, "shesha_data", "ananta_data")
 
     assert caplog.text == ""
+
+
+def test_mv_target_uses_new_path_not_legacy_parent(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Migration message shows correct target for nested directories."""
+    legacy = tmp_path / ".shesha" / "code-explorer"
+    legacy.mkdir(parents=True)
+    new = tmp_path / ".ananta" / "code-explorer"
+
+    with caplog.at_level(logging.WARNING):
+        check_legacy_directory(legacy, new, ".shesha/code-explorer", ".ananta/code-explorer")
+
+    # Target must be the new_path, not legacy_path.parent / new_name
+    assert str(new) in caplog.text

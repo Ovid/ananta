@@ -22,5 +22,5 @@ def check_legacy_directory(
             legacy_path,
             new_name,
             legacy_path,
-            legacy_path.parent / new_name,
+            new_path,
         )

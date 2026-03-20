@@ -324,3 +324,43 @@ class TestRenameTopic:
         mgr.create("Safe")
         with pytest.raises(ValueError, match="path separator"):
             mgr.rename("Safe", new_name)
+
+
+class TestReorderItems:
+    @pytest.fixture
+    def mgr(self, tmp_path: Path) -> BaseTopicManager:
+        return BaseTopicManager(tmp_path)
+
+    def test_reorder_changes_item_order(self, mgr: BaseTopicManager) -> None:
+        mgr.create("Alpha")
+        mgr.add_item("Alpha", "a")
+        mgr.add_item("Alpha", "b")
+        mgr.add_item("Alpha", "c")
+        mgr.reorder_items("Alpha", ["c", "a", "b"])
+        assert mgr.list_items("Alpha") == ["c", "a", "b"]
+
+    def test_reorder_nonexistent_topic_raises(self, mgr: BaseTopicManager) -> None:
+        with pytest.raises(ValueError, match="not found"):
+            mgr.reorder_items("NoSuch", ["a"])
+
+    def test_reorder_with_mismatched_ids_raises(self, mgr: BaseTopicManager) -> None:
+        mgr.create("Alpha")
+        mgr.add_item("Alpha", "a")
+        mgr.add_item("Alpha", "b")
+        with pytest.raises(ValueError, match="must contain exactly"):
+            mgr.reorder_items("Alpha", ["a", "b", "c"])
+
+    def test_reorder_with_missing_ids_raises(self, mgr: BaseTopicManager) -> None:
+        mgr.create("Alpha")
+        mgr.add_item("Alpha", "a")
+        mgr.add_item("Alpha", "b")
+        with pytest.raises(ValueError, match="must contain exactly"):
+            mgr.reorder_items("Alpha", ["a"])
+
+    def test_reorder_preserves_topic_name(self, mgr: BaseTopicManager) -> None:
+        mgr.create("Alpha")
+        mgr.add_item("Alpha", "a")
+        mgr.add_item("Alpha", "b")
+        mgr.reorder_items("Alpha", ["b", "a"])
+        # Topic name should be unchanged
+        assert "Alpha" in mgr.list_topics()

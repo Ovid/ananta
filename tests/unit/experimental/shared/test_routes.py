@@ -575,3 +575,33 @@ class TestCreateItemRouter:
         topic_mgr.create("Research")
         resp = client.delete("/api/topics/Research/items/ghost")
         assert resp.status_code == 404
+
+    def test_reorder_items(self, client: TestClient, topic_mgr: BaseTopicManager) -> None:
+        topic_mgr.create("Research")
+        topic_mgr.add_item("Research", "doc-1")
+        topic_mgr.add_item("Research", "doc-2")
+        topic_mgr.add_item("Research", "doc-3")
+        resp = client.put(
+            "/api/topics/Research/items/order",
+            json={"item_ids": ["doc-3", "doc-1", "doc-2"]},
+        )
+        assert resp.status_code == 200
+        assert topic_mgr.list_items("Research") == ["doc-3", "doc-1", "doc-2"]
+
+    def test_reorder_items_topic_not_found(self, client: TestClient) -> None:
+        resp = client.put(
+            "/api/topics/NoSuch/items/order",
+            json={"item_ids": ["doc-1"]},
+        )
+        assert resp.status_code == 404
+
+    def test_reorder_items_mismatched_ids(
+        self, client: TestClient, topic_mgr: BaseTopicManager
+    ) -> None:
+        topic_mgr.create("Research")
+        topic_mgr.add_item("Research", "doc-1")
+        resp = client.put(
+            "/api/topics/Research/items/order",
+            json={"item_ids": ["doc-1", "doc-2"]},
+        )
+        assert resp.status_code == 422

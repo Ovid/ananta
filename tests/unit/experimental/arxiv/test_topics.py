@@ -234,3 +234,62 @@ class TestTopicRename:
 
         with pytest.raises(ValueError, match="Topic not found"):
             mgr.rename("nonexistent", "new")
+
+
+class TestDocOrder:
+    """Tests for TopicManager.get_doc_order / set_doc_order."""
+
+    def test_get_doc_order_returns_none_when_unset(self, tmp_path: Path) -> None:
+        """When no doc_order has been stored, get_doc_order returns None."""
+        from shesha.experimental.arxiv.topics import TopicManager
+
+        shesha, storage = _make_shesha_and_storage(tmp_path)
+        mgr = TopicManager(shesha, storage)
+        project_id = mgr.create("no-order")
+        assert mgr.get_doc_order(project_id) is None
+
+    def test_set_and_get_doc_order(self, tmp_path: Path) -> None:
+        """set_doc_order stores order, get_doc_order retrieves it."""
+        from shesha.experimental.arxiv.topics import TopicManager
+
+        shesha, storage = _make_shesha_and_storage(tmp_path)
+        mgr = TopicManager(shesha, storage)
+        project_id = mgr.create("ordered")
+        mgr.set_doc_order(project_id, ["paper-c", "paper-a", "paper-b"])
+        assert mgr.get_doc_order(project_id) == ["paper-c", "paper-a", "paper-b"]
+
+    def test_set_doc_order_preserves_existing_meta(self, tmp_path: Path) -> None:
+        """set_doc_order does not clobber other fields in _topic.json."""
+        from shesha.experimental.arxiv.topics import TopicManager
+
+        shesha, storage = _make_shesha_and_storage(tmp_path)
+        mgr = TopicManager(shesha, storage)
+        project_id = mgr.create("preserve-meta")
+
+        mgr.set_doc_order(project_id, ["a", "b"])
+
+        meta_path = storage.get_project_dir(project_id) / "_topic.json"
+        meta = json.loads(meta_path.read_text())
+        assert meta["name"] == "preserve-meta"
+        assert "created" in meta
+        assert meta["doc_order"] == ["a", "b"]
+
+    def test_set_doc_order_overwrites_previous(self, tmp_path: Path) -> None:
+        """Calling set_doc_order again replaces the previous order."""
+        from shesha.experimental.arxiv.topics import TopicManager
+
+        shesha, storage = _make_shesha_and_storage(tmp_path)
+        mgr = TopicManager(shesha, storage)
+        project_id = mgr.create("overwrite")
+
+        mgr.set_doc_order(project_id, ["x", "y"])
+        mgr.set_doc_order(project_id, ["y", "x"])
+        assert mgr.get_doc_order(project_id) == ["y", "x"]
+
+    def test_get_doc_order_returns_none_for_missing_project(self, tmp_path: Path) -> None:
+        """get_doc_order returns None when project has no _topic.json."""
+        from shesha.experimental.arxiv.topics import TopicManager
+
+        shesha, storage = _make_shesha_and_storage(tmp_path)
+        mgr = TopicManager(shesha, storage)
+        assert mgr.get_doc_order("nonexistent-project") is None

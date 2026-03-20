@@ -24,6 +24,8 @@ This is a clean break with no backwards-compatibility shims. Version becomes 1.0
 ### Configuration
 
 - `pyproject.toml`: package name, entry points, build paths
+- `.env` file: update variable names
+- `Makefile`: update `src/shesha/` paths
 - All `SHESHA_*` environment variables → `ANANTA_*` (14 total: `API_KEY`, `MODEL`, `STORAGE_PATH`, `POOL_SIZE`, `CONTAINER_MEMORY_MB`, `EXECUTION_TIMEOUT_SEC`, `SANDBOX_IMAGE`, `MAX_ITERATIONS`, `MAX_OUTPUT_CHARS`, `VERIFY_CITATIONS`, `VERIFY`, `MAX_TRACES_PER_PROJECT`, `KEEP_RAW_FILES`, `PROMPTS_DIR`)
 
 ### CLI Entry Points
@@ -50,6 +52,9 @@ This is a clean break with no backwards-compatibility shims. Version becomes 1.0
 
 - `@shesha/` scoped packages → `@ananta/`
 - package.json files updated
+- localStorage keys: `shesha-*` → `ananta-*` (`theme`, `welcome-dismissed`, `polite-email`, `email-skipped`)
+- Static asset path: `/static/shesha.png` → `/static/ananta.png`
+- UI copy/text mentioning "Shesha" (e.g., FAQ in App.tsx)
 
 ### Examples
 
@@ -60,8 +65,8 @@ This is a clean break with no backwards-compatibility shims. Version becomes 1.0
 - README.md: title, logo (`images/ananta.png`), examples, "Who is Ananta?" section
 - CHANGELOG.md: new `[1.0.0]` section documenting the rename
 - CLAUDE.md: project description, paths
-- docs/ENVIRONMENT.md, DEVELOPMENT.md, OVERVIEW.md: references
-- prompts/README.md: env var references
+- docs/ENVIRONMENT.md, DEVELOPMENT.md, OVERVIEW.md, extending-web-tools.md: references
+- prompts/README.md: env var references, `python -m shesha.prompts` → `python -m ananta.prompts`
 - .github/copilot-instructions.md: references
 
 ### oolong (research)
@@ -77,6 +82,7 @@ This is a clean break with no backwards-compatibility shims. Version becomes 1.0
 - Build artifacts (`.venv/`, `.mypy_cache/`, `htmlcov/` — regenerated)
 - Research prose in `oolong/` (only runnable code updated)
 - The repo directory itself on disk
+- GitHub repository URL (to be handled separately later)
 
 ## Version
 

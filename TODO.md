@@ -1,3 +1,7 @@
+- Consolidate frontend localStorage keys under a single top-level namespace
+  key (e.g., `ananta-settings`) instead of four separate flat keys
+  (`ananta-theme`, `ananta-welcome-dismissed`, `ananta-polite-email`,
+  `ananta-email-skipped`).
 - Can we have the bug report button go straight to a new github issue with
   the explorer name filled in? What about a bug report template? I could use
   guidance on what works best here.

@@ -39,7 +39,9 @@ from shesha.models import ParsedDocument
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 MAX_AGGREGATE_UPLOAD_BYTES = 200 * 1024 * 1024
 
-_SAFE_ID_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
+# Allow / for old-style arXiv IDs (e.g. cs/9808001v1), but block .. traversal.
+# safe_path() provides the real path-traversal defence; this is belt-and-suspenders.
+_SAFE_ID_RE = re.compile(r"^(?!.*\.\.)[a-zA-Z0-9][a-zA-Z0-9._/-]*$")
 
 
 def _validate_doc_id(doc_id: str) -> None:

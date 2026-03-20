@@ -111,6 +111,38 @@ class TestHandleQueryDocIdValidation:
         assert state.shesha.storage.get_document.call_count >= 1
 
 
+    @pytest.mark.asyncio
+    async def test_accepts_old_style_arxiv_ids_with_slash(self) -> None:
+        """Old-style arXiv IDs like cs/9808001v1 must pass validation."""
+        ws = _make_ws()
+        state = _make_state()
+        cancel = threading.Event()
+
+        mock_session = MagicMock()
+        mock_session.format_history_prefix.return_value = ""
+
+        data = {
+            "topic": "my-topic",
+            "question": "hello",
+            "document_ids": ["cs/9808001v1", "astro-ph/0601001"],
+        }
+
+        with patch(
+            "shesha.experimental.shared.websockets.WebConversationSession",
+            return_value=mock_session,
+        ):
+            project = state.shesha.get_project.return_value
+            project.rlm_engine.query.side_effect = RuntimeError("stop here")
+            await _handle_query(ws, data, state, cancel)
+
+        # Should have passed validation and reached storage
+        assert state.shesha.storage.get_document.call_count >= 1
+        # No "Invalid document id" errors
+        error_msgs = [m for m in ws.sent if m.get("type") == "error"]
+        invalid_errors = [m for m in error_msgs if "invalid" in m["message"].lower()]
+        assert invalid_errors == []
+
+
 class TestHandleQueryExceptionLeakage:
     """I6: Exception details must not leak to WebSocket clients."""
 

@@ -382,7 +382,6 @@ class TestDocumentIdValidation:
             "../etc/passwd",
             "../../secret",
             ".hidden",
-            "foo/bar",
             "foo\\bar",
             "",
             " ",

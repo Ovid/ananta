@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- RLM now reports partial findings when it cannot answer a question, instead of a flat refusal
+- "More" button uses a retry-focused prompt after a give-up answer, then reverts to the default deeper-analysis prompt
+
 ### Added
 
 - **Trace download endpoint** (`GET /api/topics/{name}/trace-download/{trace_id}`) returns raw JSONL trace files with correct `application/x-ndjson` content type and attachment disposition; uses iterate-and-match (no path construction from user input)

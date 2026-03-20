@@ -82,6 +82,7 @@ export default function ChatArea({
   const [thinking, setThinking] = useState(false)
   const [pendingQuestion, setPendingQuestion] = useState<string | null>(null)
   const [pendingSentAt, setPendingSentAt] = useState<string>('')
+  const [pendingTopic, setPendingTopic] = useState<string | null>(null)
   const [phase, setPhase] = useState('')
   const [showBanner, setShowBanner] = useState(() => {
     return localStorage.getItem('shesha-welcome-dismissed') !== 'true'
@@ -97,12 +98,8 @@ export default function ChatArea({
     el.style.height = Math.max(36, el.scrollHeight) + 'px'
   }, [input])
 
-  // Load history when topic changes — clear in-flight query state so a
-  // pending question from the previous topic doesn't bleed into the new one.
+  // Load history when topic changes
   useEffect(() => {
-    setPendingQuestion(null)
-    setThinking(false)
-    setPhase('')
     if (!topicName) {
       setExchanges([])
       return
@@ -124,6 +121,7 @@ export default function ChatArea({
       } else if (msg.type === 'complete') {
         setThinking(false)
         setPendingQuestion(null)
+        setPendingTopic(null)
         setPhase('')
         // Reload history to get the saved exchange
         if (topicName) {
@@ -136,22 +134,28 @@ export default function ChatArea({
       } else if (msg.type === 'error') {
         setThinking(false)
         setPendingQuestion(null)
+        setPendingTopic(null)
         setPhase('')
         showToast(msg.message, 'error')
       } else if (msg.type === 'cancelled') {
         setThinking(false)
         setPendingQuestion(null)
+        setPendingTopic(null)
         setPhase('')
       }
     })
   }, [wsOnMessage, topicName, loadHistory])
 
+  const hasDocuments = selectedDocuments != null && selectedDocuments.size > 0
+
+  // Pending question and thinking indicator only show when viewing the topic
+  // that owns the in-flight query. This prevents bleed across topic switches.
+  const showPending = thinking && pendingTopic === topicName
+
   // Auto-scroll on new messages
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
-  }, [exchanges, thinking])
-
-  const hasDocuments = selectedDocuments != null && selectedDocuments.size > 0
+  }, [exchanges, showPending])
 
   /** Send button requires non-empty input plus all shared preconditions. */
   const canSend = !!input.trim() && !!topicName && !thinking && connected && hasDocuments
@@ -185,6 +189,7 @@ export default function ChatArea({
     wsSend(msg)
     setPendingQuestion(question)
     setPendingSentAt(new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }))
+    setPendingTopic(topicName)
     setThinking(true)
     setPhase('Starting')
   }, [topicName, wsSend, selectedDocuments, allowBackgroundKnowledge])
@@ -240,7 +245,7 @@ export default function ChatArea({
 
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0 px-4">
-        {exchanges.length === 0 && !thinking && (
+        {exchanges.length === 0 && !showPending && (
           <div className="flex items-center justify-center h-full text-text-dim text-sm">
             Ask a question about the documents in this topic.
           </div>
@@ -249,8 +254,8 @@ export default function ChatArea({
           <ChatMessage key={ex.exchange_id} exchange={ex} onViewTrace={onViewTrace} renderAnswer={renderAnswer} answerFooter={renderAnswerFooter?.(ex)} />
         ))}
 
-        {/* Pending question (shown immediately before answer arrives) */}
-        {pendingQuestion && (
+        {/* Pending question (shown only when viewing the topic that owns the query) */}
+        {showPending && pendingQuestion && (
           <div className="flex flex-col gap-3 py-3">
             <div className="flex flex-col items-end gap-0.5">
               <div className="max-w-[70%] bg-accent/10 border border-accent/20 rounded-lg px-3 py-2 text-sm text-text-primary">
@@ -262,7 +267,7 @@ export default function ChatArea({
         )}
 
         {/* Thinking indicator */}
-        {thinking && (
+        {showPending && (
           <div className="flex justify-start py-3">
             <div className="bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-text-dim">
               <span className="inline-flex gap-1">

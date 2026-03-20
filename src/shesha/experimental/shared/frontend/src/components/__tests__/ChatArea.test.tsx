@@ -20,10 +20,16 @@ beforeAll(() => {
   Element.prototype.scrollTo = vi.fn()
 })
 
-import ChatArea, { DEEPER_ANALYSIS_PROMPT } from '../ChatArea'
+import ChatArea, { DEEPER_ANALYSIS_PROMPT, RETRY_SEARCH_PROMPT, getMorePrompt } from '../ChatArea'
 import type { ChatAreaProps } from '../ChatArea'
 
-/** Sample exchange for tests that need non-empty history (required for More button). */
+/**
+ * Sample exchange for tests that need non-empty history (required for More button).
+ * NOTE: The `answer` value intentionally does NOT start with "I cannot answer" —
+ * this matters because getMorePrompt() checks the last exchange's answer prefix
+ * to decide which prompt the More button sends. Tests that use this fixture
+ * implicitly test the "normal answer → DEEPER_ANALYSIS_PROMPT" path.
+ */
 const sampleExchangeForHistory = {
   exchange_id: 'ex-0',
   question: 'Prior question',
@@ -1128,5 +1134,51 @@ describe('ChatArea (shared) - Property 5: Pending question display', () => {
       ),
       { numRuns: 100 },
     )
+  })
+})
+
+describe('ChatArea (shared) - getMorePrompt context-sensitive selection', () => {
+  it('returns DEEPER_ANALYSIS_PROMPT when exchanges is empty', () => {
+    expect(getMorePrompt([])).toBe(DEEPER_ANALYSIS_PROMPT)
+  })
+
+  it('returns DEEPER_ANALYSIS_PROMPT when last answer is a normal response', () => {
+    const exchanges = [{
+      ...sampleExchangeForHistory,
+      answer: 'Here is a detailed analysis of the documents...',
+    }]
+    expect(getMorePrompt(exchanges)).toBe(DEEPER_ANALYSIS_PROMPT)
+  })
+
+  it('returns RETRY_SEARCH_PROMPT when last answer starts with "I cannot answer"', () => {
+    const exchanges = [{
+      ...sampleExchangeForHistory,
+      answer: 'I cannot answer this question based on the provided documents.',
+    }]
+    expect(getMorePrompt(exchanges)).toBe(RETRY_SEARCH_PROMPT)
+  })
+
+  it('returns RETRY_SEARCH_PROMPT when last answer has partial evidence after "I cannot answer"', () => {
+    const exchanges = [{
+      ...sampleExchangeForHistory,
+      answer: 'I cannot answer this question based on the provided documents.\n\n**Partial findings:**\n- Found 7 titles\n- Missing publication dates',
+    }]
+    expect(getMorePrompt(exchanges)).toBe(RETRY_SEARCH_PROMPT)
+  })
+
+  it('returns DEEPER_ANALYSIS_PROMPT when only earlier exchange was a give-up but last is normal', () => {
+    const exchanges = [
+      {
+        ...sampleExchangeForHistory,
+        exchange_id: 'ex-fail',
+        answer: 'I cannot answer this question based on the provided documents.',
+      },
+      {
+        ...sampleExchangeForHistory,
+        exchange_id: 'ex-retry',
+        answer: 'After retrying, here are the titles in order...',
+      },
+    ]
+    expect(getMorePrompt(exchanges)).toBe(DEEPER_ANALYSIS_PROMPT)
   })
 })

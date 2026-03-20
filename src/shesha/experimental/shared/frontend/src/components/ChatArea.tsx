@@ -36,6 +36,32 @@ export const DEEPER_ANALYSIS_PROMPT =
   'with those changes and/or additions. You must also walk through the entire report, ' +
   'point by point, and ensure its aligned with the previous report and the changes or additions.'
 
+/**
+ * Prompt sent when the previous exchange ended in a give-up ("I cannot answer").
+ * Instructs the RLM to try fundamentally different search strategies.
+ */
+export const RETRY_SEARCH_PROMPT =
+  'The previous attempt could not answer the question. ' +
+  'Try a fundamentally different exploration strategy — search for different ' +
+  'keywords, examine different sections of the documents, or restructure your ' +
+  'sub-LLM queries. Do not repeat the same approaches.'
+
+/**
+ * Select the appropriate prompt for the "More" button based on conversation context.
+ *
+ * When the last exchange was a give-up answer (starts with "I cannot answer"),
+ * returns a retry-focused prompt. Otherwise returns the default deeper-analysis
+ * prompt. After one retry, the new answer replaces the give-up as the last
+ * exchange, so subsequent clicks naturally revert to the default prompt.
+ */
+export function getMorePrompt(exchanges: Exchange[]): string {
+  const lastAnswer = exchanges[exchanges.length - 1]?.answer ?? ''
+  if (lastAnswer.startsWith('I cannot answer')) {
+    return RETRY_SEARCH_PROMPT
+  }
+  return DEEPER_ANALYSIS_PROMPT
+}
+
 export default function ChatArea({
   topicName,
   connected,
@@ -170,8 +196,8 @@ export default function ChatArea({
   /** Sends the predefined deeper-analysis prompt with one click. */
   const handleMore = useCallback(() => {
     if (!canSendMore) return
-    sendQuery(DEEPER_ANALYSIS_PROMPT)
-  }, [canSendMore, sendQuery])
+    sendQuery(getMorePrompt(exchanges))
+  }, [canSendMore, sendQuery, exchanges])
 
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {

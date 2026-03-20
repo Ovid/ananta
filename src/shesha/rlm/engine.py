@@ -55,6 +55,7 @@ class QueryResult:
     execution_time: float
     verification: VerificationResult | None = field(default=None)
     semantic_verification: SemanticVerificationReport | None = field(default=None)
+    gave_up: bool = False
 
 
 def extract_code_blocks(text: str) -> list[str]:
@@ -224,6 +225,7 @@ class _CodeBlockResult:
     all_output: list[str]
     exec_results: list[ExecutionResult]
     failed_final_var: str | None = None
+    gave_up: bool = False
 
 
 class RLMEngine:
@@ -539,6 +541,7 @@ class RLMEngine:
         exec_results: list[ExecutionResult] = []
         final_answer: str | None = None
         failed_final_var: str | None = None
+        gave_up = False
 
         for code in code_blocks:
             exec_start = time.time()
@@ -624,6 +627,25 @@ class RLMEngine:
                         copy.copy(token_usage),
                     )
                 break
+            elif isinstance(result.partial_answer, str):
+                final_answer = result.partial_answer
+                gave_up = True
+                step = trace.add_step(
+                    type=StepType.FINAL_ANSWER,
+                    content=final_answer,
+                    iteration=iteration,
+                    metadata={"source": "code_block_partial"},
+                )
+                if on_step:
+                    on_step(step)
+                if on_progress:
+                    on_progress(
+                        StepType.FINAL_ANSWER,
+                        iteration,
+                        final_answer,
+                        copy.copy(token_usage),
+                    )
+                break
 
         # If a FINAL_VAR failed but later blocks executed (and may have
         # defined the variable), retry resolution before reporting failure.
@@ -653,6 +675,7 @@ class RLMEngine:
             all_output=all_output,
             exec_results=exec_results,
             failed_final_var=failed_final_var,
+            gave_up=gave_up,
         )
 
     def _resolve_final_var(
@@ -984,6 +1007,7 @@ class RLMEngine:
                             trace=trace,
                             token_usage=token_usage,
                             execution_time=time.time() - start_time,
+                            gave_up=(final_type == "partial"),
                         )
                         _finalize_trace_and_cleanup(bare_answer, "success")
                         return query_result
@@ -1009,6 +1033,7 @@ class RLMEngine:
                     _write_step,
                 )
                 final_answer = cb_result.final_answer
+                gave_up = cb_result.gave_up
 
                 # If code blocks didn't produce a final answer, check for
                 # bare FINAL in the same response. Now that code blocks have
@@ -1028,6 +1053,7 @@ class RLMEngine:
                                 var_lookup_failed = final_value
                     else:
                         final_answer = final_value
+                        gave_up = final_type == "partial"
 
                     if final_answer is not None:
                         step = trace.add_step(
@@ -1074,6 +1100,7 @@ class RLMEngine:
                         execution_time=execution_time,
                         verification=verification,
                         semantic_verification=semantic_verification,
+                        gave_up=gave_up,
                     )
                     _finalize_trace_and_cleanup(final_answer, "success")
                     return query_result

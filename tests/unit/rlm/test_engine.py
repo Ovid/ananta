@@ -3387,3 +3387,74 @@ class TestAllowBackgroundKnowledge:
             spy.assert_called_once()
             call_kwargs = spy.call_args[1]
             assert call_kwargs.get("augmented") is False
+
+
+class TestGaveUpFlag:
+    """Tests for QueryResult.gave_up flag propagation."""
+
+    @patch("shesha.rlm.engine.ContainerExecutor")
+    @patch("shesha.rlm.engine.LLMClient")
+    def test_engine_gave_up_false_for_final(
+        self, mock_llm_cls: MagicMock, mock_exec_cls: MagicMock
+    ):
+        """QueryResult.gave_up is False when RLM returns FINAL(...)."""
+        mock_llm = mock_llm_cls.return_value
+        mock_llm.complete.return_value = MagicMock(
+            content='FINAL(The answer is 42)',
+            prompt_tokens=10,
+            completion_tokens=5,
+            total_tokens=15,
+        )
+        mock_executor = mock_exec_cls.return_value
+        mock_executor.is_alive = True
+        engine = RLMEngine(model="test")
+        result = engine.query(["doc content"], "question?")
+        assert result.gave_up is False
+
+    @patch("shesha.rlm.engine.ContainerExecutor")
+    @patch("shesha.rlm.engine.LLMClient")
+    def test_engine_gave_up_true_for_bare_partial(
+        self, mock_llm_cls: MagicMock, mock_exec_cls: MagicMock
+    ):
+        """QueryResult.gave_up is True when RLM returns bare PARTIAL(...)."""
+        mock_llm = mock_llm_cls.return_value
+        mock_llm.complete.return_value = MagicMock(
+            content='PARTIAL(Found 7 titles but no dates)',
+            prompt_tokens=10,
+            completion_tokens=5,
+            total_tokens=15,
+        )
+        mock_executor = mock_exec_cls.return_value
+        mock_executor.is_alive = True
+        engine = RLMEngine(model="test")
+        result = engine.query(["doc content"], "question?")
+        assert result.gave_up is True
+        assert result.answer == "Found 7 titles but no dates"
+
+    @patch("shesha.rlm.engine.ContainerExecutor")
+    @patch("shesha.rlm.engine.LLMClient")
+    def test_engine_gave_up_true_for_sandbox_partial(
+        self, mock_llm_cls: MagicMock, mock_exec_cls: MagicMock
+    ):
+        """QueryResult.gave_up is True when sandbox returns partial_answer."""
+        mock_llm = mock_llm_cls.return_value
+        mock_llm.complete.return_value = MagicMock(
+            content='```repl\nPARTIAL("Found some evidence")\n```',
+            prompt_tokens=10,
+            completion_tokens=5,
+            total_tokens=15,
+        )
+        mock_executor = mock_exec_cls.return_value
+        mock_executor.is_alive = True
+        mock_executor.execute.return_value = ExecutionResult(
+            status="ok",
+            stdout="",
+            stderr="",
+            return_value=None,
+            error=None,
+            partial_answer="Found some evidence",
+        )
+        engine = RLMEngine(model="test")
+        result = engine.query(["doc content"], "question?")
+        assert result.gave_up is True
+        assert result.answer == "Found some evidence"

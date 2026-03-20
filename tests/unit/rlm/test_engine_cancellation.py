@@ -2,7 +2,7 @@
 
 import inspect
 import threading
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from shesha.rlm.engine import RLMEngine
 
@@ -15,7 +15,6 @@ def test_query_accepts_cancel_event():
 
 def test_query_exits_when_cancel_event_set():
     """Query loop exits after current iteration when cancel_event is set."""
-    engine = RLMEngine(model="test-model")
     event = threading.Event()
 
     # Mock the LLM to set the cancel event after first call
@@ -35,21 +34,32 @@ def test_query_exits_when_cancel_event_set():
         return resp
 
     mock_llm.complete = fake_complete
+    mock_factory = MagicMock(return_value=mock_llm)
+
+    engine = RLMEngine(model="test-model", llm_client_factory=mock_factory)
 
     mock_executor = MagicMock()
     mock_executor.is_alive = True
-    mock_executor.execute.return_value = MagicMock(status="ok", output="", final_answer=None)
+    mock_executor.execute.return_value = MagicMock(
+        status="ok",
+        stdout="",
+        stderr="",
+        error=None,
+        final_answer=None,
+        final_var=None,
+        final_value=None,
+        vars=None,
+    )
 
     mock_pool = MagicMock()
     mock_pool.acquire.return_value = mock_executor
-    engine._pool = mock_pool
+    engine.set_pool(mock_pool)
 
-    with patch("shesha.rlm.engine.LLMClient", return_value=mock_llm):
-        result = engine.query(
-            documents=["test doc"],
-            question="What is this?",
-            cancel_event=event,
-        )
+    result = engine.query(
+        documents=["test doc"],
+        question="What is this?",
+        cancel_event=event,
+    )
 
     assert result.answer == "[interrupted]"
     # Should have only done 1 iteration, not max_iterations (20)
@@ -58,23 +68,25 @@ def test_query_exits_when_cancel_event_set():
 
 def test_query_returns_interrupted_status_in_trace():
     """Cancelled query writes trace with interrupted status."""
-    engine = RLMEngine(model="test-model")
     event = threading.Event()
     event.set()  # Set immediately — should exit before first iteration
+
+    mock_llm = MagicMock()
+    mock_factory = MagicMock(return_value=mock_llm)
+
+    engine = RLMEngine(model="test-model", llm_client_factory=mock_factory)
 
     mock_executor = MagicMock()
     mock_executor.is_alive = True
     mock_pool = MagicMock()
     mock_pool.acquire.return_value = mock_executor
-    engine._pool = mock_pool
+    engine.set_pool(mock_pool)
 
-    mock_llm = MagicMock()
-    with patch("shesha.rlm.engine.LLMClient", return_value=mock_llm):
-        result = engine.query(
-            documents=["test doc"],
-            question="What is this?",
-            cancel_event=event,
-        )
+    result = engine.query(
+        documents=["test doc"],
+        question="What is this?",
+        cancel_event=event,
+    )
 
     assert result.answer == "[interrupted]"
     # LLM should never have been called

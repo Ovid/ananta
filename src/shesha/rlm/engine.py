@@ -4,6 +4,7 @@ import ast
 import copy
 import json
 import keyword
+import logging
 import re
 import threading
 import time
@@ -12,7 +13,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from shesha.llm.client import LLMClient
+from shesha.llm.client import LLMClient, LLMClientFactory
 from shesha.models import QueryContext
 from shesha.prompts import PromptLoader
 from shesha.rlm.boundary import generate_boundary, wrap_untrusted
@@ -33,9 +34,12 @@ from shesha.rlm.verification import (
     build_verification_code,
     parse_verification_output,
 )
-from shesha.sandbox.executor import ContainerExecutor, ExecutionResult, SubcallContentError
+from shesha.sandbox.base import ExecutionResult, SandboxExecutor
+from shesha.sandbox.executor import ContainerExecutor, SubcallContentError
 from shesha.sandbox.pool import ContainerPool
 from shesha.storage.base import StorageBackend
+
+logger = logging.getLogger(__name__)
 
 # Callback type for progress notifications
 ProgressCallback = Callable[[StepType, int, str, TokenUsage], None]
@@ -51,6 +55,7 @@ class QueryResult:
     execution_time: float
     verification: VerificationResult | None = field(default=None)
     semantic_verification: SemanticVerificationReport | None = field(default=None)
+    gave_up: bool = False
 
 
 def extract_code_blocks(text: str) -> list[str]:
@@ -118,13 +123,40 @@ def find_final_answer(text: str) -> tuple[str, str] | None:
     numbers, expressions, and sentences are still treated as literal answers.
 
     Returns:
+        ("partial", answer_string) for PARTIAL(...) with literal content
         ("final", answer_string) for FINAL(...) with literal content
         ("final_var", variable_name) for FINAL_VAR(...) or FINAL(identifier)
         None if no pattern found
     """
-    # Strip code blocks so we don't match FINAL inside ```repl blocks
+    # Strip code blocks so we don't match FINAL/PARTIAL inside ```repl blocks
     # (those are handled by the executor)
     stripped = re.sub(r"```repl\s*\n.*?\n```", "", text, flags=re.DOTALL)
+
+    # Check PARTIAL first — no VAR variant, no identifier heuristic.
+    # Content is always treated as literal text.
+    #
+    # Pass order mirrors FINAL but single-line check comes first so
+    # PARTIAL(x)\nFINAL(y) doesn't greedily capture across both lines.
+    partial_line = re.search(r"^\s*PARTIAL\((.*)\)\s*$", stripped, re.MULTILINE)
+    if partial_line:
+        partial_content = partial_line.group(1).strip()
+        if partial_content:
+            return ("partial", _strip_string_quotes(partial_content))
+    else:
+        # Multi-line PARTIAL with closing ')' at end of string
+        partial_pattern = r"^\s*PARTIAL\((.*)\)\s*\Z"
+        partial_match = re.search(partial_pattern, stripped, re.MULTILINE | re.DOTALL)
+        if partial_match:
+            partial_content = partial_match.group(1).strip()
+            if partial_content:
+                return ("partial", _strip_string_quotes(partial_content))
+        else:
+            # No closing paren — take everything after PARTIAL(
+            partial_anchor = re.search(r"^\s*PARTIAL\(", stripped, re.MULTILINE)
+            if partial_anchor:
+                partial_content = stripped[partial_anchor.end() :].strip()
+                if partial_content:
+                    return ("partial", _strip_string_quotes(partial_content))
 
     # Check FINAL_VAR first (more specific pattern)
     final_var_pattern = r"^\s*FINAL_VAR\((.*?)\)"
@@ -135,28 +167,52 @@ def find_final_answer(text: str) -> tuple[str, str] | None:
             return ("final_var", var_name)
         return ("final", var_name)
 
-    # Check FINAL pattern — greedy match to handle nested parentheses,
-    # no quote requirement (aligned with reference RLM rlm/utils/parsing.py:58)
-    final_pattern = r"^\s*FINAL\((.*)\)\s*$"
+    # Two-pass FINAL detection.  The old greedy regex FINAL\((.*)\)\s*$
+    # with re.MULTILINE silently truncated answers when a nested ')'
+    # sat at end-of-line — the regex treated it as the FINAL closer.
+    #
+    # Pass 1: require closing ')' at end of *string* (not line).
+    # This correctly handles FINAL(content with (nested) parens).
+    # Pass 1: require closing ')' at end of *string* (not line).
+    # This correctly handles FINAL(content with (nested) parens).
+    final_pattern = r"^\s*FINAL\((.*)\)\s*\Z"
     match = re.search(final_pattern, stripped, re.MULTILINE | re.DOTALL)
     if match:
         content = match.group(1).strip()
-        # Heuristic: if the content is a bare Python identifier (valid variable
-        # name, no quotes, no spaces, no operators), the LLM almost certainly
-        # meant to reference a sandbox variable — not return the identifier
-        # itself as a literal answer. Treat it as a variable reference so the
-        # engine retrieves the actual value from the sandbox.
-        #
-        # Examples:
-        #   FINAL(final_answer) → ("final_var", "final_answer")  # variable ref
-        #   FINAL("the answer")  → ("final", "the answer")       # quotes stripped
-        #   FINAL(42)            → ("final", "42")                # literal
-        #   FINAL(x + y)         → ("final", "x + y")            # literal
-        if _is_python_identifier(content):
-            return ("final_var", content)
-        return ("final", _strip_string_quotes(content))
+    else:
+        # Pass 1b: FINAL(x) on a single line, possibly followed by
+        # commentary on subsequent lines.  Uses MULTILINE (no DOTALL)
+        # so '.' stops at newlines — captures only the first line.
+        line_match = re.search(r"^\s*FINAL\((.*)\)\s*$", stripped, re.MULTILINE)
+        if line_match:
+            content = line_match.group(1).strip()
+        else:
+            # Pass 2: FINAL( with no matching close paren — the LLM wrote
+            # the entire answer after FINAL( without a closing ')'.
+            # Take everything after the opening paren.
+            anchor = re.search(r"^\s*FINAL\(", stripped, re.MULTILINE)
+            if not anchor:
+                return None
+            content = stripped[anchor.end() :].strip()
 
-    return None
+    # Empty content (bare "FINAL(" with nothing) should trigger retry
+    if not content:
+        return None
+
+    # Heuristic: if the content is a bare Python identifier (valid variable
+    # name, no quotes, no spaces, no operators), the LLM almost certainly
+    # meant to reference a sandbox variable — not return the identifier
+    # itself as a literal answer. Treat it as a variable reference so the
+    # engine retrieves the actual value from the sandbox.
+    #
+    # Examples:
+    #   FINAL(final_answer) → ("final_var", "final_answer")  # variable ref
+    #   FINAL("the answer")  → ("final", "the answer")       # quotes stripped
+    #   FINAL(42)            → ("final", "42")                # literal
+    #   FINAL(x + y)         → ("final", "x + y")            # literal
+    if _is_python_identifier(content):
+        return ("final_var", content)
+    return ("final", _strip_string_quotes(content))
 
 
 @dataclass
@@ -166,6 +222,8 @@ class _CodeBlockResult:
     final_answer: str | None
     all_output: list[str]
     exec_results: list[ExecutionResult]
+    failed_final_var: str | None = None
+    gave_up: bool = False
 
 
 class RLMEngine:
@@ -187,6 +245,7 @@ class RLMEngine:
         max_traces_per_project: int = 50,
         verify_citations: bool = True,
         verify: bool = False,
+        llm_client_factory: LLMClientFactory | None = None,
     ) -> None:
         """Initialize the RLM engine."""
         self.model = model
@@ -200,7 +259,26 @@ class RLMEngine:
         self.max_traces_per_project = max_traces_per_project
         self.verify_citations = verify_citations
         self.verify = verify
+        self._llm_client_factory: LLMClientFactory = llm_client_factory or LLMClient
         self._subcall_lock = threading.Lock()
+
+    @property
+    def pool(self) -> ContainerPool | None:
+        """The container pool used for query execution, or None."""
+        return self._pool
+
+    @property
+    def llm_client_factory(self) -> LLMClientFactory:
+        """The factory callable used to create LLM clients."""
+        return self._llm_client_factory
+
+    def set_pool(self, pool: ContainerPool | None) -> None:
+        """Set or clear the container pool used for query execution.
+
+        Args:
+            pool: A ContainerPool instance, or None to clear.
+        """
+        self._pool = pool
 
     def _handle_llm_query(
         self,
@@ -267,7 +345,7 @@ class RLMEngine:
             prompt = instruction
 
         # LLM call runs outside lock — this is the I/O-bound work we parallelize
-        sub_llm = LLMClient(model=self.model, api_key=self.api_key)
+        sub_llm = self._llm_client_factory(model=self.model, api_key=self.api_key)
         response = sub_llm.complete(messages=[{"role": "user", "content": prompt}])
 
         # Record response and update tokens (lock protects shared state)
@@ -350,7 +428,7 @@ class RLMEngine:
                 copy.copy(token_usage),
             )
 
-        sub_llm = LLMClient(model=self.model, api_key=self.api_key)
+        sub_llm = self._llm_client_factory(model=self.model, api_key=self.api_key)
         response = sub_llm.complete(messages=[{"role": "user", "content": prompt}])
         token_usage.prompt_tokens += response.prompt_tokens
         token_usage.completion_tokens += response.completion_tokens
@@ -414,7 +492,7 @@ class RLMEngine:
                     copy.copy(token_usage),
                 )
 
-            sub_llm2 = LLMClient(model=self.model, api_key=self.api_key)
+            sub_llm2 = self._llm_client_factory(model=self.model, api_key=self.api_key)
             response2 = sub_llm2.complete(messages=[{"role": "user", "content": prompt}])
             token_usage.prompt_tokens += response2.prompt_tokens
             token_usage.completion_tokens += response2.completion_tokens
@@ -445,7 +523,7 @@ class RLMEngine:
     def _execute_code_blocks(
         self,
         code_blocks: list[str],
-        executor: ContainerExecutor,
+        executor: SandboxExecutor,
         trace: Trace,
         iteration: int,
         token_usage: TokenUsage,
@@ -460,6 +538,8 @@ class RLMEngine:
         all_output: list[str] = []
         exec_results: list[ExecutionResult] = []
         final_answer: str | None = None
+        failed_final_var: str | None = None
+        gave_up = False
 
         for code in code_blocks:
             exec_start = time.time()
@@ -503,6 +583,7 @@ class RLMEngine:
                     type=StepType.FINAL_ANSWER,
                     content=final_answer,
                     iteration=iteration,
+                    metadata={"source": "code_block"},
                 )
                 if on_step:
                     on_step(step)
@@ -515,11 +596,43 @@ class RLMEngine:
                     )
                 break
             elif result.final_var is not None:
-                final_answer = result.final_value or ""
+                resolved = result.final_value
+                if resolved is None:
+                    # Sandbox returned the variable name but not its value.
+                    # Try resolving it explicitly; if that also fails, let
+                    # the loop continue so the model can retry (matching the
+                    # bare-text FINAL_VAR retry in the main query loop).
+                    resolved = self._resolve_final_var(result.final_var, executor)
+                if resolved is None:
+                    # Variable not found yet — record for retry but keep
+                    # executing later blocks which may define the variable.
+                    failed_final_var = result.final_var
+                    continue
+                final_answer = resolved
                 step = trace.add_step(
                     type=StepType.FINAL_ANSWER,
                     content=final_answer,
                     iteration=iteration,
+                    metadata={"source": "code_block_var"},
+                )
+                if on_step:
+                    on_step(step)
+                if on_progress:
+                    on_progress(
+                        StepType.FINAL_ANSWER,
+                        iteration,
+                        final_answer,
+                        copy.copy(token_usage),
+                    )
+                break
+            elif isinstance(result.partial_answer, str):
+                final_answer = result.partial_answer
+                gave_up = True
+                step = trace.add_step(
+                    type=StepType.FINAL_ANSWER,
+                    content=final_answer,
+                    iteration=iteration,
+                    metadata={"source": "code_block_partial"},
                 )
                 if on_step:
                     on_step(step)
@@ -532,16 +645,41 @@ class RLMEngine:
                     )
                 break
 
+        # If a FINAL_VAR failed but later blocks executed (and may have
+        # defined the variable), retry resolution before reporting failure.
+        if failed_final_var and final_answer is None:
+            resolved = self._resolve_final_var(failed_final_var, executor)
+            if resolved is not None:
+                final_answer = resolved
+                failed_final_var = None
+                step = trace.add_step(
+                    type=StepType.FINAL_ANSWER,
+                    content=final_answer,
+                    iteration=iteration,
+                    metadata={"source": "post_loop_var_retry"},
+                )
+                if on_step:
+                    on_step(step)
+                if on_progress:
+                    on_progress(
+                        StepType.FINAL_ANSWER,
+                        iteration,
+                        final_answer,
+                        copy.copy(token_usage),
+                    )
+
         return _CodeBlockResult(
             final_answer=final_answer,
             all_output=all_output,
             exec_results=exec_results,
+            failed_final_var=failed_final_var,
+            gave_up=gave_up,
         )
 
     def _resolve_final_var(
         self,
         var_name: str,
-        executor: ContainerExecutor,
+        executor: SandboxExecutor,
     ) -> str | None:
         """Resolve a FINAL_VAR variable from the sandbox.
 
@@ -550,13 +688,18 @@ class RLMEngine:
         """
         result = executor.execute(f"print({var_name})", timeout=self.execution_timeout)
         if result.status == "ok":
-            return result.stdout.strip()
+            value = result.stdout.strip()
+            # print(None) outputs "None" — treat as unresolved so the
+            # engine retries rather than returning the literal string.
+            if value == "None":
+                return None
+            return value
         return None
 
     def _run_verifications(
         self,
         final_answer: str,
-        executor: ContainerExecutor,
+        executor: SandboxExecutor,
         documents: list[str],
         doc_names: list[str],
         trace: Trace,
@@ -652,6 +795,12 @@ class RLMEngine:
         allow_background_knowledge: bool = False,
     ) -> QueryResult:
         """Run an RLM query against documents."""
+        logger.info(
+            "Starting query (model=%s, docs=%d, project=%s)",
+            self.model,
+            len(documents),
+            project_id,
+        )
         start_time = time.time()
         trace = Trace()
         token_usage = TokenUsage()
@@ -686,7 +835,6 @@ class RLMEngine:
         inc_writer = (
             IncrementalTraceWriter(storage, suppress_errors=True) if storage is not None else None
         )
-        trace_finalized = False
         if inc_writer is not None and project_id is not None:
             trace_id = str(uuid.uuid4())
             context = QueryContext(
@@ -703,11 +851,9 @@ class RLMEngine:
             if inc_writer is not None:
                 inc_writer.write_step(step)
 
-        def _finalize_trace(answer: str, status: str) -> None:
-            nonlocal trace_finalized
-            if trace_finalized or inc_writer is None:
+        def _finalize_trace_and_cleanup(answer: str, status: str) -> None:
+            if inc_writer is None or inc_writer.finalized:
                 return
-            trace_finalized = True
             inc_writer.finalize(
                 answer=answer,
                 token_usage=token_usage,
@@ -720,7 +866,9 @@ class RLMEngine:
                 )
 
         # Initialize LLM client
-        llm = LLMClient(model=self.model, system_prompt=system_prompt, api_key=self.api_key)
+        llm = self._llm_client_factory(
+            model=self.model, system_prompt=system_prompt, api_key=self.api_key
+        )
 
         # Iteration-0 safeguard: prevent model from jumping to FINAL()
         # without exploring. Matches reference rlm/rlm/utils/prompts.py:136.
@@ -749,9 +897,12 @@ class RLMEngine:
 
             return llm_query_callback
 
-        # Acquire executor from pool or create standalone
-        if self._pool is not None:
-            executor = self._pool.acquire()
+        # Acquire executor from pool or create standalone.
+        # Capture pool in a local so the finally block is immune to
+        # concurrent set_pool(None) from Shesha.stop().
+        pool = self._pool
+        if pool is not None:
+            executor = pool.acquire()
             executor.llm_query_handler = _make_llm_callback(0)
             owns_executor = False
         else:
@@ -774,7 +925,7 @@ class RLMEngine:
                         token_usage=token_usage,
                         execution_time=time.time() - start_time,
                     )
-                    _finalize_trace(answer, "interrupted")
+                    _finalize_trace_and_cleanup(answer, "interrupted")
                     return query_result
 
                 executor.llm_query_handler = _make_llm_callback(iteration)
@@ -838,6 +989,7 @@ class RLMEngine:
                             type=StepType.FINAL_ANSWER,
                             content=bare_answer,
                             iteration=iteration,
+                            metadata={"source": f"bare_{final_type}"},
                         )
                         _write_step(step)
                         if on_progress:
@@ -853,8 +1005,9 @@ class RLMEngine:
                             trace=trace,
                             token_usage=token_usage,
                             execution_time=time.time() - start_time,
+                            gave_up=(final_type == "partial"),
                         )
-                        _finalize_trace(bare_answer, "success")
+                        _finalize_trace_and_cleanup(bare_answer, "success")
                         return query_result
 
                     # No bare FINAL either — prompt for code
@@ -878,11 +1031,12 @@ class RLMEngine:
                     _write_step,
                 )
                 final_answer = cb_result.final_answer
+                gave_up = cb_result.gave_up
 
                 # If code blocks didn't produce a final answer, check for
                 # bare FINAL in the same response. Now that code blocks have
                 # executed, any variables they defined exist in the sandbox.
-                var_lookup_failed: str | None = None
+                var_lookup_failed: str | None = cb_result.failed_final_var
                 if final_answer is None and bare_final is not None:
                     final_type, final_value = bare_final
                     if final_type == "final_var":
@@ -891,16 +1045,20 @@ class RLMEngine:
                             final_answer = resolved
                         else:
                             # Variable not found — record name so a helpful
-                            # message is appended after the code-echo messages
-                            var_lookup_failed = final_value
+                            # message is appended after the code-echo messages.
+                            # Don't overwrite if already set from code blocks.
+                            if var_lookup_failed is None:
+                                var_lookup_failed = final_value
                     else:
                         final_answer = final_value
+                        gave_up = final_type == "partial"
 
                     if final_answer is not None:
                         step = trace.add_step(
                             type=StepType.FINAL_ANSWER,
                             content=final_answer,
                             iteration=iteration,
+                            metadata={"source": f"bare_{final_type}_after_code"},
                         )
                         _write_step(step)
                         if on_progress:
@@ -925,25 +1083,51 @@ class RLMEngine:
                         boundary=boundary,
                     )
 
+                    execution_time = time.time() - start_time
+                    logger.info(
+                        "Query completed in %.1fs (%d iters, %d+%d tokens)",
+                        execution_time,
+                        iteration + 1,
+                        token_usage.prompt_tokens,
+                        token_usage.completion_tokens,
+                    )
                     query_result = QueryResult(
                         answer=final_answer,
                         trace=trace,
                         token_usage=token_usage,
-                        execution_time=time.time() - start_time,
+                        execution_time=execution_time,
                         verification=verification,
                         semantic_verification=semantic_verification,
+                        gave_up=gave_up,
                     )
-                    _finalize_trace(final_answer, "success")
+                    _finalize_trace_and_cleanup(final_answer, "success")
                     return query_result
 
                 # Recover from dead executor mid-loop
-                if not executor.is_alive and self._pool is not None:
+                if not executor.is_alive and pool is not None:
+                    logger.warning("Executor died at iteration %d, recovering from pool", iteration)
                     executor.stop()
-                    self._pool.discard(executor)
-                    executor = self._pool.acquire()
+                    pool.discard(executor)
+                    try:
+                        executor = pool.acquire()
+                    except RuntimeError:
+                        # Pool was stopped (e.g. shutdown during in-flight query)
+                        logger.error(
+                            "Pool stopped during recovery at iteration %d, aborting", iteration
+                        )
+                        answer = "[Executor died — cannot continue]"
+                        query_result = QueryResult(
+                            answer=answer,
+                            trace=trace,
+                            token_usage=token_usage,
+                            execution_time=time.time() - start_time,
+                        )
+                        _finalize_trace_and_cleanup(answer, "executor_died")
+                        return query_result
                     executor.llm_query_handler = _make_llm_callback(iteration)
                     executor.setup_context(wrapped_documents)
                 elif not executor.is_alive:
+                    logger.error("Executor died at iteration %d with no pool, aborting", iteration)
                     answer = "[Executor died — cannot continue]"
                     query_result = QueryResult(
                         answer=answer,
@@ -951,7 +1135,7 @@ class RLMEngine:
                         token_usage=token_usage,
                         execution_time=time.time() - start_time,
                     )
-                    _finalize_trace(answer, "executor_died")
+                    _finalize_trace_and_cleanup(answer, "executor_died")
                     return query_result
 
                 # Add assistant response, then per-block code echo messages
@@ -993,7 +1177,7 @@ class RLMEngine:
             # Max iterations reached — ask LLM for one last answer
             fallback_messages = messages + [
                 {
-                    "role": "assistant",
+                    "role": "user",
                     "content": "Please provide a final answer to the user's question "
                     "based on the information provided.",
                 }
@@ -1007,6 +1191,7 @@ class RLMEngine:
                 type=StepType.FINAL_ANSWER,
                 content=f"[max-iter fallback] {answer}",
                 iteration=self.max_iterations - 1,
+                metadata={"source": "max_iterations_fallback"},
             )
             _write_step(step)
 
@@ -1016,14 +1201,16 @@ class RLMEngine:
                 token_usage=token_usage,
                 execution_time=time.time() - start_time,
             )
-            _finalize_trace(answer, "max_iterations")
+            _finalize_trace_and_cleanup(answer, "max_iterations")
             return query_result
 
         finally:
-            _finalize_trace("[interrupted]", "interrupted")
+            _finalize_trace_and_cleanup("[interrupted]", "interrupted")
             if owns_executor:
                 executor.stop()
             else:
+                # owns_executor is False only when pool was not None at acquire
+                assert pool is not None
                 executor.llm_query_handler = None
                 try:
                     executor.reset_namespace()
@@ -1031,6 +1218,6 @@ class RLMEngine:
                     # Executor is broken (e.g., socket closed after protocol error).
                     # Stop it and discard from pool — don't return a broken executor.
                     executor.stop()
-                    self._pool.discard(executor)  # type: ignore[union-attr]
+                    pool.discard(executor)
                 else:
-                    self._pool.release(executor)  # type: ignore[union-attr]
+                    pool.release(executor)

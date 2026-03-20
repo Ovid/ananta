@@ -19,6 +19,7 @@ from fastapi.responses import FileResponse, PlainTextResponse
 from shesha.experimental.shared.schemas import (
     ContextBudget,
     ConversationHistory,
+    ItemReorder,
     ModelInfo,
     ModelUpdate,
     TopicCreate,
@@ -110,6 +111,14 @@ def create_item_router(topic_mgr: BaseTopicManager) -> APIRouter:
         except ValueError as e:
             raise HTTPException(404, str(e)) from e
         return {"status": "removed", "topic": name, "project_id": project_id}
+
+    @router.put("/topics/{name}/items/order")
+    def reorder_topic_items(name: str, body: ItemReorder) -> dict[str, str]:
+        try:
+            topic_mgr.reorder_items(name, body.item_ids)
+        except ValueError as e:
+            raise HTTPException(_topic_error_to_status(e), str(e)) from e
+        return {"status": "reordered", "topic": name}
 
     return router
 

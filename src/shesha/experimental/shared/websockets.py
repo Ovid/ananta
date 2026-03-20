@@ -28,7 +28,9 @@ from shesha.rlm.trace import StepType, TokenUsage
 
 logger = logging.getLogger(__name__)
 
-_SAFE_ID_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
+# Allow / for old-style arXiv IDs (e.g. cs/9808001v1), but block .. traversal.
+# safe_path() provides the real path-traversal defence; this is belt-and-suspenders.
+_SAFE_ID_RE = re.compile(r"^(?!.*\.\.)[a-zA-Z0-9][a-zA-Z0-9._/-]*$")
 
 
 def build_complete_response(
@@ -40,6 +42,7 @@ def build_complete_response(
     document_ids: list[str],
     document_bytes: int,
     allow_background_knowledge: bool,
+    gave_up: bool = False,
 ) -> dict[str, object]:
     """Build the WebSocket ``complete`` response dict.
 
@@ -58,6 +61,7 @@ def build_complete_response(
         "document_ids": document_ids,
         "document_bytes": document_bytes,
         "allow_background_knowledge": allow_background_knowledge,
+        "gave_up": gave_up,
     }
 
 
@@ -336,6 +340,7 @@ async def _handle_query(
         model=state.model,
         document_ids=consulted_document_ids,
         allow_background_knowledge=allow_background,
+        gave_up=result.gave_up,
     )
 
     await websocket.send_json(
@@ -347,6 +352,7 @@ async def _handle_query(
             document_ids=consulted_document_ids,
             document_bytes=document_bytes,
             allow_background_knowledge=allow_background,
+            gave_up=result.gave_up,
         )
     )
 
@@ -542,6 +548,7 @@ async def handle_multi_project_query(
         model=state.model,
         document_ids=consulted_ids,
         allow_background_knowledge=allow_background,
+        gave_up=result.gave_up,
     )
 
     await ws.send_json(
@@ -553,5 +560,6 @@ async def handle_multi_project_query(
             document_ids=consulted_ids,
             document_bytes=document_bytes,
             allow_background_knowledge=allow_background,
+            gave_up=result.gave_up,
         )
     )

@@ -38,6 +38,7 @@ class FakeQueryResult:
 
     answer: str = "test answer"
     execution_time: float = 1.0
+    gave_up: bool = False
     token_usage: MagicMock = field(
         default_factory=lambda: MagicMock(
             prompt_tokens=10,

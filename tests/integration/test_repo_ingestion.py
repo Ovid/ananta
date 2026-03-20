@@ -7,6 +7,10 @@ from unittest.mock import patch
 import pytest
 
 from shesha import Shesha
+from shesha.exceptions import RepoIngestError
+from shesha.parser import create_default_registry
+from shesha.repo.ingester import RepoIngester
+from shesha.storage.filesystem import FilesystemStorage
 
 
 @pytest.fixture
@@ -45,6 +49,46 @@ def sample_git_repo(tmp_path: Path) -> Path:
     return repo_path
 
 
+class TestLocalPathRestriction:
+    """Tests for allow_local_paths flag on RepoIngester."""
+
+    def test_rejects_local_path_when_disabled(self, sample_git_repo: Path, tmp_path: Path):
+        """ingest() raises when allow_local_paths=False and URL is a local path."""
+
+        storage = FilesystemStorage(root_path=tmp_path / "storage")
+
+        registry = create_default_registry()
+        ingester = RepoIngester(storage_path=tmp_path, allow_local_paths=False)
+
+        with pytest.raises(RepoIngestError, match="Local path ingestion is disabled"):
+            ingester.ingest(
+                storage=storage,
+                parser_registry=registry,
+                url=str(sample_git_repo),
+                name="blocked-project",
+                path=None,
+                is_update=False,
+            )
+
+    def test_allows_local_path_by_default(self, sample_git_repo: Path, tmp_path: Path):
+        """ingest() works for local paths with default settings."""
+
+        storage = FilesystemStorage(root_path=tmp_path / "storage")
+
+        registry = create_default_registry()
+        ingester = RepoIngester(storage_path=tmp_path)
+
+        result = ingester.ingest(
+            storage=storage,
+            parser_registry=registry,
+            url=str(sample_git_repo),
+            name="allowed-project",
+            path=None,
+            is_update=False,
+        )
+        assert result.files_ingested >= 1
+
+
 class TestRepoIngestion:
     """Integration tests for create_project_from_repo."""
 
@@ -76,7 +120,7 @@ class TestRepoIngestion:
                 name="sample-project",
             )
 
-            docs = shesha._storage.load_all_documents("sample-project")
+            docs = shesha.storage.load_all_documents("sample-project")
             main_doc = next(d for d in docs if "main.py" in d.name)
 
             assert "=== FILE:" in main_doc.content

@@ -49,6 +49,17 @@ _PLAIN_TEXT_EXTENSIONS = frozenset(
 )
 
 
+_SUPPORTED_EXTENSIONS = _PLAIN_TEXT_EXTENSIONS | frozenset(
+    {".pdf", ".docx", ".pptx", ".xlsx", ".rtf"}
+)
+
+
+def is_supported_extension(filename: str) -> bool:
+    """Check if a filename has a supported extension for text extraction."""
+    ext = Path(filename).suffix.lower()
+    return ext in _SUPPORTED_EXTENSIONS
+
+
 def extract_text(path: Path, content_type: str | None = None) -> str:
     """Extract text content from a file.
 

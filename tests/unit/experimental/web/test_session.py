@@ -183,6 +183,35 @@ def test_save_is_atomic_on_crash(session_dir: Path) -> None:
     assert tmp_files == []
 
 
+def test_add_exchange_stores_gave_up(session: WebConversationSession) -> None:
+    """add_exchange stores gave_up flag when provided."""
+    exchange = session.add_exchange(
+        question="What?",
+        answer="Partial evidence.",
+        trace_id="t1",
+        tokens={"prompt": 10, "completion": 5, "total": 15},
+        execution_time=0.5,
+        model="test",
+        gave_up=True,
+    )
+    assert exchange["gave_up"] is True
+    reloaded = WebConversationSession(session._file.parent)
+    assert reloaded.list_exchanges()[0]["gave_up"] is True
+
+
+def test_add_exchange_gave_up_defaults_to_false(session: WebConversationSession) -> None:
+    """gave_up defaults to False when not provided."""
+    exchange = session.add_exchange(
+        question="What?",
+        answer="Full answer.",
+        trace_id="t1",
+        tokens={"prompt": 10, "completion": 5, "total": 15},
+        execution_time=0.5,
+        model="test",
+    )
+    assert exchange["gave_up"] is False
+
+
 def test_add_exchange_document_ids_defaults_to_none(session: WebConversationSession) -> None:
     """add_exchange works without document_ids for backward compatibility."""
     exchange = session.add_exchange(

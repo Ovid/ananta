@@ -227,6 +227,10 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** The pool is assigned to the engine via direct private attribute mutation (`self._rlm_engine._pool = self._pool`) inside `start()`. The engine's behavior depends on whether this external method was called. Without `start()`, the engine silently creates standalone executors instead of using the pool.
 - **Evidence:** `shesha.py:342`, read in `engine.py:546-553`
 - **Found by:** Structure, Coupling
+- **Status:** Fixed
+- **Status reason:** Added RLMEngine.set_pool() with isinstance validation. Shesha.start() now uses the public API instead of mutating _pool directly.
+- **Status date:** 2026-03-18 23:30 UTC
+- **Status commit:** 909d354
 
 ### [F-5] Repo ingestion logic misplaced in Shesha facade
 - **Category:** 10 (Feature envy / anemic domain model)
@@ -234,6 +238,10 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** The 115-line `_ingest_repo()` method in `Shesha` orchestrates file parsing, staging, atomic swap, error cleanup, and SHA persistence. This logic belongs in `RepoIngester` or a dedicated service, not the main API facade. `Shesha` has intimate knowledge of parser behavior and storage staging internals.
 - **Evidence:** `shesha.py:470-584` — calls `_repo_ingester.list_files_from_path()`, `_parser_registry.find_parser()`, `_storage.create_project()`, `_storage.store_document()`, `_storage.swap_docs()`, `_storage.delete_project()`
 - **Found by:** Structure
+- **Status:** Fixed
+- **Status reason:** Moved ingestion orchestration into RepoIngester.ingest(). Shesha._ingest_repo is now a thin wrapper that delegates and wraps IngestResult into RepoProjectResult.
+- **Status date:** 2026-03-18 22:40 UTC
+- **Status commit:** 3aa3f7f
 
 ### [F-6] Shotgun surgery: dual WebSocket response construction
 - **Category:** 9 (Shotgun surgery)
@@ -251,6 +259,10 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** `RLMEngine` instantiates `LLMClient` at four points throughout the engine (subcall handler, two semantic verification layers, main query loop). There is no way to inject a custom LLM client for testing without API calls or for using a different LLM abstraction.
 - **Evidence:** `engine.py:261` (subcall), `:344` (verification L1), `:408` (verification L2), `:516` (main loop)
 - **Found by:** Coupling
+- **Status:** Fixed
+- **Status reason:** Added llm_client_factory parameter to RLMEngine.__init__() defaulting to LLMClient. All 4 creation sites use self._llm_client_factory() enabling test injection without import-level patching.
+- **Status date:** 2026-03-18 22:47 UTC
+- **Status commit:** b7b3122
 
 ### [F-8] hasattr check breaks storage protocol abstraction
 - **Category:** 6 (Leaky abstractions)
@@ -258,6 +270,10 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** `Shesha._ingest_repo` uses `hasattr(self._storage, "swap_docs")` to decide between an atomic swap path and manual copy-then-delete. `swap_docs` is not part of the `StorageBackend` protocol, creating an implicit dependency on `FilesystemStorage`.
 - **Evidence:** `shesha.py:535`
 - **Found by:** Coupling
+- **Status:** Fixed
+- **Status reason:** Added swap_docs to StorageBackend protocol with default_swap_docs fallback function. hasattr check eliminated — ingestion now calls storage.swap_docs() unconditionally.
+- **Status date:** 2026-03-18 22:40 UTC
+- **Status commit:** 3aa3f7f
 
 ### [F-9] No logging in core library modules
 - **Category:** 21 (No observability plan) / 34 (Inconsistent error/logging)
@@ -265,6 +281,10 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** The entire core library (RLM engine, LLM client, sandbox executor, container pool, Shesha facade, Project) has zero `logging` module usage. Only `trace_writer.py` and the `experimental/` subsystem use loggers. Operator-facing diagnostics (container lifecycle, LLM call timing, pool exhaustion, executor restarts) are invisible.
 - **Evidence:** Zero `logger` instances in `engine.py`, `client.py`, `executor.py`, `pool.py`, `shesha.py`, `project.py`
 - **Found by:** Error Handling
+- **Status:** Fixed
+- **Status reason:** Added logging.getLogger(__name__) to all 6 core modules. Key log points: query start/end with timing, pool lifecycle, pool exhaustion, executor recovery, LLM errors.
+- **Status date:** 2026-03-19 00:20 UTC
+- **Status commit:** ccf6025
 
 ### [F-10] Broad exception swallowing in analysis shortcut
 - **Category:** 20 (Weak error handling strategy)
@@ -282,6 +302,10 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** The TUI's `_make_query_runner` contains analysis shortcut decision logic (try shortcut, check result, branch on success/failure). This same logic would need to be duplicated for any other frontend.
 - **Evidence:** `tui/app.py:384-423`
 - **Found by:** Error Handling
+- **Status:** Fixed
+- **Status reason:** Extracted query_with_shortcut() and ShortcutResult dataclass into analysis/shortcut.py. TUI now calls the domain function instead of inlining the shortcut decision logic.
+- **Status date:** 2026-03-19 00:00 UTC
+- **Status commit:** 809e32b
 
 ### [F-12] Synchronous-only LLM client
 - **Category:** 16 (Synchronous-only integration)
@@ -296,6 +320,10 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** Document upload performs 6 sequential side effects (write file, extract text, write metadata, create project, store document, add to topic). Only text extraction failure triggers cleanup. Failures at later steps leave orphaned upload directories and unattached projects.
 - **Evidence:** `document_explorer/api.py:155-213`
 - **Found by:** Integration
+- **Status:** Fixed
+- **Status reason:** Wrapped post-extraction steps in try/except with cleanup: deletes project (if created) and upload dir on failure at any step.
+- **Status date:** 2026-03-19 00:10 UTC
+- **Status commit:** acd713c
 
 ### [F-14] ContainerPool returns concrete ContainerExecutor
 - **Category:** 6 (Leaky abstractions)
@@ -303,6 +331,10 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** `ContainerPool.acquire()` returns the concrete `ContainerExecutor` class. There is no executor protocol/interface, preventing substitution of mock executors for testing or non-Docker backends.
 - **Evidence:** `sandbox/pool.py:51` (`def acquire(self) -> ContainerExecutor`)
 - **Found by:** Coupling
+- **Status:** Fixed
+- **Status reason:** Added SandboxExecutor protocol in sandbox/base.py. ContainerPool and RLMEngine now use the protocol type instead of concrete ContainerExecutor for parameters and return types.
+- **Status date:** 2026-03-19 06:44 UTC
+- **Status commit:** f76ffee
 
 ### [F-15] IncrementalTraceWriter temporal coupling
 - **Category:** 27 (Temporal coupling)
@@ -310,6 +342,10 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** Requires calling `start()` before `write_step()` before `finalize()`. Skipping `start()` causes silent no-ops. The no-op behavior is intentional fault tolerance but the call sequence has no type-level enforcement.
 - **Evidence:** `rlm/trace_writer.py:204` (`if self.path is None: return`), `:243` (same guard)
 - **Found by:** Coupling
+- **Status:** Fixed
+- **Status reason:** Added _finalized state flag to IncrementalTraceWriter with public `finalized` property. write_step() and finalize() are no-ops after finalization. Removed redundant `trace_finalized` guard from RLMEngine.query() — writer now owns its own state invariant.
+- **Status date:** 2026-03-19 06:12 UTC
+- **Status commit:** cfad664
 
 ### [F-16] analysis/shortcut.py creates LLMClient directly
 - **Category:** 3 (Tight coupling)
@@ -317,6 +353,10 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** Both functions create `LLMClient` inline, making them impossible to test without mocking at the import level. Less impactful than engine coupling since these are standalone utility functions.
 - **Evidence:** `analysis/shortcut.py:74`, `:110`
 - **Found by:** Coupling
+- **Status:** Fixed
+- **Status reason:** Added llm_client_factory parameter to classify_query() and try_answer_from_analysis(), defaulting to LLMClient. Same pattern as F-7 fix.
+- **Status date:** 2026-03-18 22:50 UTC
+- **Status commit:** a33371a
 
 ### [F-17] AnalysisGenerator takes full Shesha instance
 - **Category:** 3 (Tight coupling)
@@ -324,6 +364,10 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** `AnalysisGenerator.__init__` takes a `Shesha` instance but only uses `get_project()` and `get_project_sha()`. Wider dependency surface than necessary.
 - **Evidence:** `analysis/generator.py:24`
 - **Found by:** Coupling
+- **Status:** Fixed
+- **Status reason:** Changed constructor to accept two callables (get_project, get_project_sha) instead of full Shesha instance
+- **Status date:** 2026-03-18 22:02 UTC
+- **Status commit:** 699ea3d
 
 ### [F-18] Non-idempotent document upload
 - **Category:** 19 (Lack of idempotency)
@@ -331,6 +375,9 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** `_make_project_id` includes `datetime.now(UTC).isoformat()` in its hash, so uploading the same file twice creates different project IDs. Repeated uploads waste storage.
 - **Evidence:** `document_explorer/api.py:47`
 - **Found by:** Integration
+- **Status:** Skipped
+- **Status reason:** Requires content-based hashing and duplicate detection in the upload endpoint — broader change than a simple hash fix. Deferred to a dedicated task.
+- **Status date:** 2026-03-19 06:15 UTC
 
 ### [F-19] WebSocket vs REST field naming mismatch
 - **Category:** 24 (Inconsistent API contracts)
@@ -338,6 +385,9 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** WebSocket `complete` message uses `duration_ms` (int) while `ExchangeSchema` uses `execution_time` (float seconds). Different field names for the same concept across channels.
 - **Evidence:** `shared/websockets.py:320` vs `shared/schemas.py:65`
 - **Found by:** Integration
+- **Status:** Won't fix
+- **Status reason:** False positive — the naming split is intentional. execution_time (float seconds) is the internal representation used in QueryResult, ExchangeSchema, and session storage. duration_ms (int milliseconds) is the WebSocket wire format for client convenience, produced by build_complete_response() at the API boundary. Different units at different layers, not inconsistent naming.
+- **Status date:** 2026-03-18 22:05 UTC
 
 ### [F-20] Code explorer pending_updates in memory
 - **Category:** 26 (Poor transactional boundaries)
@@ -345,12 +395,20 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** The check-updates/apply-updates two-phase operation stores state in an in-memory dict. Server restart between check and apply loses the pending update.
 - **Evidence:** `code_explorer/api.py:61` (`pending_updates: dict[str, RepoProjectResult] = {}`)
 - **Found by:** Integration
+- **Status:** Fixed
+- **Status reason:** apply-updates now self-heals when cache is empty: re-derives update state via create_project_from_repo, returns 409 only if genuinely no updates available. Server restarts no longer lose pending updates.
+- **Status date:** 2026-03-19 06:30 UTC
+- **Status commit:** 0733dac
 
 ### [F-21] LLMError doesn't inherit SheshaError
 - **Category:** 20 (Weak error handling strategy)
 - **Impact:** Low
 - **Explanation:** `LLMError` inherits from `Exception`, not `SheshaError`. A caller catching `SheshaError` will miss LLM errors. May be intentional (infrastructure vs domain separation) but creates a gap.
 - **Evidence:** `llm/exceptions.py:4` (`class LLMError(Exception)`)
+- **Status:** Fixed
+- **Status reason:** Changed LLMError to inherit from SheshaError, unifying the exception hierarchy
+- **Status date:** 2026-03-18 21:55 UTC
+- **Status commit:** 789f6a4
 - **Found by:** Error Handling
 
 ### [F-22] Magic numbers in context budget estimation
@@ -369,6 +427,10 @@ Shesha is a Python library implementing Recursive Language Models (RLMs) per arX
 - **Explanation:** The `_finalize_trace` inner function not only writes the summary but also calls `cleanup_old_traces` which deletes old trace files. The function name doesn't suggest data deletion.
 - **Evidence:** `rlm/engine.py:499-513`
 - **Found by:** Error Handling
+- **Status:** Fixed
+- **Status reason:** Renamed to _finalize_trace_and_cleanup to make the cleanup side effect visible in the name
+- **Status date:** 2026-03-18 21:58 UTC
+- **Status commit:** f2aa232
 
 ### [F-24] Config env_map incomplete
 - **Category:** 22 (Configuration sprawl)

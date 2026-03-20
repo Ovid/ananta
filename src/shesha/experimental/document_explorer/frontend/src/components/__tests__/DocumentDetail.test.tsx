@@ -14,16 +14,16 @@ const mockDoc: DocumentInfo = {
 }
 
 describe('DocumentDetail', () => {
-  let onClose: ReturnType<typeof vi.fn>
-  let onDelete: ReturnType<typeof vi.fn>
-  let onAddToTopic: ReturnType<typeof vi.fn>
-  let onRemoveFromTopic: ReturnType<typeof vi.fn>
+  let onClose: ReturnType<typeof vi.fn<() => void>>
+  let onDelete: ReturnType<typeof vi.fn<(id: string) => void>>
+  let onAddToTopic: ReturnType<typeof vi.fn<(id: string, topic: string) => void>>
+  let onRemoveFromTopic: ReturnType<typeof vi.fn<(id: string, topic: string) => void>>
 
   beforeEach(() => {
-    onClose = vi.fn()
-    onDelete = vi.fn()
-    onAddToTopic = vi.fn()
-    onRemoveFromTopic = vi.fn()
+    onClose = vi.fn<() => void>()
+    onDelete = vi.fn<(id: string) => void>()
+    onAddToTopic = vi.fn<(id: string, topic: string) => void>()
+    onRemoveFromTopic = vi.fn<(id: string, topic: string) => void>()
   })
 
   function renderDetail(overrides: Partial<{

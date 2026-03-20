@@ -86,6 +86,7 @@ make all                         # Format + lint + typecheck + test
 - Max iterations = 20 (configurable)
 - Container pool with 3 warm containers
 - Documents organized into projects
+- **Beyond PoC mindset:** The experimental web explorers are moving beyond proof-of-concept. When making design choices in the experimental layer, prefer resilient patterns (graceful degradation, self-healing on restart) over shortcuts that assume single-use or ephemeral state. This is not a mandate to gold-plate everything, but "it's just a PoC" should not be the default justification for fragile design.
 
 ## Changelog & Versioning
 

@@ -147,6 +147,26 @@ class TestCreateAndListTopics:
         assert "Research" in mgr.list_topics()
 
 
+class TestResolve:
+    """I6: BaseTopicManager must provide resolve() for shared routes/websockets."""
+
+    def test_resolve_returns_first_item(self, tmp_path: Path) -> None:
+        mgr = BaseTopicManager(tmp_path)
+        mgr.create("Reports")
+        mgr.add_item("Reports", "proj-1")
+        mgr.add_item("Reports", "proj-2")
+        assert mgr.resolve("Reports") == "proj-1"
+
+    def test_resolve_returns_none_for_missing_topic(self, tmp_path: Path) -> None:
+        mgr = BaseTopicManager(tmp_path)
+        assert mgr.resolve("nonexistent") is None
+
+    def test_resolve_returns_none_for_empty_topic(self, tmp_path: Path) -> None:
+        mgr = BaseTopicManager(tmp_path)
+        mgr.create("Empty")
+        assert mgr.resolve("Empty") is None
+
+
 class TestAddAndListItems:
     def test_add_item_to_topic(self, tmp_path: Path) -> None:
         mgr = BaseTopicManager(tmp_path)
@@ -304,3 +324,43 @@ class TestRenameTopic:
         mgr.create("Safe")
         with pytest.raises(ValueError, match="path separator"):
             mgr.rename("Safe", new_name)
+
+
+class TestReorderItems:
+    @pytest.fixture
+    def mgr(self, tmp_path: Path) -> BaseTopicManager:
+        return BaseTopicManager(tmp_path)
+
+    def test_reorder_changes_item_order(self, mgr: BaseTopicManager) -> None:
+        mgr.create("Alpha")
+        mgr.add_item("Alpha", "a")
+        mgr.add_item("Alpha", "b")
+        mgr.add_item("Alpha", "c")
+        mgr.reorder_items("Alpha", ["c", "a", "b"])
+        assert mgr.list_items("Alpha") == ["c", "a", "b"]
+
+    def test_reorder_nonexistent_topic_raises(self, mgr: BaseTopicManager) -> None:
+        with pytest.raises(ValueError, match="not found"):
+            mgr.reorder_items("NoSuch", ["a"])
+
+    def test_reorder_with_mismatched_ids_raises(self, mgr: BaseTopicManager) -> None:
+        mgr.create("Alpha")
+        mgr.add_item("Alpha", "a")
+        mgr.add_item("Alpha", "b")
+        with pytest.raises(ValueError, match="must contain exactly"):
+            mgr.reorder_items("Alpha", ["a", "b", "c"])
+
+    def test_reorder_with_missing_ids_raises(self, mgr: BaseTopicManager) -> None:
+        mgr.create("Alpha")
+        mgr.add_item("Alpha", "a")
+        mgr.add_item("Alpha", "b")
+        with pytest.raises(ValueError, match="must contain exactly"):
+            mgr.reorder_items("Alpha", ["a"])
+
+    def test_reorder_preserves_topic_name(self, mgr: BaseTopicManager) -> None:
+        mgr.create("Alpha")
+        mgr.add_item("Alpha", "a")
+        mgr.add_item("Alpha", "b")
+        mgr.reorder_items("Alpha", ["b", "a"])
+        # Topic name should be unchanged
+        assert "Alpha" in mgr.list_topics()

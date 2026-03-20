@@ -193,6 +193,37 @@ def test_model_update():
     assert m.model == "gpt-5"
 
 
+def test_exchange_schema_gave_up_default():
+    """gave_up defaults to False when not provided."""
+    e = ExchangeSchema(
+        exchange_id="uuid-1",
+        question="What?",
+        answer="This.",
+        timestamp="2025-01-15T10:30:00Z",
+        tokens={"prompt": 100, "completion": 50, "total": 150},
+        execution_time=44.5,
+        model="gpt-5-mini",
+    )
+    assert e.gave_up is False
+
+
+def test_exchange_schema_gave_up_true():
+    """gave_up=True is stored and serialized."""
+    e = ExchangeSchema(
+        exchange_id="uuid-1",
+        question="What?",
+        answer="Partial findings here.",
+        timestamp="2025-01-15T10:30:00Z",
+        tokens={"prompt": 100, "completion": 50, "total": 150},
+        execution_time=44.5,
+        model="gpt-5-mini",
+        gave_up=True,
+    )
+    assert e.gave_up is True
+    d = e.model_dump()
+    assert d["gave_up"] is True
+
+
 def test_context_budget():
     b = ContextBudget(
         used_tokens=31000,

@@ -1,18 +1,22 @@
 """Docker container executor for sandboxed code execution."""
 
 import json
+import logging
 import struct
 import time
-from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
 from typing import Any
 
 import docker
 from docker.errors import DockerException
 from docker.models.containers import Container
 
+from shesha.sandbox.base import ExecutionResult, LLMQueryHandler
 from shesha.security.containers import DEFAULT_SECURITY, ContainerSecurityConfig
+
+__all__ = ["ContainerExecutor", "ExecutionResult", "LLMQueryHandler"]
+
+logger = logging.getLogger(__name__)
 
 
 class ProtocolError(Exception):
@@ -33,24 +37,6 @@ MAX_MESSAGE_SIZE = 10 * 1024 * 1024  # 10 MB max incoming message
 MAX_READ_DURATION = 300  # 5 min total deadline
 MAX_PAYLOAD_SIZE = 50 * 1024 * 1024  # 50 MB max outgoing payload
 DEFAULT_SEND_TIMEOUT = 30  # 30 seconds for send operations
-
-
-@dataclass
-class ExecutionResult:
-    """Result of code execution in sandbox."""
-
-    status: str
-    stdout: str
-    stderr: str
-    return_value: Any
-    error: str | None
-    final_answer: str | None = None
-    final_var: str | None = None
-    final_value: str | None = None
-    vars: dict[str, str] | None = None
-
-
-LLMQueryHandler = Callable[[str, str], str]  # (instruction, content) -> response
 
 
 class ContainerExecutor:
@@ -83,6 +69,7 @@ class ContainerExecutor:
 
     def start(self) -> None:
         """Start a container for execution."""
+        logger.debug("Starting container (image=%s, memory=%s)", self.image, self.memory_limit)
         self._raw_buffer = b""  # Clear raw stream buffer
         self._content_buffer = b""  # Clear content buffer
         try:
@@ -107,6 +94,7 @@ class ContainerExecutor:
 
     def stop(self) -> None:
         """Stop and remove the container."""
+        logger.debug("Stopping container")
         if self._socket is not None:
             self._socket.close()
             self._socket = None
@@ -252,6 +240,7 @@ class ContainerExecutor:
                     final_answer=result.get("final_answer"),
                     final_var=result.get("final_var"),
                     final_value=result.get("final_value"),
+                    partial_answer=result.get("partial_answer"),
                     vars=result.get("vars"),
                 )
         except ProtocolError as e:
@@ -298,6 +287,16 @@ class ContainerExecutor:
                 return_value=None,
                 error=f"Protocol error: invalid UTF-8 from container: {e}",
             )
+        except RuntimeError as e:
+            # Container was stopped externally (e.g., pool.stop() during
+            # in-flight query). Return error so the engine can recover.
+            return ExecutionResult(
+                status="error",
+                stdout="",
+                stderr="",
+                return_value=None,
+                error=f"Executor stopped: {e}",
+            )
 
     _MAX_BATCH_WORKERS = 32
 
@@ -312,7 +311,7 @@ class ContainerExecutor:
         def _call_one(prompt: str) -> str:
             try:
                 return handler(prompt, "")
-            except SubcallContentError as e:
+            except Exception as e:
                 return f"[error: {e}]"
 
         workers = min(len(prompts), self._MAX_BATCH_WORKERS)

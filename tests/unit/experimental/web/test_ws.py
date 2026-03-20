@@ -42,6 +42,7 @@ def test_ws_query_returns_complete(client: TestClient, mock_state: MagicMock) ->
     mock_result.token_usage = TokenUsage(prompt_tokens=100, completion_tokens=50)
     mock_result.execution_time = 1.5
     mock_result.trace = Trace(steps=[])
+    mock_result.gave_up = False
 
     mock_project = MagicMock()
     mock_project.rlm_engine.query.return_value = mock_result

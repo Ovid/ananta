@@ -29,6 +29,14 @@ class TestParseArgs:
         args = parse_args([])
         assert args.model is None
 
+    def test_default_bind_is_localhost(self) -> None:
+        args = parse_args([])
+        assert args.bind == "127.0.0.1"
+
+    def test_custom_bind(self) -> None:
+        args = parse_args(["--bind", "0.0.0.0"])
+        assert args.bind == "0.0.0.0"
+
 
 class TestMain:
     @patch("shesha.experimental.document_explorer.__main__.parse_args")
@@ -66,4 +74,4 @@ class TestMain:
         sentinel = MagicMock(name="app")
         mock_api.return_value = sentinel
         main()
-        mock_uvicorn.run.assert_called_once_with(sentinel, host="0.0.0.0", port=9999)
+        mock_uvicorn.run.assert_called_once_with(sentinel, host="127.0.0.1", port=9999)

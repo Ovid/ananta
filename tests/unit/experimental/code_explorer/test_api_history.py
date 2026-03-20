@@ -23,13 +23,16 @@ from shesha.experimental.shared.session import WebConversationSession
 
 
 @pytest.fixture
-def mock_shesha() -> MagicMock:
+def mock_shesha(tmp_path: Path) -> MagicMock:
     """Create a mock Shesha instance."""
     shesha = MagicMock()
     shesha.list_projects.return_value = []
     shesha.storage = MagicMock()
     shesha.storage.list_documents.return_value = []
     shesha.storage.list_traces.return_value = []
+    # Return a real Path so _build_repo_info's display-name lookup doesn't
+    # produce a MagicMock string.  Individual tests can override this.
+    shesha.storage.get_project_dir.return_value = tmp_path / "default_project_dir"
     return shesha
 
 

@@ -55,6 +55,10 @@ class TestRepoIngester:
         assert not ingester.is_local_path("https://github.com/org/repo")
         assert not ingester.is_local_path("git@github.com:org/repo.git")
 
+    def test_file_protocol_not_in_safe_protocols(self):
+        """file:// must not be allowed — it bypasses is_local_path() checks."""
+        assert "file" not in RepoIngester._GIT_SAFE_PROTOCOLS.split(":")
+
     def test_detect_host_github(self, ingester: RepoIngester):
         """detect_host identifies GitHub URLs."""
         assert ingester.detect_host("https://github.com/org/repo") == "github.com"
@@ -261,6 +265,16 @@ class TestSHATracking:
         data = json.loads(meta_path.read_text())
         assert data["head_sha"] == "abc123def456"
 
+    def test_save_sha_preserves_existing_metadata(self, ingester: RepoIngester, tmp_path: Path):
+        """save_sha() preserves existing keys like source_url."""
+        ingester.save_source_url("my-project", "https://example.com/repo")
+        ingester.save_sha("my-project", "abc123def456")
+
+        meta_path = tmp_path / "repos" / "my-project" / "_repo_meta.json"
+        data = json.loads(meta_path.read_text())
+        assert data["head_sha"] == "abc123def456"
+        assert data["source_url"] == "https://example.com/repo"
+
     def test_get_saved_sha(self, ingester: RepoIngester, tmp_path: Path):
         """get_saved_sha() returns stored SHA."""
         (tmp_path / "repos" / "my-project").mkdir(parents=True)
@@ -383,6 +397,58 @@ class TestFileListing:
             assert files == []
 
 
+class TestCorruptMetadata:
+    """Tests for corrupt _repo_meta.json handling."""
+
+    def test_save_sha_with_corrupt_json_recovers(self, ingester: RepoIngester, tmp_path: Path):
+        """save_sha() falls back to empty dict when JSON is corrupt."""
+        repo_path = tmp_path / "repos" / "my-project"
+        repo_path.mkdir(parents=True)
+        meta_path = repo_path / "_repo_meta.json"
+        meta_path.write_text("NOT VALID JSON{{{")
+
+        ingester.save_sha("my-project", "abc123")
+
+        data = json.loads(meta_path.read_text())
+        assert data["head_sha"] == "abc123"
+
+    def test_save_source_url_with_corrupt_json_recovers(
+        self, ingester: RepoIngester, tmp_path: Path
+    ):
+        """save_source_url() falls back to empty dict when JSON is corrupt."""
+        repo_path = tmp_path / "repos" / "my-project"
+        repo_path.mkdir(parents=True)
+        meta_path = repo_path / "_repo_meta.json"
+        meta_path.write_text("CORRUPT")
+
+        ingester.save_source_url("my-project", "https://example.com")
+
+        data = json.loads(meta_path.read_text())
+        assert data["source_url"] == "https://example.com"
+
+    def test_get_saved_sha_with_corrupt_json_returns_none(
+        self, ingester: RepoIngester, tmp_path: Path
+    ):
+        """get_saved_sha() returns None when JSON is corrupt."""
+        repo_path = tmp_path / "repos" / "my-project"
+        repo_path.mkdir(parents=True)
+        meta_path = repo_path / "_repo_meta.json"
+        meta_path.write_text("CORRUPT")
+
+        assert ingester.get_saved_sha("my-project") is None
+
+    def test_get_source_url_with_corrupt_json_returns_none(
+        self, ingester: RepoIngester, tmp_path: Path
+    ):
+        """get_source_url() returns None when JSON is corrupt."""
+        repo_path = tmp_path / "repos" / "my-project"
+        repo_path.mkdir(parents=True)
+        meta_path = repo_path / "_repo_meta.json"
+        meta_path.write_text("CORRUPT")
+
+        assert ingester.get_source_url("my-project") is None
+
+
 class TestSourceURLTracking:
     """Tests for source URL tracking functionality."""
 
@@ -407,6 +473,31 @@ class TestSourceURLTracking:
         ingester = RepoIngester(tmp_path)
 
         assert ingester.get_source_url("nonexistent") is None
+
+
+class TestSubdirPathTracking:
+    """Tests for subdirectory path persistence in _repo_meta.json."""
+
+    def test_save_path_stores_subdir(self, tmp_path: Path):
+        """save_path persists the subdirectory scope."""
+        ingester = RepoIngester(tmp_path)
+        ingester.save_path("my-project", "src/")
+        assert ingester.get_saved_path("my-project") == "src/"
+
+    def test_get_saved_path_returns_none_when_not_set(self, tmp_path: Path):
+        """get_saved_path returns None when no path has been saved."""
+        ingester = RepoIngester(tmp_path)
+        assert ingester.get_saved_path("nonexistent") is None
+
+    def test_save_path_coexists_with_sha_and_url(self, tmp_path: Path):
+        """path field doesn't clobber existing sha/url metadata."""
+        ingester = RepoIngester(tmp_path)
+        ingester.save_sha("my-project", "abc123")
+        ingester.save_source_url("my-project", "https://example.com")
+        ingester.save_path("my-project", "lib/")
+        assert ingester.get_saved_sha("my-project") == "abc123"
+        assert ingester.get_source_url("my-project") == "https://example.com"
+        assert ingester.get_saved_path("my-project") == "lib/"
 
 
 class TestDeleteRepo:
@@ -647,6 +738,41 @@ class TestTokenInGetRemoteSha:
             assert "GIT_ASKPASS" in env
             assert env["GIT_TOKEN"] == "my_token"
             assert env["GIT_TERMINAL_PROMPT"] == "0"
+
+
+class TestGitProtocolAllowlist:
+    """Tests for GIT_ALLOW_PROTOCOL restriction to block ext:: RCE."""
+
+    def test_no_prompt_env_sets_allow_protocol(self, ingester: RepoIngester):
+        """_no_prompt_env() restricts git protocols to safe set."""
+        env = ingester._no_prompt_env()
+        assert "GIT_ALLOW_PROTOCOL" in env
+        allowed = set(env["GIT_ALLOW_PROTOCOL"].split(":"))
+        assert {"https", "ssh"} == allowed
+
+    def test_git_protocol_excluded(self, ingester: RepoIngester):
+        """git:// protocol must not be allowed — unauthenticated, SSRF risk."""
+        assert "git" not in RepoIngester._GIT_SAFE_PROTOCOLS.split(":")
+
+    def test_create_askpass_sets_allow_protocol(self, ingester: RepoIngester):
+        """_create_askpass() restricts git protocols to safe set."""
+        env, askpass_path = ingester._create_askpass("test-token")
+        try:
+            assert "GIT_ALLOW_PROTOCOL" in env
+            allowed = set(env["GIT_ALLOW_PROTOCOL"].split(":"))
+            assert {"https", "ssh"} == allowed
+        finally:
+            askpass_path.unlink(missing_ok=True)
+
+    def test_clone_env_has_allow_protocol(self, ingester: RepoIngester):
+        """clone() subprocess env includes GIT_ALLOW_PROTOCOL."""
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stderr="")
+            ingester.clone("https://github.com/org/repo", "my-project")
+
+            call_kwargs = mock_run.call_args[1]
+            env = call_kwargs.get("env", {})
+            assert "GIT_ALLOW_PROTOCOL" in env
 
 
 class TestNoPromptEnv:

@@ -1,7 +1,28 @@
 """Analysis shortcut — skip RLM when the pre-computed analysis can answer."""
 
-from shesha.llm.client import LLMClient
-from shesha.rlm.boundary import wrap_untrusted
+from __future__ import annotations
+
+import threading
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+from shesha.llm.client import LLMClient, LLMClientFactory
+from shesha.llm.exceptions import PermanentError
+from shesha.rlm.boundary import generate_boundary, wrap_untrusted
+
+if TYPE_CHECKING:
+    from shesha.project import Project
+    from shesha.rlm.engine import ProgressCallback, QueryResult
+
+
+@dataclass
+class ShortcutResult:
+    """Result returned when the analysis shortcut answered the question."""
+
+    answer: str
+    prompt_tokens: int
+    completion_tokens: int
+
 
 _SYSTEM_PROMPT = """\
 You are a helpful assistant. You have access to a pre-computed codebase analysis.
@@ -63,7 +84,12 @@ _SENTINEL = "NEED_DEEPER"
 _CLASSIFIER_OK = "ANALYSIS_OK"
 
 
-def classify_query(question: str, model: str, api_key: str | None) -> tuple[bool, int, int]:
+def classify_query(
+    question: str,
+    model: str,
+    api_key: str | None,
+    llm_client_factory: LLMClientFactory | None = None,
+) -> tuple[bool, int, int]:
     """Classify whether a query can be answered from the codebase analysis.
 
     Returns ``(should_try, prompt_tokens, completion_tokens)``.  The first
@@ -71,18 +97,24 @@ def classify_query(question: str, model: str, api_key: str | None) -> tuple[bool
     the query should go straight to the full RLM engine.  Returns ``True``
     on any error or unparseable output (graceful fallback).
     """
-    client = LLMClient(model=model, system_prompt=_CLASSIFIER_PROMPT, api_key=api_key)
+    factory = llm_client_factory or LLMClient
+    client = factory(model=model, system_prompt=_CLASSIFIER_PROMPT, api_key=api_key)
 
     try:
         response = client.complete([{"role": "user", "content": question}])
+    except PermanentError:
+        raise  # Auth failures should surface immediately
     except Exception:
         return (True, 0, 0)  # Graceful fallback — allow shortcut attempt
 
     tokens = (response.prompt_tokens, response.completion_tokens)
+    # Prefix match on stripped LLM output.  The LLM is prompted with exact
+    # tokens, but may append punctuation or a colon.  The final fallback
+    # (line below) handles any unparseable output gracefully.
     label = response.content.strip()
-    if label == _SENTINEL:
+    if label.startswith(_SENTINEL):
         return (False, *tokens)
-    if label == _CLASSIFIER_OK:
+    if label.startswith(_CLASSIFIER_OK):
         return (True, *tokens)
     return (True, *tokens)  # Unparseable output — graceful fallback
 
@@ -93,6 +125,7 @@ def try_answer_from_analysis(
     model: str,
     api_key: str | None,
     boundary: str | None = None,
+    llm_client_factory: LLMClientFactory | None = None,
 ) -> tuple[str, int, int] | None:
     """Try to answer a question using only the pre-computed analysis.
 
@@ -103,25 +136,29 @@ def try_answer_from_analysis(
     if not analysis_context:
         return None
 
-    should_try, cls_prompt, cls_completion = classify_query(question, model, api_key)
+    should_try, cls_prompt, cls_completion = classify_query(
+        question, model, api_key, llm_client_factory=llm_client_factory
+    )
     if not should_try:
         return None
 
-    client = LLMClient(model=model, system_prompt=_SYSTEM_PROMPT, api_key=api_key)
+    factory = llm_client_factory or LLMClient
+    client = factory(model=model, system_prompt=_SYSTEM_PROMPT, api_key=api_key)
 
-    if boundary is not None:
-        wrapped = wrap_untrusted(analysis_context, boundary)
-    else:
-        wrapped = f"<untrusted_document_content>\n{analysis_context}\n</untrusted_document_content>"
+    if boundary is None:
+        boundary = generate_boundary()
+    wrapped = wrap_untrusted(analysis_context, boundary)
     user_content = f"{wrapped}\n\nQuestion: {question}"
 
     try:
         response = client.complete([{"role": "user", "content": user_content}])
+    except PermanentError:
+        raise  # Auth failures should surface immediately
     except Exception:
         return None  # Graceful fallback to full RLM query
 
     answer = response.content.strip()
-    if answer == _SENTINEL:
+    if answer.startswith(_SENTINEL):
         return None
 
     return (
@@ -129,3 +166,54 @@ def try_answer_from_analysis(
         cls_prompt + response.prompt_tokens,
         cls_completion + response.completion_tokens,
     )
+
+
+def query_with_shortcut(
+    project: Project,
+    question: str,
+    analysis_context: str | None,
+    model: str,
+    api_key: str | None,
+    on_progress: ProgressCallback | None = None,
+    cancel_event: threading.Event | None = None,
+    llm_client_factory: LLMClientFactory | None = None,
+) -> QueryResult | ShortcutResult:
+    """Try the analysis shortcut, falling back to a full RLM query.
+
+    Returns a ``ShortcutResult`` when the shortcut answered the question,
+    or a ``QueryResult`` when the full RLM engine was used.
+
+    Note: ``llm_client_factory`` is only used for the shortcut LLM call.
+    The RLM fallback uses the engine's own factory (set at construction).
+    This is intentional — the shortcut is a single lightweight call while
+    the engine manages its own LLM lifecycle.
+    """
+    if analysis_context:
+        boundary = generate_boundary()
+        shortcut = try_answer_from_analysis(
+            question,
+            analysis_context,
+            model,
+            api_key,
+            boundary=boundary,
+            llm_client_factory=llm_client_factory,
+        )
+        if shortcut is not None:
+            answer, prompt_tokens, completion_tokens = shortcut
+            return ShortcutResult(
+                answer=answer,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+            )
+
+    # Prepend analysis context for the RLM engine (the shortcut received it
+    # separately; the engine needs it in the question text).  Wrap in
+    # untrusted boundary markers — the analysis was produced by a prior LLM
+    # pass over potentially adversarial content and must not be treated as a
+    # trusted instruction.
+    if analysis_context:
+        wrapped_ctx = wrap_untrusted(analysis_context, generate_boundary())
+        rlm_question = f"{wrapped_ctx}\n\n{question}"
+    else:
+        rlm_question = question
+    return project.query(rlm_question, on_progress=on_progress, cancel_event=cancel_event)

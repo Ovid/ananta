@@ -4,10 +4,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import UploadArea from '../UploadArea'
 
 describe('UploadArea', () => {
-  let onUpload: ReturnType<typeof vi.fn>
+  let onUpload: ReturnType<typeof vi.fn<(files: File[]) => Promise<void>>>
 
   beforeEach(() => {
-    onUpload = vi.fn().mockResolvedValue(undefined)
+    onUpload = vi.fn<(files: File[]) => Promise<void>>().mockResolvedValue(undefined)
   })
 
   it('renders upload prompt text', () => {
@@ -53,7 +53,7 @@ describe('UploadArea', () => {
   it('restores upload state after failure', async () => {
     // onUpload rejects, but UploadArea uses try/finally (no catch), so the
     // caller (App) is responsible for catching. Simulate that by wrapping.
-    const rejectingUpload = vi.fn().mockImplementation(() =>
+    const rejectingUpload = vi.fn<(files: File[]) => Promise<void>>().mockImplementation(() =>
       Promise.reject(new Error('network error')).catch(() => { /* caller handles */ }),
     )
 

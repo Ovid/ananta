@@ -3,6 +3,8 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from litellm.exceptions import AuthenticationError
+from litellm.exceptions import RateLimitError as LiteLLMRateLimit
 
 from shesha.llm.client import LLMClient, LLMResponse
 from shesha.llm.exceptions import PermanentError
@@ -78,6 +80,19 @@ class TestLLMClient:
         assert "timeout" in call_kwargs
         assert call_kwargs["timeout"] > 0
 
+    @patch("shesha.llm.client.litellm")
+    def test_complete_returns_empty_string_when_content_is_none(self, mock_litellm: MagicMock):
+        """LLMClient returns empty string when API returns content=None."""
+        mock_litellm.completion.return_value = MagicMock(
+            choices=[MagicMock(message=MagicMock(content=None))],
+            usage=MagicMock(prompt_tokens=10, completion_tokens=0, total_tokens=10),
+        )
+
+        client = LLMClient(model="gpt-4")
+        response = client.complete(messages=[{"role": "user", "content": "Hi"}])
+
+        assert response.content == ""
+
 
 class TestLLMClientRetry:
     """Tests for LLM client retry integration."""
@@ -90,7 +105,6 @@ class TestLLMClientRetry:
         mock_response.usage = MagicMock(prompt_tokens=10, completion_tokens=5, total_tokens=15)
 
         # Import after patching
-        from litellm.exceptions import RateLimitError as LiteLLMRateLimit
 
         mock_litellm.completion.side_effect = [
             LiteLLMRateLimit("rate limited", "model", None),
@@ -109,7 +123,6 @@ class TestLLMClientRetry:
     @patch("shesha.llm.client.litellm")
     def test_no_retry_on_auth_error(self, mock_litellm: MagicMock) -> None:
         """Client doesn't retry on auth error (4xx)."""
-        from litellm.exceptions import AuthenticationError
 
         mock_litellm.completion.side_effect = AuthenticationError("invalid key", "model", None)
 

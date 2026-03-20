@@ -1,15 +1,29 @@
+- Can we have the bug report button go straight to a new github issue with
+  the explorer name filled in? What about a bug report template? I could use
+  guidance on what works best here.
+- What happens if we upload two files with the same name, but different
+  contents? Right now, they get separated by project ID (I think) but all
+  files should only have one canonical source.  This seems like a larger fix
+  is needed. If someone uploads something with the same name and it hashes to
+  the same value, it should be a no-op, but the same name and a different hash
+  value? This might be replacing older content, but it might be that it's
+  genuinely different content. Is that correct?
 - We need better ways of identifying sources. arXiv is good, but the others
   are not. We might need just filename. Or page or slide number. All text
   documents should use linenumber, and reuse code in code explorer.
-- The downloaded filename should give an indication of what the conversation was about.
+- The downloaded filename should give an indication of what the conversation
+  was about.
 - We need a session history (that they can also delete individual sessions)
-- When I issue a prompt, the response should include *which* documents in a topic have been consulted. If I return
-  to a conversation later, the topic should only check those documents which were included in the *last* response from the LLM. Users can
-  explicitly *choose* to include more documents in subsequent responses, but currently when I return to a topic, it checks *all* documents,
-  so the user might accidentally pull in documents in the response that they were not expecting. 
+- When I issue a prompt, the response should include *which* documents in a
+  topic have been consulted. If I return to a conversation later, the topic
+  should only check those documents which were included in the *last* response
+  from the LLM. Users can explicitly *choose* to include more documents in
+  subsequent responses, but currently when I return to a topic, it checks
+  *all* documents, so the user might accidentally pull in documents in the
+  response that they were not expecting. 
 - Voice mode?
-- Audit: all endpoints should return correct status codes. We had one return a 404 on
-  duplicate topic id when it should have returned a 409:
+- Audit: all endpoints should return correct status codes. We had one return a
+  404 on duplicate topic id when it should have returned a 409:
 - bottom bar for code/arxiv explorer needs size of data retrieved
 
 oolong, choose scale:

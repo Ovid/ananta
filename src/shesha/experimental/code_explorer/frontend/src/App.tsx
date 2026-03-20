@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, type ReactNode } from 'react'
 
 import {
   AppShell,
@@ -23,10 +23,14 @@ import type {
   TopicInfo,
 } from './types'
 
+function repoDisplayName(repo: RepoInfo): string {
+  return repo.display_name ?? repo.project_id
+}
+
 function repoToDocument(repo: RepoInfo): DocumentItem {
   return {
     id: repo.project_id,
-    label: repo.project_id,
+    label: repo.display_name ?? repo.project_id,
     sublabel: `${repo.file_count} files \u00B7 ${repo.analysis_status ?? 'no analysis'}`,
   }
 }
@@ -174,10 +178,48 @@ export default function App() {
     setReposVersion(v => v + 1)
   }, [])
 
+  const handleRenameRepo = useCallback(async (docId: string, newName: string) => {
+    await api.repos.rename(docId, newName)
+    setReposVersion(v => v + 1)
+  }, [])
+
+  const handleReorderItems = useCallback(async (topicName: string, itemIds: string[]) => {
+    await api.topics.reorderItems(topicName, itemIds)
+  }, [])
+
   const loadHistory = useCallback(async (topic: string): Promise<Exchange[]> => {
     const data = await api.history.get(topic)
     return data.exchanges
   }, [])
+
+  const renderAnswerFooter = useCallback((exchange: Exchange): ReactNode => {
+    const ids = exchange.document_ids
+    if (!ids || ids.length === 0) return undefined
+
+    const consulted = ids
+      .map(pid => allReposRef.current.find(r => r.project_id === pid))
+      .filter((r): r is RepoInfo => r != null)
+
+    if (consulted.length === 0) return undefined
+
+    return (
+      <div className="mt-2 pt-2 border-t border-border">
+        <div className="text-[10px] text-text-dim mb-1">Repositories:</div>
+        <div className="flex flex-wrap gap-1">
+          {consulted.map(repo => (
+            <button
+              key={repo.project_id}
+              onClick={() => handleViewRepo({ id: repo.project_id, label: repoDisplayName(repo), sublabel: '' })}
+              className="text-[10px] text-accent hover:underline bg-accent/5 rounded px-1.5 py-0.5"
+              title={repo.source_url}
+            >
+              {repoDisplayName(repo)}
+            </button>
+          ))}
+        </div>
+      </div>
+    )
+  }, [handleViewRepo])
 
   const handleClearHistory = useCallback(async () => {
     if (!activeTopic) return
@@ -250,6 +292,8 @@ export default function App() {
           }
           addDocToTopic={handleAddDocToTopic}
           removeDocFromTopic={handleRemoveDocFromTopic}
+          renameDocument={handleRenameRepo}
+          reorderItems={handleReorderItems}
           uncategorizedDocs={uncategorizedRepos}
           viewingDocumentId={viewingRepo?.project_id}
           style={{ width: sidebarWidth }}
@@ -297,6 +341,7 @@ export default function App() {
               emptySelectionMessage="Select repositories in the sidebar first..."
               placeholder="Ask a question about the selected repositories..."
               loadHistory={loadHistory}
+              renderAnswerFooter={renderAnswerFooter}
               allowBackgroundKnowledge={allowBgKnowledge}
             />
           </div>

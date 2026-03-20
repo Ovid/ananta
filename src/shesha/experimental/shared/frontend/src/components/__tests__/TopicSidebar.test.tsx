@@ -1,4 +1,4 @@
-import { render, screen, within, waitFor } from '@testing-library/react'
+import { render, screen, within, waitFor, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import TopicSidebar from '../TopicSidebar'
@@ -616,5 +616,298 @@ describe('TopicSidebar (shared)', () => {
     const docLabel = await screen.findByText('Chess Strategies')
     const docRow = docLabel.closest('div[class*="flex"]')!
     expect(docRow.className).toContain('accent')
+  })
+
+  describe('click-outside closes menus', () => {
+    it('closes topic context menu when clicking outside', async () => {
+      const props = defaultProps()
+      render(<TopicSidebar {...props} />)
+
+      const topicRow = await screen.findByText('chess')
+      const groupDiv = topicRow.closest('[class*="group"]')!
+      const buttons = within(groupDiv as HTMLElement).getAllByRole('button')
+      await userEvent.click(buttons[buttons.length - 1])
+
+      // Menu should be open
+      expect(screen.getByText('Rename')).toBeInTheDocument()
+
+      // Click outside (on the document body)
+      await userEvent.click(document.body)
+
+      // Menu should be closed
+      expect(screen.queryByText('Rename')).not.toBeInTheDocument()
+    })
+
+    it('closes document context menu when clicking outside', async () => {
+      const props = defaultProps({
+        activeTopic: 'chess',
+        loadDocuments: vi.fn().mockResolvedValue(chessDocs),
+        addDocToTopic: vi.fn(),
+      })
+      render(<TopicSidebar {...props} />)
+
+      await screen.findByText('Chess Strategies')
+      const menuButtons = screen.getAllByTitle('Document actions')
+      await userEvent.click(menuButtons[0])
+
+      // Menu should be open
+      expect(screen.getByText('View')).toBeInTheDocument()
+
+      // Click outside
+      await userEvent.click(document.body)
+
+      // Menu should be closed
+      expect(screen.queryByText('View')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('drag-and-drop onto topics', () => {
+    it('document rows are draggable when addDocToTopic is provided', async () => {
+      const props = defaultProps({
+        activeTopic: 'chess',
+        loadDocuments: vi.fn().mockResolvedValue(chessDocs),
+        addDocToTopic: vi.fn(),
+      })
+      render(<TopicSidebar {...props} />)
+
+      await screen.findByText('Chess Strategies')
+      const docRow = screen.getByText('Chess Strategies').closest('div[class*="flex"]')!
+      expect(docRow).toHaveAttribute('draggable', 'true')
+    })
+
+    it('document rows are not draggable when addDocToTopic is not provided', async () => {
+      const props = defaultProps({
+        activeTopic: 'chess',
+        loadDocuments: vi.fn().mockResolvedValue(chessDocs),
+      })
+      render(<TopicSidebar {...props} />)
+
+      await screen.findByText('Chess Strategies')
+      const docRow = screen.getByText('Chess Strategies').closest('div[class*="flex"]')!
+      expect(docRow).not.toHaveAttribute('draggable', 'true')
+    })
+
+    it('topic rows accept drops and call addDocToTopic', async () => {
+      const addDocToTopic = vi.fn().mockResolvedValue(undefined)
+      const props = defaultProps({
+        activeTopic: 'chess',
+        loadDocuments: vi.fn().mockResolvedValue(chessDocs),
+        addDocToTopic,
+      })
+      render(<TopicSidebar {...props} />)
+
+      await screen.findByText('Chess Strategies')
+
+      const mathText = screen.getByText('math')
+      const mathRow = mathText.closest('div[class*="group"]')!
+      const docRow = screen.getByText('Chess Strategies').closest('div[draggable]')!
+
+      const mockDataTransfer = {
+        setData: vi.fn(),
+        getData: vi.fn().mockReturnValue('doc-1'),
+        effectAllowed: '',
+        dropEffect: '',
+      }
+
+      fireEvent.dragStart(docRow, { dataTransfer: mockDataTransfer })
+      fireEvent.dragOver(mathRow, { dataTransfer: mockDataTransfer })
+      fireEvent.drop(mathRow, { dataTransfer: mockDataTransfer })
+
+      await waitFor(() => {
+        expect(addDocToTopic).toHaveBeenCalledWith('doc-1', 'math')
+      })
+    })
+
+    it('shows visual feedback on topic row during dragover', async () => {
+      const addDocToTopic = vi.fn().mockResolvedValue(undefined)
+      const props = defaultProps({
+        activeTopic: 'chess',
+        loadDocuments: vi.fn().mockResolvedValue(chessDocs),
+        addDocToTopic,
+      })
+      render(<TopicSidebar {...props} />)
+
+      await screen.findByText('Chess Strategies')
+
+      const mathText = screen.getByText('math')
+      const mathRow = mathText.closest('div[class*="group"]')!
+
+      const mockDataTransfer = {
+        setData: vi.fn(),
+        getData: vi.fn(),
+        effectAllowed: '',
+        dropEffect: '',
+      }
+
+      fireEvent.dragOver(mathRow, { dataTransfer: mockDataTransfer })
+
+      expect(mathRow.className).toContain('drop-target')
+    })
+
+    it('removes visual feedback when dragleave', async () => {
+      const addDocToTopic = vi.fn().mockResolvedValue(undefined)
+      const props = defaultProps({
+        activeTopic: 'chess',
+        loadDocuments: vi.fn().mockResolvedValue(chessDocs),
+        addDocToTopic,
+      })
+      render(<TopicSidebar {...props} />)
+
+      await screen.findByText('Chess Strategies')
+
+      const mathText = screen.getByText('math')
+      const mathRow = mathText.closest('div[class*="group"]')!
+
+      const mockDataTransfer = {
+        setData: vi.fn(),
+        getData: vi.fn(),
+        effectAllowed: '',
+        dropEffect: '',
+      }
+
+      fireEvent.dragOver(mathRow, { dataTransfer: mockDataTransfer })
+      fireEvent.dragLeave(mathRow, { dataTransfer: mockDataTransfer })
+
+      expect(mathRow.className).not.toContain('drop-target')
+    })
+
+    it('uncategorized docs are also draggable', async () => {
+      const addDocToTopic = vi.fn()
+      const uncatDocs: DocumentItem[] = [
+        { id: 'uncat-1', label: 'Orphan Doc' },
+      ]
+      const props = defaultProps({
+        uncategorizedDocs: uncatDocs,
+        addDocToTopic,
+      })
+      render(<TopicSidebar {...props} />)
+
+      await screen.findByText('Orphan Doc')
+      const docRow = screen.getByText('Orphan Doc').closest('div[class*="flex"]')!
+      expect(docRow).toHaveAttribute('draggable', 'true')
+    })
+  })
+
+  describe('document rename', () => {
+    it('shows "Rename" option in doc menu when renameDocument is provided', async () => {
+      const props = defaultProps({
+        activeTopic: 'chess',
+        loadDocuments: vi.fn().mockResolvedValue(chessDocs),
+        addDocToTopic: vi.fn(),
+        renameDocument: vi.fn(),
+      })
+      render(<TopicSidebar {...props} />)
+
+      await screen.findByText('Chess Strategies')
+      const menuButtons = screen.getAllByTitle('Document actions')
+      await userEvent.click(menuButtons[0])
+
+      expect(screen.getByText('Rename')).toBeInTheDocument()
+    })
+
+    it('entering new name and pressing Enter calls renameDocument', async () => {
+      const renameDocument = vi.fn().mockResolvedValue(undefined)
+      const props = defaultProps({
+        activeTopic: 'chess',
+        loadDocuments: vi.fn().mockResolvedValue(chessDocs),
+        addDocToTopic: vi.fn(),
+        renameDocument,
+      })
+      render(<TopicSidebar {...props} />)
+
+      await screen.findByText('Chess Strategies')
+      const menuButtons = screen.getAllByTitle('Document actions')
+      await userEvent.click(menuButtons[0])
+      await userEvent.click(screen.getByText('Rename'))
+
+      // An input should appear pre-filled with the doc label
+      const input = screen.getByDisplayValue('Chess Strategies')
+      await userEvent.clear(input)
+      await userEvent.type(input, 'Chess Tactics{Enter}')
+
+      expect(renameDocument).toHaveBeenCalledWith('doc-1', 'Chess Tactics')
+    })
+
+    it('does not show "Rename" in doc menu when renameDocument is not provided', async () => {
+      const props = defaultProps({
+        activeTopic: 'chess',
+        loadDocuments: vi.fn().mockResolvedValue(chessDocs),
+        addDocToTopic: vi.fn(),
+      })
+      render(<TopicSidebar {...props} />)
+
+      await screen.findByText('Chess Strategies')
+      const menuButtons = screen.getAllByTitle('Document actions')
+      await userEvent.click(menuButtons[0])
+
+      // "Rename" should only be in the topic menu, not the doc menu
+      const renameButtons = screen.queryAllByRole('button', { name: 'Rename' })
+      const docMenuRenameButtons = renameButtons.filter(b => {
+        const menu = b.closest('.absolute')
+        return menu && menu.closest('div[class*="flex"]')
+      })
+      expect(docMenuRenameButtons).toHaveLength(0)
+    })
+  })
+
+  describe('drag-to-reorder within topic', () => {
+    it('calls reorderItems when dropping a doc onto another doc in the same topic', async () => {
+      const reorderItems = vi.fn().mockResolvedValue(undefined)
+      const props = defaultProps({
+        activeTopic: 'chess',
+        loadDocuments: vi.fn().mockResolvedValue(chessDocs),
+        addDocToTopic: vi.fn(),
+        reorderItems,
+      })
+      render(<TopicSidebar {...props} />)
+
+      await screen.findByText('Chess Strategies')
+
+      const docRow1 = screen.getByText('Chess Strategies').closest('div[draggable]')!
+      const docRow2 = screen.getByText('Opening Theory').closest('div[draggable]')!
+
+      const storedData: Record<string, string> = {}
+      const mockDataTransfer = {
+        setData: vi.fn((key: string, val: string) => { storedData[key] = val }),
+        getData: vi.fn((key: string) => storedData[key] ?? ''),
+        effectAllowed: '',
+        dropEffect: '',
+      }
+
+      fireEvent.dragStart(docRow1, { dataTransfer: mockDataTransfer })
+      fireEvent.dragOver(docRow2, { dataTransfer: mockDataTransfer })
+      fireEvent.drop(docRow2, { dataTransfer: mockDataTransfer })
+
+      await waitFor(() => {
+        expect(reorderItems).toHaveBeenCalledWith('chess', ['doc-2', 'doc-1'])
+      })
+    })
+
+    it('does not call reorderItems when reorderItems prop is not provided', async () => {
+      const addDocToTopic = vi.fn()
+      const props = defaultProps({
+        activeTopic: 'chess',
+        loadDocuments: vi.fn().mockResolvedValue(chessDocs),
+        addDocToTopic,
+      })
+      render(<TopicSidebar {...props} />)
+
+      await screen.findByText('Chess Strategies')
+
+      const docRow2 = screen.getByText('Opening Theory').closest('div[draggable]')!
+
+      const mockDataTransfer = {
+        setData: vi.fn(),
+        getData: vi.fn().mockReturnValue('doc-1'),
+        effectAllowed: '',
+        dropEffect: '',
+      }
+
+      fireEvent.dragOver(docRow2, { dataTransfer: mockDataTransfer })
+      fireEvent.drop(docRow2, { dataTransfer: mockDataTransfer })
+
+      // Should not call addDocToTopic for same-topic reorder either
+      expect(addDocToTopic).not.toHaveBeenCalled()
+    })
   })
 })

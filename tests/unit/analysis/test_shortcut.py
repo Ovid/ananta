@@ -1,8 +1,19 @@
 """Tests for analysis shortcut — skip RLM when analysis can answer."""
 
+import threading
 from unittest.mock import MagicMock, patch
 
-from shesha.analysis.shortcut import _SYSTEM_PROMPT, try_answer_from_analysis
+import pytest
+
+from shesha.analysis.shortcut import (
+    _SYSTEM_PROMPT,
+    ShortcutResult,
+    query_with_shortcut,
+    try_answer_from_analysis,
+)
+from shesha.llm.exceptions import PermanentError
+from shesha.rlm.engine import QueryResult
+from shesha.rlm.trace import TokenUsage, Trace
 
 
 class TestTryAnswerFromAnalysis:
@@ -68,6 +79,25 @@ class TestTryAnswerFromAnalysis:
 
         assert result is None
 
+    def test_returns_none_when_need_deeper_with_trailing_punctuation(self):
+        """NEED_DEEPER with trailing punctuation still returns None."""
+        for suffix in [".", "!", ".\n", ". ", ".\nI need more context."]:
+            mock_response = MagicMock()
+            mock_response.content = f"NEED_DEEPER{suffix}"
+            mock_response.prompt_tokens = 50
+            mock_response.completion_tokens = 10
+
+            with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+                mock_cls.return_value.complete.return_value = mock_response
+                result = try_answer_from_analysis(
+                    question="Any question",
+                    analysis_context="Some analysis",
+                    model="test-model",
+                    api_key="test-key",
+                )
+
+            assert result is None, f"NEED_DEEPER{suffix!r} should return None"
+
     def test_returns_none_when_analysis_context_is_none(self):
         """No analysis context -> None immediately, no LLM call."""
         with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
@@ -118,6 +148,32 @@ class TestTryAnswerFromAnalysis:
         assert "_END" in user_content
         assert "Overview: A web framework..." in user_content
 
+    def test_generates_dynamic_boundary_when_none(self):
+        """When boundary=None, a random boundary is generated instead of
+        falling back to static <untrusted_document_content> tags."""
+        mock_response = MagicMock()
+        mock_response.content = "Some answer"
+
+        with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+            mock_client = mock_cls.return_value
+            mock_client.complete.return_value = mock_response
+            try_answer_from_analysis(
+                question="What does this do?",
+                analysis_context="Overview: test content",
+                model="test-model",
+                api_key="test-key",
+                boundary=None,
+            )
+
+        call_args = mock_client.complete.call_args
+        messages = call_args[0][0]
+        user_content = messages[0]["content"]
+        # Should NOT contain static tags
+        assert "<untrusted_document_content>" not in user_content
+        # Should contain dynamic boundary markers
+        assert "_BEGIN" in user_content
+        assert "_END" in user_content
+
     def test_returns_stripped_answer(self):
         """Answer is stripped of leading/trailing whitespace."""
         mock_response = MagicMock()
@@ -150,6 +206,198 @@ class TestTryAnswerFromAnalysis:
             )
 
         assert result is None
+
+    def test_permanent_error_propagates(self):
+        """PermanentError (e.g. auth failure) must not be swallowed."""
+        classifier_response = MagicMock()
+        classifier_response.content = "ANALYSIS_OK"
+        classifier_response.prompt_tokens = 5
+        classifier_response.completion_tokens = 1
+
+        with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+            classifier_client = MagicMock()
+            classifier_client.complete.return_value = classifier_response
+            answer_client = MagicMock()
+            answer_client.complete.side_effect = PermanentError("Invalid API key")
+            mock_cls.side_effect = [classifier_client, answer_client]
+
+            with pytest.raises(PermanentError, match="Invalid API key"):
+                try_answer_from_analysis(
+                    question="What does this do?",
+                    analysis_context="Some analysis",
+                    model="test-model",
+                    api_key="bad-key",
+                )
+
+
+class TestQueryWithShortcut:
+    """Tests for query_with_shortcut() — domain-level shortcut-or-query."""
+
+    def _make_project(self) -> MagicMock:
+        project = MagicMock()
+        project.query.return_value = QueryResult(
+            answer="Full RLM answer",
+            trace=Trace(),
+            token_usage=TokenUsage(),
+            execution_time=1.0,
+        )
+        return project
+
+    def test_returns_shortcut_result_when_shortcut_succeeds(self):
+        """When analysis can answer, returns ShortcutResult."""
+        project = self._make_project()
+
+        with patch(
+            "shesha.analysis.shortcut.try_answer_from_analysis",
+            return_value=("shortcut answer", 10, 5),
+        ):
+            result = query_with_shortcut(
+                project=project,
+                question="What does this do?",
+                analysis_context="Overview: ...",
+                model="test-model",
+                api_key="key",
+            )
+
+        assert isinstance(result, ShortcutResult)
+        assert result.answer == "shortcut answer"
+        assert result.prompt_tokens == 10
+        assert result.completion_tokens == 5
+        project.query.assert_not_called()
+
+    def test_falls_back_to_full_query_when_shortcut_returns_none(self):
+        """When shortcut returns None, falls back to project.query()."""
+        project = self._make_project()
+
+        with patch(
+            "shesha.analysis.shortcut.try_answer_from_analysis",
+            return_value=None,
+        ):
+            result = query_with_shortcut(
+                project=project,
+                question="Find bugs in executor",
+                analysis_context="Overview: ...",
+                model="test-model",
+                api_key="key",
+            )
+
+        assert isinstance(result, QueryResult)
+        assert result.answer == "Full RLM answer"
+        project.query.assert_called_once()
+
+    def test_skips_shortcut_when_no_analysis_context(self):
+        """Without analysis_context, goes straight to project.query()."""
+        project = self._make_project()
+
+        with patch(
+            "shesha.analysis.shortcut.try_answer_from_analysis",
+        ) as mock_try:
+            result = query_with_shortcut(
+                project=project,
+                question="What does this do?",
+                analysis_context=None,
+                model="test-model",
+                api_key="key",
+            )
+
+        mock_try.assert_not_called()
+        assert isinstance(result, QueryResult)
+
+    def test_passes_on_progress_and_cancel_event_to_query(self):
+        """on_progress and cancel_event are forwarded to project.query()."""
+        project = self._make_project()
+        progress = MagicMock()
+        cancel = threading.Event()
+
+        with patch(
+            "shesha.analysis.shortcut.try_answer_from_analysis",
+            return_value=None,
+        ):
+            query_with_shortcut(
+                project=project,
+                question="Q",
+                analysis_context="ctx",
+                model="m",
+                api_key="k",
+                on_progress=progress,
+                cancel_event=cancel,
+            )
+
+        call_args = project.query.call_args
+        assert call_args[1]["on_progress"] is progress
+        assert call_args[1]["cancel_event"] is cancel
+        question_sent = call_args[0][0]
+        assert "ctx" in question_sent
+        assert "Q" in question_sent
+
+    def test_rlm_fallback_prepends_analysis_context_to_question(self):
+        """When shortcut declines, project.query() receives the analysis
+        context prepended to the question — matching pre-refactor behavior."""
+        project = self._make_project()
+
+        with patch(
+            "shesha.analysis.shortcut.try_answer_from_analysis",
+            return_value=None,
+        ):
+            query_with_shortcut(
+                project=project,
+                question="What does module X do?",
+                analysis_context="Overview: A web framework.",
+                model="test-model",
+                api_key="key",
+            )
+
+        call_args = project.query.call_args
+        question_sent = call_args[0][0]
+        assert "Overview: A web framework." in question_sent
+        assert "What does module X do?" in question_sent
+
+    def test_rlm_fallback_wraps_analysis_context_in_untrusted_boundary(self):
+        """When shortcut declines, analysis context in the RLM question must
+        be wrapped in untrusted boundary markers (security)."""
+        project = self._make_project()
+
+        with patch(
+            "shesha.analysis.shortcut.try_answer_from_analysis",
+            return_value=None,
+        ):
+            query_with_shortcut(
+                project=project,
+                question="What does module X do?",
+                analysis_context="Overview: A web framework.",
+                model="test-model",
+                api_key="key",
+            )
+
+        call_args = project.query.call_args
+        question_sent = call_args[0][0]
+        assert "<untrusted_document_content>" in question_sent or "_BEGIN" in question_sent
+
+    def test_rlm_fallback_without_analysis_context_passes_question_unchanged(self):
+        """Without analysis context, project.query() receives the original question."""
+        project = self._make_project()
+
+        with patch(
+            "shesha.analysis.shortcut.try_answer_from_analysis",
+        ):
+            query_with_shortcut(
+                project=project,
+                question="What does module X do?",
+                analysis_context=None,
+                model="test-model",
+                api_key="key",
+            )
+
+        call_args = project.query.call_args
+        question_sent = call_args[0][0]
+        assert question_sent == "What does module X do?"
+
+    def test_shortcut_result_is_dataclass(self):
+        """ShortcutResult is a proper dataclass with expected fields."""
+        sr = ShortcutResult(answer="a", prompt_tokens=1, completion_tokens=2)
+        assert sr.answer == "a"
+        assert sr.prompt_tokens == 1
+        assert sr.completion_tokens == 2
 
 
 class TestShortcutPromptContent:

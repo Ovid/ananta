@@ -11,6 +11,9 @@ live on a local router.
 
 from __future__ import annotations
 
+import collections
+import re as _re
+import threading
 from dataclasses import asdict
 from pathlib import Path
 
@@ -25,12 +28,32 @@ from shesha.experimental.code_explorer.schemas import (
     AnalysisResponse,
     RepoAdd,
     RepoInfo,
+    RepoRename,
     UpdateStatus,
 )
 from shesha.experimental.code_explorer.websockets import websocket_handler
 from shesha.experimental.shared.app_factory import create_app
 from shesha.experimental.shared.routes import create_item_router, create_shared_router
 from shesha.models import RepoProjectResult
+
+# Allow / for old-style arXiv IDs (e.g. cs/9808001v1), but block .. traversal.
+# safe_path() provides the real path-traversal defence; this is belt-and-suspenders.
+_SAFE_ID_RE = _re.compile(r"^(?!.*\.\.)[a-zA-Z0-9][a-zA-Z0-9._/-]*$")
+
+
+def _validate_project_id(project_id: str) -> None:
+    """Raise 400 if *project_id* contains path-traversal or unsafe characters."""
+    if not _SAFE_ID_RE.match(project_id):
+        raise HTTPException(400, f"Invalid project id: {project_id!r}")
+
+
+def _sanitize_ingest_error(exc: RepoIngestError) -> str:
+    """Return user-safe error message with internal filesystem paths stripped."""
+    msg = str(exc)
+    # Strip quoted or unquoted absolute paths (e.g. '/tmp/repo', '/var/lib/...')
+    msg = _re.sub(r"'/?(?:[\w./-]+/){1,}[\w.-]+'", "'<path>'", msg)
+    msg = _re.sub(r"(?<!\w)/?(?:[\w./-]+/){1,}[\w.-]+", "<path>", msg)
+    return msg
 
 
 def _resolve_code_project_ids(state: CodeExplorerState, topic_name: str) -> list[str]:
@@ -58,18 +81,29 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
 
     # Cache of pending update results keyed by project_id, so that
     # apply-updates can call the stored apply_updates() method.
-    pending_updates: dict[str, RepoProjectResult] = {}
+    # Protected by a lock since sync FastAPI handlers run in a thread pool.
+    _pending_lock = threading.Lock()
+    _pending_updates: collections.OrderedDict[str, RepoProjectResult] = collections.OrderedDict()
+    _max_pending = 100  # Bound growth — oldest entries evicted when full
 
     def _build_repo_info(pid: str) -> RepoInfo:
         """Build a RepoInfo for a project_id."""
         info = state.shesha.get_project_info(pid)
         # TODO: Replace with a public Shesha API method when available
         doc_count = len(state.shesha.storage.list_documents(pid))
+        display_name: str | None = None
+        try:
+            dn_path = state.shesha.storage.get_project_dir(pid) / "_display_name.txt"
+            if dn_path.exists():
+                display_name = dn_path.read_text().strip() or None
+        except Exception:
+            pass  # Display name is optional; missing/unreadable is OK
         return RepoInfo(
             project_id=pid,
             source_url=info.source_url or "",
             file_count=doc_count,
             analysis_status=info.analysis_status,
+            display_name=display_name,
         )
 
     @router.get("/repos")
@@ -96,7 +130,7 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
         try:
             repo_result = state.shesha.create_project_from_repo(body.url)
         except RepoIngestError as exc:
-            raise HTTPException(422, detail=str(exc)) from exc
+            raise HTTPException(422, detail=_sanitize_ingest_error(exc)) from exc
         project_id = repo_result.project.project_id
 
         if body.topic:
@@ -114,13 +148,29 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
 
     @router.get("/repos/{project_id}")
     def get_repo(project_id: str) -> RepoInfo:
+        _validate_project_id(project_id)
         try:
             return _build_repo_info(project_id)
         except ProjectNotFoundError:
             raise HTTPException(404, f"Project '{project_id}' not found")
 
+    @router.patch("/repos/{project_id}")
+    def rename_repo(project_id: str, body: RepoRename) -> RepoInfo:
+        _validate_project_id(project_id)
+        new_name = body.new_name.strip()
+        if not new_name:
+            raise HTTPException(422, "Display name cannot be empty")
+        try:
+            state.shesha.get_project_info(project_id)
+        except ProjectNotFoundError:
+            raise HTTPException(404, f"Project '{project_id}' not found")
+        dn_path = state.shesha.storage.get_project_dir(project_id) / "_display_name.txt"
+        dn_path.write_text(new_name)
+        return _build_repo_info(project_id)
+
     @router.delete("/repos/{project_id}")
     def delete_repo(project_id: str) -> dict[str, str]:
+        _validate_project_id(project_id)
         try:
             state.shesha.get_project_info(project_id)
         except ProjectNotFoundError:
@@ -131,6 +181,7 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
 
     @router.post("/repos/{project_id}/check-updates")
     def check_updates(project_id: str) -> UpdateStatus:
+        _validate_project_id(project_id)
         try:
             info = state.shesha.get_project_info(project_id)
         except ProjectNotFoundError:
@@ -140,11 +191,21 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
         if not source_url:
             raise HTTPException(400, f"Project '{project_id}' has no source URL")
 
-        repo_result = state.shesha.create_project_from_repo(source_url)
+        saved_path = state.shesha.repo_ingester.get_saved_path(project_id)
+        try:
+            repo_result = state.shesha.create_project_from_repo(
+                source_url, name=project_id, path=saved_path
+            )
+        except RepoIngestError as exc:
+            raise HTTPException(422, detail=_sanitize_ingest_error(exc)) from exc
 
         # Cache the result if updates are available so apply-updates can use it
         if repo_result.status == "updates_available":
-            pending_updates[project_id] = repo_result
+            with _pending_lock:
+                _pending_updates[project_id] = repo_result
+                # Evict oldest entries if cache is full
+                while len(_pending_updates) > _max_pending:
+                    _pending_updates.popitem(last=False)
 
         return UpdateStatus(
             status=repo_result.status,
@@ -153,11 +214,40 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
 
     @router.post("/repos/{project_id}/apply-updates")
     def apply_updates(project_id: str) -> UpdateStatus:
-        if project_id not in pending_updates:
-            raise HTTPException(409, f"No pending update for project '{project_id}'")
+        _validate_project_id(project_id)
+        with _pending_lock:
+            repo_result = _pending_updates.pop(project_id, None)
+        if repo_result is not None:
+            pass  # Use cached result from check-updates
+        else:
+            # Self-heal: re-derive update state when cache is empty
+            # (e.g., after server restart between check and apply).
+            try:
+                info = state.shesha.get_project_info(project_id)
+            except ProjectNotFoundError:
+                raise HTTPException(404, f"Project '{project_id}' not found")
 
-        repo_result = pending_updates.pop(project_id)
-        updated = repo_result.apply_updates()
+            source_url = info.source_url
+            if not source_url:
+                raise HTTPException(400, f"Project '{project_id}' has no source URL")
+
+            saved_path = state.shesha.repo_ingester.get_saved_path(project_id)
+            try:
+                repo_result = state.shesha.create_project_from_repo(
+                    source_url, name=project_id, path=saved_path
+                )
+            except RepoIngestError as exc:
+                raise HTTPException(422, detail=_sanitize_ingest_error(exc)) from exc
+
+            if repo_result.status == "check_failed":
+                raise HTTPException(503, f"Could not check for updates on project '{project_id}'")
+            if repo_result.status != "updates_available":
+                raise HTTPException(409, f"No updates available for project '{project_id}'")
+
+        try:
+            updated = repo_result.apply_updates()
+        except RepoIngestError as exc:
+            raise HTTPException(422, detail=_sanitize_ingest_error(exc)) from exc
 
         return UpdateStatus(
             status=updated.status,
@@ -166,6 +256,7 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
 
     @router.post("/repos/{project_id}/analyze")
     def generate_analysis(project_id: str) -> AnalysisResponse:
+        _validate_project_id(project_id)
         try:
             analysis = state.shesha.generate_analysis(project_id)
         except ProjectNotFoundError:
@@ -174,6 +265,7 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
 
     @router.get("/repos/{project_id}/analysis")
     def get_analysis(project_id: str) -> AnalysisResponse:
+        _validate_project_id(project_id)
         try:
             analysis = state.shesha.get_analysis(project_id)
         except ProjectNotFoundError:

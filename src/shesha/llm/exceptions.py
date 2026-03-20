@@ -1,7 +1,9 @@
 """LLM-specific exceptions."""
 
+from shesha.exceptions import SheshaError
 
-class LLMError(Exception):
+
+class LLMError(SheshaError):
     """Base class for LLM errors."""
 
     pass

@@ -80,6 +80,19 @@ class TestTraceRedaction:
         assert step.tokens_used == 100
         assert step.duration_ms == 500
 
+    def test_preserves_metadata_dict(self) -> None:
+        """Step metadata dict (e.g. final_source) is preserved after redaction."""
+        trace = Trace()
+        trace.add_step(
+            StepType.FINAL_ANSWER,
+            "the answer",
+            iteration=3,
+            metadata={"final_source": "code_block"},
+        )
+        redacted = trace.redacted()
+        step = redacted.steps[0]
+        assert step.metadata == {"final_source": "code_block"}
+
     def test_custom_redaction_config(self) -> None:
         """Custom redaction config is respected."""
         import re

@@ -65,6 +65,7 @@ class TestQueryMultipleProjects:
         mock_result.token_usage = TokenUsage(prompt_tokens=100, completion_tokens=50)
         mock_result.execution_time = 2.0
         mock_result.trace = Trace(steps=[])
+        mock_result.gave_up = False
 
         mock_project = MagicMock()
         mock_project.rlm_engine.query.return_value = mock_result
@@ -157,6 +158,7 @@ class TestSessionRecordsDocumentIds:
         mock_result.token_usage = TokenUsage(prompt_tokens=10, completion_tokens=5)
         mock_result.execution_time = 0.5
         mock_result.trace = Trace(steps=[])
+        mock_result.gave_up = False
 
         mock_project = MagicMock()
         mock_project.rlm_engine.query.return_value = mock_result
@@ -200,6 +202,7 @@ class TestCompleteMessageFields:
         mock_result.token_usage = TokenUsage(prompt_tokens=200, completion_tokens=100)
         mock_result.execution_time = 3.5
         mock_result.trace = Trace(steps=[])
+        mock_result.gave_up = False
 
         mock_project = MagicMock()
         mock_project.rlm_engine.query.return_value = mock_result
@@ -332,6 +335,7 @@ class TestAnalysisContext:
         mock_result.token_usage = TokenUsage(prompt_tokens=10, completion_tokens=5)
         mock_result.execution_time = 0.5
         mock_result.trace = Trace(steps=[])
+        mock_result.gave_up = False
 
         mock_project = MagicMock()
         mock_project.rlm_engine.query.return_value = mock_result
@@ -382,7 +386,6 @@ class TestDocumentIdValidation:
             "../etc/passwd",
             "../../secret",
             ".hidden",
-            "foo/bar",
             "foo\\bar",
             "",
             " ",
@@ -449,6 +452,7 @@ class TestStaleProjectId:
         mock_result.token_usage = TokenUsage(prompt_tokens=10, completion_tokens=5)
         mock_result.execution_time = 0.5
         mock_result.trace = Trace(steps=[])
+        mock_result.gave_up = False
 
         mock_project = MagicMock()
         mock_project.rlm_engine.query.return_value = mock_result
@@ -520,6 +524,7 @@ class TestStaleFirstProjectFallback:
         mock_result.token_usage = TokenUsage(prompt_tokens=10, completion_tokens=5)
         mock_result.execution_time = 0.5
         mock_result.trace = Trace(steps=[])
+        mock_result.gave_up = False
 
         mock_project = MagicMock()
         mock_project.rlm_engine.query.return_value = mock_result

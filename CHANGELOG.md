@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- RLM uses structured `PARTIAL()` callable instead of string-prefix detection for partial evidence answers
+- "More" button detects partial evidence via `gave_up` flag instead of parsing answer text
+
 ### Added
 
 - **Trace download endpoint** (`GET /api/topics/{name}/trace-download/{trace_id}`) returns raw JSONL trace files with correct `application/x-ndjson` content type and attachment disposition; uses iterate-and-match (no path construction from user input)

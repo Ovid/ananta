@@ -1,13 +1,19 @@
 """Tests for RLM engine."""
 
+import concurrent.futures
 import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from shesha.rlm.engine import QueryResult, RLMEngine, extract_code_blocks
+from shesha.llm.client import LLMClient
+from shesha.rlm.engine import QueryResult, RLMEngine, extract_code_blocks, find_final_answer
 from shesha.rlm.trace import StepType, TokenUsage, Trace
+from shesha.rlm.verification import Citation, VerificationResult
+from shesha.sandbox.executor import ExecutionResult, SubcallContentError
+from shesha.sandbox.pool import ContainerPool
+from shesha.storage.filesystem import FilesystemStorage
 
 
 def test_extract_code_blocks_finds_repl():
@@ -58,7 +64,6 @@ def test_query_result_verification_defaults_none():
 
 def test_query_result_accepts_verification():
     """QueryResult accepts optional verification param."""
-    from shesha.rlm.verification import Citation, VerificationResult
 
     vr = VerificationResult(
         citations=[Citation(doc_id=0, found=True)],
@@ -102,6 +107,73 @@ def test_engine_verify_can_be_enabled():
     """RLMEngine accepts verify=True."""
     engine = RLMEngine(model="test-model", verify=True)
     assert engine.verify is True
+
+
+def test_engine_accepts_llm_client_factory():
+    """RLMEngine accepts an llm_client_factory parameter."""
+    factory = MagicMock()
+    engine = RLMEngine(model="test-model", llm_client_factory=factory)
+    assert engine.llm_client_factory is factory
+
+
+def test_engine_defaults_llm_client_factory_to_llm_client():
+    """RLMEngine defaults llm_client_factory to LLMClient."""
+
+    engine = RLMEngine(model="test-model")
+    assert engine.llm_client_factory is LLMClient
+
+
+class TestSetPool:
+    """Tests for RLMEngine.set_pool()."""
+
+    def test_set_pool_assigns_pool(self):
+        """set_pool() stores the pool for use during queries."""
+
+        engine = RLMEngine(model="test-model")
+        pool = MagicMock(spec=ContainerPool)
+        engine.set_pool(pool)
+        assert engine.pool is pool
+
+    def test_set_pool_accepts_none_to_clear(self):
+        """set_pool(None) clears the pool, reverting to standalone executors."""
+
+        pool = MagicMock(spec=ContainerPool)
+        engine = RLMEngine(model="test-model", pool=pool)
+        engine.set_pool(None)
+        assert engine.pool is None
+
+
+@patch("shesha.rlm.engine.ContainerExecutor")
+def test_engine_uses_injected_llm_factory(mock_executor_cls: MagicMock):
+    """Engine uses the injected factory instead of importing LLMClient directly."""
+    mock_llm = MagicMock()
+    mock_llm.complete.return_value = MagicMock(
+        content='```repl\nFINAL("result")\n```',
+        prompt_tokens=10,
+        completion_tokens=5,
+        total_tokens=15,
+    )
+
+    factory = MagicMock(return_value=mock_llm)
+
+    mock_executor = MagicMock()
+    mock_executor.execute.return_value = MagicMock(
+        status="ok",
+        stdout="",
+        stderr="",
+        error=None,
+        final_answer="result",
+    )
+    mock_executor_cls.return_value = mock_executor
+
+    engine = RLMEngine(model="test-model", llm_client_factory=factory)
+    result = engine.query(
+        documents=["doc content"],
+        question="What?",
+    )
+
+    assert result.answer == "result"
+    factory.assert_called()
 
 
 class TestRLMEngine:
@@ -375,7 +447,6 @@ class TestRLMEngine:
         mock_llm_cls: MagicMock,
     ):
         """When pool is provided, engine acquires executor from pool instead of creating one."""
-        from shesha.sandbox.pool import ContainerPool
 
         mock_llm = MagicMock()
         mock_llm.complete.return_value = MagicMock(
@@ -411,7 +482,6 @@ class TestRLMEngine:
         mock_llm_cls: MagicMock,
     ):
         """Engine resets executor namespace before releasing back to pool."""
-        from shesha.sandbox.pool import ContainerPool
 
         mock_llm = MagicMock()
         mock_llm.complete.return_value = MagicMock(
@@ -479,7 +549,6 @@ class TestRLMEngine:
         mock_llm_cls: MagicMock,
     ):
         """Engine raises SubcallContentError when subcall content exceeds limit."""
-        from shesha.sandbox.executor import SubcallContentError
 
         # Create engine with small limit for testing
         engine = RLMEngine(model="test-model", max_subcall_content_chars=1000)
@@ -548,7 +617,6 @@ class TestRLMEngine:
         mock_llm_cls: MagicMock,
     ):
         """Size limit applies to instruction when content is empty (single-arg form)."""
-        from shesha.sandbox.executor import SubcallContentError
 
         engine = RLMEngine(model="test-model", max_subcall_content_chars=1000)
         trace = Trace()
@@ -968,6 +1036,180 @@ class TestRLMEngine:
 
         assert result.answer == "The computed answer"
 
+    @patch("shesha.rlm.engine.ContainerExecutor")
+    def test_engine_retries_when_code_block_final_var_value_is_none(
+        self,
+        mock_executor_cls: MagicMock,
+    ):
+        """When executor returns final_var with final_value=None, engine retries
+        via _resolve_final_var rather than returning an empty answer."""
+        mock_llm = MagicMock()
+        # First call: model writes FINAL_VAR in code block
+        # Second call: model writes FINAL with literal answer after retry
+        mock_llm.complete.side_effect = [
+            MagicMock(
+                content='```repl\nFINAL_VAR("missing_var")\n```',
+                prompt_tokens=100,
+                completion_tokens=50,
+                total_tokens=150,
+            ),
+            MagicMock(
+                content='```repl\nFINAL("fallback answer")\n```',
+                prompt_tokens=100,
+                completion_tokens=50,
+                total_tokens=150,
+            ),
+        ]
+        mock_factory = MagicMock(return_value=mock_llm)
+
+        mock_executor = MagicMock()
+        # First execute: FINAL_VAR code block — var not found
+        # (final_var set but final_value is None)
+        exec_result_1 = MagicMock(
+            status="ok",
+            stdout="",
+            stderr="",
+            error=None,
+            final_answer=None,
+            final_var="missing_var",
+            final_value=None,
+            vars=None,
+        )
+        # _resolve_final_var calls execute(print(missing_var)) — fails
+        resolve_result = MagicMock(
+            status="error",
+            stdout="",
+            stderr="NameError: name 'missing_var' is not defined",
+            error="NameError",
+        )
+        # Second execute: FINAL with literal
+        exec_result_2 = MagicMock(
+            status="ok",
+            stdout="",
+            stderr="",
+            error=None,
+            final_answer="fallback answer",
+            final_var=None,
+            final_value=None,
+            vars=None,
+        )
+        # Post-loop re-resolution also fails (var still undefined after
+        # single code block), then outer loop retries with guidance.
+        resolve_result_2 = MagicMock(
+            status="error",
+            stdout="",
+            stderr="NameError: name 'missing_var' is not defined",
+            error="NameError",
+        )
+        mock_executor.execute.side_effect = [
+            exec_result_1,
+            resolve_result,
+            resolve_result_2,
+            exec_result_2,
+        ]
+        mock_executor.is_alive = True
+        mock_executor_cls.return_value = mock_executor
+
+        engine = RLMEngine(model="test-model", llm_client_factory=mock_factory)
+        result = engine.query(
+            documents=["Doc content"],
+            question="What?",
+        )
+
+        # Should NOT be empty — should have retried and got "fallback answer"
+        assert result.answer == "fallback answer"
+        assert result.answer != ""
+
+
+class TestCodeBlockFinalVarRetryGuidance:
+    """Tests for retry guidance when FINAL_VAR fails in code block."""
+
+    @patch("shesha.rlm.engine.ContainerExecutor")
+    def test_code_block_final_var_failure_sends_retry_guidance(
+        self,
+        mock_executor_cls: MagicMock,
+    ):
+        """When code-block FINAL_VAR fails, engine sends 'variable not found'
+        guidance to the model, matching the bare-text FINAL_VAR retry path."""
+        mock_llm = MagicMock()
+        # First call: code block with FINAL_VAR that fails
+        # Second call: model retries successfully
+        mock_llm.complete.side_effect = [
+            MagicMock(
+                content='```repl\nFINAL_VAR("missing_var")\n```',
+                prompt_tokens=100,
+                completion_tokens=50,
+                total_tokens=150,
+            ),
+            MagicMock(
+                content='```repl\nFINAL("correct answer")\n```',
+                prompt_tokens=100,
+                completion_tokens=50,
+                total_tokens=150,
+            ),
+        ]
+        mock_factory = MagicMock(return_value=mock_llm)
+
+        mock_executor = MagicMock()
+        # First: code block with FINAL_VAR — var not found
+        exec_result_1 = MagicMock(
+            status="ok",
+            stdout="",
+            stderr="",
+            error=None,
+            final_answer=None,
+            final_var="missing_var",
+            final_value=None,
+            vars=None,
+        )
+        # _resolve_final_var attempt — fails
+        resolve_result = MagicMock(
+            status="error",
+            stdout="",
+            stderr="NameError: name 'missing_var' is not defined",
+            error="NameError",
+        )
+        # Second iteration: FINAL with literal
+        exec_result_2 = MagicMock(
+            status="ok",
+            stdout="",
+            stderr="",
+            error=None,
+            final_answer="correct answer",
+            final_var=None,
+            final_value=None,
+            vars=None,
+        )
+        # Post-loop re-resolution also fails (var still undefined)
+        resolve_result_2 = MagicMock(
+            status="error",
+            stdout="",
+            stderr="NameError: name 'missing_var' is not defined",
+            error="NameError",
+        )
+        mock_executor.execute.side_effect = [
+            exec_result_1,
+            resolve_result,
+            resolve_result_2,
+            exec_result_2,
+        ]
+        mock_executor.is_alive = True
+        mock_executor_cls.return_value = mock_executor
+
+        engine = RLMEngine(model="test-model", llm_client_factory=mock_factory)
+        engine.query(documents=["Doc content"], question="What?")
+
+        # Check the messages sent in the second LLM call
+        second_call_messages = mock_llm.complete.call_args_list[1].kwargs["messages"]
+        guidance_msgs = [
+            msg
+            for msg in second_call_messages
+            if msg.get("role") == "user" and "was not found" in msg.get("content", "")
+        ]
+        assert len(guidance_msgs) == 1, "Expected retry guidance message for failed FINAL_VAR"
+        assert "missing_var" in guidance_msgs[0]["content"]
+        assert "Define it in a ```repl``` block" in guidance_msgs[0]["content"]
+
 
 class TestIterationQueryReminder:
     """Tests for query reminder appended to iteration messages."""
@@ -1061,7 +1303,6 @@ class TestCallbackIterationCapture:
         Bug: callback captured `current_iteration` by reference, so by the time
         it was called, the value could have advanced to a later iteration.
         """
-        from shesha.sandbox.pool import ContainerPool
 
         captured_iterations: list[int] = []
 
@@ -1142,8 +1383,6 @@ class TestCallbackIterationCapture:
         mock_llm_cls: MagicMock,
     ) -> None:
         """After dead executor recovery, the new callback uses the current iteration."""
-        from shesha.sandbox.executor import ExecutionResult
-        from shesha.sandbox.pool import ContainerPool
 
         captured_iterations: list[int] = []
 
@@ -1224,7 +1463,6 @@ class TestDeadExecutorNoPool:
         mock_executor_cls: MagicMock,
     ):
         """Engine makes only 1 LLM call, not 20, when executor dies without pool."""
-        from shesha.sandbox.executor import ExecutionResult
 
         mock_llm = MagicMock()
         mock_llm.complete.return_value = MagicMock(
@@ -1265,7 +1503,6 @@ class TestDeadExecutorNoPool:
         mock_executor_cls: MagicMock,
     ):
         """Early exit answer is distinct from max iterations message."""
-        from shesha.sandbox.executor import ExecutionResult
 
         mock_llm = MagicMock()
         mock_llm.complete.return_value = MagicMock(
@@ -1309,8 +1546,6 @@ class TestDeadExecutorWithPool:
         mock_llm_cls: MagicMock,
     ) -> None:
         """Dead executor is stopped before being discarded from pool."""
-        from shesha.sandbox.executor import ExecutionResult
-        from shesha.sandbox.pool import ContainerPool
 
         mock_llm = MagicMock()
         call_count = 0
@@ -1373,6 +1608,234 @@ class TestDeadExecutorWithPool:
         mock_pool.discard.assert_called_once_with(dead_executor)
 
 
+class TestDeadExecutorPoolStopped:
+    """Test that pool.acquire() RuntimeError during recovery is handled gracefully."""
+
+    @patch("shesha.rlm.engine.LLMClient")
+    def test_pool_acquire_raises_runtime_error_aborts_gracefully(
+        self,
+        mock_llm_cls: MagicMock,
+    ) -> None:
+        """If pool.acquire() raises RuntimeError (pool stopped), abort gracefully."""
+
+        mock_llm = MagicMock()
+        mock_llm.complete.return_value = MagicMock(
+            content='```repl\nprint("boom")\n```',
+            prompt_tokens=100,
+            completion_tokens=50,
+            total_tokens=150,
+        )
+        mock_llm_cls.return_value = mock_llm
+
+        dead_executor = MagicMock()
+        dead_executor.is_alive = True
+
+        def kill_on_execute(code, timeout=30):
+            dead_executor.is_alive = False
+            return ExecutionResult(
+                status="error",
+                stdout="",
+                stderr="",
+                return_value=None,
+                error="Protocol error",
+            )
+
+        dead_executor.execute.side_effect = kill_on_execute
+
+        mock_pool = MagicMock(spec=ContainerPool)
+        # First acquire returns the dead executor; recovery acquire raises
+        mock_pool.acquire.side_effect = [
+            dead_executor,
+            RuntimeError("Cannot acquire from a stopped pool"),
+        ]
+
+        engine = RLMEngine(model="test-model", pool=mock_pool)
+        result = engine.query(documents=["doc"], question="Q?")
+
+        # Should abort gracefully, not propagate RuntimeError
+        assert "died" in result.answer.lower() or "executor" in result.answer.lower()
+
+
+class TestPostLoopFinalVarRetryTrace:
+    """Tests for trace/callback emission on post-loop FINAL_VAR retry."""
+
+    @patch("shesha.rlm.engine.ContainerExecutor")
+    def test_post_loop_retry_emits_trace_step_and_progress(self, mock_executor_cls: MagicMock):
+        """When a FINAL_VAR fails initially but is resolved in the post-loop
+        retry, a FINAL_ANSWER trace step and on_progress callback must be emitted."""
+        mock_llm = MagicMock()
+        # Response contains code block with FINAL_VAR, plus a second block
+        # that defines the variable.
+        mock_llm.complete.side_effect = [
+            MagicMock(
+                content=('```repl\nFINAL_VAR("result")\n```\n\n```repl\nresult = "found it"\n```'),
+                prompt_tokens=100,
+                completion_tokens=50,
+                total_tokens=150,
+            ),
+        ]
+
+        mock_executor = MagicMock()
+        # First execute: FINAL_VAR("result") — var not found yet
+        exec_result_1 = MagicMock(
+            status="ok",
+            stdout="",
+            stderr="",
+            error=None,
+            final_answer=None,
+            final_var="result",
+            final_value=None,
+            vars=None,
+        )
+        # In-block _resolve_final_var — fails
+        resolve_fail = MagicMock(
+            status="error",
+            stdout="",
+            stderr="NameError",
+            error="NameError",
+        )
+        # Second execute: defines variable
+        exec_result_2 = MagicMock(
+            status="ok",
+            stdout="",
+            stderr="",
+            error=None,
+            final_answer=None,
+            final_var=None,
+            final_value=None,
+            vars=None,
+        )
+        # Post-loop _resolve_final_var — succeeds
+        resolve_ok = MagicMock(status="ok", stdout="found it\n")
+
+        mock_executor.execute.side_effect = [
+            exec_result_1,
+            resolve_fail,
+            exec_result_2,
+            resolve_ok,
+        ]
+        mock_executor.is_alive = True
+        mock_executor_cls.return_value = mock_executor
+
+        on_progress = MagicMock()
+        engine = RLMEngine(model="test-model", llm_client_factory=MagicMock(return_value=mock_llm))
+        result = engine.query(
+            documents=["Doc content"],
+            question="What?",
+            on_progress=on_progress,
+        )
+
+        assert result.answer == "found it"
+        # Trace should have a FINAL_ANSWER step with post_loop_var_retry source
+        final_steps = [s for s in result.trace.steps if s.type == StepType.FINAL_ANSWER]
+        assert len(final_steps) == 1
+        assert final_steps[0].metadata.get("source") == "post_loop_var_retry"
+        # on_progress should have been called with FINAL_ANSWER
+        progress_calls = [c for c in on_progress.call_args_list if c[0][0] == StepType.FINAL_ANSWER]
+        assert len(progress_calls) == 1
+
+
+class TestResolveFinalVar:
+    """Tests for _resolve_final_var edge cases."""
+
+    @patch("shesha.rlm.engine.ContainerExecutor")
+    def test_empty_string_is_valid_answer(self, mock_executor_cls: MagicMock):
+        """A variable holding an empty string is a valid answer, not None."""
+        engine = RLMEngine(model="test-model", llm_client_factory=MagicMock())
+        mock_executor = MagicMock()
+        # print(var) returns empty string
+        mock_executor.execute.return_value = MagicMock(status="ok", stdout="")
+
+        result = engine._resolve_final_var("my_var", mock_executor)
+        # Empty string should be returned as a valid value, not None
+        assert result is not None
+        assert result == ""
+
+    @patch("shesha.rlm.engine.ContainerExecutor")
+    def test_none_variable_returns_none(self, mock_executor_cls: MagicMock):
+        """S1: print(None) outputs 'None' — must return None, not the string."""
+        engine = RLMEngine(model="test-model", llm_client_factory=MagicMock())
+        mock_executor = MagicMock()
+        # print(None) in Python outputs "None\n"
+        mock_executor.execute.return_value = MagicMock(status="ok", stdout="None\n")
+
+        result = engine._resolve_final_var("my_var", mock_executor)
+        assert result is None
+
+    @patch("shesha.rlm.engine.ContainerExecutor")
+    @patch("shesha.rlm.engine.LLMClient")
+    def test_bare_final_var_empty_string_accepted_without_code_blocks(
+        self,
+        mock_llm_cls: MagicMock,
+        mock_executor_cls: MagicMock,
+    ):
+        """I1: bare FINAL_VAR resolving to '' must be accepted, not retried."""
+        mock_llm = MagicMock()
+        mock_llm.complete.return_value = MagicMock(
+            content="FINAL_VAR(my_var)",
+            prompt_tokens=10,
+            completion_tokens=10,
+            total_tokens=20,
+        )
+        mock_llm_cls.return_value = mock_llm
+
+        mock_executor = MagicMock()
+        mock_executor.is_alive = True
+        # _resolve_final_var prints the var and gets ""
+        mock_executor.execute.return_value = MagicMock(status="ok", stdout="")
+        mock_executor_cls.return_value = mock_executor
+
+        engine = RLMEngine(model="test-model")
+        result = engine.query(documents=["Doc"], question="What?")
+
+        assert result.answer == ""
+        # Should be one LLM call only (no retry)
+        assert mock_llm.complete.call_count == 1
+
+    @patch("shesha.rlm.engine.ContainerExecutor")
+    @patch("shesha.rlm.engine.LLMClient")
+    def test_bare_final_var_empty_string_accepted_after_code_blocks(
+        self,
+        mock_llm_cls: MagicMock,
+        mock_executor_cls: MagicMock,
+    ):
+        """I1: bare FINAL_VAR after code blocks resolving to '' accepted."""
+        mock_llm = MagicMock()
+        # Response has both a code block and a bare FINAL_VAR
+        mock_llm.complete.return_value = MagicMock(
+            content='```repl\nmy_var = ""\n```\nFINAL_VAR(my_var)',
+            prompt_tokens=10,
+            completion_tokens=10,
+            total_tokens=20,
+        )
+        mock_llm_cls.return_value = mock_llm
+
+        mock_executor = MagicMock()
+        mock_executor.is_alive = True
+        # Code block execution: no final answer
+        mock_executor.execute.side_effect = [
+            MagicMock(
+                status="ok",
+                stdout="",
+                stderr="",
+                error=None,
+                final_answer=None,
+                final_var=None,
+                final_value=None,
+                vars=None,
+            ),
+            # _resolve_final_var for the bare FINAL_VAR
+            MagicMock(status="ok", stdout=""),
+        ]
+        mock_executor_cls.return_value = mock_executor
+
+        engine = RLMEngine(model="test-model")
+        result = engine.query(documents=["Doc"], question="What?")
+
+        assert result.answer == ""
+        assert mock_llm.complete.call_count == 1
+
+
 class TestEngineTraceWriterSuppression:
     """Tests for engine trace writer suppress_errors configuration."""
 
@@ -1385,7 +1848,6 @@ class TestEngineTraceWriterSuppression:
         tmp_path: Path,
     ) -> None:
         """Engine creates IncrementalTraceWriter with suppress_errors=True."""
-        from shesha.storage.filesystem import FilesystemStorage
 
         storage = FilesystemStorage(root_path=tmp_path)
         storage.create_project("test-project")
@@ -1432,7 +1894,6 @@ class TestEngineTraceWriterSuppression:
         tmp_path: Path,
     ) -> None:
         """Engine creates TraceWriter with suppress_errors=True for cleanup."""
-        from shesha.storage.filesystem import FilesystemStorage
 
         storage = FilesystemStorage(root_path=tmp_path)
         storage.create_project("test-project")
@@ -1482,7 +1943,6 @@ class TestEngineTraceWriting:
         tmp_path: Path,
     ) -> None:
         """Query writes trace file when storage is provided."""
-        from shesha.storage.filesystem import FilesystemStorage
 
         storage = FilesystemStorage(root_path=tmp_path)
         storage.create_project("test-project")
@@ -1526,7 +1986,6 @@ class TestEngineTraceWriting:
         tmp_path: Path,
     ) -> None:
         """Query writes trace steps incrementally, not just at the end."""
-        from shesha.storage.filesystem import FilesystemStorage
 
         storage = FilesystemStorage(root_path=tmp_path)
         storage.create_project("test-project")
@@ -1581,7 +2040,6 @@ class TestEngineTraceWriting:
         tmp_path: Path,
     ) -> None:
         """If query is interrupted by exception, partial trace is still written."""
-        from shesha.storage.filesystem import FilesystemStorage
 
         storage = FilesystemStorage(root_path=tmp_path)
         storage.create_project("test-project")
@@ -1653,7 +2111,6 @@ class TestEngineMaxTracesConfig:
         tmp_path: Path,
     ) -> None:
         """Engine passes max_traces_per_project to cleanup_old_traces."""
-        from shesha.storage.filesystem import FilesystemStorage
 
         storage = FilesystemStorage(root_path=tmp_path)
         storage.create_project("test-project")
@@ -1932,12 +2389,6 @@ class TestHandleLlmQueryThreadSafety:
         threads call _handle_llm_query simultaneously. Trace steps and
         token counts must be consistent.
         """
-        import concurrent.futures
-        from unittest.mock import MagicMock, patch
-
-        engine = RLMEngine(model="test-model")
-        trace = Trace()
-        token_usage = TokenUsage()
 
         mock_response = MagicMock(
             content="answer",
@@ -1946,23 +2397,26 @@ class TestHandleLlmQueryThreadSafety:
             total_tokens=15,
         )
 
-        with patch("shesha.rlm.engine.LLMClient") as mock_llm_cls:
-            mock_llm_cls.return_value.complete.return_value = mock_response
+        mock_llm_factory = MagicMock()
+        mock_llm_factory.return_value.complete.return_value = mock_response
 
-            n_calls = 20
+        engine = RLMEngine(model="test-model", llm_client_factory=mock_llm_factory)
+        trace = Trace()
+        token_usage = TokenUsage()
+        n_calls = 20
 
-            def call_handler(i: int) -> str:
-                return engine._handle_llm_query(
-                    instruction=f"prompt_{i}",
-                    content="",
-                    trace=trace,
-                    token_usage=token_usage,
-                    iteration=0,
-                    boundary="test",
-                )
+        def call_handler(i: int) -> str:
+            return engine._handle_llm_query(
+                instruction=f"prompt_{i}",
+                content="",
+                trace=trace,
+                token_usage=token_usage,
+                iteration=0,
+                boundary="test",
+            )
 
-            with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
-                results = list(pool.map(call_handler, range(n_calls)))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+            results = list(pool.map(call_handler, range(n_calls)))
 
         assert len(results) == n_calls
         # Each call adds 2 steps (SUBCALL_REQUEST + SUBCALL_RESPONSE)
@@ -2051,7 +2505,6 @@ class TestFindFinalAnswerInText:
 
     def test_find_final_answer_bare_final(self):
         """Detects bare FINAL("answer") outside code blocks, strips quotes."""
-        from shesha.rlm.engine import find_final_answer
 
         text = 'FINAL("human being")'
         result = find_final_answer(text)
@@ -2059,7 +2512,6 @@ class TestFindFinalAnswerInText:
 
     def test_find_final_answer_bare_final_var(self):
         """Detects bare FINAL_VAR(var_name) outside code blocks."""
-        from shesha.rlm.engine import find_final_answer
 
         text = "FINAL_VAR(my_answer)"
         result = find_final_answer(text)
@@ -2067,7 +2519,6 @@ class TestFindFinalAnswerInText:
 
     def test_find_final_answer_returns_none_for_no_match(self):
         """Returns None when no FINAL pattern is present."""
-        from shesha.rlm.engine import find_final_answer
 
         text = "Let me continue exploring the data."
         result = find_final_answer(text)
@@ -2075,7 +2526,6 @@ class TestFindFinalAnswerInText:
 
     def test_find_final_answer_ignores_inside_repl_block(self):
         """Does NOT match FINAL inside a ```repl block (handled by executor)."""
-        from shesha.rlm.engine import find_final_answer
 
         text = '```repl\nFINAL("answer")\n```'
         result = find_final_answer(text)
@@ -2083,7 +2533,6 @@ class TestFindFinalAnswerInText:
 
     def test_find_final_answer_with_leading_whitespace(self):
         """FINAL at start of line with whitespace is detected, strips quotes."""
-        from shesha.rlm.engine import find_final_answer
 
         text = '  FINAL("the answer")'
         result = find_final_answer(text)
@@ -2091,7 +2540,6 @@ class TestFindFinalAnswerInText:
 
     def test_find_final_answer_strips_quotes_from_var(self):
         """FINAL_VAR with quoted variable name strips quotes."""
-        from shesha.rlm.engine import find_final_answer
 
         text = 'FINAL_VAR("my_var")'
         result = find_final_answer(text)
@@ -2099,7 +2547,6 @@ class TestFindFinalAnswerInText:
 
     def test_find_final_var_non_identifier_treated_as_literal(self):
         """FINAL_VAR with non-identifier content falls back to literal."""
-        from shesha.rlm.engine import find_final_answer
 
         # Dotted expression — not a valid identifier, must not become final_var
         result = find_final_answer("FINAL_VAR(foo.bar)")
@@ -2107,56 +2554,48 @@ class TestFindFinalAnswerInText:
 
     def test_find_final_var_expression_treated_as_literal(self):
         """FINAL_VAR(x + y) with operators falls back to literal."""
-        from shesha.rlm.engine import find_final_answer
 
         result = find_final_answer("FINAL_VAR(x + y)")
         assert result == ("final", "x + y")
 
     def test_find_final_var_keyword_treated_as_literal(self):
         """FINAL_VAR(True) with Python keyword falls back to literal."""
-        from shesha.rlm.engine import find_final_answer
 
         result = find_final_answer("FINAL_VAR(True)")
         assert result == ("final", "True")
 
     def test_find_final_var_valid_identifier_still_works(self):
         """FINAL_VAR(valid_name) with a valid identifier stays as final_var."""
-        from shesha.rlm.engine import find_final_answer
 
         result = find_final_answer("FINAL_VAR(my_answer)")
         assert result == ("final_var", "my_answer")
 
     def test_find_final_answer_unquoted_content(self):
         """FINAL(bare text) without quotes is detected (reference RLM compat)."""
-        from shesha.rlm.engine import find_final_answer
 
         result = find_final_answer("FINAL(42)")
         assert result == ("final", "42")
 
     def test_find_final_answer_single_quoted_content(self):
         """FINAL('single quoted') strips quotes (reference RLM compat)."""
-        from shesha.rlm.engine import find_final_answer
 
         result = find_final_answer("FINAL('hello world')")
         assert result == ("final", "hello world")
 
     def test_find_final_answer_nested_parentheses(self):
         """FINAL with nested parens uses greedy match (reference RLM compat)."""
-        from shesha.rlm.engine import find_final_answer
 
         result = find_final_answer("FINAL(func(arg1, arg2))")
         assert result == ("final", "func(arg1, arg2)")
 
     def test_find_final_answer_not_mid_line(self):
         """FINAL mid-line (not at start) should NOT match."""
-        from shesha.rlm.engine import find_final_answer
 
         result = find_final_answer("The result is FINAL(42)")
         assert result is None
 
     def test_find_final_answer_multiline_content(self):
         """FINAL with multiline content is captured."""
-        from shesha.rlm.engine import find_final_answer
 
         text = "FINAL(This is a\nmultiline answer)"
         result = find_final_answer(text)
@@ -2178,7 +2617,6 @@ class TestFindFinalAnswerInText:
         literal string "final_answer" instead of the 38K-char report the
         LLM had stored in the `final_answer` variable.
         """
-        from shesha.rlm.engine import find_final_answer
 
         # Single identifier — should be treated as variable reference
         result = find_final_answer("FINAL(final_answer)")
@@ -2186,59 +2624,150 @@ class TestFindFinalAnswerInText:
 
     def test_find_final_answer_bare_identifier_with_underscores(self):
         """FINAL(my_var_name) is treated as a variable reference."""
-        from shesha.rlm.engine import find_final_answer
 
         result = find_final_answer("FINAL(my_report)")
         assert result == ("final_var", "my_report")
 
     def test_find_final_answer_bare_identifier_simple(self):
         """FINAL(result) with a simple identifier is a variable reference."""
-        from shesha.rlm.engine import find_final_answer
 
         result = find_final_answer("FINAL(result)")
         assert result == ("final_var", "result")
 
     def test_find_final_answer_strips_surrounding_double_quotes(self):
         """FINAL("text") strips surrounding double quotes."""
-        from shesha.rlm.engine import find_final_answer
 
         result = find_final_answer('FINAL("The answer is 42")')
         assert result == ("final", "The answer is 42")
 
     def test_find_final_answer_strips_surrounding_single_quotes(self):
         """FINAL('text') strips surrounding single quotes."""
-        from shesha.rlm.engine import find_final_answer
 
         result = find_final_answer("FINAL('The answer is 42')")
         assert result == ("final", "The answer is 42")
 
     def test_find_final_answer_unescapes_newlines_in_quoted_string(self):
         r"""FINAL("line1\nline2") unescapes \n to real newlines."""
-        from shesha.rlm.engine import find_final_answer
 
         result = find_final_answer(r'FINAL("line1\nline2")')
         assert result == ("final", "line1\nline2")
 
     def test_find_final_answer_number_stays_literal(self):
         """FINAL(42) with a number stays as a literal (not a valid identifier)."""
-        from shesha.rlm.engine import find_final_answer
 
         result = find_final_answer("FINAL(42)")
         assert result == ("final", "42")
 
     def test_find_final_answer_expression_stays_literal(self):
         """FINAL(x + y) with operators stays as a literal."""
-        from shesha.rlm.engine import find_final_answer
 
         result = find_final_answer("FINAL(x + y)")
         assert result == ("final", "x + y")
 
     def test_find_final_answer_sentence_stays_literal(self):
         """FINAL(The answer is 42) with spaces stays as a literal."""
-        from shesha.rlm.engine import find_final_answer
 
         result = find_final_answer("FINAL(The answer is 42)")
         assert result == ("final", "The answer is 42")
+
+    def test_find_final_answer_nested_paren_at_end_of_line_not_truncated(self):
+        """FINAL(...) with nested parens at end-of-line must not truncate.
+
+        Regression: greedy regex with re.MULTILINE matched ')' in
+        '(point-by-point)' at end-of-line as the FINAL closer,
+        silently dropping everything after it.  The actual bug: the
+        LLM writes FINAL( with no matching close paren, and the
+        content contains (nested) at end of a line, causing the regex
+        to treat that ) as the FINAL closer.
+        """
+
+        # Mimics the real trace: FINAL( opens, content has (point-by-point)
+        # at end of a line, then more content follows with NO closing paren
+        # for FINAL.
+        text = (
+            "FINAL(# Analysis\n\n"
+            "## Section (point-by-point)\n\n"
+            "1) First item verified.\n"
+            "2) Second item confirmed.\n"
+        )
+        result = find_final_answer(text)
+        assert result is not None
+        assert result[0] == "final"
+        # The full content must include the numbered items AFTER (point-by-point)
+        assert "Second item confirmed." in result[1]
+
+    def test_find_final_answer_bare_final_paren_returns_none(self):
+        """Bare FINAL( with no content should return None, not empty answer."""
+
+        result = find_final_answer("FINAL(")
+        assert result is None
+
+    def test_find_final_answer_bare_final_paren_whitespace_returns_none(self):
+        """FINAL( followed by only whitespace should return None."""
+
+        result = find_final_answer("FINAL(   \n  )")
+        assert result is None
+
+    def test_find_final_answer_with_trailing_commentary(self):
+        """FINAL(answer) followed by commentary on next line extracts cleanly."""
+
+        text = "FINAL(The answer)\nSome commentary"
+        result = find_final_answer(text)
+        assert result is not None
+        assert result[0] == "final"
+        assert result[1] == "The answer"
+
+    def test_find_final_answer_bare_partial(self):
+        """Detects bare PARTIAL(text) outside code blocks."""
+        result = find_final_answer("PARTIAL(Found 7 titles but no dates)")
+        assert result == ("partial", "Found 7 titles but no dates")
+
+    def test_find_final_answer_partial_strips_quotes(self):
+        """PARTIAL('quoted text') strips surrounding quotes."""
+        result = find_final_answer('PARTIAL("Some partial findings")')
+        assert result == ("partial", "Some partial findings")
+
+    def test_find_final_answer_partial_ignores_inside_repl_block(self):
+        """Does NOT match PARTIAL inside a ```repl block (handled by executor)."""
+        text = '```repl\nPARTIAL("partial findings")\n```'
+        result = find_final_answer(text)
+        assert result is None
+
+    def test_find_final_answer_partial_identifier_stays_literal(self):
+        """PARTIAL(findings) with a bare identifier is treated as literal text,
+        NOT as a variable reference. Unlike FINAL, PARTIAL has no VAR variant."""
+        result = find_final_answer("PARTIAL(findings)")
+        assert result == ("partial", "findings")
+
+    def test_find_final_answer_partial_multiline(self):
+        """PARTIAL with multiline content is captured."""
+        text = "PARTIAL(## Partial Findings\n\nFound some titles\n\n**Missing:** dates)"
+        result = find_final_answer(text)
+        assert result is not None
+        assert result[0] == "partial"
+        assert "Found some titles" in result[1]
+        assert "Missing" in result[1]
+
+    def test_find_final_answer_partial_with_leading_whitespace(self):
+        """PARTIAL at start of line with whitespace is detected."""
+        result = find_final_answer("  PARTIAL(partial text)")
+        assert result == ("partial", "partial text")
+
+    def test_find_final_answer_partial_not_mid_line(self):
+        """PARTIAL mid-line (not at start) should NOT match."""
+        result = find_final_answer("The result is PARTIAL(text)")
+        assert result is None
+
+    def test_find_final_answer_partial_empty_returns_none(self):
+        """Bare PARTIAL( with no content should return None."""
+        result = find_final_answer("PARTIAL(")
+        assert result is None
+
+    def test_find_final_answer_partial_takes_priority_over_final(self):
+        """When both PARTIAL and FINAL appear, PARTIAL should match first."""
+        text = "PARTIAL(partial text)\nFINAL(full answer)"
+        result = find_final_answer(text)
+        assert result == ("partial", "partial text")
 
     @patch("shesha.rlm.engine.ContainerExecutor")
     @patch("shesha.rlm.engine.LLMClient")
@@ -2450,42 +2979,38 @@ class TestFindFinalAnswerInText:
 
     @patch("shesha.rlm.engine.ContainerExecutor")
     @patch("shesha.rlm.engine.LLMClient")
-    def test_engine_returns_empty_string_var_not_literal_name(
+    def test_engine_accepts_empty_string_from_var_resolution(
         self,
         mock_llm_cls: MagicMock,
         mock_executor_cls: MagicMock,
     ):
-        """FINAL(var) where var is defined as empty string returns empty string.
+        """FINAL(var) where var is "" should accept the empty string answer.
 
-        The variable exists (status="ok") but its printed representation is
-        empty. The engine should return the empty string, not fall back to
-        the literal identifier name.
+        Consistent with the `is not None` policy documented at
+        _execute_code_blocks line 544-545: falsy values like FINAL(0),
+        FINAL(""), FINAL(False) are valid final answers.
         """
         mock_llm = MagicMock()
-        mock_llm.complete.side_effect = [
-            MagicMock(
-                content="FINAL(empty_var)",
-                prompt_tokens=100,
-                completion_tokens=50,
-                total_tokens=150,
-            ),
-        ]
+        mock_llm.complete.return_value = MagicMock(
+            content="FINAL(empty_var)",
+            prompt_tokens=100,
+            completion_tokens=50,
+            total_tokens=150,
+        )
         mock_llm_cls.return_value = mock_llm
 
         mock_executor = MagicMock()
         mock_executor.is_alive = True
-        mock_executor.execute.side_effect = [
+        mock_executor.execute.return_value = MagicMock(
             # Variable exists but print("") outputs just a newline
-            MagicMock(
-                status="ok",
-                stdout="\n",
-                stderr="",
-                error=None,
-                final_answer=None,
-                final_var=None,
-                vars=None,
-            ),
-        ]
+            status="ok",
+            stdout="\n",
+            stderr="",
+            error=None,
+            final_answer=None,
+            final_var=None,
+            vars=None,
+        )
         mock_executor_cls.return_value = mock_executor
 
         engine = RLMEngine(model="test-model", max_iterations=5)
@@ -2494,8 +3019,9 @@ class TestFindFinalAnswerInText:
             question="What is the answer?",
         )
 
-        # Should return empty string (the variable's value), not "empty_var"
+        # Empty string is a valid answer (is not None policy)
         assert result.answer == ""
+        assert mock_llm.complete.call_count == 1
 
     @patch("shesha.rlm.engine.ContainerExecutor")
     @patch("shesha.rlm.engine.LLMClient")
@@ -2725,6 +3251,58 @@ class TestMaxIterationsFallback:
         assert result.answer == "The answer is 42 based on my analysis."
         assert mock_llm.complete.call_count == 3
 
+    @patch("shesha.rlm.engine.ContainerExecutor")
+    @patch("shesha.rlm.engine.LLMClient")
+    def test_max_iterations_fallback_uses_user_role(
+        self,
+        mock_llm_cls: MagicMock,
+        mock_executor_cls: MagicMock,
+    ):
+        """Fallback message must use 'user' role to avoid consecutive assistant msgs."""
+        mock_llm = MagicMock()
+        responses = [
+            MagicMock(
+                content='```repl\nprint("exploring")\n```',
+                prompt_tokens=100,
+                completion_tokens=50,
+                total_tokens=150,
+            ),
+            MagicMock(
+                content="The final answer.",
+                prompt_tokens=100,
+                completion_tokens=50,
+                total_tokens=150,
+            ),
+        ]
+        mock_llm.complete.side_effect = responses
+        mock_llm_cls.return_value = mock_llm
+
+        mock_executor = MagicMock()
+        mock_executor.is_alive = True
+        mock_executor.execute.return_value = MagicMock(
+            status="ok",
+            stdout="output",
+            stderr="",
+            error=None,
+            final_answer=None,
+            final_var=None,
+            vars=None,
+        )
+        mock_executor_cls.return_value = mock_executor
+
+        engine = RLMEngine(model="test-model", max_iterations=1)
+        engine.query(documents=["Doc"], question="What?")
+
+        # The fallback call is the last complete() call
+        fallback_call = mock_llm.complete.call_args_list[-1]
+        fallback_messages = fallback_call.kwargs.get(
+            "messages", fallback_call.args[0] if fallback_call.args else None
+        )
+        last_msg = fallback_messages[-1]
+        assert last_msg["role"] == "user", (
+            f"Fallback message role should be 'user', got '{last_msg['role']}'"
+        )
+
 
 class TestAllowBackgroundKnowledge:
     """Tests for allow_background_knowledge parameter on query()."""
@@ -2809,3 +3387,74 @@ class TestAllowBackgroundKnowledge:
             spy.assert_called_once()
             call_kwargs = spy.call_args[1]
             assert call_kwargs.get("augmented") is False
+
+
+class TestGaveUpFlag:
+    """Tests for QueryResult.gave_up flag propagation."""
+
+    @patch("shesha.rlm.engine.ContainerExecutor")
+    @patch("shesha.rlm.engine.LLMClient")
+    def test_engine_gave_up_false_for_final(
+        self, mock_llm_cls: MagicMock, mock_exec_cls: MagicMock
+    ):
+        """QueryResult.gave_up is False when RLM returns FINAL(...)."""
+        mock_llm = mock_llm_cls.return_value
+        mock_llm.complete.return_value = MagicMock(
+            content="FINAL(The answer is 42)",
+            prompt_tokens=10,
+            completion_tokens=5,
+            total_tokens=15,
+        )
+        mock_executor = mock_exec_cls.return_value
+        mock_executor.is_alive = True
+        engine = RLMEngine(model="test")
+        result = engine.query(["doc content"], "question?")
+        assert result.gave_up is False
+
+    @patch("shesha.rlm.engine.ContainerExecutor")
+    @patch("shesha.rlm.engine.LLMClient")
+    def test_engine_gave_up_true_for_bare_partial(
+        self, mock_llm_cls: MagicMock, mock_exec_cls: MagicMock
+    ):
+        """QueryResult.gave_up is True when RLM returns bare PARTIAL(...)."""
+        mock_llm = mock_llm_cls.return_value
+        mock_llm.complete.return_value = MagicMock(
+            content="PARTIAL(Found 7 titles but no dates)",
+            prompt_tokens=10,
+            completion_tokens=5,
+            total_tokens=15,
+        )
+        mock_executor = mock_exec_cls.return_value
+        mock_executor.is_alive = True
+        engine = RLMEngine(model="test")
+        result = engine.query(["doc content"], "question?")
+        assert result.gave_up is True
+        assert result.answer == "Found 7 titles but no dates"
+
+    @patch("shesha.rlm.engine.ContainerExecutor")
+    @patch("shesha.rlm.engine.LLMClient")
+    def test_engine_gave_up_true_for_sandbox_partial(
+        self, mock_llm_cls: MagicMock, mock_exec_cls: MagicMock
+    ):
+        """QueryResult.gave_up is True when sandbox returns partial_answer."""
+        mock_llm = mock_llm_cls.return_value
+        mock_llm.complete.return_value = MagicMock(
+            content='```repl\nPARTIAL("Found some evidence")\n```',
+            prompt_tokens=10,
+            completion_tokens=5,
+            total_tokens=15,
+        )
+        mock_executor = mock_exec_cls.return_value
+        mock_executor.is_alive = True
+        mock_executor.execute.return_value = ExecutionResult(
+            status="ok",
+            stdout="",
+            stderr="",
+            return_value=None,
+            error=None,
+            partial_answer="Found some evidence",
+        )
+        engine = RLMEngine(model="test")
+        result = engine.query(["doc content"], "question?")
+        assert result.gave_up is True
+        assert result.answer == "Found some evidence"

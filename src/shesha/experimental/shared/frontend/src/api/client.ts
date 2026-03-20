@@ -24,6 +24,10 @@ export const sharedApi = {
       method: 'PATCH', body: JSON.stringify({ new_name: newName }),
     }),
     delete: (name: string) => request<void>(`/topics/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+    reorderItems: (name: string, itemIds: string[]) => request<{ status: string }>(
+      `/topics/${encodeURIComponent(name)}/items/order`,
+      { method: 'PUT', body: JSON.stringify({ item_ids: itemIds }) },
+    ),
   },
   traces: {
     list: (topic: string) => request<TraceListItem[]>(

@@ -3,6 +3,7 @@ export interface RepoInfo {
   source_url: string
   file_count: number
   analysis_status: string | null
+  display_name: string | null
 }
 
 export interface RepoAnalysis {

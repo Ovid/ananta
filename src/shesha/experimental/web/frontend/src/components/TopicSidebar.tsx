@@ -79,6 +79,22 @@ export default function TopicSidebar({
     await api.topics.delete(name)
   }, [])
 
+  const handleAddDocToTopic = useCallback(async (docId: string, topicName: string) => {
+    await api.papers.add(docId, [topicName])
+  }, [])
+
+  const handleRemoveDocFromTopic = useCallback(async (docId: string, topicName: string) => {
+    await api.papers.remove(topicName, docId)
+  }, [])
+
+  const handleRenameDocument = useCallback(async (docId: string, newName: string) => {
+    await api.papers.rename(docId, newName)
+  }, [])
+
+  const handleReorderItems = useCallback(async (topicName: string, itemIds: string[]) => {
+    await api.papers.reorder(topicName, itemIds)
+  }, [])
+
   return (
     <SharedTopicSidebar
       activeTopic={activeTopic}
@@ -94,6 +110,10 @@ export default function TopicSidebar({
       createTopic={handleCreateTopic}
       renameTopic={handleRenameTopic}
       deleteTopic={handleDeleteTopic}
+      addDocToTopic={handleAddDocToTopic}
+      removeDocFromTopic={handleRemoveDocFromTopic}
+      renameDocument={handleRenameDocument}
+      reorderItems={handleReorderItems}
       viewingDocumentId={viewingPaperId}
       style={style}
       bottomControls={bottomControls}

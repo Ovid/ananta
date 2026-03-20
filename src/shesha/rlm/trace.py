@@ -30,6 +30,7 @@ class TraceStep:
     iteration: int
     tokens_used: int | None = None
     duration_ms: int | None = None
+    metadata: dict[str, str] | None = None
 
 
 @dataclass
@@ -58,6 +59,7 @@ class Trace:
         iteration: int,
         tokens_used: int | None = None,
         duration_ms: int | None = None,
+        metadata: dict[str, str] | None = None,
     ) -> TraceStep:
         """Add a step to the trace."""
         step = TraceStep(
@@ -67,6 +69,7 @@ class Trace:
             iteration=iteration,
             tokens_used=tokens_used,
             duration_ms=duration_ms,
+            metadata=metadata,
         )
         self.steps.append(step)
         return step
@@ -90,6 +93,7 @@ class Trace:
                     iteration=step.iteration,
                     tokens_used=step.tokens_used,
                     duration_ms=step.duration_ms,
+                    metadata=step.metadata,
                 )
             )
         return Trace(steps=redacted_steps)

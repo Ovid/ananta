@@ -2,11 +2,14 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from shesha.analysis.shortcut import (
     _CLASSIFIER_PROMPT,
     classify_query,
     try_answer_from_analysis,
 )
+from shesha.llm.exceptions import PermanentError, TransientError
 
 
 class TestClassifyQuery:
@@ -102,10 +105,10 @@ class TestClassifyQuery:
 
         assert result[0] is True
 
-    def test_returns_true_on_llm_exception(self):
-        """LLM exception -> True (graceful fallback, allow shortcut attempt)."""
+    def test_returns_true_on_transient_exception(self):
+        """Transient LLM exception -> True (graceful fallback, allow shortcut attempt)."""
         with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
-            mock_cls.return_value.complete.side_effect = Exception("API error")
+            mock_cls.return_value.complete.side_effect = TransientError("timeout")
             result = classify_query(
                 question="What does this do?",
                 model="test-model",
@@ -113,6 +116,35 @@ class TestClassifyQuery:
             )
 
         assert result[0] is True
+
+    def test_raises_permanent_error(self):
+        """PermanentError (auth failure) propagates instead of being swallowed."""
+        with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+            mock_cls.return_value.complete.side_effect = PermanentError("invalid key")
+            with pytest.raises(PermanentError):
+                classify_query(
+                    question="What does this do?",
+                    model="test-model",
+                    api_key="test-key",
+                )
+
+    def test_returns_false_for_need_deeper_with_trailing_punctuation(self):
+        """NEED_DEEPER with trailing punctuation should still be recognized."""
+        for suffix in [".", "!", ".\n"]:
+            mock_response = MagicMock()
+            mock_response.content = f"NEED_DEEPER{suffix}"
+            mock_response.prompt_tokens = 10
+            mock_response.completion_tokens = 5
+
+            with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+                mock_cls.return_value.complete.return_value = mock_response
+                result = classify_query(
+                    question="Any question",
+                    model="test-model",
+                    api_key="test-key",
+                )
+
+            assert result[0] is False, f"NEED_DEEPER{suffix!r} should return False"
 
     def test_returns_true_on_unparseable_output(self):
         """Unparseable LLM output -> True (graceful fallback)."""
@@ -217,6 +249,61 @@ class TestClassifierPromptContent:
     def test_contains_when_in_doubt_bias(self):
         """Classifier prompt biases toward NEED_DEEPER when uncertain."""
         assert "When in doubt, respond NEED_DEEPER" in _CLASSIFIER_PROMPT
+
+
+class TestLLMClientFactoryInjection:
+    """Tests for llm_client_factory parameter in shortcut functions."""
+
+    def test_classify_query_uses_injected_factory(self):
+        """classify_query uses the provided llm_client_factory."""
+        mock_response = MagicMock()
+        mock_response.content = "ANALYSIS_OK"
+        mock_response.prompt_tokens = 10
+        mock_response.completion_tokens = 5
+
+        mock_factory = MagicMock()
+        mock_factory.return_value.complete.return_value = mock_response
+
+        result = classify_query(
+            question="What does this do?",
+            model="test-model",
+            api_key="test-key",
+            llm_client_factory=mock_factory,
+        )
+
+        mock_factory.assert_called_once()
+        assert result[0] is True
+
+    def test_try_answer_uses_injected_factory(self):
+        """try_answer_from_analysis uses the provided llm_client_factory."""
+        classifier_response = MagicMock()
+        classifier_response.content = "ANALYSIS_OK"
+        classifier_response.prompt_tokens = 10
+        classifier_response.completion_tokens = 5
+
+        answer_response = MagicMock()
+        answer_response.content = "The answer."
+        answer_response.prompt_tokens = 50
+        answer_response.completion_tokens = 10
+
+        mock_factory = MagicMock()
+        classifier_client = MagicMock()
+        classifier_client.complete.return_value = classifier_response
+        answer_client = MagicMock()
+        answer_client.complete.return_value = answer_response
+        mock_factory.side_effect = [classifier_client, answer_client]
+
+        result = try_answer_from_analysis(
+            question="What does this do?",
+            analysis_context="Some analysis",
+            model="test-model",
+            api_key="test-key",
+            llm_client_factory=mock_factory,
+        )
+
+        assert result is not None
+        assert result[0] == "The answer."
+        assert mock_factory.call_count == 2
 
 
 class TestTryAnswerFromAnalysisWithClassifier:

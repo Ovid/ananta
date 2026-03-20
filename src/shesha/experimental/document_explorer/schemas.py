@@ -28,6 +28,7 @@ from shesha.experimental.shared.schemas import (
 __all__ = [
     "ContextBudget",
     "DocumentInfo",
+    "DocumentRename",
     "DocumentUploadResponse",
     "ExchangeSchema",
     "ModelInfo",
@@ -53,6 +54,10 @@ class DocumentInfo(BaseModel):
     size: int
     upload_date: str
     page_count: int | None
+
+
+class DocumentRename(BaseModel):
+    new_name: str
 
 
 class DocumentUploadResponse(BaseModel):

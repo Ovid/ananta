@@ -9,6 +9,10 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 
+class ItemReorder(BaseModel):
+    item_ids: list[str]
+
+
 class TopicCreate(BaseModel):
     name: str
 
@@ -66,6 +70,7 @@ class ExchangeSchema(BaseModel):
     model: str
     document_ids: list[str] | None = None
     allow_background_knowledge: bool = False
+    gave_up: bool = False
 
 
 class ConversationHistory(BaseModel):

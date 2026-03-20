@@ -37,7 +37,7 @@ class RepoProjectResult:
     """Result from create_project_from_repo()."""
 
     project: "Project"
-    status: Literal["created", "unchanged", "updates_available"]
+    status: Literal["created", "updated", "unchanged", "updates_available", "check_failed"]
     files_ingested: int
     files_skipped: int = 0
     warnings: list[str] = field(default_factory=list)

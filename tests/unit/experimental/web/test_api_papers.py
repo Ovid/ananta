@@ -231,3 +231,184 @@ def test_add_paper_download_errors_when_searcher_returns_none(
             t.join(timeout=5)
 
     assert mock_state.download_tasks[task_id]["papers"][0]["status"] == "error"
+
+
+def test_rename_paper_updates_title(client: TestClient, mock_state: MagicMock) -> None:
+    from datetime import datetime
+
+    from shesha.experimental.arxiv.models import PaperMeta
+
+    meta = PaperMeta(
+        arxiv_id="2501.08753",
+        title="Original Title",
+        authors=["Author A"],
+        abstract="Abstract",
+        published=datetime(2025, 1, 15),
+        updated=datetime(2025, 1, 15),
+        categories=["q-bio.PE"],
+        primary_category="q-bio.PE",
+        pdf_url="https://arxiv.org/pdf/2501.08753",
+        arxiv_url="https://arxiv.org/abs/2501.08753",
+    )
+    mock_state.cache.get_meta.return_value = meta
+
+    resp = client.patch(
+        "/api/papers/2501.08753",
+        json={"new_name": "Better Title"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["title"] == "Better Title"
+    assert data["arxiv_id"] == "2501.08753"
+    # Verify store_meta was called with updated title
+    mock_state.cache.store_meta.assert_called_once()
+    stored = mock_state.cache.store_meta.call_args[0][0]
+    assert stored.title == "Better Title"
+    assert stored.arxiv_id == "2501.08753"
+
+
+def test_rename_paper_not_found(client: TestClient, mock_state: MagicMock) -> None:
+    mock_state.cache.get_meta.return_value = None
+    resp = client.patch(
+        "/api/papers/9999.99999",
+        json={"new_name": "New Title"},
+    )
+    assert resp.status_code == 404
+
+
+def test_rename_paper_empty_name_returns_422(client: TestClient, mock_state: MagicMock) -> None:
+    from datetime import datetime
+
+    from shesha.experimental.arxiv.models import PaperMeta
+
+    meta = PaperMeta(
+        arxiv_id="2501.08753",
+        title="Original",
+        authors=["Author A"],
+        abstract="Abstract",
+        published=datetime(2025, 1, 15),
+        updated=datetime(2025, 1, 15),
+        categories=["q-bio.PE"],
+        primary_category="q-bio.PE",
+        pdf_url="https://arxiv.org/pdf/2501.08753",
+        arxiv_url="https://arxiv.org/abs/2501.08753",
+    )
+    mock_state.cache.get_meta.return_value = meta
+    resp = client.patch(
+        "/api/papers/2501.08753",
+        json={"new_name": "  "},
+    )
+    assert resp.status_code == 422
+
+
+# --- Paper reordering ---
+
+
+def test_reorder_papers(client: TestClient, mock_state: MagicMock) -> None:
+    """PUT /api/topics/{name}/papers/order stores the new order."""
+    mock_state.topic_mgr.resolve.return_value = "proj-id"
+    mock_state.topic_mgr.storage.list_documents.return_value = [
+        "paper-a",
+        "paper-b",
+        "paper-c",
+    ]
+
+    resp = client.put(
+        "/api/topics/test-topic/papers/order",
+        json={"arxiv_ids": ["paper-c", "paper-a", "paper-b"]},
+    )
+    assert resp.status_code == 200
+    mock_state.topic_mgr.set_doc_order.assert_called_once_with(
+        "proj-id", ["paper-c", "paper-a", "paper-b"]
+    )
+
+
+def test_reorder_papers_topic_not_found(client: TestClient, mock_state: MagicMock) -> None:
+    mock_state.topic_mgr.resolve.return_value = None
+    resp = client.put(
+        "/api/topics/nonexistent/papers/order",
+        json={"arxiv_ids": ["paper-a"]},
+    )
+    assert resp.status_code == 404
+
+
+def test_reorder_papers_mismatched_ids(client: TestClient, mock_state: MagicMock) -> None:
+    """If the provided arxiv_ids don't match existing papers, return 422."""
+    mock_state.topic_mgr.resolve.return_value = "proj-id"
+    mock_state.topic_mgr.storage.list_documents.return_value = ["paper-a", "paper-b"]
+    resp = client.put(
+        "/api/topics/test-topic/papers/order",
+        json={"arxiv_ids": ["paper-a", "paper-b", "paper-c"]},
+    )
+    assert resp.status_code == 422
+
+
+def test_list_papers_respects_order(client: TestClient, mock_state: MagicMock) -> None:
+    """list_papers sorts results according to stored doc_order."""
+    from datetime import datetime
+
+    from shesha.experimental.arxiv.models import PaperMeta
+
+    mock_state.topic_mgr.resolve.return_value = "proj-id"
+    mock_state.topic_mgr.storage.list_documents.return_value = [
+        "paper-a",
+        "paper-b",
+        "paper-c",
+    ]
+    mock_state.topic_mgr.get_doc_order.return_value = [
+        "paper-c",
+        "paper-a",
+        "paper-b",
+    ]
+
+    def make_meta(arxiv_id: str) -> MagicMock:
+        meta = MagicMock(spec=PaperMeta)
+        meta.arxiv_id = arxiv_id
+        meta.title = f"Title {arxiv_id}"
+        meta.authors = ["Author"]
+        meta.abstract = "Abstract"
+        meta.primary_category = "cs.AI"
+        meta.published = datetime(2025, 1, 15)
+        meta.arxiv_url = f"https://arxiv.org/abs/{arxiv_id}"
+        meta.source_type = None
+        return meta
+
+    mock_state.cache.get_meta.side_effect = lambda aid: make_meta(aid)
+
+    resp = client.get("/api/topics/test-topic/papers")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert [p["arxiv_id"] for p in data] == ["paper-c", "paper-a", "paper-b"]
+
+
+def test_list_papers_without_order(client: TestClient, mock_state: MagicMock) -> None:
+    """When no doc_order is stored, list_papers returns filesystem order."""
+    from datetime import datetime
+
+    from shesha.experimental.arxiv.models import PaperMeta
+
+    mock_state.topic_mgr.resolve.return_value = "proj-id"
+    mock_state.topic_mgr.storage.list_documents.return_value = [
+        "paper-a",
+        "paper-b",
+    ]
+    mock_state.topic_mgr.get_doc_order.return_value = None
+
+    def make_meta(arxiv_id: str) -> MagicMock:
+        meta = MagicMock(spec=PaperMeta)
+        meta.arxiv_id = arxiv_id
+        meta.title = f"Title {arxiv_id}"
+        meta.authors = ["Author"]
+        meta.abstract = "Abstract"
+        meta.primary_category = "cs.AI"
+        meta.published = datetime(2025, 1, 15)
+        meta.arxiv_url = f"https://arxiv.org/abs/{arxiv_id}"
+        meta.source_type = None
+        return meta
+
+    mock_state.cache.get_meta.side_effect = lambda aid: make_meta(aid)
+
+    resp = client.get("/api/topics/test-topic/papers")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert [p["arxiv_id"] for p in data] == ["paper-a", "paper-b"]

@@ -1,17 +1,37 @@
 """Git repository ingester."""
 
 import json
+import logging
 import os
 import re
 import shutil
 import stat
 import subprocess
 import tempfile
+import threading
+import uuid
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
-from shesha.exceptions import AuthenticationError, RepoIngestError
+from shesha.exceptions import AuthenticationError, NoParserError, ParseError, RepoIngestError
+from shesha.models import ParsedDocument
 from shesha.security.paths import safe_path
+
+if TYPE_CHECKING:
+    from shesha.parser.registry import ParserRegistry
+    from shesha.storage.base import StorageBackend
+
+
+@dataclass
+class IngestResult:
+    """Result of ingesting files from a repository into storage."""
+
+    files_ingested: int
+    files_skipped: int = 0
+    warnings: list[str] = field(default_factory=list)
+
 
 # Timeouts for git subprocess calls (seconds)
 GIT_CLONE_TIMEOUT = 300
@@ -19,6 +39,9 @@ GIT_PULL_TIMEOUT = 120
 GIT_FETCH_TIMEOUT = 120
 GIT_LS_REMOTE_TIMEOUT = 30
 GIT_LOCAL_TIMEOUT = 30
+
+
+logger = logging.getLogger(__name__)
 
 
 class RepoIngester:
@@ -31,21 +54,39 @@ class RepoIngester:
         "bitbucket.org": "BITBUCKET_TOKEN",
     }
 
-    def __init__(self, storage_path: Path | str) -> None:
-        """Initialize with storage path for cloned repos."""
+    def __init__(
+        self,
+        storage_path: Path | str,
+        allow_local_paths: bool = True,
+    ) -> None:
+        """Initialize with storage path for cloned repos.
+
+        Args:
+            storage_path: Path to store cloned repos and metadata.
+            allow_local_paths: Whether to allow ingesting from local paths.
+                Defaults to True for CLI/library use. Web explorers should
+                set this to False to prevent unauthorized filesystem reads.
+        """
         self.storage_path = Path(storage_path)
         self.repos_dir = self.storage_path / "repos"
         self.repos_dir.mkdir(parents=True, exist_ok=True)
+        self._meta_lock = threading.Lock()
+        self._allow_local_paths = allow_local_paths
 
     def _repo_path(self, project_id: str) -> Path:
         """Get safe path for a project's repo directory."""
         return safe_path(self.repos_dir, project_id)
+
+    # Only allow safe git transport protocols — blocks ext:: (RCE) and
+    # file:// (bypasses is_local_path() check, enabling local filesystem reads).
+    _GIT_SAFE_PROTOCOLS = "https:ssh"
 
     @staticmethod
     def _no_prompt_env() -> dict[str, str]:
         """Return env dict with GIT_TERMINAL_PROMPT=0 to prevent interactive prompts."""
         env = os.environ.copy()
         env["GIT_TERMINAL_PROMPT"] = "0"
+        env["GIT_ALLOW_PROTOCOL"] = RepoIngester._GIT_SAFE_PROTOCOLS
         return env
 
     def is_local_path(self, url: str) -> bool:
@@ -160,47 +201,64 @@ class RepoIngester:
         env["GIT_ASKPASS"] = path
         env["GIT_TOKEN"] = token
         env["GIT_TERMINAL_PROMPT"] = "0"
+        env["GIT_ALLOW_PROTOCOL"] = RepoIngester._GIT_SAFE_PROTOCOLS
         return env, Path(path)
+
+    def _load_meta(self, meta_path: Path) -> dict[str, str]:
+        """Load repo metadata JSON, returning {} on missing or corrupt file."""
+        if not meta_path.exists():
+            return {}
+        try:
+            return json.loads(meta_path.read_text())  # type: ignore[no-any-return]
+        except json.JSONDecodeError:
+            return {}  # Corrupt file — start fresh
+
+    def _save_meta_field(self, project_id: str, key: str, value: str) -> None:
+        """Save a single field to _repo_meta.json under a lock."""
+        repo_path = self._repo_path(project_id)
+        repo_path.mkdir(parents=True, exist_ok=True)
+        meta_path = repo_path / "_repo_meta.json"
+
+        with self._meta_lock:
+            data = self._load_meta(meta_path)
+            data[key] = value
+            meta_path.write_text(json.dumps(data))
 
     def save_sha(self, project_id: str, sha: str) -> None:
         """Save the HEAD SHA for a project."""
-        repo_path = self._repo_path(project_id)
-        repo_path.mkdir(parents=True, exist_ok=True)
-        meta_path = repo_path / "_repo_meta.json"
-        meta_path.write_text(json.dumps({"head_sha": sha}))
+        self._save_meta_field(project_id, "head_sha", sha)
 
     def save_source_url(self, project_id: str, url: str) -> None:
         """Save the source URL for a project."""
-        repo_path = self._repo_path(project_id)
-        repo_path.mkdir(parents=True, exist_ok=True)
-        meta_path = repo_path / "_repo_meta.json"
-
-        # Load existing metadata or start fresh
-        if meta_path.exists():
-            data = json.loads(meta_path.read_text())
-        else:
-            data = {}
-
-        data["source_url"] = url
-        meta_path.write_text(json.dumps(data))
+        self._save_meta_field(project_id, "source_url", url)
 
     def get_source_url(self, project_id: str) -> str | None:
         """Get the saved source URL for a project."""
         meta_path = self._repo_path(project_id) / "_repo_meta.json"
-        if not meta_path.exists():
-            return None
-        data = json.loads(meta_path.read_text())
+        with self._meta_lock:
+            data = self._load_meta(meta_path)
         url = data.get("source_url")
         return str(url) if url is not None else None
 
     def get_saved_sha(self, project_id: str) -> str | None:
         """Get the saved HEAD SHA for a project."""
         meta_path = self._repo_path(project_id) / "_repo_meta.json"
-        if not meta_path.exists():
-            return None
-        data = json.loads(meta_path.read_text())
+        with self._meta_lock:
+            data = self._load_meta(meta_path)
         sha = data.get("head_sha")
         return str(sha) if sha is not None else None
+
+    def save_path(self, project_id: str, path: str) -> None:
+        """Save the subdirectory scope for a project."""
+        self._save_meta_field(project_id, "path", path)
+
+    def get_saved_path(self, project_id: str) -> str | None:
+        """Get the saved subdirectory scope for a project."""
+        meta_path = self._repo_path(project_id) / "_repo_meta.json"
+        with self._meta_lock:
+            data = self._load_meta(meta_path)
+        p = data.get("path")
+        return str(p) if p is not None else None
 
     def get_remote_sha(self, url: str, token: str | None = None) -> str | None:
         """Get the HEAD SHA from remote repository."""
@@ -387,3 +445,115 @@ class RepoIngester:
         repo_path = self._repo_path(project_id)
         if repo_path.exists():
             shutil.rmtree(repo_path)
+
+    def ingest(
+        self,
+        storage: "StorageBackend",
+        parser_registry: "ParserRegistry",
+        url: str,
+        name: str,
+        path: str | None,
+        *,
+        is_update: bool,
+    ) -> IngestResult:
+        """Ingest files from repository into project storage.
+
+        For new projects (is_update=False): creates project, ingests files,
+        and deletes the project if ingestion fails.
+
+        For updates (is_update=True): ingests into a staging project, then
+        swaps docs into the target project. If ingestion fails, the staging
+        project is cleaned up and the original is untouched.
+        """
+        staging_name = f"_staging_{name}_{uuid.uuid4().hex[:8]}" if is_update else name
+        is_local = self.is_local_path(url)
+        if is_local and not self._allow_local_paths:
+            raise RepoIngestError(url, RuntimeError("Local path ingestion is disabled"))
+
+        try:
+            if not is_update:
+                storage.create_project(name)
+            else:
+                storage.create_project(staging_name)
+
+            if is_local:
+                repo_path = Path(url).expanduser()
+            else:
+                repo_path = self._repo_path(name)
+
+            files = self.list_files_from_path(repo_path, subdir=path)
+            files_ingested = 0
+            files_skipped = 0
+            warnings: list[str] = []
+
+            for file_path in files:
+                full_path = repo_path / file_path
+                try:
+                    parser = parser_registry.find_parser(full_path)
+                    if parser is None:
+                        files_skipped += 1
+                        continue
+
+                    doc = parser.parse(full_path, include_line_numbers=True, file_path=file_path)
+                    doc = ParsedDocument(
+                        name=file_path,
+                        content=doc.content,
+                        format=doc.format,
+                        metadata=doc.metadata,
+                        char_count=doc.char_count,
+                        parse_warnings=doc.parse_warnings,
+                    )
+                    storage.store_document(staging_name, doc)
+                    files_ingested += 1
+                except (ParseError, NoParserError) as e:
+                    files_skipped += 1
+                    warnings.append(f"Failed to parse {file_path}: {e}")
+                except Exception as e:
+                    raise RepoIngestError(url, cause=e) from e
+
+            if is_update:
+                storage.swap_docs(staging_name, name)
+                # swap_docs moves docs but may leave the staging project shell;
+                # delete it so _staging_* entries don't accumulate.
+                try:
+                    if storage.project_exists(staging_name):
+                        storage.delete_project(staging_name)
+                except Exception:
+                    pass  # Swap succeeded; orphaned staging shell is harmless
+
+        except Exception:
+            try:
+                if is_update:
+                    if storage.project_exists(staging_name):
+                        storage.delete_project(staging_name)
+                else:
+                    if storage.project_exists(name):
+                        storage.delete_project(name)
+                    if not is_local:
+                        self.delete_repo(name)
+            except Exception:
+                pass  # Cleanup failure must not mask the original error
+            raise
+
+        # Save metadata — failure here must not mask a successful ingest.
+        try:
+            sha = self.get_sha_from_path(repo_path)
+            if sha:
+                self.save_sha(name, sha)
+
+            if self.is_local_path(url):
+                save_url = str(Path(url).expanduser().resolve())
+            else:
+                save_url = url
+            self.save_source_url(name, save_url)
+
+            if path is not None:
+                self.save_path(name, path)
+        except Exception as exc:
+            logger.warning("Failed to save repo metadata for '%s': %s", name, exc)
+
+        return IngestResult(
+            files_ingested=files_ingested,
+            files_skipped=files_skipped,
+            warnings=warnings,
+        )

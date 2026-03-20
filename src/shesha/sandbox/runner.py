@@ -47,8 +47,10 @@ BUILTINS_SET: frozenset[str] = frozenset(
         "llm_query_batched",
         "FINAL",
         "FINAL_VAR",
+        "PARTIAL",
         "FinalAnswer",
         "FinalVar",
+        "PartialAnswer",
         "SHOW_VARS",
         "context",
     ]
@@ -146,6 +148,10 @@ def main() -> None:
         def __init__(self, var_name: str):
             self.var_name = var_name
 
+    class PartialAnswer:
+        def __init__(self, answer: str):
+            self.answer = answer
+
     def llm_query(instruction: str, content: str = "") -> str:
         """Request LLM query from host - blocks until response."""
         request = handle_llm_query(instruction, content)
@@ -180,14 +186,22 @@ def main() -> None:
         NAMESPACE["_return_value_"] = fv
         return fv
 
+    def make_partial(answer: str) -> PartialAnswer:
+        """Create PartialAnswer and register it for detection."""
+        pa = PartialAnswer(answer)
+        NAMESPACE["_return_value_"] = pa
+        return pa
+
     def register_builtins() -> None:
         """Register built-in functions in the namespace."""
         NAMESPACE["llm_query"] = llm_query
         NAMESPACE["llm_query_batched"] = llm_query_batched
         NAMESPACE["FINAL"] = make_final
         NAMESPACE["FINAL_VAR"] = make_final_var
+        NAMESPACE["PARTIAL"] = make_partial
         NAMESPACE["FinalAnswer"] = FinalAnswer
         NAMESPACE["FinalVar"] = FinalVar
+        NAMESPACE["PartialAnswer"] = PartialAnswer
         NAMESPACE["SHOW_VARS"] = show_vars
 
     register_builtins()
@@ -211,7 +225,13 @@ def main() -> None:
                     result["return_value"] = None  # Not JSON serializable
                 elif isinstance(rv, FinalVar):
                     result["final_var"] = rv.var_name
-                    result["final_value"] = str(NAMESPACE.get(rv.var_name, ""))
+                    value = NAMESPACE.get(rv.var_name)
+                    result["final_value"] = (
+                        str(value) if rv.var_name in NAMESPACE and value is not None else None
+                    )
+                    result["return_value"] = None  # Not JSON serializable
+                elif isinstance(rv, PartialAnswer):
+                    result["partial_answer"] = rv.answer
                     result["return_value"] = None  # Not JSON serializable
                 _write_message(real_stdout_buf, result)
 

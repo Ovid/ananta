@@ -53,6 +53,7 @@ export interface Exchange {
   model: string
   document_ids?: string[]
   allow_background_knowledge?: boolean
+  gave_up?: boolean
 }
 
 export interface ContextBudget {
@@ -73,6 +74,6 @@ export interface ModelInfo {
 export type WSMessage =
   | { type: 'status'; phase: string; iteration: number }
   | { type: 'step'; step_type: string; iteration: number; content: string; prompt_tokens?: number; completion_tokens?: number }
-  | { type: 'complete'; answer: string; trace_id: string | null; tokens: { prompt: number; completion: number; total: number }; duration_ms: number; document_ids?: string[]; document_bytes?: number }
+  | { type: 'complete'; answer: string; trace_id: string | null; tokens: { prompt: number; completion: number; total: number }; duration_ms: number; document_ids?: string[]; document_bytes?: number; gave_up?: boolean }
   | { type: 'error'; message: string }
   | { type: 'cancelled' }

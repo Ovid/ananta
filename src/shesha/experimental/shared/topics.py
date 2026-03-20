@@ -124,6 +124,15 @@ class BaseTopicManager:
                 names.append(meta["name"])
         return sorted(names)
 
+    def resolve(self, name: str) -> str | None:
+        """Resolve a topic name to its first project_id, or None."""
+        try:
+            meta, _path = self._resolve(name)
+        except ValueError:
+            return None
+        items = meta["items"]
+        return items[0] if items else None
+
     # ------------------------------------------------------------------
     # Item references
     # ------------------------------------------------------------------
@@ -190,6 +199,20 @@ class BaseTopicManager:
             if project_id in items:
                 items.remove(project_id)
                 meta_path.write_text(json.dumps(meta, indent=2))
+
+    def reorder_items(self, topic: str, item_ids: list[str]) -> None:
+        """Reorder items in a topic. *item_ids* must contain exactly the same IDs."""
+        meta, meta_path = self._resolve(topic)
+        existing = set(meta["items"])
+        new = set(item_ids)
+        if existing != new:
+            msg = (
+                f"item_ids must contain exactly the same items as the topic "
+                f"(got {len(item_ids)}, expected {len(existing)})"
+            )
+            raise ValueError(msg)
+        meta["items"] = list(item_ids)
+        meta_path.write_text(json.dumps(meta, indent=2))
 
     def get_topic_dir(self, name: str) -> Path:
         """Return the directory for the topic with *name*.

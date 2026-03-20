@@ -251,6 +251,32 @@ class TestArxivSearcher:
         assert extract_arxiv_id("http://arxiv.org/abs/2501.12345v1") == "2501.12345v1"
         assert extract_arxiv_id("http://arxiv.org/abs/2501.12345") == "2501.12345"
 
+    def test_extract_arxiv_id_replaces_slash_in_old_style_ids(self) -> None:
+        """Old-style arXiv IDs like cs/9808001v1 must have / replaced with -.
+
+        Slashes in IDs break _SAFE_ID_RE validation and create subdirectories
+        in the storage layer.
+        """
+        from shesha.experimental.arxiv.search import extract_arxiv_id
+
+        assert extract_arxiv_id("http://arxiv.org/abs/cs/9808001v1") == "cs-9808001v1"
+        assert extract_arxiv_id("http://arxiv.org/abs/astro-ph/0601001v1") == "astro-ph-0601001v1"
+        assert extract_arxiv_id("http://arxiv.org/abs/math/0703001") == "math-0703001"
+
+    @patch("shesha.experimental.arxiv.search.arxiv")
+    def test_old_style_id_preserves_slash_in_urls(self, mock_arxiv: MagicMock) -> None:
+        """Old-style IDs get sanitized for arxiv_id but URLs keep the slash."""
+        from shesha.experimental.arxiv.search import ArxivSearcher
+
+        mock_client = MagicMock()
+        mock_arxiv.Client.return_value = mock_client
+        mock_client.results.return_value = iter([_mock_arxiv_result(arxiv_id="cs/9808001v1")])
+
+        searcher = ArxivSearcher()
+        results = searcher.search("chess")
+        assert results[0].arxiv_id == "cs-9808001v1"
+        assert results[0].arxiv_url == "https://arxiv.org/abs/cs/9808001v1"
+
     @patch("shesha.experimental.arxiv.search.arxiv")
     def test_close_closes_underlying_session(self, mock_arxiv: MagicMock) -> None:
         """close() should close the arxiv.Client's requests session."""

@@ -3,6 +3,7 @@
 import datetime
 import json
 import logging
+import threading
 from pathlib import Path
 
 from shesha.exceptions import TraceWriteError
@@ -59,6 +60,13 @@ class IncrementalTraceWriter:
         self.suppress_errors = suppress_errors
         self.path: Path | None = None
         self._max_iteration: int = 0
+        self._finalized: bool = False
+        self._lock = threading.Lock()
+
+    @property
+    def finalized(self) -> bool:
+        """Whether finalize() has been called."""
+        return self._finalized
 
     def start(self, project_id: str, context: QueryContext) -> Path | None:
         """Create trace file and write the header line.
@@ -107,29 +115,32 @@ class IncrementalTraceWriter:
         Args:
             step: The trace step to write.
         """
-        if self.path is None:
-            return
-
-        try:
-            self._max_iteration = max(self._max_iteration, step.iteration)
-            step_data = {
-                "type": "step",
-                "step_type": step.type.value,
-                "iteration": step.iteration,
-                "timestamp": datetime.datetime.fromtimestamp(
-                    step.timestamp, tz=datetime.UTC
-                ).isoformat(),
-                "content": redact(step.content),
-                "tokens_used": step.tokens_used,
-                "duration_ms": step.duration_ms,
-            }
-            with self.path.open("a") as f:
-                f.write(json.dumps(step_data) + "\n")
-        except Exception as e:
-            if self.suppress_errors:
-                logger.warning(f"Failed to write incremental trace step: {e}")
+        with self._lock:
+            if self.path is None or self._finalized:
                 return
-            raise TraceWriteError(f"Failed to write incremental trace step: {e}") from e
+
+            try:
+                self._max_iteration = max(self._max_iteration, step.iteration)
+                step_data: dict[str, object] = {
+                    "type": "step",
+                    "step_type": step.type.value,
+                    "iteration": step.iteration,
+                    "timestamp": datetime.datetime.fromtimestamp(
+                        step.timestamp, tz=datetime.UTC
+                    ).isoformat(),
+                    "content": redact(step.content),
+                    "tokens_used": step.tokens_used,
+                    "duration_ms": step.duration_ms,
+                }
+                if step.metadata:
+                    step_data["metadata"] = step.metadata
+                with self.path.open("a") as f:
+                    f.write(json.dumps(step_data) + "\n")
+            except Exception as e:
+                if self.suppress_errors:
+                    logger.warning(f"Failed to write incremental trace step: {e}")
+                    return
+                raise TraceWriteError(f"Failed to write incremental trace step: {e}") from e
 
     def finalize(
         self,
@@ -146,25 +157,30 @@ class IncrementalTraceWriter:
             execution_time: Total execution time in seconds.
             status: Query status (success, max_iterations, interrupted).
         """
-        if self.path is None:
-            return
-
-        try:
-            summary = {
-                "type": "summary",
-                "answer": answer,
-                "total_iterations": self._max_iteration + 1,
-                "total_tokens": {
-                    "prompt": token_usage.prompt_tokens,
-                    "completion": token_usage.completion_tokens,
-                },
-                "total_duration_ms": int(execution_time * 1000),
-                "status": status,
-            }
-            with self.path.open("a") as f:
-                f.write(json.dumps(summary) + "\n")
-        except Exception as e:
-            if self.suppress_errors:
-                logger.warning(f"Failed to finalize incremental trace: {e}")
+        with self._lock:
+            if self.path is None or self._finalized:
                 return
-            raise TraceWriteError(f"Failed to finalize incremental trace: {e}") from e
+
+            try:
+                summary = {
+                    "type": "summary",
+                    "answer": answer,
+                    "total_iterations": self._max_iteration + 1,
+                    "total_tokens": {
+                        "prompt": token_usage.prompt_tokens,
+                        "completion": token_usage.completion_tokens,
+                    },
+                    "total_duration_ms": int(execution_time * 1000),
+                    "status": status,
+                }
+                with self.path.open("a") as f:
+                    f.write(json.dumps(summary) + "\n")
+                self._finalized = True
+            except Exception as e:
+                if self.suppress_errors:
+                    # Mark as finalized even on failure to prevent a later
+                    # safety-net call from overwriting with "[interrupted]".
+                    self._finalized = True
+                    logger.warning(f"Failed to finalize incremental trace: {e}")
+                    return
+                raise TraceWriteError(f"Failed to finalize incremental trace: {e}") from e

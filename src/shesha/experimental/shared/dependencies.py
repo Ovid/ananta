@@ -9,6 +9,7 @@ from shesha import Shesha
 from shesha.config import SheshaConfig
 from shesha.experimental.shared.session import WebConversationSession
 from shesha.experimental.shared.topics import BaseTopicManager
+from shesha.repo.ingester import RepoIngester
 from shesha.storage.filesystem import FilesystemStorage
 
 
@@ -58,7 +59,11 @@ def create_app_state(
         config.model = model
 
     storage = FilesystemStorage(shesha_data)
-    shesha = Shesha(config=config, storage=storage)
+    repo_ingester = RepoIngester(
+        storage_path=config.storage_path,
+        allow_local_paths=False,
+    )
+    shesha = Shesha(config=config, storage=storage, repo_ingester=repo_ingester)
     topic_mgr = topic_mgr_class(topics_dir)
     session = WebConversationSession(data_dir)
 

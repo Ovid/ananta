@@ -9,6 +9,7 @@ const baseRepo: RepoInfo = {
   source_url: 'https://github.com/owner/myrepo',
   file_count: 42,
   analysis_status: 'current',
+  display_name: null,
 }
 
 const sampleAnalysis: RepoAnalysis = {

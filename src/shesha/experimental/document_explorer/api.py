@@ -20,9 +20,14 @@ from shesha.experimental.document_explorer.dependencies import (
     DocumentExplorerState,
     get_topic_session,
 )
-from shesha.experimental.document_explorer.extractors import extract_text, get_page_count
+from shesha.experimental.document_explorer.extractors import (
+    extract_text,
+    get_page_count,
+    is_supported_extension,
+)
 from shesha.experimental.document_explorer.schemas import (
     DocumentInfo,
+    DocumentRename,
     DocumentUploadResponse,
 )
 from shesha.experimental.document_explorer.topics import _slugify
@@ -31,7 +36,13 @@ from shesha.experimental.shared.app_factory import create_app
 from shesha.experimental.shared.routes import create_item_router, create_shared_router
 from shesha.models import ParsedDocument
 
-_SAFE_ID_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
+# Maximum upload size per file (50 MB).
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+MAX_AGGREGATE_UPLOAD_BYTES = 200 * 1024 * 1024
+
+# Allow / for old-style arXiv IDs (e.g. cs/9808001v1), but block .. traversal.
+# safe_path() provides the real path-traversal defence; this is belt-and-suspenders.
+_SAFE_ID_RE = re.compile(r"^(?!.*\.\.)[a-zA-Z0-9][a-zA-Z0-9._/-]*$")
 
 
 def _validate_doc_id(doc_id: str) -> None:
@@ -153,63 +164,102 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                 raise HTTPException(422, str(exc)) from exc
 
         results: list[DocumentUploadResponse] = []
-        for file in files:
-            if not file.filename:
-                continue
+        created_projects: list[str] = []
+        created_upload_dirs: list[Path] = []
+        total_bytes = 0
+        try:
+            for file in files:
+                if not file.filename:
+                    continue
 
-            project_id = _make_project_id(file.filename)
+                project_id = _make_project_id(file.filename)
 
-            # Save original file
-            upload_dir = state.uploads_dir / project_id
-            upload_dir.mkdir(parents=True, exist_ok=True)
-            content = await file.read()
+                # Validate extension before reading body — only needs filename,
+                # avoids allocating memory for files we'll reject anyway.
+                ext = Path(file.filename).suffix.lower()
+                if not is_supported_extension(file.filename):
+                    raise HTTPException(422, f"Unsupported file type: {ext}")
 
-            ext = Path(file.filename).suffix
-            original_path = upload_dir / f"original{ext}"
-            original_path.write_bytes(content)
+                # Cap read to avoid memory exhaustion from oversized uploads.
+                content = await file.read(MAX_UPLOAD_BYTES + 1)
+                if len(content) > MAX_UPLOAD_BYTES:
+                    raise HTTPException(
+                        413,
+                        f"File '{file.filename}' exceeds the "
+                        f"{MAX_UPLOAD_BYTES // (1024 * 1024)} MB upload limit",
+                    )
 
-            # Extract text
-            try:
-                text = extract_text(original_path)
-            except ValueError as exc:
-                shutil.rmtree(upload_dir)
-                raise HTTPException(422, str(exc)) from exc
+                total_bytes += len(content)
+                if total_bytes > MAX_AGGREGATE_UPLOAD_BYTES:
+                    raise HTTPException(
+                        413,
+                        f"Total upload size exceeds the "
+                        f"{MAX_AGGREGATE_UPLOAD_BYTES // (1024 * 1024)} MB aggregate limit",
+                    )
 
-            # Compute page/sheet/slide count where applicable
-            page_count = get_page_count(original_path)
+                # Save original file
+                upload_dir = state.uploads_dir / project_id
+                upload_dir.mkdir(parents=True, exist_ok=True)
+                created_upload_dirs.append(upload_dir)
 
-            # Save upload metadata
-            meta = {
-                "filename": file.filename,
-                "content_type": file.content_type or "application/octet-stream",
-                "size": len(content),
-                "upload_date": datetime.now(UTC).isoformat(),
-                "page_count": page_count,
-            }
-            (upload_dir / "meta.json").write_text(json.dumps(meta, indent=2))
+                original_path = upload_dir / f"original{ext}"
+                original_path.write_bytes(content)
 
-            # Create Shesha project and store extracted text
-            state.shesha.create_project(project_id)
-            doc = ParsedDocument(
-                name=file.filename,
-                content=text,
-                format=ext.lstrip(".") or "txt",
-                metadata={"filename": file.filename, "size": len(content)},
-                char_count=len(text),
-            )
-            state.shesha.storage.store_document(project_id, doc)
+                # Extract text
+                try:
+                    text = extract_text(original_path)
+                except ValueError as exc:
+                    raise HTTPException(422, str(exc)) from exc
 
-            # Add to topic (already created/validated above)
-            if topic:
-                state.topic_mgr.add_item(topic, project_id)
+                # Compute page/sheet/slide count where applicable
+                page_count = get_page_count(original_path)
 
-            results.append(
-                DocumentUploadResponse(
-                    project_id=project_id,
-                    filename=file.filename,
-                    status="created",
+                # Save upload metadata
+                meta = {
+                    "filename": file.filename,
+                    "content_type": file.content_type or "application/octet-stream",
+                    "size": len(content),
+                    "upload_date": datetime.now(UTC).isoformat(),
+                    "page_count": page_count,
+                }
+                (upload_dir / "meta.json").write_text(json.dumps(meta, indent=2))
+
+                state.shesha.create_project(project_id)
+                created_projects.append(project_id)
+                doc = ParsedDocument(
+                    name=file.filename,
+                    content=text,
+                    format=ext.lstrip(".") or "txt",
+                    metadata={"filename": file.filename, "size": len(content)},
+                    char_count=len(text),
                 )
-            )
+                state.shesha.storage.store_document(project_id, doc)
+
+                if topic:
+                    state.topic_mgr.add_item(topic, project_id)
+
+                results.append(
+                    DocumentUploadResponse(
+                        project_id=project_id,
+                        filename=file.filename,
+                        status="created",
+                    )
+                )
+        except Exception:
+            # Roll back all projects and upload dirs created so far
+            for pid in created_projects:
+                try:
+                    state.topic_mgr.remove_item_from_all(pid)
+                except Exception:
+                    pass  # Best-effort cleanup — original error takes priority
+                try:
+                    state.shesha.delete_project(pid)
+                except Exception:
+                    pass  # Best-effort cleanup — original error takes priority
+            for udir in created_upload_dirs:
+                shutil.rmtree(udir, ignore_errors=True)
+            raise
+
         return results
 
     @router.get("/documents/{doc_id}")
@@ -237,6 +287,27 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
         state.shesha.delete_project(doc_id)
         return {"status": "deleted", "project_id": doc_id}
 
+    @router.patch("/documents/{doc_id:path}")
+    def rename_document(doc_id: str, body: DocumentRename) -> DocumentInfo:
+        _validate_doc_id(doc_id)
+        new_name = body.new_name.strip()
+        if not new_name:
+            raise HTTPException(422, "new_name must not be empty or whitespace")
+        meta = _read_upload_meta(state.uploads_dir, doc_id)
+        if meta is None:
+            raise HTTPException(404, f"Document '{doc_id}' not found")
+        meta["filename"] = new_name
+        meta_path = state.uploads_dir / doc_id / "meta.json"
+        meta_path.write_text(json.dumps(meta, indent=2))
+        return DocumentInfo(
+            project_id=doc_id,
+            filename=meta.get("filename", ""),
+            content_type=meta.get("content_type", ""),
+            size=meta.get("size", 0),
+            upload_date=meta.get("upload_date", ""),
+            page_count=meta.get("page_count"),
+        )
+
     @router.get("/documents/{doc_id}/download")
     def download_document(doc_id: str) -> FileResponse:
         _validate_doc_id(doc_id)
@@ -254,7 +325,9 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
             if not originals:
                 raise HTTPException(404, f"Original file not found for '{doc_id}'")
             original_path = originals[0]
-        return FileResponse(original_path, filename=filename)
+        # Sanitize filename to prevent Content-Disposition header injection
+        safe_filename = re.sub(r'["\r\n;]', "_", filename)
+        return FileResponse(original_path, filename=safe_filename)
 
     return router
 

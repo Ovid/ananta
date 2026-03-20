@@ -21,6 +21,15 @@ class TestMakeProjectId:
         # Format: slug-xxxxxxxx
         assert re.fullmatch(r"[a-z0-9]+-[a-f0-9]{8}", pid), f"unexpected format: {pid}"
 
+    def test_same_filename_produces_different_ids(self) -> None:
+        """Same filename yields different IDs due to timestamp in hash.
+
+        Known limitation (F-18): fix deferred — requires content-based hashing.
+        """
+        id1 = _make_project_id("report.pdf")
+        id2 = _make_project_id("report.pdf")
+        assert id1 != id2
+
 
 @pytest.fixture
 def mock_shesha() -> MagicMock:
@@ -200,6 +209,261 @@ class TestUploadDocument:
         assert ".png" in resp.json()["detail"]
 
 
+class TestUploadAtomicity:
+    """Upload failures at each step should clean up and not leave orphaned state."""
+
+    def test_create_project_failure_cleans_up_upload_dir(
+        self,
+        state: DocumentExplorerState,
+        mock_shesha: MagicMock,
+        uploads_dir: Path,
+    ) -> None:
+        """If create_project fails, upload dir is cleaned up."""
+        mock_shesha.create_project.side_effect = RuntimeError("storage full")
+        app = create_api(state)
+        client = TestClient(app, raise_server_exceptions=False)
+
+        resp = client.post(
+            "/api/documents/upload",
+            files=[("files", ("notes.txt", b"Hello", "text/plain"))],
+        )
+        assert resp.status_code == 500
+        mock_shesha.storage.store_document.assert_not_called()
+        # Upload dir should be cleaned up
+        assert list(uploads_dir.iterdir()) == []
+
+    def test_store_document_failure_cleans_up_project_and_upload(
+        self,
+        state: DocumentExplorerState,
+        mock_shesha: MagicMock,
+        uploads_dir: Path,
+    ) -> None:
+        """If store_document fails, both project and upload dir are cleaned up."""
+        mock_shesha.create_project.return_value = MagicMock()
+        mock_shesha.storage.store_document.side_effect = RuntimeError("disk error")
+        app = create_api(state)
+        client = TestClient(app, raise_server_exceptions=False)
+
+        resp = client.post(
+            "/api/documents/upload",
+            files=[("files", ("notes.txt", b"Hello", "text/plain"))],
+        )
+        assert resp.status_code == 500
+        # Project should be deleted (cleanup)
+        mock_shesha.delete_project.assert_called_once()
+        # Upload dir should be cleaned up
+        assert list(uploads_dir.iterdir()) == []
+
+    def test_text_extraction_failure_cleans_up_upload_dir(
+        self,
+        client: TestClient,
+        uploads_dir: Path,
+    ) -> None:
+        """Existing behavior: extraction failure removes the upload directory."""
+        resp = client.post(
+            "/api/documents/upload",
+            files=[("files", ("photo.png", b"\x89PNG", "image/png"))],
+        )
+        assert resp.status_code == 422
+        # Upload dir should be cleaned up
+        assert list(uploads_dir.iterdir()) == []
+
+    def test_topic_add_failure_cleans_up_everything(
+        self,
+        state: DocumentExplorerState,
+        mock_shesha: MagicMock,
+        uploads_dir: Path,
+    ) -> None:
+        """If add_to_topic fails, project, document, and upload dir are cleaned up."""
+        mock_shesha.create_project.return_value = MagicMock()
+        # Create the topic so the pre-flight validation passes
+        state.topic_mgr.create("Research")
+
+        # Make add_item fail
+        original_add = state.topic_mgr.add_item
+
+        def fail_add(topic: str, item: str) -> None:
+            raise RuntimeError("topic storage error")
+
+        state.topic_mgr.add_item = fail_add  # type: ignore[assignment]
+
+        app = create_api(state)
+        client = TestClient(app, raise_server_exceptions=False)
+
+        resp = client.post(
+            "/api/documents/upload",
+            files=[("files", ("notes.txt", b"Hello", "text/plain"))],
+            data={"topic": "Research"},
+        )
+        assert resp.status_code == 500
+        # Project should be deleted (cleanup)
+        mock_shesha.delete_project.assert_called_once()
+        # Upload dir should be cleaned up
+        assert list(uploads_dir.iterdir()) == []
+
+        state.topic_mgr.add_item = original_add  # type: ignore[assignment]
+
+    def test_batch_upload_cleans_up_earlier_files_on_later_failure(
+        self,
+        state: DocumentExplorerState,
+        mock_shesha: MagicMock,
+        uploads_dir: Path,
+    ) -> None:
+        """If file 2 of 2 fails at store_document, file 1's project is also cleaned up."""
+        call_count = [0]
+
+        def store_side_effect(project_id, doc, **kwargs):
+            call_count[0] += 1
+            if call_count[0] == 2:
+                raise RuntimeError("disk full on second file")
+
+        mock_shesha.create_project.return_value = MagicMock()
+        mock_shesha.storage.store_document.side_effect = store_side_effect
+        app = create_api(state)
+        client = TestClient(app, raise_server_exceptions=False)
+
+        resp = client.post(
+            "/api/documents/upload",
+            files=[
+                ("files", ("first.txt", b"Hello", "text/plain")),
+                ("files", ("second.txt", b"World", "text/plain")),
+            ],
+        )
+        assert resp.status_code == 500
+        # Both projects should be cleaned up — not just the second one
+        assert mock_shesha.delete_project.call_count == 2
+        # All upload dirs should be cleaned up
+        assert list(uploads_dir.iterdir()) == []
+
+    def test_batch_upload_rollback_removes_topic_associations(
+        self,
+        state: DocumentExplorerState,
+        mock_shesha: MagicMock,
+        topic_mgr: DocumentTopicManager,
+        uploads_dir: Path,
+    ) -> None:
+        """Batch upload rollback removes topic associations for cleaned-up projects."""
+        topic_mgr.create("MyTopic")
+        call_count = [0]
+        created_pids: list[str] = []
+
+        def store_side_effect(project_id, doc, **kwargs):
+            call_count[0] += 1
+            created_pids.append(project_id)
+            if call_count[0] == 2:
+                raise RuntimeError("disk full on second file")
+
+        mock_shesha.create_project.return_value = MagicMock()
+        mock_shesha.storage.store_document.side_effect = store_side_effect
+        app = create_api(state)
+        client = TestClient(app, raise_server_exceptions=False)
+
+        resp = client.post(
+            "/api/documents/upload",
+            data={"topic": "MyTopic"},
+            files=[
+                ("files", ("first.txt", b"Hello", "text/plain")),
+                ("files", ("second.txt", b"World", "text/plain")),
+            ],
+        )
+        assert resp.status_code == 500
+        # Topic associations should be cleaned up — no orphaned references
+        for pid in created_pids:
+            items = topic_mgr.list_items("MyTopic")
+            assert pid not in items, f"Orphaned topic entry for {pid}"
+
+
+class TestUploadSizeLimit:
+    def test_upload_exceeding_size_limit_returns_413(
+        self,
+        client: TestClient,
+    ) -> None:
+        """Uploads exceeding MAX_UPLOAD_BYTES are rejected with 413."""
+        from shesha.experimental.document_explorer.api import MAX_UPLOAD_BYTES
+
+        oversized = b"x" * (MAX_UPLOAD_BYTES + 1)
+        resp = client.post(
+            "/api/documents/upload",
+            files=[("files", ("big.txt", oversized, "text/plain"))],
+        )
+        assert resp.status_code == 413
+
+    def test_upload_at_size_limit_succeeds(
+        self,
+        client: TestClient,
+        mock_shesha: MagicMock,
+    ) -> None:
+        """Uploads exactly at the limit should succeed."""
+        from shesha.experimental.document_explorer.api import MAX_UPLOAD_BYTES
+
+        mock_shesha.create_project.return_value = MagicMock()
+        at_limit = b"x" * MAX_UPLOAD_BYTES
+        resp = client.post(
+            "/api/documents/upload",
+            files=[("files", ("ok.txt", at_limit, "text/plain"))],
+        )
+        assert resp.status_code == 200
+
+    def test_unsupported_extension_rejected_before_reading_body(
+        self,
+        client: TestClient,
+        uploads_dir: Path,
+    ) -> None:
+        """Unsupported extension must be rejected before reading the upload body.
+
+        Regression: the old code read the entire file into memory before
+        checking the extension, so a large .png upload would allocate RAM
+        before being rejected.
+        """
+        # A small payload is enough — the extension check must come first.
+        resp = client.post(
+            "/api/documents/upload",
+            files=[("files", ("photo.png", b"\x89PNG", "image/png"))],
+        )
+        assert resp.status_code == 422
+        # No upload directory should have been created for the rejected file.
+        assert list(uploads_dir.iterdir()) == []
+
+    def test_oversized_upload_caps_memory(
+        self,
+        client: TestClient,
+    ) -> None:
+        """Server must not read more than MAX_UPLOAD_BYTES+1 into memory.
+
+        Verifies the capped-read approach: the endpoint reads at most
+        MAX_UPLOAD_BYTES+1 bytes, then checks length.
+        """
+        from shesha.experimental.document_explorer.api import MAX_UPLOAD_BYTES
+
+        # 2x the limit — old code would allocate all of this.
+        oversized = b"x" * (MAX_UPLOAD_BYTES * 2)
+        resp = client.post(
+            "/api/documents/upload",
+            files=[("files", ("huge.txt", oversized, "text/plain"))],
+        )
+        assert resp.status_code == 413
+
+    def test_extension_lowercased_in_stored_format(
+        self,
+        client: TestClient,
+        mock_shesha: MagicMock,
+        uploads_dir: Path,
+    ) -> None:
+        """Stored file extension should be lowercased (S9)."""
+        mock_shesha.create_project.return_value = MagicMock()
+        resp = client.post(
+            "/api/documents/upload",
+            files=[("files", ("NOTES.TXT", b"hello", "text/plain"))],
+        )
+        assert resp.status_code == 200
+        # Find the upload dir and check the original file extension is lowered
+        dirs = list(uploads_dir.iterdir())
+        assert len(dirs) == 1
+        originals = list(dirs[0].glob("original.*"))
+        assert len(originals) == 1
+        assert originals[0].suffix == ".txt"
+
+
 class TestDeleteDocument:
     def test_delete_removes_from_topics(
         self,
@@ -315,3 +579,125 @@ class TestTopicDocumentRoutes:
         resp = client.delete("/api/topics/Research/items/doc-1")
         assert resp.status_code == 200
         assert "doc-1" not in topic_mgr.list_items("Research")
+
+
+class TestDownloadDocument:
+    """Tests for GET /documents/{doc_id}/download."""
+
+    def _setup_upload(
+        self, uploads_dir: Path, doc_id: str, filename: str, content: bytes = b"data"
+    ) -> None:
+        """Create upload dir with meta.json and original file."""
+        doc_dir = uploads_dir / doc_id
+        doc_dir.mkdir(parents=True, exist_ok=True)
+        ext = Path(filename).suffix
+        (doc_dir / f"original{ext}").write_bytes(content)
+        (doc_dir / "meta.json").write_text(json.dumps({"filename": filename}))
+
+    def test_download_returns_file(self, client: TestClient, uploads_dir: Path) -> None:
+        self._setup_upload(uploads_dir, "doc-abc12345", "report.pdf")
+        resp = client.get("/api/documents/doc-abc12345/download")
+        assert resp.status_code == 200
+        assert resp.content == b"data"
+
+    def test_download_sanitizes_quotes_in_filename(
+        self, client: TestClient, uploads_dir: Path
+    ) -> None:
+        """Filenames with " are sanitized to prevent header injection."""
+        self._setup_upload(uploads_dir, "doc-abc12345", 'bad"name.pdf')
+        resp = client.get("/api/documents/doc-abc12345/download")
+        assert resp.status_code == 200
+        cd = resp.headers["content-disposition"]
+        # The sanitized filename should replace " with _
+        assert "bad_name.pdf" in cd
+
+    def test_download_sanitizes_newlines_in_filename(
+        self, client: TestClient, uploads_dir: Path
+    ) -> None:
+        """Filenames with \\r\\n are sanitized to prevent header injection."""
+        self._setup_upload(uploads_dir, "doc-abc12345", "bad\r\nname.pdf")
+        resp = client.get("/api/documents/doc-abc12345/download")
+        assert resp.status_code == 200
+        cd = resp.headers["content-disposition"]
+        assert "\r" not in cd
+        assert "\n" not in cd
+
+    def test_download_sanitizes_semicolons_in_filename(
+        self, client: TestClient, uploads_dir: Path
+    ) -> None:
+        """Filenames with ; are sanitized to prevent header injection."""
+        self._setup_upload(uploads_dir, "doc-abc12345", "bad;name.pdf")
+        resp = client.get("/api/documents/doc-abc12345/download")
+        assert resp.status_code == 200
+        cd = resp.headers["content-disposition"]
+        # The raw filename portion should not contain unescaped semicolons
+        assert "bad_name.pdf" in cd
+
+    def test_download_404_missing_doc(self, client: TestClient) -> None:
+        resp = client.get("/api/documents/doc-nosuch00/download")
+        assert resp.status_code == 404
+
+
+class TestRenameDocument:
+    def _setup_doc(self, uploads_dir: Path, doc_id: str, filename: str) -> None:
+        """Create upload dir with meta.json."""
+        doc_dir = uploads_dir / doc_id
+        doc_dir.mkdir(parents=True, exist_ok=True)
+        (doc_dir / "meta.json").write_text(
+            json.dumps(
+                {
+                    "filename": filename,
+                    "content_type": "application/pdf",
+                    "size": 1024,
+                    "upload_date": "2026-03-20T12:00:00Z",
+                    "page_count": 5,
+                }
+            )
+        )
+
+    def test_rename_updates_filename(self, client: TestClient, uploads_dir: Path) -> None:
+        self._setup_doc(uploads_dir, "report-a3f2", "report.pdf")
+        resp = client.patch(
+            "/api/documents/report-a3f2",
+            json={"new_name": "quarterly-report.pdf"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["filename"] == "quarterly-report.pdf"
+        # Verify meta.json was updated
+        meta = json.loads((uploads_dir / "report-a3f2" / "meta.json").read_text())
+        assert meta["filename"] == "quarterly-report.pdf"
+
+    def test_rename_returns_full_document_info(self, client: TestClient, uploads_dir: Path) -> None:
+        self._setup_doc(uploads_dir, "report-a3f2", "report.pdf")
+        resp = client.patch(
+            "/api/documents/report-a3f2",
+            json={"new_name": "new-name.pdf"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["project_id"] == "report-a3f2"
+        assert data["content_type"] == "application/pdf"
+        assert data["size"] == 1024
+
+    def test_rename_nonexistent_returns_404(self, client: TestClient) -> None:
+        resp = client.patch(
+            "/api/documents/nosuch-doc0",
+            json={"new_name": "new.pdf"},
+        )
+        assert resp.status_code == 404
+
+    def test_rename_empty_name_returns_422(self, client: TestClient, uploads_dir: Path) -> None:
+        self._setup_doc(uploads_dir, "report-a3f2", "report.pdf")
+        resp = client.patch(
+            "/api/documents/report-a3f2",
+            json={"new_name": "  "},
+        )
+        assert resp.status_code == 422
+
+    def test_rename_validates_doc_id(self, client: TestClient) -> None:
+        resp = client.patch(
+            "/api/documents/..%2F..%2Fetc",
+            json={"new_name": "evil.pdf"},
+        )
+        assert resp.status_code == 400

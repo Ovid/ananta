@@ -6,9 +6,9 @@ import json
 import os
 import re
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from shesha.exceptions import ProjectExistsError
+from shesha.exceptions import ProjectExistsError, ProjectNotFoundError
 from shesha.experimental.arxiv.models import TopicInfo
 
 if TYPE_CHECKING:
@@ -139,7 +139,30 @@ class TopicManager:
             project_id=project_id,
         )
 
-    def _read_topic_meta(self, project_id: str) -> dict[str, str] | None:
+    def get_doc_order(self, project_id: str) -> list[str] | None:
+        """Return the stored document order for a project, or None if unset."""
+        try:
+            meta = self._read_topic_meta(project_id)
+        except ProjectNotFoundError:
+            return None
+        if meta is None:
+            return None
+        order = meta.get("doc_order")
+        if order is None:
+            return None
+        return list(order)
+
+    def set_doc_order(self, project_id: str, order: list[str]) -> None:
+        """Store a custom document order in the topic metadata."""
+        meta = self._read_topic_meta(project_id)
+        if meta is None:
+            msg = f"Topic metadata not found for project: {project_id}"
+            raise ValueError(msg)
+        meta["doc_order"] = order
+        meta_path = self._project_path(project_id) / self.TOPIC_META_FILE
+        meta_path.write_text(json.dumps(meta, indent=2))
+
+    def _read_topic_meta(self, project_id: str) -> dict[str, Any] | None:
         """Read the _topic.json for a project, or None if not a topic."""
         meta_path = self._project_path(project_id) / self.TOPIC_META_FILE
         if not meta_path.exists():

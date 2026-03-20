@@ -9,6 +9,7 @@ import pytest
 from shesha.exceptions import TraceWriteError
 from shesha.models import QueryContext
 from shesha.rlm.trace import StepType, TokenUsage, Trace
+from shesha.rlm.trace_writer import IncrementalTraceWriter, TraceWriter
 from shesha.storage.filesystem import FilesystemStorage
 
 
@@ -24,7 +25,6 @@ class TestTraceWriterCleanup:
 
     def test_cleanup_removes_oldest_traces(self, storage: FilesystemStorage) -> None:
         """cleanup_old_traces removes oldest when over limit."""
-        from shesha.rlm.trace_writer import TraceWriter
 
         traces_dir = storage.get_traces_dir("test-project")
         # Create 5 trace files
@@ -44,7 +44,6 @@ class TestTraceWriterCleanup:
 
     def test_cleanup_does_nothing_under_limit(self, storage: FilesystemStorage) -> None:
         """cleanup_old_traces does nothing when under limit."""
-        from shesha.rlm.trace_writer import TraceWriter
 
         traces_dir = storage.get_traces_dir("test-project")
         # Create 2 trace files
@@ -63,8 +62,6 @@ class TestCleanupOldTracesErrorHandling:
 
     def test_cleanup_raises_by_default_on_error(self, tmp_path: Path) -> None:
         """cleanup_old_traces raises TraceWriteError when suppress_errors is False."""
-        from shesha.exceptions import TraceWriteError
-        from shesha.rlm.trace_writer import TraceWriter
 
         storage = MagicMock()
         storage.list_traces.side_effect = OSError("disk error")
@@ -75,7 +72,6 @@ class TestCleanupOldTracesErrorHandling:
 
     def test_cleanup_suppresses_errors_when_configured(self, tmp_path: Path) -> None:
         """cleanup_old_traces swallows errors when suppress_errors is True."""
-        from shesha.rlm.trace_writer import TraceWriter
 
         storage = MagicMock()
         storage.list_traces.side_effect = OSError("disk error")
@@ -111,7 +107,6 @@ class TestIncrementalTraceWriter:
         self, storage: FilesystemStorage, context: QueryContext
     ) -> None:
         """start() creates a JSONL file with header as first line."""
-        from shesha.rlm.trace_writer import IncrementalTraceWriter
 
         writer = IncrementalTraceWriter(storage)
         path = writer.start("test-project", context)
@@ -131,7 +126,6 @@ class TestIncrementalTraceWriter:
         self, storage: FilesystemStorage, context: QueryContext
     ) -> None:
         """write_step() appends a step line after the header."""
-        from shesha.rlm.trace_writer import IncrementalTraceWriter
 
         writer = IncrementalTraceWriter(storage)
         writer.start("test-project", context)
@@ -148,11 +142,45 @@ class TestIncrementalTraceWriter:
         assert step_data["content"] == "print('hi')"
         assert step_data["tokens_used"] == 50
 
+    def test_write_step_includes_metadata_when_present(
+        self, storage: FilesystemStorage, context: QueryContext
+    ) -> None:
+        """write_step() includes metadata dict in JSONL when set on step."""
+
+        writer = IncrementalTraceWriter(storage)
+        writer.start("test-project", context)
+
+        step = Trace().add_step(
+            StepType.FINAL_ANSWER,
+            "the answer",
+            iteration=0,
+            metadata={"source": "bare_final"},
+        )
+        writer.write_step(step)
+
+        lines = writer.path.read_text().strip().split("\n")
+        step_data = json.loads(lines[1])
+        assert step_data["metadata"] == {"source": "bare_final"}
+
+    def test_write_step_omits_metadata_when_none(
+        self, storage: FilesystemStorage, context: QueryContext
+    ) -> None:
+        """write_step() omits metadata key from JSONL when not set."""
+
+        writer = IncrementalTraceWriter(storage)
+        writer.start("test-project", context)
+
+        step = Trace().add_step(StepType.CODE_GENERATED, "print('hi')", iteration=0)
+        writer.write_step(step)
+
+        lines = writer.path.read_text().strip().split("\n")
+        step_data = json.loads(lines[1])
+        assert "metadata" not in step_data
+
     def test_multiple_steps_appended_in_order(
         self, storage: FilesystemStorage, context: QueryContext
     ) -> None:
         """Multiple write_step() calls append in order."""
-        from shesha.rlm.trace_writer import IncrementalTraceWriter
 
         writer = IncrementalTraceWriter(storage)
         writer.start("test-project", context)
@@ -176,7 +204,6 @@ class TestIncrementalTraceWriter:
         self, storage: FilesystemStorage, context: QueryContext
     ) -> None:
         """finalize() appends summary as last line."""
-        from shesha.rlm.trace_writer import IncrementalTraceWriter
 
         writer = IncrementalTraceWriter(storage)
         writer.start("test-project", context)
@@ -203,7 +230,6 @@ class TestIncrementalTraceWriter:
         self, storage: FilesystemStorage, context: QueryContext
     ) -> None:
         """finalize() works even with no steps (e.g., early interruption)."""
-        from shesha.rlm.trace_writer import IncrementalTraceWriter
 
         writer = IncrementalTraceWriter(storage)
         writer.start("test-project", context)
@@ -222,7 +248,6 @@ class TestIncrementalTraceWriter:
 
     def test_steps_are_redacted(self, storage: FilesystemStorage, context: QueryContext) -> None:
         """Secrets in step content are redacted before writing."""
-        from shesha.rlm.trace_writer import IncrementalTraceWriter
 
         writer = IncrementalTraceWriter(storage)
         writer.start("test-project", context)
@@ -240,7 +265,6 @@ class TestIncrementalTraceWriter:
 
     def test_write_step_noop_when_not_started(self) -> None:
         """write_step() is a no-op if start() was never called."""
-        from shesha.rlm.trace_writer import IncrementalTraceWriter
 
         writer = IncrementalTraceWriter(MagicMock())
         step = Trace().add_step(StepType.CODE_GENERATED, "code", iteration=0)
@@ -249,7 +273,6 @@ class TestIncrementalTraceWriter:
 
     def test_finalize_noop_when_not_started(self) -> None:
         """finalize() is a no-op if start() was never called."""
-        from shesha.rlm.trace_writer import IncrementalTraceWriter
 
         writer = IncrementalTraceWriter(MagicMock())
         # Should not raise
@@ -262,7 +285,6 @@ class TestIncrementalTraceWriter:
 
     def test_start_raises_by_default_on_failure(self, context: QueryContext) -> None:
         """start() raises TraceWriteError by default on failure."""
-        from shesha.rlm.trace_writer import IncrementalTraceWriter
 
         mock_storage = MagicMock()
         mock_storage.get_traces_dir.side_effect = OSError("no traces dir")
@@ -273,7 +295,6 @@ class TestIncrementalTraceWriter:
 
     def test_start_returns_none_when_suppressed(self, context: QueryContext) -> None:
         """start() returns None when suppress_errors=True on failure."""
-        from shesha.rlm.trace_writer import IncrementalTraceWriter
 
         mock_storage = MagicMock()
         mock_storage.get_traces_dir.side_effect = OSError("no traces dir")
@@ -286,7 +307,6 @@ class TestIncrementalTraceWriter:
         self, storage: FilesystemStorage, context: QueryContext
     ) -> None:
         """write_step() raises TraceWriteError by default on failure."""
-        from shesha.rlm.trace_writer import IncrementalTraceWriter
 
         writer = IncrementalTraceWriter(storage)
         writer.start("test-project", context)
@@ -305,7 +325,6 @@ class TestIncrementalTraceWriter:
         self, storage: FilesystemStorage, context: QueryContext
     ) -> None:
         """write_step() logs warning when suppress_errors=True on failure."""
-        from shesha.rlm.trace_writer import IncrementalTraceWriter
 
         writer = IncrementalTraceWriter(storage, suppress_errors=True)
         writer.start("test-project", context)
@@ -324,7 +343,6 @@ class TestIncrementalTraceWriter:
         self, storage: FilesystemStorage, context: QueryContext
     ) -> None:
         """finalize() raises TraceWriteError by default on failure."""
-        from shesha.rlm.trace_writer import IncrementalTraceWriter
 
         writer = IncrementalTraceWriter(storage)
         writer.start("test-project", context)
@@ -347,7 +365,6 @@ class TestIncrementalTraceWriter:
         self, storage: FilesystemStorage, context: QueryContext
     ) -> None:
         """finalize() logs warning when suppress_errors=True on failure."""
-        from shesha.rlm.trace_writer import IncrementalTraceWriter
 
         writer = IncrementalTraceWriter(storage, suppress_errors=True)
         writer.start("test-project", context)
@@ -365,3 +382,93 @@ class TestIncrementalTraceWriter:
             )
         finally:
             writer.path.chmod(0o644)
+
+    def test_finalize_marks_finalized_after_suppressed_write_failure(
+        self, storage: FilesystemStorage, context: QueryContext
+    ) -> None:
+        """finalize() marks as finalized even after suppressed write failure.
+
+        This prevents a later safety-net call (e.g., the finally block
+        in the engine) from overwriting with "[interrupted]".
+        """
+
+        writer = IncrementalTraceWriter(storage, suppress_errors=True)
+        writer.start("test-project", context)
+
+        # Force write failure by making file read-only
+        writer.path.chmod(0o444)
+        writer.finalize(
+            answer="42",
+            token_usage=TokenUsage(prompt_tokens=100, completion_tokens=50),
+            execution_time=1.5,
+            status="success",
+        )
+        writer.path.chmod(0o644)
+
+        # Should be marked as finalized despite the write failure
+        assert writer.finalized
+
+        # A second call (simulating the finally block) should be a no-op
+        writer.finalize(
+            answer="[interrupted]",
+            token_usage=TokenUsage(),
+            execution_time=0.0,
+            status="interrupted",
+        )
+        # No summary line should have been written at all
+        lines = writer.path.read_text().strip().split("\n")
+        assert all(json.loads(line)["type"] != "summary" for line in lines)
+
+    def test_write_step_after_finalize_is_noop(
+        self, storage: FilesystemStorage, context: QueryContext
+    ) -> None:
+        """write_step() after finalize() is a no-op — writer enforces order."""
+
+        writer = IncrementalTraceWriter(storage)
+        writer.start("test-project", context)
+
+        step = Trace().add_step(StepType.CODE_GENERATED, "code", iteration=0)
+        writer.write_step(step)
+
+        writer.finalize(
+            answer="42",
+            token_usage=TokenUsage(prompt_tokens=100, completion_tokens=50),
+            execution_time=1.5,
+            status="success",
+        )
+
+        lines_after_finalize = writer.path.read_text().strip().split("\n")
+        assert len(lines_after_finalize) == 3  # header + step + summary
+
+        late_step = Trace().add_step(StepType.CODE_OUTPUT, "late", iteration=1)
+        writer.write_step(late_step)
+
+        lines_after_late = writer.path.read_text().strip().split("\n")
+        # No-op: still 3 lines
+        assert len(lines_after_late) == 3
+
+    def test_finalize_after_finalize_is_noop(
+        self, storage: FilesystemStorage, context: QueryContext
+    ) -> None:
+        """Calling finalize() twice is a no-op — only the first write takes effect."""
+
+        writer = IncrementalTraceWriter(storage)
+        writer.start("test-project", context)
+
+        writer.finalize(
+            answer="first",
+            token_usage=TokenUsage(),
+            execution_time=1.0,
+            status="success",
+        )
+        writer.finalize(
+            answer="second",
+            token_usage=TokenUsage(),
+            execution_time=2.0,
+            status="success",
+        )
+
+        lines = writer.path.read_text().strip().split("\n")
+        assert len(lines) == 2  # header + 1 summary only
+        summary = json.loads(lines[-1])
+        assert summary["answer"] == "first"

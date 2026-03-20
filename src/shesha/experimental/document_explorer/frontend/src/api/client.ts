@@ -12,6 +12,11 @@ export const api = {
     get: (id: string) => request<DocumentInfo>(`/documents/${encodeURIComponent(id)}`),
     delete: (id: string) =>
       request<{ status: string }>(`/documents/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    rename: (id: string, newName: string) =>
+      request<DocumentInfo>(`/documents/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ new_name: newName }),
+      }),
     topics: (id: string) =>
       request<string[]>(`/documents/${encodeURIComponent(id)}/topics`),
     upload: (files: File[], topic?: string) => {

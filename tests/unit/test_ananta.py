@@ -20,7 +20,7 @@ from ananta.storage.filesystem import FilesystemStorage
 
 @pytest.fixture
 def ananta_instance(tmp_path: Path) -> Ananta:
-    """Create a Ananta instance for testing (no Docker needed at init)."""
+    """Create an Ananta instance for testing (no Docker needed at init)."""
     return Ananta(model="test-model", storage_path=tmp_path)
 
 
@@ -1196,7 +1196,7 @@ class TestExtractRepoName:
     """Tests for _extract_repo_name method."""
 
     def _make_ananta(self, tmp_path: Path, is_local: bool = False) -> Ananta:
-        """Create a Ananta instance with mocked Docker and RepoIngester."""
+        """Create an Ananta instance with mocked Docker and RepoIngester."""
         with patch("ananta.ananta.docker"), patch("ananta.ananta.ContainerPool"):
             with patch("ananta.ananta.RepoIngester") as mock_ingester_cls:
                 mock_ingester = MagicMock()

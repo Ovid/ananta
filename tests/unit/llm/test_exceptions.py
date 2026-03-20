@@ -20,7 +20,7 @@ class TestLLMExceptionHierarchy:
         assert isinstance(error, AnantaError)
 
     def test_llm_subtypes_catchable_by_ananta_error(self) -> None:
-        """All LLM exceptions are catchable via AnantaError."""
+        """All LLM exceptions are catchable vian AnantaError."""
         for exc_class in [LLMError, RateLimitError, TransientError, PermanentError]:
             with pytest.raises(AnantaError):
                 raise exc_class("test")

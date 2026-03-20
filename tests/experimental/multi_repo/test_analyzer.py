@@ -14,7 +14,7 @@ class TestMultiRepoAnalyzerInit:
     """Tests for analyzer initialization."""
 
     def test_init_with_ananta_instance(self):
-        """Analyzer initializes with a Ananta instance."""
+        """Analyzer initializes with an Ananta instance."""
         mock_ananta = MagicMock()
         analyzer = MultiRepoAnalyzer(mock_ananta)
 
@@ -80,7 +80,7 @@ class TestMultiRepoAnalyzerAddRepo:
     """Tests for add_repo method."""
 
     def test_add_repo_creates_project(self):
-        """add_repo creates a project via Ananta."""
+        """add_repo creates a project vian Ananta."""
         mock_ananta = MagicMock()
         mock_result = MagicMock()
         mock_result.project.project_id = "org-repo"

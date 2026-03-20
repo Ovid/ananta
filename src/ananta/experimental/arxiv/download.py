@@ -55,7 +55,7 @@ def extract_source_files(data: bytes) -> dict[str, str]:
 
 
 def to_parsed_document(arxiv_id: str, cache: PaperCache) -> ParsedDocument:
-    """Convert a cached paper to a Ananta ParsedDocument."""
+    """Convert a cached paper to an Ananta ParsedDocument."""
     meta = cache.get_meta(arxiv_id)
     if meta is None:
         msg = f"Paper not in cache: {arxiv_id}"

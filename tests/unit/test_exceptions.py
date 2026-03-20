@@ -30,7 +30,7 @@ class TestTraceWriteError:
     """Tests for TraceWriteError."""
 
     def test_is_subclass_of_ananta_error(self):
-        """TraceWriteError is a AnantaError subclass."""
+        """TraceWriteError is an AnantaError subclass."""
         assert issubclass(TraceWriteError, AnantaError)
 
     def test_accepts_message(self):
@@ -43,7 +43,7 @@ class TestEngineNotConfiguredError:
     """Tests for EngineNotConfiguredError."""
 
     def test_is_subclass_of_ananta_error(self):
-        """EngineNotConfiguredError is a AnantaError subclass."""
+        """EngineNotConfiguredError is an AnantaError subclass."""
         assert issubclass(EngineNotConfiguredError, AnantaError)
 
     def test_default_message_mentions_engine(self):

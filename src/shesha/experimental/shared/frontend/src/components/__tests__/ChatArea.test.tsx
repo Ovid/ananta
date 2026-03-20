@@ -310,11 +310,11 @@ describe('ChatArea (shared) - renderAnswer passthrough', () => {
 })
 
 describe('ChatArea (shared) - input row button alignment', () => {
-  it('input row flex container uses items-start so buttons stay fixed height', async () => {
+  it('input row flex container uses items-end so buttons align to bottom of expanding textarea', async () => {
     await renderChatArea()
     const textarea = screen.getByPlaceholderText('Ask a question...')
     const container = textarea.parentElement!
-    expect(container.className).toContain('items-start')
+    expect(container.className).toContain('items-end')
   })
 })
 

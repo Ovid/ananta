@@ -274,7 +274,7 @@ export default function ChatArea({
 
       {/* Input */}
       <div className="border-t border-border bg-surface-1 px-4 py-3">
-        <div className="flex items-start gap-2">
+        <div className="flex items-end gap-2">
           <textarea
             ref={textareaRef}
             value={input}
@@ -288,12 +288,12 @@ export default function ChatArea({
             }
             rows={1}
             style={{ maxHeight: '6rem' }}
-            className="flex-1 bg-surface-2 border border-border rounded px-3 py-2 text-sm text-text-primary resize-none overflow-y-auto focus:outline-none focus:border-accent disabled:opacity-50"
+            className="flex-1 min-h-9 bg-surface-2 border border-border rounded px-3 py-1.5 text-sm leading-6 text-text-primary resize-none overflow-y-auto focus:outline-none focus:border-accent disabled:opacity-50"
           />
           {thinking ? (
             <button
               onClick={() => wsSend({ type: 'cancel' })}
-              className="w-20 py-2 border border-transparent bg-red text-white rounded text-sm font-medium hover:bg-red/90 transition-colors"
+              className="w-20 h-9 border border-transparent bg-red text-white rounded text-sm font-medium hover:bg-red/90 transition-colors"
             >
               Cancel
             </button>
@@ -301,7 +301,7 @@ export default function ChatArea({
             <button
               onClick={handleSend}
               disabled={!canSend}
-              className="w-20 py-2 border border-transparent bg-accent text-surface-0 rounded text-sm font-medium hover:bg-accent/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              className="w-20 h-9 border border-transparent bg-accent text-surface-0 rounded text-sm font-medium hover:bg-accent/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             >
               Send
             </button>
@@ -312,7 +312,7 @@ export default function ChatArea({
               disabled={!canSendMore}
               aria-label="Request deeper analysis"
               aria-disabled={!canSendMore}
-              className="w-20 py-2 bg-surface-2 border border-border text-text-primary rounded text-sm font-medium hover:bg-surface-3 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              className="w-20 h-9 bg-surface-2 border border-border text-text-primary rounded text-sm font-medium hover:bg-surface-3 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             >
               More
             </button>

@@ -1,3 +1,7 @@
+- When adding papers on arxiv, you should have the option of adding them to an
+  existing topic or create a new topic.
+- Bug: arXiv explorer forces topic names to lowercase on rename. Renaming
+  "mars" to "Mars" silently lowercases it back.
 - Bug: Can't drag-and-drop uncategorized repos onto a topic in the code
   explorer sidebar. "Ovid-tramp-freighter" in Uncategorized can't be
   dragged onto the "PAAD" topic.

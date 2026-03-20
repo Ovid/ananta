@@ -4,7 +4,7 @@ Note that your author is *not* a security expert. I have tried to implement some
 
 ## Threat Model
 
-Shesha executes LLM-generated code in Docker containers. The primary threats are:
+Ananta executes LLM-generated code in Docker containers. The primary threats are:
 
 1. **Prompt Injection**: Malicious content in documents attempting to manipulate the LLM
 2. **Sandbox Escape**: Code attempting to break out of the container
@@ -64,7 +64,7 @@ When limits are exceeded, the container is terminated and an error is returned.
 
 ## Configuration
 
-Security-relevant settings in `SheshaConfig`:
+Security-relevant settings in `AnantaConfig`:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
@@ -76,4 +76,4 @@ Security-relevant settings in `SheshaConfig`:
 
 ## Disclaimer
 
-Shesha provides defense-in-depth but cannot guarantee perfect isolation. Do not process highly sensitive documents without additional security review.
+Ananta provides defense-in-depth but cannot guarantee perfect isolation. Do not process highly sensitive documents without additional security review.

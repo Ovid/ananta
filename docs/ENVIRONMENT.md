@@ -1,17 +1,17 @@
 # Environment Variables
 
-This document describes all environment variables used by Shesha.
+This document describes all environment variables used by Ananta.
 
 ## Getting Started
 
-These are the only variables you need to run Shesha.
+These are the only variables you need to run Ananta.
 
-### SHESHA_API_KEY
+### ANANTA_API_KEY
 
 **Required** for cloud LLM providers. Your API key for the LLM service.
 
 ```bash
-export SHESHA_API_KEY="your-api-key-here"
+export ANANTA_API_KEY="your-api-key-here"
 ```
 
 The key format depends on your provider:
@@ -21,12 +21,12 @@ The key format depends on your provider:
 
 **Not required** when using Ollama (local models).
 
-### SHESHA_MODEL
+### ANANTA_MODEL
 
 The LLM model to use. Defaults to `claude-sonnet-4-20250514`.
 
 ```bash
-export SHESHA_MODEL="gpt-4o"  # or any supported model
+export ANANTA_MODEL="gpt-4o"  # or any supported model
 ```
 
 #### Provider Examples
@@ -49,8 +49,8 @@ Run models locally with no API key:
 ollama serve
 ollama pull llama3
 
-# Run Shesha with no API key needed
-export SHESHA_MODEL="ollama/llama3"
+# Run Ananta with no API key needed
+export ANANTA_MODEL="ollama/llama3"
 python examples/barsoom.py
 ```
 
@@ -58,14 +58,14 @@ See [LiteLLM providers](https://docs.litellm.ai/docs/providers) for the full lis
 
 ## Configuration Options
 
-Optional settings for customizing Shesha's behavior.
+Optional settings for customizing Ananta's behavior.
 
-### SHESHA_STORAGE_PATH
+### ANANTA_STORAGE_PATH
 
 Directory where projects and documents are stored.
 
 ```bash
-export SHESHA_STORAGE_PATH="./shesha_data"  # default
+export ANANTA_STORAGE_PATH="./ananta_data"  # default
 ```
 
 This directory contains:
@@ -73,22 +73,22 @@ This directory contains:
 - Project metadata and settings
 - Cached repository clones
 
-### SHESHA_POOL_SIZE
+### ANANTA_POOL_SIZE
 
 Number of warm Docker containers kept ready for code execution.
 
 ```bash
-export SHESHA_POOL_SIZE="3"  # default
+export ANANTA_POOL_SIZE="3"  # default
 ```
 
 Higher values improve response time for concurrent queries but use more memory. Each container uses approximately 50-100MB.
 
-### SHESHA_MAX_ITERATIONS
+### ANANTA_MAX_ITERATIONS
 
 Maximum RLM loop iterations before stopping.
 
 ```bash
-export SHESHA_MAX_ITERATIONS="20"  # default
+export ANANTA_MAX_ITERATIONS="20"  # default
 ```
 
 The RLM engine iterates: generate code → execute → observe output → repeat. This limit prevents runaway loops on difficult queries. Increase for complex multi-document analysis; decrease to limit token usage.
@@ -129,7 +129,7 @@ Create an app password at Bitbucket → Personal settings → App passwords. Req
 
 ### Token Priority
 
-When accessing repositories, Shesha checks in order:
+When accessing repositories, Ananta checks in order:
 
 1. Explicit `token` parameter passed to `create_project_from_repo()`
 2. Environment variable for the host (`GITHUB_TOKEN`, etc.)
@@ -141,11 +141,11 @@ Public repositories work without any token.
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `SHESHA_API_KEY` | Yes* | — | LLM provider API key |
-| `SHESHA_MODEL` | No | `claude-sonnet-4-20250514` | Model to use |
-| `SHESHA_STORAGE_PATH` | No | `./shesha_data` | Project storage directory |
-| `SHESHA_POOL_SIZE` | No | `3` | Warm container count |
-| `SHESHA_MAX_ITERATIONS` | No | `20` | Max RLM loop iterations |
+| `ANANTA_API_KEY` | Yes* | — | LLM provider API key |
+| `ANANTA_MODEL` | No | `claude-sonnet-4-20250514` | Model to use |
+| `ANANTA_STORAGE_PATH` | No | `./ananta_data` | Project storage directory |
+| `ANANTA_POOL_SIZE` | No | `3` | Warm container count |
+| `ANANTA_MAX_ITERATIONS` | No | `20` | Max RLM loop iterations |
 | `GITHUB_TOKEN` | No | — | GitHub private repo access |
 | `GITLAB_TOKEN` | No | — | GitLab private repo access |
 | `BITBUCKET_TOKEN` | No | — | Bitbucket private repo access |
@@ -157,16 +157,16 @@ Public repositories work without any token.
 Environment variables can be overridden programmatically:
 
 ```python
-from shesha import Shesha, SheshaConfig
+from ananta import Ananta, AnantaConfig
 
-config = SheshaConfig(
+config = AnantaConfig(
     model="gpt-4o",
-    api_key="your-key",  # overrides SHESHA_API_KEY
+    api_key="your-key",  # overrides ANANTA_API_KEY
     storage_path="./data",
     pool_size=5,
     max_iterations=30,
 )
-shesha = Shesha(config=config)
+ananta = Ananta(config=config)
 ```
 
 See [README.md](README.md#programmatic-configuration) for more configuration examples.

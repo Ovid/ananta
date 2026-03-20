@@ -2,7 +2,7 @@
 
 ## GitHub Copilot Setup
 
-GitHub Copilot can help you work on Shesha if it is configured with the same
+GitHub Copilot can help you work on Ananta if it is configured with the same
 context and guardrails used by the project.
 
 ### 1) Install Copilot in your IDE
@@ -22,7 +22,7 @@ reference it when starting a Copilot Chat session.
 
 - **TDD is mandatory**. Write a failing test before implementation changes.
 - Make the **smallest possible change** that solves the problem.
-- Prefer existing patterns and modules in `src/shesha/`.
+- Prefer existing patterns and modules in `src/ananta/`.
 - Do not introduce new dependencies unless absolutely necessary.
 
 ### 4) Recommended workflow
@@ -30,7 +30,7 @@ reference it when starting a Copilot Chat session.
 ```bash
 pip install -e ".[dev]"
 ruff check src tests
-mypy src/shesha
+mypy src/ananta
 pytest
 ```
 

@@ -1,10 +1,10 @@
 # Release Workflow
 
-This document describes how to release a new version of Shesha.
+This document describes how to release a new version of Ananta.
 
 ## Overview
 
-Shesha uses **semantic versioning** with version numbers automatically derived from git tags via `hatch-vcs`. You never manually set version numbers in code - they come from tags.
+Ananta uses **semantic versioning** with version numbers automatically derived from git tags via `hatch-vcs`. You never manually set version numbers in code - they come from tags.
 
 ## Prerequisites
 
@@ -83,7 +83,7 @@ After pushing, verify the version is correct:
 
 ```bash
 pip install -e .
-python -c "import shesha; print(shesha.__version__)"
+python -c "import ananta; print(ananta.__version__)"
 # Should print: 0.2.0
 ```
 
@@ -98,7 +98,7 @@ python -c "import shesha; print(shesha.__version__)"
 
 ### The `_version.py` File
 
-When installed, `hatch-vcs` generates `src/shesha/_version.py` containing:
+When installed, `hatch-vcs` generates `src/ananta/_version.py` containing:
 
 ```python
 __version__ = "0.2.0"
@@ -143,7 +143,7 @@ git push && git push --tags
 
 # 6. Verify
 pip install -e .
-python -c "import shesha; print(shesha.__version__)"
+python -c "import ananta; print(ananta.__version__)"
 ```
 
 ## Hotfix Releases

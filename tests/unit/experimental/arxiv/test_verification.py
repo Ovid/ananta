@@ -10,8 +10,8 @@ class TestArxivVerifier:
     """Tests for ArxivVerifier."""
 
     def test_verified_when_title_matches(self) -> None:
-        from shesha.experimental.arxiv.citations import ArxivVerifier
-        from shesha.experimental.arxiv.models import (
+        from ananta.experimental.arxiv.citations import ArxivVerifier
+        from ananta.experimental.arxiv.models import (
             ExtractedCitation,
             PaperMeta,
             VerificationStatus,
@@ -42,8 +42,8 @@ class TestArxivVerifier:
         assert result.status == VerificationStatus.VERIFIED
 
     def test_verified_when_title_has_bibtex_linebreaks(self) -> None:
-        from shesha.experimental.arxiv.citations import ArxivVerifier
-        from shesha.experimental.arxiv.models import (
+        from ananta.experimental.arxiv.citations import ArxivVerifier
+        from ananta.experimental.arxiv.models import (
             ExtractedCitation,
             PaperMeta,
             VerificationStatus,
@@ -77,8 +77,8 @@ class TestArxivVerifier:
         assert result.status == VerificationStatus.VERIFIED
 
     def test_verified_when_title_has_latex_commands(self) -> None:
-        from shesha.experimental.arxiv.citations import ArxivVerifier
-        from shesha.experimental.arxiv.models import (
+        from ananta.experimental.arxiv.citations import ArxivVerifier
+        from ananta.experimental.arxiv.models import (
             ExtractedCitation,
             PaperMeta,
             VerificationStatus,
@@ -109,8 +109,8 @@ class TestArxivVerifier:
         assert result.status == VerificationStatus.VERIFIED
 
     def test_mismatch_when_title_differs(self) -> None:
-        from shesha.experimental.arxiv.citations import ArxivVerifier
-        from shesha.experimental.arxiv.models import (
+        from ananta.experimental.arxiv.citations import ArxivVerifier
+        from ananta.experimental.arxiv.models import (
             ExtractedCitation,
             PaperMeta,
             VerificationStatus,
@@ -142,8 +142,8 @@ class TestArxivVerifier:
         assert "Fluid Dynamics" in (result.actual_title or "")
 
     def test_not_found_when_id_missing(self) -> None:
-        from shesha.experimental.arxiv.citations import ArxivVerifier
-        from shesha.experimental.arxiv.models import ExtractedCitation, VerificationStatus
+        from ananta.experimental.arxiv.citations import ArxivVerifier
+        from ananta.experimental.arxiv.models import ExtractedCitation, VerificationStatus
 
         mock_searcher = MagicMock()
         mock_searcher.get_by_id.return_value = None
@@ -160,8 +160,8 @@ class TestArxivVerifier:
         assert result.status == VerificationStatus.NOT_FOUND
 
     def test_unresolved_for_non_arxiv_citation(self) -> None:
-        from shesha.experimental.arxiv.citations import ArxivVerifier
-        from shesha.experimental.arxiv.models import ExtractedCitation, VerificationStatus
+        from ananta.experimental.arxiv.citations import ArxivVerifier
+        from ananta.experimental.arxiv.models import ExtractedCitation, VerificationStatus
 
         verifier = ArxivVerifier(searcher=MagicMock())
         cite = ExtractedCitation(
@@ -176,8 +176,8 @@ class TestArxivVerifier:
 
     def test_not_found_has_error_severity(self) -> None:
         """Non-existent arXiv IDs should have 'error' severity."""
-        from shesha.experimental.arxiv.citations import ArxivVerifier
-        from shesha.experimental.arxiv.models import ExtractedCitation, VerificationStatus
+        from ananta.experimental.arxiv.citations import ArxivVerifier
+        from ananta.experimental.arxiv.models import ExtractedCitation, VerificationStatus
 
         mock_searcher = MagicMock()
         mock_searcher.get_by_id.return_value = None
@@ -192,8 +192,8 @@ class TestArxivVerifier:
 
     def test_mismatch_has_warning_severity(self) -> None:
         """Title mismatches should have 'warning' severity (could be version rename)."""
-        from shesha.experimental.arxiv.citations import ArxivVerifier
-        from shesha.experimental.arxiv.models import (
+        from ananta.experimental.arxiv.citations import ArxivVerifier
+        from ananta.experimental.arxiv.models import (
             ExtractedCitation,
             PaperMeta,
             VerificationStatus,
@@ -226,8 +226,8 @@ class TestArxivVerifier:
 
     def test_verified_has_no_severity(self) -> None:
         """Verified citations should have None severity."""
-        from shesha.experimental.arxiv.citations import ArxivVerifier
-        from shesha.experimental.arxiv.models import (
+        from ananta.experimental.arxiv.citations import ArxivVerifier
+        from ananta.experimental.arxiv.models import (
             ExtractedCitation,
             PaperMeta,
             VerificationStatus,
@@ -263,8 +263,8 @@ class TestFormatCheckReport:
     """Tests for report formatting."""
 
     def test_format_includes_disclaimer(self) -> None:
-        from shesha.experimental.arxiv.citations import format_check_report
-        from shesha.experimental.arxiv.models import CheckReport
+        from ananta.experimental.arxiv.citations import format_check_report
+        from ananta.experimental.arxiv.models import CheckReport
 
         report = CheckReport(
             arxiv_id="2501.12345",
@@ -278,8 +278,8 @@ class TestFormatCheckReport:
         assert "capable of making mistakes" in output
 
     def test_format_shows_mismatch_details(self) -> None:
-        from shesha.experimental.arxiv.citations import format_check_report
-        from shesha.experimental.arxiv.models import (
+        from ananta.experimental.arxiv.citations import format_check_report
+        from ananta.experimental.arxiv.models import (
             CheckReport,
             ExtractedCitation,
             VerificationResult,
@@ -313,8 +313,8 @@ class TestFormatCheckReport:
         assert "2301.04567" in output
 
     def test_format_shows_llm_phrases_with_potential_label(self) -> None:
-        from shesha.experimental.arxiv.citations import format_check_report
-        from shesha.experimental.arxiv.models import CheckReport
+        from ananta.experimental.arxiv.citations import format_check_report
+        from ananta.experimental.arxiv.models import CheckReport
 
         report = CheckReport(
             arxiv_id="2501.12345",
@@ -334,8 +334,8 @@ class TestFormatCheckReportJson:
 
     def test_verified_paper_grouped_as_verified(self) -> None:
         """Paper with all citations verified → group 'verified'."""
-        from shesha.experimental.arxiv.citations import format_check_report_json
-        from shesha.experimental.arxiv.models import (
+        from ananta.experimental.arxiv.citations import format_check_report_json
+        from ananta.experimental.arxiv.models import (
             CheckReport,
             ExtractedCitation,
             VerificationResult,
@@ -363,8 +363,8 @@ class TestFormatCheckReportJson:
 
     def test_unverifiable_paper_grouped_as_unverifiable(self) -> None:
         """Paper with unresolved citations but no mismatches → group 'unverifiable'."""
-        from shesha.experimental.arxiv.citations import format_check_report_json
-        from shesha.experimental.arxiv.models import (
+        from ananta.experimental.arxiv.citations import format_check_report_json
+        from ananta.experimental.arxiv.models import (
             CheckReport,
             ExtractedCitation,
             VerificationResult,
@@ -388,8 +388,8 @@ class TestFormatCheckReportJson:
 
     def test_paper_with_mismatches_grouped_as_issues(self) -> None:
         """Paper with mismatches → group 'issues'."""
-        from shesha.experimental.arxiv.citations import format_check_report_json
-        from shesha.experimental.arxiv.models import (
+        from ananta.experimental.arxiv.citations import format_check_report_json
+        from ananta.experimental.arxiv.models import (
             CheckReport,
             ExtractedCitation,
             VerificationResult,
@@ -422,8 +422,8 @@ class TestFormatCheckReportJson:
 
     def test_paper_with_llm_phrases_grouped_as_issues(self) -> None:
         """Paper with LLM-tell phrases → group 'issues'."""
-        from shesha.experimental.arxiv.citations import format_check_report_json
-        from shesha.experimental.arxiv.models import CheckReport
+        from ananta.experimental.arxiv.citations import format_check_report_json
+        from ananta.experimental.arxiv.models import CheckReport
 
         report = CheckReport(
             arxiv_id="2501.12345",
@@ -439,8 +439,8 @@ class TestFormatCheckReportJson:
 
     def test_zero_citations_grouped_as_issues(self) -> None:
         """Paper with zero citations → group 'issues'."""
-        from shesha.experimental.arxiv.citations import format_check_report_json
-        from shesha.experimental.arxiv.models import CheckReport
+        from ananta.experimental.arxiv.citations import format_check_report_json
+        from ananta.experimental.arxiv.models import CheckReport
 
         report = CheckReport(
             arxiv_id="2501.12345",
@@ -455,8 +455,8 @@ class TestFormatCheckReportJson:
 
     def test_json_structure_has_required_fields(self) -> None:
         """JSON output has all required fields."""
-        from shesha.experimental.arxiv.citations import format_check_report_json
-        from shesha.experimental.arxiv.models import CheckReport
+        from ananta.experimental.arxiv.citations import format_check_report_json
+        from ananta.experimental.arxiv.models import CheckReport
 
         report = CheckReport(
             arxiv_id="2501.12345",
@@ -483,8 +483,8 @@ class TestFormatCheckReportJson:
 
     def test_mismatch_entry_has_required_fields(self) -> None:
         """Each mismatch in JSON has key, message, severity, arxiv_url."""
-        from shesha.experimental.arxiv.citations import format_check_report_json
-        from shesha.experimental.arxiv.models import (
+        from ananta.experimental.arxiv.citations import format_check_report_json
+        from ananta.experimental.arxiv.models import (
             CheckReport,
             ExtractedCitation,
             VerificationResult,

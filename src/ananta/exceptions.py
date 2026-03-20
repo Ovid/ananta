@@ -1,11 +1,11 @@
-"""Shesha domain exceptions."""
+"""Ananta domain exceptions."""
 
 
-class SheshaError(Exception):
-    """Base exception for all Shesha errors."""
+class AnantaError(Exception):
+    """Base exception for all Ananta errors."""
 
 
-class ProjectError(SheshaError):
+class ProjectError(AnantaError):
     """Base exception for project-related errors."""
 
 
@@ -25,7 +25,7 @@ class ProjectExistsError(ProjectError):
         super().__init__(f"Project '{project_id}' already exists")
 
 
-class DocumentError(SheshaError):
+class DocumentError(AnantaError):
     """Base exception for document-related errors."""
 
 
@@ -38,7 +38,7 @@ class DocumentNotFoundError(DocumentError):
         super().__init__(f"Document '{doc_name}' not found in project '{project_id}'")
 
 
-class ParseError(SheshaError):
+class ParseError(AnantaError):
     """Raised when document parsing fails."""
 
     def __init__(self, path: str, reason: str) -> None:
@@ -47,7 +47,7 @@ class ParseError(SheshaError):
         super().__init__(f"Failed to parse '{path}': {reason}")
 
 
-class NoParserError(SheshaError):
+class NoParserError(AnantaError):
     """Raised when no parser can handle a file."""
 
     def __init__(self, path: str) -> None:
@@ -55,7 +55,7 @@ class NoParserError(SheshaError):
         super().__init__(f"No parser available for '{path}'")
 
 
-class RepoError(SheshaError):
+class RepoError(AnantaError):
     """Base exception for repository-related errors."""
 
 
@@ -84,11 +84,11 @@ class RepoIngestError(RepoError):
             self.__cause__ = cause
 
 
-class TraceWriteError(SheshaError):
+class TraceWriteError(AnantaError):
     """Raised when writing a trace fails."""
 
 
-class EngineNotConfiguredError(SheshaError):
+class EngineNotConfiguredError(AnantaError):
     """Raised when a query is attempted without an RLM engine."""
 
     def __init__(self) -> None:

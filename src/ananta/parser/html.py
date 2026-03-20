@@ -4,7 +4,7 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
-from shesha.models import ParsedDocument
+from ananta.models import ParsedDocument
 
 
 class HtmlParser:

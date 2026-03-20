@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock, patch
 
-from shesha.experimental.arxiv.models import (
+from ananta.experimental.arxiv.models import (
     ExtractedCitation,
     VerificationStatus,
 )
@@ -15,7 +15,7 @@ class TestTopicalRelevanceChecker:
     """Tests for LLM-based topical relevance checking."""
 
     def test_flags_unrelated_citation(self) -> None:
-        from shesha.experimental.arxiv.relevance import check_topical_relevance
+        from ananta.experimental.arxiv.relevance import check_topical_relevance
 
         citations = [
             ExtractedCitation(key="a", title="RNA Catalysis", authors=[], year=None),
@@ -42,7 +42,7 @@ class TestTopicalRelevanceChecker:
         mock_completion.choices[0].message.content = llm_response
 
         with patch(
-            "shesha.experimental.arxiv.relevance.litellm.completion",
+            "ananta.experimental.arxiv.relevance.litellm.completion",
             return_value=mock_completion,
         ):
             results = check_topical_relevance(
@@ -58,7 +58,7 @@ class TestTopicalRelevanceChecker:
         assert results[0].status == VerificationStatus.TOPICALLY_UNRELATED
 
     def test_skips_unverified_citations(self) -> None:
-        from shesha.experimental.arxiv.relevance import check_topical_relevance
+        from ananta.experimental.arxiv.relevance import check_topical_relevance
 
         citations = [
             ExtractedCitation(key="a", title="Paper A", authors=[], year=None),
@@ -76,7 +76,7 @@ class TestTopicalRelevanceChecker:
         mock_completion.choices[0].message.content = llm_response
 
         with patch(
-            "shesha.experimental.arxiv.relevance.litellm.completion",
+            "ananta.experimental.arxiv.relevance.litellm.completion",
             return_value=mock_completion,
         ) as mock_llm:
             results = check_topical_relevance(
@@ -93,13 +93,13 @@ class TestTopicalRelevanceChecker:
         assert results == []
 
     def test_no_verified_citations_returns_empty(self) -> None:
-        from shesha.experimental.arxiv.relevance import check_topical_relevance
+        from ananta.experimental.arxiv.relevance import check_topical_relevance
 
         citations = [
             ExtractedCitation(key="a", title="Paper A", authors=[], year=None),
         ]
 
-        with patch("shesha.experimental.arxiv.relevance.litellm.completion") as mock_llm:
+        with patch("ananta.experimental.arxiv.relevance.litellm.completion") as mock_llm:
             results = check_topical_relevance(
                 paper_title="Test",
                 paper_abstract="Abstract",
@@ -112,14 +112,14 @@ class TestTopicalRelevanceChecker:
         assert results == []
 
     def test_llm_error_returns_empty(self) -> None:
-        from shesha.experimental.arxiv.relevance import check_topical_relevance
+        from ananta.experimental.arxiv.relevance import check_topical_relevance
 
         citations = [
             ExtractedCitation(key="a", title="Paper A", authors=[], year=None),
         ]
 
         with patch(
-            "shesha.experimental.arxiv.relevance.litellm.completion",
+            "ananta.experimental.arxiv.relevance.litellm.completion",
             side_effect=Exception("API error"),
         ):
             results = check_topical_relevance(
@@ -133,7 +133,7 @@ class TestTopicalRelevanceChecker:
         assert results == []
 
     def test_passes_api_key_to_litellm(self) -> None:
-        from shesha.experimental.arxiv.relevance import check_topical_relevance
+        from ananta.experimental.arxiv.relevance import check_topical_relevance
 
         citations = [
             ExtractedCitation(key="a", title="Paper A", authors=[], year=None),
@@ -145,7 +145,7 @@ class TestTopicalRelevanceChecker:
         )
 
         with patch(
-            "shesha.experimental.arxiv.relevance.litellm.completion",
+            "ananta.experimental.arxiv.relevance.litellm.completion",
             return_value=mock_completion,
         ) as mock_llm:
             check_topical_relevance(
@@ -161,7 +161,7 @@ class TestTopicalRelevanceChecker:
         assert call_kwargs["api_key"] == "sk-test-key-123"
 
     def test_omits_api_key_when_none(self) -> None:
-        from shesha.experimental.arxiv.relevance import check_topical_relevance
+        from ananta.experimental.arxiv.relevance import check_topical_relevance
 
         citations = [
             ExtractedCitation(key="a", title="Paper A", authors=[], year=None),
@@ -173,7 +173,7 @@ class TestTopicalRelevanceChecker:
         )
 
         with patch(
-            "shesha.experimental.arxiv.relevance.litellm.completion",
+            "ananta.experimental.arxiv.relevance.litellm.completion",
             return_value=mock_completion,
         ) as mock_llm:
             check_topical_relevance(
@@ -188,7 +188,7 @@ class TestTopicalRelevanceChecker:
         assert "api_key" not in call_kwargs
 
     def test_malformed_json_returns_empty(self) -> None:
-        from shesha.experimental.arxiv.relevance import check_topical_relevance
+        from ananta.experimental.arxiv.relevance import check_topical_relevance
 
         citations = [
             ExtractedCitation(key="a", title="Paper A", authors=[], year=None),
@@ -199,7 +199,7 @@ class TestTopicalRelevanceChecker:
         mock_completion.choices[0].message.content = "not valid json"
 
         with patch(
-            "shesha.experimental.arxiv.relevance.litellm.completion",
+            "ananta.experimental.arxiv.relevance.litellm.completion",
             return_value=mock_completion,
         ):
             results = check_topical_relevance(

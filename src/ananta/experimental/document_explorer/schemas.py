@@ -1,6 +1,6 @@
 """Pydantic schemas for the document explorer API.
 
-Generic schemas are imported from shesha.experimental.shared.schemas and
+Generic schemas are imported from ananta.experimental.shared.schemas and
 re-exported here so that ``from document_explorer.schemas import X`` works for
 all schema types.  Document-explorer-specific schemas (DocumentInfo,
 DocumentUploadResponse) are defined locally.
@@ -11,7 +11,7 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 # Re-export shared schemas used by the document explorer API.
-from shesha.experimental.shared.schemas import (
+from ananta.experimental.shared.schemas import (
     ContextBudget,
     ExchangeSchema,
     ModelInfo,

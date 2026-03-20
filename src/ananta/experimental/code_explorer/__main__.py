@@ -9,13 +9,13 @@ from pathlib import Path
 
 import uvicorn
 
-from shesha.experimental.code_explorer.api import create_api
-from shesha.experimental.code_explorer.dependencies import create_app_state
+from ananta.experimental.code_explorer.api import create_api
+from ananta.experimental.code_explorer.dependencies import create_app_state
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """Parse command-line arguments for the code explorer."""
-    parser = argparse.ArgumentParser(description="Shesha Code Explorer")
+    parser = argparse.ArgumentParser(description="Ananta Code Explorer")
     parser.add_argument("--port", type=int, default=8001)
     parser.add_argument("--data-dir", type=str, default=None)
     parser.add_argument("--no-browser", action="store_true")

@@ -3,8 +3,8 @@
 from typing import Any
 from unittest.mock import MagicMock
 
-from shesha.sandbox.base import ExecutionResult, SandboxExecutor
-from shesha.sandbox.executor import ContainerExecutor
+from ananta.sandbox.base import ExecutionResult, SandboxExecutor
+from ananta.sandbox.executor import ContainerExecutor
 
 
 class TestSandboxExecutorProtocol:
@@ -54,10 +54,10 @@ class TestSandboxExecutorProtocol:
         """ExecutionResult and LLMQueryHandler should be defined in base.py."""
         import inspect
 
-        from shesha.sandbox.base import ExecutionResult, LLMQueryHandler
+        from ananta.sandbox.base import ExecutionResult, LLMQueryHandler
 
         # They should be defined in base.py, not re-exported from executor.py
-        assert inspect.getmodule(ExecutionResult).__name__ == "shesha.sandbox.base"  # type: ignore[union-attr]
+        assert inspect.getmodule(ExecutionResult).__name__ == "ananta.sandbox.base"  # type: ignore[union-attr]
         assert inspect.getmodule(LLMQueryHandler) is None or "executor" not in str(
             inspect.getmodule(LLMQueryHandler)
         )
@@ -67,7 +67,7 @@ class TestSandboxExecutorProtocol:
         # Check acquire return type
         import inspect
 
-        from shesha.sandbox.pool import ContainerPool
+        from ananta.sandbox.pool import ContainerPool
 
         sig = inspect.signature(ContainerPool.acquire)
         assert (

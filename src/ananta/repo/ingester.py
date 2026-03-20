@@ -15,13 +15,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
-from shesha.exceptions import AuthenticationError, NoParserError, ParseError, RepoIngestError
-from shesha.models import ParsedDocument
-from shesha.security.paths import safe_path
+from ananta.exceptions import AuthenticationError, NoParserError, ParseError, RepoIngestError
+from ananta.models import ParsedDocument
+from ananta.security.paths import safe_path
 
 if TYPE_CHECKING:
-    from shesha.parser.registry import ParserRegistry
-    from shesha.storage.base import StorageBackend
+    from ananta.parser.registry import ParserRegistry
+    from ananta.storage.base import StorageBackend
 
 
 @dataclass

@@ -8,7 +8,7 @@ def test_recon_prompt_exists():
     prompt_path = (
         Path(__file__).parent.parent.parent.parent
         / "src"
-        / "shesha"
+        / "ananta"
         / "experimental"
         / "multi_repo"
         / "prompts"
@@ -25,7 +25,7 @@ def test_impact_prompt_exists():
     prompt_path = (
         Path(__file__).parent.parent.parent.parent
         / "src"
-        / "shesha"
+        / "ananta"
         / "experimental"
         / "multi_repo"
         / "prompts"
@@ -42,7 +42,7 @@ def test_synthesize_prompt_exists():
     prompt_path = (
         Path(__file__).parent.parent.parent.parent
         / "src"
-        / "shesha"
+        / "ananta"
         / "experimental"
         / "multi_repo"
         / "prompts"
@@ -58,7 +58,7 @@ def test_align_prompt_exists():
     prompt_path = (
         Path(__file__).parent.parent.parent.parent
         / "src"
-        / "shesha"
+        / "ananta"
         / "experimental"
         / "multi_repo"
         / "prompts"

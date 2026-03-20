@@ -5,19 +5,19 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from shesha import Shesha
-from shesha.config import SheshaConfig
-from shesha.experimental.arxiv.cache import PaperCache
-from shesha.experimental.arxiv.search import ArxivSearcher
-from shesha.experimental.arxiv.topics import TopicManager
-from shesha.storage.filesystem import FilesystemStorage
+from ananta import Ananta
+from ananta.config import AnantaConfig
+from ananta.experimental.arxiv.cache import PaperCache
+from ananta.experimental.arxiv.search import ArxivSearcher
+from ananta.experimental.arxiv.topics import TopicManager
+from ananta.storage.filesystem import FilesystemStorage
 
 
 @dataclass
 class AppState:
     """Shared application state."""
 
-    shesha: Shesha
+    ananta: Ananta
     topic_mgr: TopicManager
     cache: PaperCache
     searcher: ArxivSearcher
@@ -30,23 +30,23 @@ def create_app_state(
     model: str | None = None,
 ) -> AppState:
     """Initialize all components and return shared state."""
-    data_dir = data_dir or Path.home() / ".shesha-arxiv"
-    shesha_data = data_dir / "shesha_data"
+    data_dir = data_dir or Path.home() / ".ananta-arxiv"
+    ananta_data = data_dir / "ananta_data"
     cache_dir = data_dir / "paper-cache"
-    shesha_data.mkdir(parents=True, exist_ok=True)
+    ananta_data.mkdir(parents=True, exist_ok=True)
     cache_dir.mkdir(parents=True, exist_ok=True)
 
-    config = SheshaConfig.load(storage_path=str(shesha_data))
+    config = AnantaConfig.load(storage_path=str(ananta_data))
     if model:
         config.model = model
-    storage = FilesystemStorage(shesha_data)
-    shesha = Shesha(config=config, storage=storage)
+    storage = FilesystemStorage(ananta_data)
+    ananta = Ananta(config=config, storage=storage)
     cache = PaperCache(cache_dir)
     searcher = ArxivSearcher()
-    topic_mgr = TopicManager(shesha=shesha, storage=storage)
+    topic_mgr = TopicManager(ananta=ananta, storage=storage)
 
     return AppState(
-        shesha=shesha,
+        ananta=ananta,
         topic_mgr=topic_mgr,
         cache=cache,
         searcher=searcher,

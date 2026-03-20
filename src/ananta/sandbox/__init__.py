@@ -1,7 +1,7 @@
-"""Sandbox execution for Shesha."""
+"""Sandbox execution for Ananta."""
 
-from shesha.sandbox.base import ExecutionResult, SandboxExecutor
-from shesha.sandbox.executor import ContainerExecutor
-from shesha.sandbox.pool import ContainerPool
+from ananta.sandbox.base import ExecutionResult, SandboxExecutor
+from ananta.sandbox.executor import ContainerExecutor
+from ananta.sandbox.pool import ContainerPool
 
 __all__ = ["ContainerExecutor", "ContainerPool", "ExecutionResult", "SandboxExecutor"]

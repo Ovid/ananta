@@ -4,8 +4,8 @@ import re
 
 import pytest
 
-from shesha.tui.commands import CommandRegistry
-from shesha.tui.widgets.completion_popup import CompletionPopup
+from ananta.tui.commands import CommandRegistry
+from ananta.tui.widgets.completion_popup import CompletionPopup
 
 
 class TestCommandRegistry:
@@ -284,17 +284,17 @@ class TestCompletionPopupHeight:
 
 
 class TestTwoLevelAutocomplete:
-    """Tests for two-level autocomplete in SheshaTUI."""
+    """Tests for two-level autocomplete in AnantaTUI."""
 
     async def test_group_space_shows_subcommand_completions(self) -> None:
         """Typing '/topic ' shows subcommand completions."""
         from unittest.mock import MagicMock
 
-        from shesha.tui import SheshaTUI
-        from shesha.tui.widgets.input_area import InputArea
+        from ananta.tui import AnantaTUI
+        from ananta.tui.widgets.input_area import InputArea
 
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         app._command_registry.register_group("/topic", "Topic management")
         app._command_registry.register_subcommand("/topic", "list", lambda a: None, "List topics")
         app._command_registry.register_subcommand(
@@ -315,11 +315,11 @@ class TestTwoLevelAutocomplete:
         """Typing '/topic sw' narrows to 'switch'."""
         from unittest.mock import MagicMock
 
-        from shesha.tui import SheshaTUI
-        from shesha.tui.widgets.input_area import InputArea
+        from ananta.tui import AnantaTUI
+        from ananta.tui.widgets.input_area import InputArea
 
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         app._command_registry.register_group("/topic", "Topic management")
         app._command_registry.register_subcommand("/topic", "list", lambda a: None, "List topics")
         app._command_registry.register_subcommand(
@@ -340,11 +340,11 @@ class TestTwoLevelAutocomplete:
         """Accepting a subcommand completion fills '/topic switch '."""
         from unittest.mock import MagicMock
 
-        from shesha.tui import SheshaTUI
-        from shesha.tui.widgets.input_area import InputArea
+        from ananta.tui import AnantaTUI
+        from ananta.tui.widgets.input_area import InputArea
 
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         app._command_registry.register_group("/topic", "Topic management")
         app._command_registry.register_subcommand("/topic", "list", lambda a: None, "List topics")
         app._command_registry.register_subcommand(
@@ -365,11 +365,11 @@ class TestTwoLevelAutocomplete:
         """Typing '/help ' (not a group) hides the popup."""
         from unittest.mock import MagicMock
 
-        from shesha.tui import SheshaTUI
-        from shesha.tui.widgets.input_area import InputArea
+        from ananta.tui import AnantaTUI
+        from ananta.tui.widgets.input_area import InputArea
 
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
 
         async with app.run_test() as pilot:
             input_area = pilot.app.query_one(InputArea)
@@ -382,11 +382,11 @@ class TestTwoLevelAutocomplete:
         """Typing '/topic list' exactly hides popup so Enter submits."""
         from unittest.mock import MagicMock
 
-        from shesha.tui import SheshaTUI
-        from shesha.tui.widgets.input_area import InputArea
+        from ananta.tui import AnantaTUI
+        from ananta.tui.widgets.input_area import InputArea
 
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         app._command_registry.register_group("/topic", "Topic management")
         app._command_registry.register_subcommand("/topic", "list", lambda a: None, "List topics")
         app._command_registry.register_subcommand(

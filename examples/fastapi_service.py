@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Example FastAPI service wrapping Shesha."""
+"""Example FastAPI service wrapping Ananta."""
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -7,28 +7,28 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from shesha import Shesha
-from shesha.exceptions import ProjectExistsError, ProjectNotFoundError
+from ananta import Ananta
+from ananta.exceptions import ProjectExistsError, ProjectNotFoundError
 
-# Global Shesha instance
-shesha: Shesha | None = None
+# Global Ananta instance
+ananta: Ananta | None = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Manage Shesha lifecycle."""
-    global shesha
-    shesha = Shesha(
+    """Manage Ananta lifecycle."""
+    global ananta
+    ananta = Ananta(
         model="claude-sonnet-4-20250514",
         storage_path="./service_data",
     )
-    shesha.start()
+    ananta.start()
     yield
-    shesha.stop()
+    ananta.stop()
 
 
 app = FastAPI(
-    title="Shesha API",
+    title="Ananta API",
     description="Query documents using Recursive Language Models",
     lifespan=lifespan,
 )
@@ -51,10 +51,10 @@ class QueryResponse(BaseModel):
 @app.post("/projects")
 def create_project(project_id: str) -> dict[str, str]:
     """Create a new project."""
-    if shesha is None:
-        raise HTTPException(500, "Shesha not initialized")
+    if ananta is None:
+        raise HTTPException(500, "Ananta not initialized")
     try:
-        shesha.create_project(project_id)
+        ananta.create_project(project_id)
         return {"status": "created", "project_id": project_id}
     except ProjectExistsError as e:
         raise HTTPException(400, str(e))
@@ -63,18 +63,18 @@ def create_project(project_id: str) -> dict[str, str]:
 @app.get("/projects")
 def list_projects() -> dict[str, list[str]]:
     """List all projects."""
-    if shesha is None:
-        raise HTTPException(500, "Shesha not initialized")
-    return {"projects": shesha.list_projects()}
+    if ananta is None:
+        raise HTTPException(500, "Ananta not initialized")
+    return {"projects": ananta.list_projects()}
 
 
 @app.post("/projects/{project_id}/query")
 def query_project(project_id: str, request: QueryRequest) -> QueryResponse:
     """Query a project's documents."""
-    if shesha is None:
-        raise HTTPException(500, "Shesha not initialized")
+    if ananta is None:
+        raise HTTPException(500, "Ananta not initialized")
     try:
-        project = shesha.get_project(project_id)
+        project = ananta.get_project(project_id)
         result = project.query(request.question)
         return QueryResponse(
             answer=result.answer,
@@ -88,9 +88,9 @@ def query_project(project_id: str, request: QueryRequest) -> QueryResponse:
 @app.delete("/projects/{project_id}")
 def delete_project(project_id: str) -> dict[str, str]:
     """Delete a project."""
-    if shesha is None:
-        raise HTTPException(500, "Shesha not initialized")
-    shesha.delete_project(project_id)
+    if ananta is None:
+        raise HTTPException(500, "Ananta not initialized")
+    ananta.delete_project(project_id)
     return {"status": "deleted", "project_id": project_id}
 
 

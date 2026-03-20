@@ -1,5 +1,5 @@
-"""Textual-based TUI for Shesha interactive examples."""
+"""Textual-based TUI for Ananta interactive examples."""
 
-from shesha.tui.app import SheshaTUI
+from ananta.tui.app import AnantaTUI
 
-__all__ = ["SheshaTUI"]
+__all__ = ["AnantaTUI"]

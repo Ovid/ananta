@@ -4,7 +4,7 @@ from pathlib import Path
 
 from docx import Document
 
-from shesha.models import ParsedDocument
+from ananta.models import ParsedDocument
 
 
 class DocxParser:

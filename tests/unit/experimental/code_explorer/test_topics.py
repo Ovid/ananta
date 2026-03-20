@@ -5,7 +5,7 @@ Full coverage lives in tests/unit/experimental/shared/test_topics.py.
 
 from pathlib import Path
 
-from shesha.experimental.code_explorer.topics import CodeExplorerTopicManager
+from ananta.experimental.code_explorer.topics import CodeExplorerTopicManager
 
 
 class TestCodeExplorerTopicManagerSubclass:

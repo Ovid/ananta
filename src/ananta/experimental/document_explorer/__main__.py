@@ -9,13 +9,13 @@ from pathlib import Path
 
 import uvicorn
 
-from shesha.experimental.document_explorer.api import create_api
-from shesha.experimental.document_explorer.dependencies import create_app_state
+from ananta.experimental.document_explorer.api import create_api
+from ananta.experimental.document_explorer.dependencies import create_app_state
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """Parse command-line arguments for the document explorer."""
-    parser = argparse.ArgumentParser(description="Shesha Document Explorer")
+    parser = argparse.ArgumentParser(description="Ananta Document Explorer")
     parser.add_argument("--port", type=int, default=8003)
     parser.add_argument("--data-dir", type=str, default=None)
     parser.add_argument("--no-browser", action="store_true")

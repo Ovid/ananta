@@ -1,4 +1,4 @@
-"""Entry point for shesha-web."""
+"""Entry point for ananta-web."""
 
 from __future__ import annotations
 
@@ -9,13 +9,13 @@ from pathlib import Path
 
 import uvicorn
 
-from shesha.experimental.web.api import create_api
-from shesha.experimental.web.dependencies import create_app_state
+from ananta.experimental.web.api import create_api
+from ananta.experimental.web.dependencies import create_app_state
 
 
 def main() -> None:
-    """Run the Shesha arXiv Web Explorer."""
-    parser = argparse.ArgumentParser(description="Shesha arXiv Web Explorer")
+    """Run the Ananta arXiv Web Explorer."""
+    parser = argparse.ArgumentParser(description="Ananta arXiv Web Explorer")
     parser.add_argument("--model", type=str, help="LLM model to use")
     parser.add_argument("--data-dir", type=str, help="Data directory")
     parser.add_argument("--port", type=int, default=8000, help="Server port")

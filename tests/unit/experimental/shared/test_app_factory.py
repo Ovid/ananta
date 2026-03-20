@@ -12,15 +12,15 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.routing import Mount
 from starlette.staticfiles import StaticFiles
 
-from shesha.experimental.shared.app_factory import create_app
+from ananta.experimental.shared.app_factory import create_app
 
 
 def _make_state() -> MagicMock:
-    """Create a minimal mock state with a shesha attribute."""
+    """Create a minimal mock state with an ananta attribute."""
     state = MagicMock()
-    state.shesha = MagicMock()
-    state.shesha.start = MagicMock()
-    state.shesha.stop = MagicMock()
+    state.ananta = MagicMock()
+    state.ananta.start = MagicMock()
+    state.ananta.stop = MagicMock()
     return state
 
 
@@ -207,19 +207,19 @@ def test_no_extra_routers_by_default() -> None:
 
 @pytest.mark.anyio
 async def test_lifespan_calls_start_and_stop() -> None:
-    """The lifespan context manager calls state.shesha.start() and stop()."""
+    """The lifespan context manager calls state.ananta.start() and stop()."""
     state = _make_state()
-    state.shesha.start = MagicMock()
-    state.shesha.stop = MagicMock()
+    state.ananta.start = MagicMock()
+    state.ananta.stop = MagicMock()
 
     app = create_app(state, title="Test App")
 
     # Exercise the lifespan by using TestClient as a context manager
     # TestClient triggers startup/shutdown events
     with TestClient(app):
-        state.shesha.start.assert_called_once()
+        state.ananta.start.assert_called_once()
 
-    state.shesha.stop.assert_called_once()
+    state.ananta.stop.assert_called_once()
 
 
 # -- Static files served correctly --

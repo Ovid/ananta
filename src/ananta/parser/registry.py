@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from shesha.parser.base import DocumentParser
+from ananta.parser.base import DocumentParser
 
 
 class ParserRegistry:

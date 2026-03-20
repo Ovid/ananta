@@ -2,8 +2,8 @@
 
 from pathlib import Path
 
-from shesha.models import ParsedDocument
-from shesha.storage.base import default_swap_docs
+from ananta.models import ParsedDocument
+from ananta.storage.base import default_swap_docs
 
 
 def _make_doc(name: str, content: str = "content") -> ParsedDocument:

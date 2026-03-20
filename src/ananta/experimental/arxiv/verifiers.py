@@ -7,13 +7,13 @@ import logging
 import httpx
 import litellm
 
-from shesha.experimental.arxiv.citations import ArxivVerifier, title_similarity
-from shesha.experimental.arxiv.models import (
+from ananta.experimental.arxiv.citations import ArxivVerifier, title_similarity
+from ananta.experimental.arxiv.models import (
     ExtractedCitation,
     VerificationResult,
     VerificationStatus,
 )
-from shesha.experimental.arxiv.rate_limit import RateLimiter
+from ananta.experimental.arxiv.rate_limit import RateLimiter
 
 # Thresholds for fuzzy title matching
 MATCH_THRESHOLD = 0.85  # Above this = confident match
@@ -30,7 +30,7 @@ class CrossRefVerifier:
         self._limiter = RateLimiter(min_interval=0.5 if polite_email else 1.0)
 
     def _headers(self) -> dict[str, str]:
-        ua = "shesha-citation-checker/1.0"
+        ua = "ananta-citation-checker/1.0"
         if self._email:
             ua += f" (mailto:{self._email})"
         return {"User-Agent": ua}

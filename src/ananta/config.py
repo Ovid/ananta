@@ -1,4 +1,4 @@
-"""Configuration for Shesha."""
+"""Configuration for Ananta."""
 
 import json
 import os
@@ -26,22 +26,22 @@ def _parse_bool_env(env_var: str, value: str) -> bool:
 
 
 @dataclass
-class SheshaConfig:
-    """Configuration for Shesha."""
+class AnantaConfig:
+    """Configuration for Ananta."""
 
     # LLM settings
     model: str = "claude-sonnet-4-20250514"
     api_key: str | None = None
 
     # Storage
-    storage_path: str = "./shesha_data"
+    storage_path: str = "./ananta_data"
     keep_raw_files: bool = True
 
     # Sandbox
     pool_size: int = 3
     container_memory_mb: int = 512
     execution_timeout_sec: int = 30
-    sandbox_image: str = "shesha-sandbox"
+    sandbox_image: str = "ananta-sandbox"
 
     # RLM behavior
     max_iterations: int = 20
@@ -57,25 +57,25 @@ class SheshaConfig:
     max_traces_per_project: int = 50
 
     @classmethod
-    def from_env(cls) -> "SheshaConfig":
+    def from_env(cls) -> "AnantaConfig":
         """Create config from environment variables."""
-        verify_env = os.environ.get("SHESHA_VERIFY_CITATIONS")
+        verify_env = os.environ.get("ANANTA_VERIFY_CITATIONS")
         verify = (
-            _parse_bool_env("SHESHA_VERIFY_CITATIONS", verify_env)
+            _parse_bool_env("ANANTA_VERIFY_CITATIONS", verify_env)
             if verify_env is not None
             else cls.verify_citations
         )
         return cls(
-            model=os.environ.get("SHESHA_MODEL", cls.model),
-            api_key=os.environ.get("SHESHA_API_KEY"),
-            storage_path=os.environ.get("SHESHA_STORAGE_PATH", cls.storage_path),
-            pool_size=int(os.environ.get("SHESHA_POOL_SIZE", str(cls.pool_size))),
-            max_iterations=int(os.environ.get("SHESHA_MAX_ITERATIONS", str(cls.max_iterations))),
+            model=os.environ.get("ANANTA_MODEL", cls.model),
+            api_key=os.environ.get("ANANTA_API_KEY"),
+            storage_path=os.environ.get("ANANTA_STORAGE_PATH", cls.storage_path),
+            pool_size=int(os.environ.get("ANANTA_POOL_SIZE", str(cls.pool_size))),
+            max_iterations=int(os.environ.get("ANANTA_MAX_ITERATIONS", str(cls.max_iterations))),
             verify_citations=verify,
         )
 
     @classmethod
-    def from_file(cls, path: Path | str) -> "SheshaConfig":
+    def from_file(cls, path: Path | str) -> "AnantaConfig":
         """Create config from a YAML or JSON file."""
         path = Path(path)
         content = path.read_text()
@@ -93,7 +93,7 @@ class SheshaConfig:
         cls,
         config_path: Path | str | None = None,
         **overrides: Any,
-    ) -> "SheshaConfig":
+    ) -> "AnantaConfig":
         """Load config with full hierarchy: defaults < file < env < kwargs."""
         # Start with defaults
         config_dict: dict[str, Any] = {}
@@ -108,19 +108,19 @@ class SheshaConfig:
 
         # Layer 3: Environment variables
         env_map = {
-            "SHESHA_MODEL": "model",
-            "SHESHA_API_KEY": "api_key",
-            "SHESHA_STORAGE_PATH": "storage_path",
-            "SHESHA_KEEP_RAW_FILES": "keep_raw_files",
-            "SHESHA_POOL_SIZE": "pool_size",
-            "SHESHA_CONTAINER_MEMORY_MB": "container_memory_mb",
-            "SHESHA_EXECUTION_TIMEOUT_SEC": "execution_timeout_sec",
-            "SHESHA_SANDBOX_IMAGE": "sandbox_image",
-            "SHESHA_MAX_ITERATIONS": "max_iterations",
-            "SHESHA_MAX_OUTPUT_CHARS": "max_output_chars",
-            "SHESHA_VERIFY_CITATIONS": "verify_citations",
-            "SHESHA_VERIFY": "verify",
-            "SHESHA_MAX_TRACES_PER_PROJECT": "max_traces_per_project",
+            "ANANTA_MODEL": "model",
+            "ANANTA_API_KEY": "api_key",
+            "ANANTA_STORAGE_PATH": "storage_path",
+            "ANANTA_KEEP_RAW_FILES": "keep_raw_files",
+            "ANANTA_POOL_SIZE": "pool_size",
+            "ANANTA_CONTAINER_MEMORY_MB": "container_memory_mb",
+            "ANANTA_EXECUTION_TIMEOUT_SEC": "execution_timeout_sec",
+            "ANANTA_SANDBOX_IMAGE": "sandbox_image",
+            "ANANTA_MAX_ITERATIONS": "max_iterations",
+            "ANANTA_MAX_OUTPUT_CHARS": "max_output_chars",
+            "ANANTA_VERIFY_CITATIONS": "verify_citations",
+            "ANANTA_VERIFY": "verify",
+            "ANANTA_MAX_TRACES_PER_PROJECT": "max_traces_per_project",
         }
         _int_fields = {
             "pool_size",

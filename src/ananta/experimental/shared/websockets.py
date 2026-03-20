@@ -21,10 +21,10 @@ from typing import Any
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-from shesha.exceptions import DocumentNotFoundError
-from shesha.experimental.shared.session import WebConversationSession
-from shesha.models import ParsedDocument
-from shesha.rlm.trace import StepType, TokenUsage
+from ananta.exceptions import DocumentNotFoundError
+from ananta.experimental.shared.session import WebConversationSession
+from ananta.models import ParsedDocument
+from ananta.rlm.trace import StepType, TokenUsage
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +105,7 @@ async def websocket_handler(
     websocket:
         The FastAPI WebSocket connection.
     state:
-        Application state (must expose ``topic_mgr``, ``shesha``, ``model``).
+        Application state (must expose ``topic_mgr``, ``ananta``, ``model``).
     query_handler:
         Optional async callback ``(ws, data, state, cancel_event) -> None``
         that executes a query.  When not provided, the built-in topic-based
@@ -199,12 +199,12 @@ async def _handle_query(
         await websocket.send_json({"type": "error", "message": f"Topic '{topic}' not found"})
         return
 
-    doc_names = state.shesha.storage.list_documents(project_id)
+    doc_names = state.ananta.storage.list_documents(project_id)
     if not doc_names:
         await websocket.send_json({"type": "error", "message": "No documents in topic"})
         return
 
-    project = state.shesha.get_project(project_id)
+    project = state.ananta.get_project(project_id)
 
     # Load documents filtered by document_ids (required)
     document_ids = data.get("document_ids")
@@ -229,7 +229,7 @@ async def _handle_query(
     loaded_docs = []
     for did in document_ids:
         try:
-            doc = state.shesha.storage.get_document(project_id, str(did))
+            doc = state.ananta.storage.get_document(project_id, str(did))
             loaded_docs.append(doc)
         except DocumentNotFoundError:
             logger.warning("Requested document_id %r not found in project %s", did, project_id)
@@ -240,7 +240,7 @@ async def _handle_query(
         return
 
     # Load session for history prefix
-    project_dir = state.shesha.storage.get_project_dir(project_id)
+    project_dir = state.ananta.storage.get_project_dir(project_id)
     factory = session_factory or WebConversationSession
     session = factory(project_dir)
     history_prefix = session.format_history_prefix()
@@ -295,7 +295,7 @@ async def _handle_query(
         await drain_task
         return
 
-    storage = state.shesha.storage
+    storage = state.ananta.storage
     try:
         result = await loop.run_in_executor(
             None,
@@ -320,7 +320,7 @@ async def _handle_query(
 
     # Save to session
     trace_id = None
-    traces = state.shesha.storage.list_traces(project_id)
+    traces = state.ananta.storage.list_traces(project_id)
     if traces:
         trace_id = traces[-1].stem
 
@@ -392,7 +392,7 @@ async def handle_multi_project_query(
     # Load documents from all requested projects
     loaded_docs: list[ParsedDocument] = []
     loaded_project_ids: list[str] = []
-    storage = state.shesha.storage
+    storage = state.ananta.storage
     for project_id in document_ids:
         pid_str = str(project_id)
         try:
@@ -487,7 +487,7 @@ async def handle_multi_project_query(
     for pid in document_ids:
         pid_str = str(pid)
         try:
-            project = state.shesha.get_project(pid_str)
+            project = state.ananta.get_project(pid_str)
         except Exception:
             # Project may be stale or deleted; try the next one
             continue

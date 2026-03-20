@@ -16,25 +16,25 @@ from typing import Any
 from fastapi import APIRouter, FastAPI, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
-from shesha.experimental.document_explorer.dependencies import (
+from ananta.experimental.document_explorer.dependencies import (
     DocumentExplorerState,
     get_topic_session,
 )
-from shesha.experimental.document_explorer.extractors import (
+from ananta.experimental.document_explorer.extractors import (
     extract_text,
     get_page_count,
     is_supported_extension,
 )
-from shesha.experimental.document_explorer.schemas import (
+from ananta.experimental.document_explorer.schemas import (
     DocumentInfo,
     DocumentRename,
     DocumentUploadResponse,
 )
-from shesha.experimental.document_explorer.topics import _slugify
-from shesha.experimental.document_explorer.websockets import websocket_handler
-from shesha.experimental.shared.app_factory import create_app
-from shesha.experimental.shared.routes import create_item_router, create_shared_router
-from shesha.models import ParsedDocument
+from ananta.experimental.document_explorer.topics import _slugify
+from ananta.experimental.document_explorer.websockets import websocket_handler
+from ananta.experimental.shared.app_factory import create_app
+from ananta.experimental.shared.routes import create_item_router, create_shared_router
+from ananta.models import ParsedDocument
 
 # Maximum upload size per file (50 MB).
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
@@ -101,15 +101,15 @@ def _resolve_doc_project_ids(
             return items
     except ValueError:
         pass  # Topic doesn't exist; fall back to all projects
-    return state.shesha.list_projects()
+    return state.ananta.list_projects()
 
 
 def _list_doc_trace_files(
     state: DocumentExplorerState,
     project_id: str,
 ) -> list[Path]:
-    """List trace files from Shesha storage."""
-    return state.shesha.storage.list_traces(project_id)
+    """List trace files from Ananta storage."""
+    return state.ananta.storage.list_traces(project_id)
 
 
 def _create_document_router(state: DocumentExplorerState) -> APIRouter:
@@ -118,7 +118,7 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
 
     @router.get("/documents")
     def list_documents() -> list[DocumentInfo]:
-        project_ids = state.shesha.list_projects()
+        project_ids = state.ananta.list_projects()
         result: list[DocumentInfo] = []
         for pid in project_ids:
             info = _build_doc_info(state.uploads_dir, pid)
@@ -128,7 +128,7 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
 
     @router.get("/documents/uncategorized")
     def list_uncategorized() -> list[DocumentInfo]:
-        all_ids = state.shesha.list_projects()
+        all_ids = state.ananta.list_projects()
         uncategorized = state.topic_mgr.list_uncategorized(all_ids)
         result: list[DocumentInfo] = []
         for pid in uncategorized:
@@ -224,7 +224,7 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                 }
                 (upload_dir / "meta.json").write_text(json.dumps(meta, indent=2))
 
-                state.shesha.create_project(project_id)
+                state.ananta.create_project(project_id)
                 created_projects.append(project_id)
                 doc = ParsedDocument(
                     name=file.filename,
@@ -233,7 +233,7 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                     metadata={"filename": file.filename, "size": len(content)},
                     char_count=len(text),
                 )
-                state.shesha.storage.store_document(project_id, doc)
+                state.ananta.storage.store_document(project_id, doc)
 
                 if topic:
                     state.topic_mgr.add_item(topic, project_id)
@@ -253,7 +253,7 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                 except Exception:
                     pass  # Best-effort cleanup — original error takes priority
                 try:
-                    state.shesha.delete_project(pid)
+                    state.ananta.delete_project(pid)
                 except Exception:
                     pass  # Best-effort cleanup — original error takes priority
             for udir in created_upload_dirs:
@@ -283,8 +283,8 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
         upload_dir = state.uploads_dir / doc_id
         if upload_dir.exists():
             shutil.rmtree(upload_dir)
-        # Remove Shesha project
-        state.shesha.delete_project(doc_id)
+        # Remove Ananta project
+        state.ananta.delete_project(doc_id)
         return {"status": "deleted", "project_id": doc_id}
 
     @router.patch("/documents/{doc_id:path}")
@@ -349,7 +349,7 @@ def create_api(state: DocumentExplorerState) -> FastAPI:
     images_dir = Path(__file__).parent.parent.parent.parent.parent / "images"
     return create_app(
         state,
-        title="Shesha Document Explorer",
+        title="Ananta Document Explorer",
         static_dir=frontend_dist,
         images_dir=images_dir,
         ws_handler=lambda ws: websocket_handler(ws, state),

@@ -2,7 +2,7 @@
 
 import pytest
 
-from shesha.prompts.validator import (
+from ananta.prompts.validator import (
     PROMPT_SCHEMAS,
     PromptValidationError,
     extract_placeholders,

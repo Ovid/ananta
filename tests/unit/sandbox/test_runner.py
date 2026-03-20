@@ -4,7 +4,7 @@ import io
 import json
 import struct
 
-from shesha.sandbox.runner import BUILTINS_SET, NAMESPACE, execute_code
+from ananta.sandbox.runner import BUILTINS_SET, NAMESPACE, execute_code
 
 
 def frame_message(data: dict) -> bytes:
@@ -63,7 +63,7 @@ class TestResetAction:
         """Sending reset action returns {"status": "ok"}."""
         import sys
 
-        from shesha.sandbox.runner import main
+        from ananta.sandbox.runner import main
 
         stdin_buf = io.BytesIO(frame_message({"action": "reset"}))
         stdout_buf = io.BytesIO()
@@ -85,7 +85,7 @@ class TestResetAction:
         """Reset clears user-defined vars but preserves FINAL/llm_query."""
         import sys
 
-        from shesha.sandbox.runner import main
+        from ananta.sandbox.runner import main
 
         stdin_data = b"".join(
             [
@@ -128,7 +128,7 @@ class TestRunnerInvalidJson:
         """Runner breaks out of main loop on JSONDecodeError (fail-closed)."""
         import sys
 
-        from shesha.sandbox.runner import main
+        from ananta.sandbox.runner import main
 
         # First message is valid, second has a valid length prefix but invalid JSON payload
         valid_msg = frame_message({"action": "ping"})
@@ -167,7 +167,7 @@ class TestLlmQueryErrorHandling:
         """llm_query() raises ValueError when host sends error field."""
         import sys
 
-        from shesha.sandbox.runner import main
+        from ananta.sandbox.runner import main
 
         error_msg = "Content size (735,490 chars) exceeds the sub-LLM limit"
 
@@ -210,7 +210,7 @@ class TestLlmQueryErrorHandling:
         """llm_query() returns result string when response has no error field."""
         import sys
 
-        from shesha.sandbox.runner import main
+        from ananta.sandbox.runner import main
 
         stdin_data = b"".join(
             [
@@ -251,7 +251,7 @@ class TestLlmQueryOptionalContent:
         """llm_query('prompt') sends empty string as content field."""
         import sys
 
-        from shesha.sandbox.runner import main
+        from ananta.sandbox.runner import main
 
         stdin_data = b"".join(
             [
@@ -289,7 +289,7 @@ class TestLlmQueryOptionalContent:
         """llm_query('instruction', 'content') still sends both fields."""
         import sys
 
-        from shesha.sandbox.runner import main
+        from ananta.sandbox.runner import main
 
         stdin_data = b"".join(
             [
@@ -328,7 +328,7 @@ class TestLlmQueryBatched:
         """llm_query_batched sends a batch action with all prompts."""
         import sys
 
-        from shesha.sandbox.runner import main
+        from ananta.sandbox.runner import main
 
         stdin_data = b"".join(
             [
@@ -371,7 +371,7 @@ class TestLlmQueryBatched:
         """llm_query_batched raises ValueError when host sends error."""
         import sys
 
-        from shesha.sandbox.runner import main
+        from ananta.sandbox.runner import main
 
         stdin_data = b"".join(
             [
@@ -402,7 +402,7 @@ class TestLlmQueryBatched:
         """llm_query_batched returns results in same order as prompts."""
         import sys
 
-        from shesha.sandbox.runner import main
+        from ananta.sandbox.runner import main
 
         stdin_data = b"".join(
             [
@@ -444,7 +444,7 @@ class TestLlmQueryBatched:
         """llm_query_batched persists after namespace reset."""
         import sys
 
-        from shesha.sandbox.runner import main
+        from ananta.sandbox.runner import main
 
         stdin_data = b"".join(
             [
@@ -477,7 +477,7 @@ class TestFinalVarMissingVariable:
         """FINAL_VAR for a missing variable must send None, not empty string."""
         import sys
 
-        from shesha.sandbox.runner import main
+        from ananta.sandbox.runner import main
 
         stdin_data = b"".join(
             [
@@ -512,7 +512,7 @@ class TestFinalVarMissingVariable:
         """FINAL_VAR for an existing variable returns its string value."""
         import sys
 
-        from shesha.sandbox.runner import main
+        from ananta.sandbox.runner import main
 
         stdin_data = b"".join(
             [
@@ -547,7 +547,7 @@ class TestFinalVarMissingVariable:
         not the string 'None'."""
         import sys
 
-        from shesha.sandbox.runner import main
+        from ananta.sandbox.runner import main
 
         stdin_data = b"".join(
             [
@@ -584,7 +584,7 @@ class TestLengthPrefixHelpers:
 
     def test_read_message_reads_length_prefixed_json(self) -> None:
         """_read_message reads 4-byte BE length prefix then exact payload."""
-        from shesha.sandbox.runner import _read_message
+        from ananta.sandbox.runner import _read_message
 
         data = {"action": "execute", "code": "print('hello')"}
         stream = io.BytesIO(frame_message(data))
@@ -593,7 +593,7 @@ class TestLengthPrefixHelpers:
 
     def test_read_message_handles_large_payload(self) -> None:
         """_read_message handles payloads larger than typical buffers."""
-        from shesha.sandbox.runner import _read_message
+        from ananta.sandbox.runner import _read_message
 
         data = {"action": "llm_response", "result": "x" * 100_000}
         stream = io.BytesIO(frame_message(data))
@@ -602,7 +602,7 @@ class TestLengthPrefixHelpers:
 
     def test_write_message_writes_length_prefixed_json(self) -> None:
         """_write_message writes 4-byte BE length prefix + JSON payload."""
-        from shesha.sandbox.runner import _write_message
+        from ananta.sandbox.runner import _write_message
 
         data = {"status": "ok", "stdout": "hello\n"}
         stream = io.BytesIO()
@@ -619,7 +619,7 @@ class TestLengthPrefixHelpers:
         """_write_message calls flush() on the stream."""
         from unittest.mock import MagicMock
 
-        from shesha.sandbox.runner import _write_message
+        from ananta.sandbox.runner import _write_message
 
         mock_stream = MagicMock()
         _write_message(mock_stream, {"status": "ok"})
@@ -627,7 +627,7 @@ class TestLengthPrefixHelpers:
 
     def test_read_exactly_raises_on_eof(self) -> None:
         """_read_exactly raises ConnectionError on EOF mid-read."""
-        from shesha.sandbox.runner import _read_exactly
+        from ananta.sandbox.runner import _read_exactly
 
         stream = io.BytesIO(b"abc")  # Only 3 bytes
         with __import__("pytest").raises(ConnectionError, match="Connection closed"):
@@ -635,7 +635,7 @@ class TestLengthPrefixHelpers:
 
     def test_read_exactly_reads_exact_bytes(self) -> None:
         """_read_exactly reads exactly n bytes from stream."""
-        from shesha.sandbox.runner import _read_exactly
+        from ananta.sandbox.runner import _read_exactly
 
         stream = io.BytesIO(b"hello world")
         result = _read_exactly(stream, 5)
@@ -643,7 +643,7 @@ class TestLengthPrefixHelpers:
 
     def test_read_message_multiple_messages(self) -> None:
         """_read_message reads only one message, leaving rest in stream."""
-        from shesha.sandbox.runner import _read_message
+        from ananta.sandbox.runner import _read_message
 
         msg1 = {"action": "ping"}
         msg2 = {"action": "reset"}
@@ -669,7 +669,7 @@ class TestPartialAnswer:
         """PARTIAL('text') in sandbox sets result['partial_answer']."""
         import sys
 
-        from shesha.sandbox.runner import main
+        from ananta.sandbox.runner import main
 
         stdin_data = b"".join(
             [
@@ -700,7 +700,7 @@ class TestPartialAnswer:
         """PARTIAL remains callable after namespace reset."""
         import sys
 
-        from shesha.sandbox.runner import main
+        from ananta.sandbox.runner import main
 
         stdin_data = b"".join(
             [

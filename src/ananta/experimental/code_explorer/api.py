@@ -2,9 +2,9 @@
 
 Provides repo management routes (list, add, get, delete, check/apply updates)
 and analysis routes for the code explorer web interface.  Uses the shared
-``create_app()`` factory from ``shesha.experimental.shared.app_factory`` for
+``create_app()`` factory from ``ananta.experimental.shared.app_factory`` for
 FastAPI boilerplate and the shared router from
-``shesha.experimental.shared.routes`` for traces, model, history, and
+``ananta.experimental.shared.routes`` for traces, model, history, and
 context-budget routes.  Code-explorer-specific repo and topic CRUD routes
 live on a local router.
 """
@@ -19,22 +19,22 @@ from pathlib import Path
 
 from fastapi import APIRouter, FastAPI, HTTPException
 
-from shesha.exceptions import ProjectNotFoundError, RepoIngestError
-from shesha.experimental.code_explorer.dependencies import (
+from ananta.exceptions import ProjectNotFoundError, RepoIngestError
+from ananta.experimental.code_explorer.dependencies import (
     CodeExplorerState,
     get_topic_session,
 )
-from shesha.experimental.code_explorer.schemas import (
+from ananta.experimental.code_explorer.schemas import (
     AnalysisResponse,
     RepoAdd,
     RepoInfo,
     RepoRename,
     UpdateStatus,
 )
-from shesha.experimental.code_explorer.websockets import websocket_handler
-from shesha.experimental.shared.app_factory import create_app
-from shesha.experimental.shared.routes import create_item_router, create_shared_router
-from shesha.models import RepoProjectResult
+from ananta.experimental.code_explorer.websockets import websocket_handler
+from ananta.experimental.shared.app_factory import create_app
+from ananta.experimental.shared.routes import create_item_router, create_shared_router
+from ananta.models import RepoProjectResult
 
 # Allow / for old-style arXiv IDs (e.g. cs/9808001v1), but block .. traversal.
 # safe_path() provides the real path-traversal defence; this is belt-and-suspenders.
@@ -67,12 +67,12 @@ def _resolve_code_project_ids(state: CodeExplorerState, topic_name: str) -> list
             return items
     except ValueError:
         pass  # Topic doesn't exist; fall back to all projects
-    return state.shesha.list_projects()
+    return state.ananta.list_projects()
 
 
 def _list_code_trace_files(state: CodeExplorerState, project_id: str) -> list[Path]:
-    """List trace files from Shesha storage (not topic manager storage)."""
-    return state.shesha.storage.list_traces(project_id)
+    """List trace files from Ananta storage (not topic manager storage)."""
+    return state.ananta.storage.list_traces(project_id)
 
 
 def _create_repo_router(state: CodeExplorerState) -> APIRouter:
@@ -88,12 +88,12 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
 
     def _build_repo_info(pid: str) -> RepoInfo:
         """Build a RepoInfo for a project_id."""
-        info = state.shesha.get_project_info(pid)
-        # TODO: Replace with a public Shesha API method when available
-        doc_count = len(state.shesha.storage.list_documents(pid))
+        info = state.ananta.get_project_info(pid)
+        # TODO: Replace with a public Ananta API method when available
+        doc_count = len(state.ananta.storage.list_documents(pid))
         display_name: str | None = None
         try:
-            dn_path = state.shesha.storage.get_project_dir(pid) / "_display_name.txt"
+            dn_path = state.ananta.storage.get_project_dir(pid) / "_display_name.txt"
             if dn_path.exists():
                 display_name = dn_path.read_text().strip() or None
         except Exception:
@@ -108,12 +108,12 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
 
     @router.get("/repos")
     def list_repos() -> list[RepoInfo]:
-        project_ids = state.shesha.list_projects()
+        project_ids = state.ananta.list_projects()
         return [_build_repo_info(pid) for pid in project_ids]
 
     @router.get("/repos/uncategorized")
     def list_uncategorized_repos() -> list[RepoInfo]:
-        all_ids = state.shesha.list_projects()
+        all_ids = state.ananta.list_projects()
         uncategorized = state.topic_mgr.list_uncategorized(all_ids)
         return [_build_repo_info(pid) for pid in uncategorized]
 
@@ -128,7 +128,7 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
     @router.post("/repos")
     def add_repo(body: RepoAdd) -> dict[str, object]:
         try:
-            repo_result = state.shesha.create_project_from_repo(body.url)
+            repo_result = state.ananta.create_project_from_repo(body.url)
         except RepoIngestError as exc:
             raise HTTPException(422, detail=_sanitize_ingest_error(exc)) from exc
         project_id = repo_result.project.project_id
@@ -161,10 +161,10 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
         if not new_name:
             raise HTTPException(422, "Display name cannot be empty")
         try:
-            state.shesha.get_project_info(project_id)
+            state.ananta.get_project_info(project_id)
         except ProjectNotFoundError:
             raise HTTPException(404, f"Project '{project_id}' not found")
-        dn_path = state.shesha.storage.get_project_dir(project_id) / "_display_name.txt"
+        dn_path = state.ananta.storage.get_project_dir(project_id) / "_display_name.txt"
         dn_path.write_text(new_name)
         return _build_repo_info(project_id)
 
@@ -172,18 +172,18 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
     def delete_repo(project_id: str) -> dict[str, str]:
         _validate_project_id(project_id)
         try:
-            state.shesha.get_project_info(project_id)
+            state.ananta.get_project_info(project_id)
         except ProjectNotFoundError:
             raise HTTPException(404, f"Project '{project_id}' not found")
         state.topic_mgr.remove_item_from_all(project_id)
-        state.shesha.delete_project(project_id, cleanup_repo=True)
+        state.ananta.delete_project(project_id, cleanup_repo=True)
         return {"status": "deleted", "project_id": project_id}
 
     @router.post("/repos/{project_id}/check-updates")
     def check_updates(project_id: str) -> UpdateStatus:
         _validate_project_id(project_id)
         try:
-            info = state.shesha.get_project_info(project_id)
+            info = state.ananta.get_project_info(project_id)
         except ProjectNotFoundError:
             raise HTTPException(404, f"Project '{project_id}' not found")
 
@@ -191,9 +191,9 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
         if not source_url:
             raise HTTPException(400, f"Project '{project_id}' has no source URL")
 
-        saved_path = state.shesha.repo_ingester.get_saved_path(project_id)
+        saved_path = state.ananta.repo_ingester.get_saved_path(project_id)
         try:
-            repo_result = state.shesha.create_project_from_repo(
+            repo_result = state.ananta.create_project_from_repo(
                 source_url, name=project_id, path=saved_path
             )
         except RepoIngestError as exc:
@@ -223,7 +223,7 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
             # Self-heal: re-derive update state when cache is empty
             # (e.g., after server restart between check and apply).
             try:
-                info = state.shesha.get_project_info(project_id)
+                info = state.ananta.get_project_info(project_id)
             except ProjectNotFoundError:
                 raise HTTPException(404, f"Project '{project_id}' not found")
 
@@ -231,9 +231,9 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
             if not source_url:
                 raise HTTPException(400, f"Project '{project_id}' has no source URL")
 
-            saved_path = state.shesha.repo_ingester.get_saved_path(project_id)
+            saved_path = state.ananta.repo_ingester.get_saved_path(project_id)
             try:
-                repo_result = state.shesha.create_project_from_repo(
+                repo_result = state.ananta.create_project_from_repo(
                     source_url, name=project_id, path=saved_path
                 )
             except RepoIngestError as exc:
@@ -258,7 +258,7 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
     def generate_analysis(project_id: str) -> AnalysisResponse:
         _validate_project_id(project_id)
         try:
-            analysis = state.shesha.generate_analysis(project_id)
+            analysis = state.ananta.generate_analysis(project_id)
         except ProjectNotFoundError:
             raise HTTPException(404, f"Project '{project_id}' not found")
         return AnalysisResponse(**asdict(analysis))
@@ -267,7 +267,7 @@ def _create_repo_router(state: CodeExplorerState) -> APIRouter:
     def get_analysis(project_id: str) -> AnalysisResponse:
         _validate_project_id(project_id)
         try:
-            analysis = state.shesha.get_analysis(project_id)
+            analysis = state.ananta.get_analysis(project_id)
         except ProjectNotFoundError:
             raise HTTPException(404, f"Project '{project_id}' not found")
         if analysis is None:
@@ -294,7 +294,7 @@ def create_api(state: CodeExplorerState) -> FastAPI:
     images_dir = Path(__file__).parent.parent.parent.parent.parent / "images"
     return create_app(
         state,
-        title="Shesha Code Explorer",
+        title="Ananta Code Explorer",
         static_dir=frontend_dist,
         images_dir=images_dir,
         ws_handler=lambda ws: websocket_handler(ws, state),

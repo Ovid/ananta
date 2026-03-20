@@ -1,1 +1,1 @@
-"""TUI widgets for Shesha."""
+"""TUI widgets for Ananta."""

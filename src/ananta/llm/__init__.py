@@ -1,5 +1,5 @@
-"""LLM client for Shesha."""
+"""LLM client for Ananta."""
 
-from shesha.llm.client import LLMClient, LLMClientFactory, LLMResponse
+from ananta.llm.client import LLMClient, LLMClientFactory, LLMResponse
 
 __all__ = ["LLMClient", "LLMClientFactory", "LLMResponse"]

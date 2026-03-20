@@ -18,11 +18,11 @@ Usage:
     python examples/multi_repo.py repo1_url repo2_url
 
 Environment Variables:
-    SHESHA_API_KEY: Required. API key for your LLM provider.
-    SHESHA_MODEL: Optional. Model name (default: claude-sonnet-4-20250514).
+    ANANTA_API_KEY: Required. API key for your LLM provider.
+    ANANTA_MODEL: Optional. Model name (default: claude-sonnet-4-20250514).
 
 Example:
-    $ export SHESHA_API_KEY="your-api-key"
+    $ export ANANTA_API_KEY="your-api-key"
     $ python examples/multi_repo.py --prd my-feature.md
 """
 
@@ -37,11 +37,11 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from script_utils import install_urllib3_cleanup_hook
 
-from shesha import Shesha, SheshaConfig
-from shesha.experimental.multi_repo import AlignmentReport, MultiRepoAnalyzer
+from ananta import Ananta, AnantaConfig
+from ananta.experimental.multi_repo import AlignmentReport, MultiRepoAnalyzer
 
-STORAGE_PATH = Path.home() / ".shesha" / "multi-repo"
-EXPLORER_STORAGE_PATH = Path.home() / ".shesha" / "repo-explorer"
+STORAGE_PATH = Path.home() / ".ananta" / "multi-repo"
+EXPLORER_STORAGE_PATH = Path.home() / ".ananta" / "repo-explorer"
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -100,7 +100,7 @@ def read_prd(prd_path: str | None) -> str:
 
 
 def collect_repos_from_storages(
-    multi_shesha: Shesha, explorer_shesha: Shesha
+    multi_ananta: Ananta, explorer_ananta: Ananta
 ) -> list[tuple[str, str | None, str]]:
     """Collect repos from both multi-repo and repo-explorer storages.
 
@@ -111,16 +111,16 @@ def collect_repos_from_storages(
     seen_ids: set[str] = set()
 
     # Multi-repo storage first (takes priority)
-    for project_id in multi_shesha.list_projects():
-        info = multi_shesha.get_project_info(project_id)
+    for project_id in multi_ananta.list_projects():
+        info = multi_ananta.get_project_info(project_id)
         repos.append((project_id, info.source_url, "multi-repo"))
         seen_ids.add(project_id)
 
     # Repo-explorer storage (skip duplicates)
-    for project_id in explorer_shesha.list_projects():
+    for project_id in explorer_ananta.list_projects():
         if project_id in seen_ids:
             continue
-        info = explorer_shesha.get_project_info(project_id)
+        info = explorer_ananta.get_project_info(project_id)
         repos.append((project_id, info.source_url, "repo-explorer"))
         seen_ids.add(project_id)
 
@@ -204,14 +204,14 @@ def main() -> None:
     install_urllib3_cleanup_hook()
     args = parse_args()
 
-    if not os.environ.get("SHESHA_API_KEY"):
-        print("Error: SHESHA_API_KEY environment variable not set.")
+    if not os.environ.get("ANANTA_API_KEY"):
+        print("Error: ANANTA_API_KEY environment variable not set.")
         sys.exit(1)
 
-    config = SheshaConfig.load(storage_path=STORAGE_PATH)
-    shesha = Shesha(config=config)
+    config = AnantaConfig.load(storage_path=STORAGE_PATH)
+    ananta = Ananta(config=config)
 
-    analyzer = MultiRepoAnalyzer(shesha)
+    analyzer = MultiRepoAnalyzer(ananta)
 
     # Determine repos
     if args.repos:
@@ -219,9 +219,9 @@ def main() -> None:
         repo_urls = args.repos
     else:
         # Interactive picker
-        explorer_config = SheshaConfig.load(storage_path=EXPLORER_STORAGE_PATH)
-        explorer_shesha = Shesha(config=explorer_config)
-        available = collect_repos_from_storages(shesha, explorer_shesha)
+        explorer_config = AnantaConfig.load(storage_path=EXPLORER_STORAGE_PATH)
+        explorer_ananta = Ananta(config=explorer_config)
+        available = collect_repos_from_storages(ananta, explorer_ananta)
 
         if not available:
             print("No repositories indexed yet.")

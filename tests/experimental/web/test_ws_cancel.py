@@ -9,11 +9,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi import WebSocketDisconnect
 
-from shesha.experimental.web.websockets import websocket_handler
+from ananta.experimental.web.websockets import websocket_handler
 
 # The web handler now delegates to the shared handler, so we patch the
 # shared module's _handle_query.
-_HANDLE_QUERY_PATCH = "shesha.experimental.shared.websockets._handle_query"
+_HANDLE_QUERY_PATCH = "ananta.experimental.shared.websockets._handle_query"
 
 
 class TestCancelDuringQuery:

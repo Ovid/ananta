@@ -5,15 +5,15 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from shesha.analysis.shortcut import (
+from ananta.analysis.shortcut import (
     _SYSTEM_PROMPT,
     ShortcutResult,
     query_with_shortcut,
     try_answer_from_analysis,
 )
-from shesha.llm.exceptions import PermanentError
-from shesha.rlm.engine import QueryResult
-from shesha.rlm.trace import TokenUsage, Trace
+from ananta.llm.exceptions import PermanentError
+from ananta.rlm.engine import QueryResult
+from ananta.rlm.trace import TokenUsage, Trace
 
 
 class TestTryAnswerFromAnalysis:
@@ -31,7 +31,7 @@ class TestTryAnswerFromAnalysis:
         answer_response.prompt_tokens = 100
         answer_response.completion_tokens = 20
 
-        with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+        with patch("ananta.analysis.shortcut.LLMClient") as mock_cls:
             classifier_client = MagicMock()
             classifier_client.complete.return_value = classifier_response
             answer_client = MagicMock()
@@ -52,7 +52,7 @@ class TestTryAnswerFromAnalysis:
         mock_response = MagicMock()
         mock_response.content = "NEED_DEEPER"
 
-        with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+        with patch("ananta.analysis.shortcut.LLMClient") as mock_cls:
             mock_cls.return_value.complete.return_value = mock_response
             result = try_answer_from_analysis(
                 question="Find race conditions in the executor",
@@ -68,7 +68,7 @@ class TestTryAnswerFromAnalysis:
         mock_response = MagicMock()
         mock_response.content = "NEED_DEEPER\n"
 
-        with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+        with patch("ananta.analysis.shortcut.LLMClient") as mock_cls:
             mock_cls.return_value.complete.return_value = mock_response
             result = try_answer_from_analysis(
                 question="Any question",
@@ -87,7 +87,7 @@ class TestTryAnswerFromAnalysis:
             mock_response.prompt_tokens = 50
             mock_response.completion_tokens = 10
 
-            with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+            with patch("ananta.analysis.shortcut.LLMClient") as mock_cls:
                 mock_cls.return_value.complete.return_value = mock_response
                 result = try_answer_from_analysis(
                     question="Any question",
@@ -100,7 +100,7 @@ class TestTryAnswerFromAnalysis:
 
     def test_returns_none_when_analysis_context_is_none(self):
         """No analysis context -> None immediately, no LLM call."""
-        with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+        with patch("ananta.analysis.shortcut.LLMClient") as mock_cls:
             result = try_answer_from_analysis(
                 question="What does this do?",
                 analysis_context=None,
@@ -113,7 +113,7 @@ class TestTryAnswerFromAnalysis:
 
     def test_returns_none_when_analysis_context_is_empty(self):
         """Empty string analysis context -> None immediately, no LLM call."""
-        with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+        with patch("ananta.analysis.shortcut.LLMClient") as mock_cls:
             result = try_answer_from_analysis(
                 question="What does this do?",
                 analysis_context="",
@@ -129,7 +129,7 @@ class TestTryAnswerFromAnalysis:
         mock_response = MagicMock()
         mock_response.content = "Some answer"
 
-        with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+        with patch("ananta.analysis.shortcut.LLMClient") as mock_cls:
             mock_client = mock_cls.return_value
             mock_client.complete.return_value = mock_response
             try_answer_from_analysis(
@@ -154,7 +154,7 @@ class TestTryAnswerFromAnalysis:
         mock_response = MagicMock()
         mock_response.content = "Some answer"
 
-        with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+        with patch("ananta.analysis.shortcut.LLMClient") as mock_cls:
             mock_client = mock_cls.return_value
             mock_client.complete.return_value = mock_response
             try_answer_from_analysis(
@@ -181,7 +181,7 @@ class TestTryAnswerFromAnalysis:
         mock_response.prompt_tokens = 100
         mock_response.completion_tokens = 20
 
-        with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+        with patch("ananta.analysis.shortcut.LLMClient") as mock_cls:
             mock_cls.return_value.complete.return_value = mock_response
             result = try_answer_from_analysis(
                 question="What framework?",
@@ -196,7 +196,7 @@ class TestTryAnswerFromAnalysis:
 
     def test_returns_none_on_llm_error(self):
         """LLM exception -> None (graceful fallback)."""
-        with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+        with patch("ananta.analysis.shortcut.LLMClient") as mock_cls:
             mock_cls.return_value.complete.side_effect = Exception("API error")
             result = try_answer_from_analysis(
                 question="What does this do?",
@@ -214,7 +214,7 @@ class TestTryAnswerFromAnalysis:
         classifier_response.prompt_tokens = 5
         classifier_response.completion_tokens = 1
 
-        with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+        with patch("ananta.analysis.shortcut.LLMClient") as mock_cls:
             classifier_client = MagicMock()
             classifier_client.complete.return_value = classifier_response
             answer_client = MagicMock()
@@ -248,7 +248,7 @@ class TestQueryWithShortcut:
         project = self._make_project()
 
         with patch(
-            "shesha.analysis.shortcut.try_answer_from_analysis",
+            "ananta.analysis.shortcut.try_answer_from_analysis",
             return_value=("shortcut answer", 10, 5),
         ):
             result = query_with_shortcut(
@@ -270,7 +270,7 @@ class TestQueryWithShortcut:
         project = self._make_project()
 
         with patch(
-            "shesha.analysis.shortcut.try_answer_from_analysis",
+            "ananta.analysis.shortcut.try_answer_from_analysis",
             return_value=None,
         ):
             result = query_with_shortcut(
@@ -290,7 +290,7 @@ class TestQueryWithShortcut:
         project = self._make_project()
 
         with patch(
-            "shesha.analysis.shortcut.try_answer_from_analysis",
+            "ananta.analysis.shortcut.try_answer_from_analysis",
         ) as mock_try:
             result = query_with_shortcut(
                 project=project,
@@ -310,7 +310,7 @@ class TestQueryWithShortcut:
         cancel = threading.Event()
 
         with patch(
-            "shesha.analysis.shortcut.try_answer_from_analysis",
+            "ananta.analysis.shortcut.try_answer_from_analysis",
             return_value=None,
         ):
             query_with_shortcut(
@@ -336,7 +336,7 @@ class TestQueryWithShortcut:
         project = self._make_project()
 
         with patch(
-            "shesha.analysis.shortcut.try_answer_from_analysis",
+            "ananta.analysis.shortcut.try_answer_from_analysis",
             return_value=None,
         ):
             query_with_shortcut(
@@ -358,7 +358,7 @@ class TestQueryWithShortcut:
         project = self._make_project()
 
         with patch(
-            "shesha.analysis.shortcut.try_answer_from_analysis",
+            "ananta.analysis.shortcut.try_answer_from_analysis",
             return_value=None,
         ):
             query_with_shortcut(
@@ -378,7 +378,7 @@ class TestQueryWithShortcut:
         project = self._make_project()
 
         with patch(
-            "shesha.analysis.shortcut.try_answer_from_analysis",
+            "ananta.analysis.shortcut.try_answer_from_analysis",
         ):
             query_with_shortcut(
                 project=project,

@@ -2,7 +2,7 @@
 
 import pytest
 
-from shesha.rlm.verification import (
+from ananta.rlm.verification import (
     Citation,
     Quote,
     VerificationResult,

@@ -14,8 +14,8 @@ from litellm.exceptions import (
 )
 from litellm.exceptions import RateLimitError as LiteLLMRateLimit
 
-from shesha.llm.exceptions import PermanentError, RateLimitError, TransientError
-from shesha.llm.retry import RetryConfig, retry_with_backoff
+from ananta.llm.exceptions import PermanentError, RateLimitError, TransientError
+from ananta.llm.retry import RetryConfig, retry_with_backoff
 
 logger = logging.getLogger(__name__)
 

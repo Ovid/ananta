@@ -3,10 +3,10 @@
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
-from shesha.models import ParsedDocument
+from ananta.models import ParsedDocument
 
 if TYPE_CHECKING:
-    from shesha.models import RepoAnalysis
+    from ananta.models import RepoAnalysis
 
 
 class StorageBackend(Protocol):

@@ -8,9 +8,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from shesha.exceptions import AuthenticationError, RepoIngestError
-from shesha.repo.ingester import RepoIngester
-from shesha.security.paths import PathTraversalError
+from ananta.exceptions import AuthenticationError, RepoIngestError
+from ananta.repo.ingester import RepoIngester
+from ananta.security.paths import PathTraversalError
 
 
 @pytest.fixture
@@ -556,7 +556,7 @@ class TestGitFetchPull:
         repo_path = tmp_path / "repos" / "my-project"
         repo_path.mkdir(parents=True)
 
-        with patch("shesha.repo.ingester.subprocess.run") as mock_run:
+        with patch("ananta.repo.ingester.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(
                 returncode=128,
                 stderr="fatal: could not read from remote",
@@ -585,7 +585,7 @@ class TestSubprocessTimeouts:
 
     def test_clone_has_timeout(self, ingester: RepoIngester):
         """clone() passes timeout to subprocess.run."""
-        with patch("shesha.repo.ingester.subprocess.run") as mock_run:
+        with patch("ananta.repo.ingester.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stderr="")
 
             ingester.clone("https://github.com/org/repo", "my-project")
@@ -599,7 +599,7 @@ class TestSubprocessTimeouts:
         repo_path = tmp_path / "repos" / "my-project"
         repo_path.mkdir(parents=True)
 
-        with patch("shesha.repo.ingester.subprocess.run") as mock_run:
+        with patch("ananta.repo.ingester.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0)
 
             ingester.pull("my-project")
@@ -609,7 +609,7 @@ class TestSubprocessTimeouts:
 
     def test_get_remote_sha_has_timeout(self, ingester: RepoIngester):
         """get_remote_sha() passes timeout to subprocess.run."""
-        with patch("shesha.repo.ingester.subprocess.run") as mock_run:
+        with patch("ananta.repo.ingester.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(
                 returncode=0,
                 stdout="abc123\tHEAD\n",
@@ -625,7 +625,7 @@ class TestSubprocessTimeouts:
         repo_path = tmp_path / "repos" / "my-project"
         repo_path.mkdir(parents=True)
 
-        with patch("shesha.repo.ingester.subprocess.run") as mock_run:
+        with patch("ananta.repo.ingester.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0)
 
             ingester.fetch("my-project")
@@ -638,7 +638,7 @@ class TestSubprocessTimeouts:
         repo_path = tmp_path / "repos" / "my-project"
         repo_path.mkdir(parents=True)
 
-        with patch("shesha.repo.ingester.subprocess.run") as mock_run:
+        with patch("ananta.repo.ingester.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout="abc123\n")
 
             ingester.get_local_sha("my-project")
@@ -651,7 +651,7 @@ class TestSubprocessTimeouts:
         repo_path = tmp_path / "repos" / "my-project"
         repo_path.mkdir(parents=True)
 
-        with patch("shesha.repo.ingester.subprocess.run") as mock_run:
+        with patch("ananta.repo.ingester.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout="file.py\n")
 
             ingester.list_files("my-project")
@@ -664,7 +664,7 @@ class TestSubprocessTimeouts:
         repo_path = tmp_path / "repos" / "my-project"
         repo_path.mkdir(parents=True)
 
-        with patch("shesha.repo.ingester.subprocess.run") as mock_run:
+        with patch("ananta.repo.ingester.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout="url\n")
 
             ingester.get_repo_url("my-project")
@@ -674,7 +674,7 @@ class TestSubprocessTimeouts:
 
     def test_clone_timeout_raises_repo_ingest_error(self, ingester: RepoIngester):
         """clone() converts TimeoutExpired to RepoIngestError."""
-        with patch("shesha.repo.ingester.subprocess.run") as mock_run:
+        with patch("ananta.repo.ingester.subprocess.run") as mock_run:
             mock_run.side_effect = subprocess.TimeoutExpired(cmd="git", timeout=300)
 
             with pytest.raises(RepoIngestError):
@@ -685,7 +685,7 @@ class TestSubprocessTimeouts:
         repo_path = tmp_path / "repos" / "my-project"
         repo_path.mkdir(parents=True)
 
-        with patch("shesha.repo.ingester.subprocess.run") as mock_run:
+        with patch("ananta.repo.ingester.subprocess.run") as mock_run:
             mock_run.side_effect = subprocess.TimeoutExpired(cmd="git", timeout=120)
 
             with pytest.raises(RepoIngestError):
@@ -696,7 +696,7 @@ class TestSubprocessTimeouts:
         repo_path = tmp_path / "repos" / "my-project"
         repo_path.mkdir(parents=True)
 
-        with patch("shesha.repo.ingester.subprocess.run") as mock_run:
+        with patch("ananta.repo.ingester.subprocess.run") as mock_run:
             mock_run.side_effect = subprocess.TimeoutExpired(cmd="git", timeout=120)
 
             with pytest.raises(RepoIngestError):
@@ -704,7 +704,7 @@ class TestSubprocessTimeouts:
 
     def test_list_files_timeout_raises_repo_ingest_error(self, ingester: RepoIngester):
         """list_files_from_path() raises RepoIngestError on timeout instead of returning []."""
-        with patch("shesha.repo.ingester.subprocess.run") as mock_run:
+        with patch("ananta.repo.ingester.subprocess.run") as mock_run:
             mock_run.side_effect = subprocess.TimeoutExpired(cmd="git", timeout=30)
 
             with pytest.raises(RepoIngestError):
@@ -712,7 +712,7 @@ class TestSubprocessTimeouts:
 
     def test_get_remote_sha_timeout_returns_none(self, ingester: RepoIngester):
         """get_remote_sha() returns None on timeout."""
-        with patch("shesha.repo.ingester.subprocess.run") as mock_run:
+        with patch("ananta.repo.ingester.subprocess.run") as mock_run:
             mock_run.side_effect = subprocess.TimeoutExpired(cmd="git", timeout=30)
 
             result = ingester.get_remote_sha("https://github.com/org/repo")
@@ -725,7 +725,7 @@ class TestTokenInGetRemoteSha:
 
     def test_get_remote_sha_uses_token_when_provided(self, ingester: RepoIngester):
         """get_remote_sha uses askpass when token is provided."""
-        with patch("shesha.repo.ingester.subprocess.run") as mock_run:
+        with patch("ananta.repo.ingester.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(
                 returncode=0,
                 stdout="abc123\tHEAD\n",
@@ -780,7 +780,7 @@ class TestNoPromptEnv:
 
     def test_clone_without_token_sets_no_prompt(self, ingester: RepoIngester):
         """clone() sets GIT_TERMINAL_PROMPT=0 even without a token."""
-        with patch("shesha.repo.ingester.subprocess.run") as mock_run:
+        with patch("ananta.repo.ingester.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stderr="")
 
             ingester.clone("https://github.com/org/repo", "my-project")
@@ -791,7 +791,7 @@ class TestNoPromptEnv:
 
     def test_get_remote_sha_without_token_sets_no_prompt(self, ingester: RepoIngester):
         """get_remote_sha() sets GIT_TERMINAL_PROMPT=0 even without a token."""
-        with patch("shesha.repo.ingester.subprocess.run") as mock_run:
+        with patch("ananta.repo.ingester.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout="abc123\tHEAD\n")
 
             ingester.get_remote_sha("https://github.com/org/repo")
@@ -805,7 +805,7 @@ class TestNoPromptEnv:
         repo_path = tmp_path / "repos" / "my-project"
         repo_path.mkdir(parents=True)
 
-        with patch("shesha.repo.ingester.subprocess.run") as mock_run:
+        with patch("ananta.repo.ingester.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0)
 
             ingester.fetch("my-project")
@@ -819,7 +819,7 @@ class TestNoPromptEnv:
         repo_path = tmp_path / "repos" / "my-project"
         repo_path.mkdir(parents=True)
 
-        with patch("shesha.repo.ingester.subprocess.run") as mock_run:
+        with patch("ananta.repo.ingester.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stderr="")
 
             ingester.pull("my-project")

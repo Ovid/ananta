@@ -14,11 +14,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from shesha.exceptions import DocumentNotFoundError
-from shesha.experimental.shared.websockets import _handle_query
-from shesha.models import ParsedDocument
+from ananta.exceptions import DocumentNotFoundError
+from ananta.experimental.shared.websockets import _handle_query
+from ananta.models import ParsedDocument
 
-_SESSION_PATCH = "shesha.experimental.shared.websockets.WebConversationSession"
+_SESSION_PATCH = "ananta.experimental.shared.websockets.WebConversationSession"
 
 
 def _make_doc(name: str) -> ParsedDocument:
@@ -57,7 +57,7 @@ def _make_state(doc_names: list[str]) -> MagicMock:
     state.topic_mgr.resolve.return_value = "proj-123"
 
     # Storage mock
-    storage = state.shesha.storage
+    storage = state.ananta.storage
     storage.list_documents.return_value = doc_names
     storage.load_all_documents.return_value = [_make_doc(n) for n in doc_names]
     storage.get_document.side_effect = lambda pid, name: _make_doc(name)
@@ -69,7 +69,7 @@ def _make_state(doc_names: list[str]) -> MagicMock:
     project._storage = storage
     project.rlm_engine.query.return_value = FakeQueryResult()
     project.query.return_value = FakeQueryResult()
-    state.shesha.get_project.return_value = project
+    state.ananta.get_project.return_value = project
 
     return state
 
@@ -99,7 +99,7 @@ class TestDocumentIdsFilterLoadsSelectedDocs:
             mock_session_cls.return_value.format_history_prefix.return_value = ""
             await _handle_query(ws, data, state, threading.Event())
 
-        storage = state.shesha.storage
+        storage = state.ananta.storage
         # get_document should be called for each document_id
         storage.get_document.assert_any_call("proj-123", "paper-a")
         storage.get_document.assert_any_call("proj-123", "paper-c")
@@ -124,7 +124,7 @@ class TestDocumentIdsFilterLoadsSelectedDocs:
             mock_session_cls.return_value.format_history_prefix.return_value = ""
             await _handle_query(ws, data, state, threading.Event())
 
-        project = state.shesha.get_project.return_value
+        project = state.ananta.get_project.return_value
         engine = project.rlm_engine
 
         # The engine should have been called with only the filtered doc
@@ -150,7 +150,7 @@ class TestDocumentIdsFilterLoadsSelectedDocs:
 
         await _handle_query(ws, data, state, threading.Event())
 
-        storage = state.shesha.storage
+        storage = state.ananta.storage
         storage.load_all_documents.assert_not_called()
         storage.get_document.assert_not_called()
 
@@ -179,7 +179,7 @@ class TestNoDocumentIdsSendsError:
 
         await _handle_query(ws, data, state, threading.Event())
 
-        storage = state.shesha.storage
+        storage = state.ananta.storage
         storage.load_all_documents.assert_not_called()
         storage.get_document.assert_not_called()
 
@@ -252,7 +252,7 @@ class TestDocumentIdsAllInvalid:
         ws = _make_ws()
 
         # Make get_document raise for unknown docs
-        storage = state.shesha.storage
+        storage = state.ananta.storage
         storage.get_document.side_effect = DocumentNotFoundError("proj-123", "nonexistent")
 
         data: dict[str, object] = {

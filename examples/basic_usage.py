@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
-"""Basic usage example for Shesha."""
+"""Basic usage example for Ananta."""
 
 from pathlib import Path
 
-from shesha import Shesha
+from ananta import Ananta
 
 
 def main() -> None:
-    """Demonstrate basic Shesha usage."""
-    # Initialize Shesha
-    shesha = Shesha(
+    """Demonstrate basic Ananta usage."""
+    # Initialize Ananta
+    ananta = Ananta(
         model="claude-sonnet-4-20250514",
         storage_path="./example_data",
     )
 
     # Create a project
-    project = shesha.create_project("demo")
+    project = ananta.create_project("demo")
 
     # Upload some documents
     docs_dir = Path(__file__).parent / "sample_docs"

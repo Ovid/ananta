@@ -10,9 +10,9 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from shesha.experimental.document_explorer.api import _make_project_id, create_api
-from shesha.experimental.document_explorer.dependencies import DocumentExplorerState
-from shesha.experimental.document_explorer.topics import DocumentTopicManager
+from ananta.experimental.document_explorer.api import _make_project_id, create_api
+from ananta.experimental.document_explorer.dependencies import DocumentExplorerState
+from ananta.experimental.document_explorer.topics import DocumentTopicManager
 
 
 class TestMakeProjectId:
@@ -32,12 +32,12 @@ class TestMakeProjectId:
 
 
 @pytest.fixture
-def mock_shesha() -> MagicMock:
-    shesha = MagicMock()
-    shesha.list_projects.return_value = []
-    shesha.storage = MagicMock()
-    shesha.storage.list_documents.return_value = []
-    return shesha
+def mock_ananta() -> MagicMock:
+    ananta = MagicMock()
+    ananta.list_projects.return_value = []
+    ananta.storage = MagicMock()
+    ananta.storage.list_documents.return_value = []
+    return ananta
 
 
 @pytest.fixture
@@ -54,12 +54,12 @@ def uploads_dir(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def state(
-    mock_shesha: MagicMock,
+    mock_ananta: MagicMock,
     topic_mgr: DocumentTopicManager,
     uploads_dir: Path,
 ) -> DocumentExplorerState:
     return DocumentExplorerState(
-        shesha=mock_shesha,
+        ananta=mock_ananta,
         topic_mgr=topic_mgr,
         session=MagicMock(),
         model="test-model",
@@ -74,8 +74,8 @@ def client(state: DocumentExplorerState) -> TestClient:
 
 
 class TestListDocuments:
-    def test_empty(self, client: TestClient, mock_shesha: MagicMock) -> None:
-        mock_shesha.list_projects.return_value = []
+    def test_empty(self, client: TestClient, mock_ananta: MagicMock) -> None:
+        mock_ananta.list_projects.return_value = []
         resp = client.get("/api/documents")
         assert resp.status_code == 200
         assert resp.json() == []
@@ -83,10 +83,10 @@ class TestListDocuments:
     def test_lists_documents(
         self,
         client: TestClient,
-        mock_shesha: MagicMock,
+        mock_ananta: MagicMock,
         uploads_dir: Path,
     ) -> None:
-        mock_shesha.list_projects.return_value = ["report-a3f2"]
+        mock_ananta.list_projects.return_value = ["report-a3f2"]
         doc_dir = uploads_dir / "report-a3f2"
         doc_dir.mkdir()
         (doc_dir / "meta.json").write_text(
@@ -112,10 +112,10 @@ class TestUploadDocument:
     def test_upload_single_file(
         self,
         client: TestClient,
-        mock_shesha: MagicMock,
+        mock_ananta: MagicMock,
         uploads_dir: Path,
     ) -> None:
-        mock_shesha.create_project.return_value = MagicMock()
+        mock_ananta.create_project.return_value = MagicMock()
 
         resp = client.post(
             "/api/documents/upload",
@@ -130,10 +130,10 @@ class TestUploadDocument:
     def test_upload_multiple_files(
         self,
         client: TestClient,
-        mock_shesha: MagicMock,
+        mock_ananta: MagicMock,
         uploads_dir: Path,
     ) -> None:
-        mock_shesha.create_project.return_value = MagicMock()
+        mock_ananta.create_project.return_value = MagicMock()
 
         resp = client.post(
             "/api/documents/upload",
@@ -149,11 +149,11 @@ class TestUploadDocument:
     def test_upload_to_topic(
         self,
         client: TestClient,
-        mock_shesha: MagicMock,
+        mock_ananta: MagicMock,
         topic_mgr: DocumentTopicManager,
         uploads_dir: Path,
     ) -> None:
-        mock_shesha.create_project.return_value = MagicMock()
+        mock_ananta.create_project.return_value = MagicMock()
         topic_mgr.create("Research")
 
         resp = client.post(
@@ -168,9 +168,9 @@ class TestUploadDocument:
     def test_upload_with_invalid_topic_name_returns_422(
         self,
         client: TestClient,
-        mock_shesha: MagicMock,
+        mock_ananta: MagicMock,
     ) -> None:
-        mock_shesha.create_project.return_value = MagicMock()
+        mock_ananta.create_project.return_value = MagicMock()
 
         resp = client.post(
             "/api/documents/upload",
@@ -183,7 +183,7 @@ class TestUploadDocument:
     def test_upload_invalid_topic_does_not_create_project(
         self,
         client: TestClient,
-        mock_shesha: MagicMock,
+        mock_ananta: MagicMock,
         uploads_dir: Path,
     ) -> None:
         """An invalid topic name must fail before creating any files or projects."""
@@ -193,7 +193,7 @@ class TestUploadDocument:
             data={"topic": "!!!"},
         )
         assert resp.status_code == 422
-        mock_shesha.create_project.assert_not_called()
+        mock_ananta.create_project.assert_not_called()
         # No upload directories should have been created
         assert list(uploads_dir.iterdir()) == []
 
@@ -215,11 +215,11 @@ class TestUploadAtomicity:
     def test_create_project_failure_cleans_up_upload_dir(
         self,
         state: DocumentExplorerState,
-        mock_shesha: MagicMock,
+        mock_ananta: MagicMock,
         uploads_dir: Path,
     ) -> None:
         """If create_project fails, upload dir is cleaned up."""
-        mock_shesha.create_project.side_effect = RuntimeError("storage full")
+        mock_ananta.create_project.side_effect = RuntimeError("storage full")
         app = create_api(state)
         client = TestClient(app, raise_server_exceptions=False)
 
@@ -228,19 +228,19 @@ class TestUploadAtomicity:
             files=[("files", ("notes.txt", b"Hello", "text/plain"))],
         )
         assert resp.status_code == 500
-        mock_shesha.storage.store_document.assert_not_called()
+        mock_ananta.storage.store_document.assert_not_called()
         # Upload dir should be cleaned up
         assert list(uploads_dir.iterdir()) == []
 
     def test_store_document_failure_cleans_up_project_and_upload(
         self,
         state: DocumentExplorerState,
-        mock_shesha: MagicMock,
+        mock_ananta: MagicMock,
         uploads_dir: Path,
     ) -> None:
         """If store_document fails, both project and upload dir are cleaned up."""
-        mock_shesha.create_project.return_value = MagicMock()
-        mock_shesha.storage.store_document.side_effect = RuntimeError("disk error")
+        mock_ananta.create_project.return_value = MagicMock()
+        mock_ananta.storage.store_document.side_effect = RuntimeError("disk error")
         app = create_api(state)
         client = TestClient(app, raise_server_exceptions=False)
 
@@ -250,7 +250,7 @@ class TestUploadAtomicity:
         )
         assert resp.status_code == 500
         # Project should be deleted (cleanup)
-        mock_shesha.delete_project.assert_called_once()
+        mock_ananta.delete_project.assert_called_once()
         # Upload dir should be cleaned up
         assert list(uploads_dir.iterdir()) == []
 
@@ -271,11 +271,11 @@ class TestUploadAtomicity:
     def test_topic_add_failure_cleans_up_everything(
         self,
         state: DocumentExplorerState,
-        mock_shesha: MagicMock,
+        mock_ananta: MagicMock,
         uploads_dir: Path,
     ) -> None:
         """If add_to_topic fails, project, document, and upload dir are cleaned up."""
-        mock_shesha.create_project.return_value = MagicMock()
+        mock_ananta.create_project.return_value = MagicMock()
         # Create the topic so the pre-flight validation passes
         state.topic_mgr.create("Research")
 
@@ -297,7 +297,7 @@ class TestUploadAtomicity:
         )
         assert resp.status_code == 500
         # Project should be deleted (cleanup)
-        mock_shesha.delete_project.assert_called_once()
+        mock_ananta.delete_project.assert_called_once()
         # Upload dir should be cleaned up
         assert list(uploads_dir.iterdir()) == []
 
@@ -306,7 +306,7 @@ class TestUploadAtomicity:
     def test_batch_upload_cleans_up_earlier_files_on_later_failure(
         self,
         state: DocumentExplorerState,
-        mock_shesha: MagicMock,
+        mock_ananta: MagicMock,
         uploads_dir: Path,
     ) -> None:
         """If file 2 of 2 fails at store_document, file 1's project is also cleaned up."""
@@ -317,8 +317,8 @@ class TestUploadAtomicity:
             if call_count[0] == 2:
                 raise RuntimeError("disk full on second file")
 
-        mock_shesha.create_project.return_value = MagicMock()
-        mock_shesha.storage.store_document.side_effect = store_side_effect
+        mock_ananta.create_project.return_value = MagicMock()
+        mock_ananta.storage.store_document.side_effect = store_side_effect
         app = create_api(state)
         client = TestClient(app, raise_server_exceptions=False)
 
@@ -331,14 +331,14 @@ class TestUploadAtomicity:
         )
         assert resp.status_code == 500
         # Both projects should be cleaned up — not just the second one
-        assert mock_shesha.delete_project.call_count == 2
+        assert mock_ananta.delete_project.call_count == 2
         # All upload dirs should be cleaned up
         assert list(uploads_dir.iterdir()) == []
 
     def test_batch_upload_rollback_removes_topic_associations(
         self,
         state: DocumentExplorerState,
-        mock_shesha: MagicMock,
+        mock_ananta: MagicMock,
         topic_mgr: DocumentTopicManager,
         uploads_dir: Path,
     ) -> None:
@@ -353,8 +353,8 @@ class TestUploadAtomicity:
             if call_count[0] == 2:
                 raise RuntimeError("disk full on second file")
 
-        mock_shesha.create_project.return_value = MagicMock()
-        mock_shesha.storage.store_document.side_effect = store_side_effect
+        mock_ananta.create_project.return_value = MagicMock()
+        mock_ananta.storage.store_document.side_effect = store_side_effect
         app = create_api(state)
         client = TestClient(app, raise_server_exceptions=False)
 
@@ -379,7 +379,7 @@ class TestUploadSizeLimit:
         client: TestClient,
     ) -> None:
         """Uploads exceeding MAX_UPLOAD_BYTES are rejected with 413."""
-        from shesha.experimental.document_explorer.api import MAX_UPLOAD_BYTES
+        from ananta.experimental.document_explorer.api import MAX_UPLOAD_BYTES
 
         oversized = b"x" * (MAX_UPLOAD_BYTES + 1)
         resp = client.post(
@@ -391,12 +391,12 @@ class TestUploadSizeLimit:
     def test_upload_at_size_limit_succeeds(
         self,
         client: TestClient,
-        mock_shesha: MagicMock,
+        mock_ananta: MagicMock,
     ) -> None:
         """Uploads exactly at the limit should succeed."""
-        from shesha.experimental.document_explorer.api import MAX_UPLOAD_BYTES
+        from ananta.experimental.document_explorer.api import MAX_UPLOAD_BYTES
 
-        mock_shesha.create_project.return_value = MagicMock()
+        mock_ananta.create_project.return_value = MagicMock()
         at_limit = b"x" * MAX_UPLOAD_BYTES
         resp = client.post(
             "/api/documents/upload",
@@ -433,7 +433,7 @@ class TestUploadSizeLimit:
         Verifies the capped-read approach: the endpoint reads at most
         MAX_UPLOAD_BYTES+1 bytes, then checks length.
         """
-        from shesha.experimental.document_explorer.api import MAX_UPLOAD_BYTES
+        from ananta.experimental.document_explorer.api import MAX_UPLOAD_BYTES
 
         # 2x the limit — old code would allocate all of this.
         oversized = b"x" * (MAX_UPLOAD_BYTES * 2)
@@ -446,11 +446,11 @@ class TestUploadSizeLimit:
     def test_extension_lowercased_in_stored_format(
         self,
         client: TestClient,
-        mock_shesha: MagicMock,
+        mock_ananta: MagicMock,
         uploads_dir: Path,
     ) -> None:
         """Stored file extension should be lowercased (S9)."""
-        mock_shesha.create_project.return_value = MagicMock()
+        mock_ananta.create_project.return_value = MagicMock()
         resp = client.post(
             "/api/documents/upload",
             files=[("files", ("NOTES.TXT", b"hello", "text/plain"))],
@@ -468,7 +468,7 @@ class TestDeleteDocument:
     def test_delete_removes_from_topics(
         self,
         client: TestClient,
-        mock_shesha: MagicMock,
+        mock_ananta: MagicMock,
         topic_mgr: DocumentTopicManager,
         uploads_dir: Path,
     ) -> None:
@@ -482,7 +482,7 @@ class TestDeleteDocument:
         resp = client.delete("/api/documents/doc-123")
         assert resp.status_code == 200
         assert "doc-123" not in topic_mgr.list_items("A")
-        mock_shesha.delete_project.assert_called_once_with("doc-123")
+        mock_ananta.delete_project.assert_called_once_with("doc-123")
 
 
 class TestCreateTopic:
@@ -512,7 +512,7 @@ class TestTopicDocumentRoutes:
         self,
         client: TestClient,
         topic_mgr: DocumentTopicManager,
-        mock_shesha: MagicMock,
+        mock_ananta: MagicMock,
         uploads_dir: Path,
     ) -> None:
         """GET /topics/{name}/items returns DocumentInfo objects, not bare IDs."""

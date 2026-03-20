@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from shesha.experimental.arxiv.models import PaperMeta
+from ananta.experimental.arxiv.models import PaperMeta
 
 
 def _make_meta() -> PaperMeta:
@@ -49,7 +49,7 @@ class TestExtractTarball:
     """Tests for tarball extraction."""
 
     def test_extract_tex_and_bib(self) -> None:
-        from shesha.experimental.arxiv.download import extract_source_files
+        from ananta.experimental.arxiv.download import extract_source_files
 
         tarball = _make_tarball(
             {
@@ -63,7 +63,7 @@ class TestExtractTarball:
         assert "\\documentclass" in files["main.tex"]
 
     def test_extract_filters_non_text_files(self) -> None:
-        from shesha.experimental.arxiv.download import extract_source_files
+        from ananta.experimental.arxiv.download import extract_source_files
 
         tarball = _make_tarball(
             {
@@ -77,7 +77,7 @@ class TestExtractTarball:
         assert "figure.png" not in files
 
     def test_extract_bbl_file(self) -> None:
-        from shesha.experimental.arxiv.download import extract_source_files
+        from ananta.experimental.arxiv.download import extract_source_files
 
         tarball = _make_tarball(
             {
@@ -90,7 +90,7 @@ class TestExtractTarball:
 
     def test_extract_single_gzipped_tex(self) -> None:
         """arXiv serves single-file submissions as gzipped .tex, not tarball."""
-        from shesha.experimental.arxiv.download import extract_source_files
+        from ananta.experimental.arxiv.download import extract_source_files
 
         content = "\\documentclass{article}\\begin{document}Hi\\end{document}"
         gz_data = _make_gzipped_tex(content)
@@ -103,8 +103,8 @@ class TestToParsedDocument:
     """Tests for converting cached papers to ParsedDocument."""
 
     def test_latex_source_to_document(self, tmp_path: Path) -> None:
-        from shesha.experimental.arxiv.cache import PaperCache
-        from shesha.experimental.arxiv.download import to_parsed_document
+        from ananta.experimental.arxiv.cache import PaperCache
+        from ananta.experimental.arxiv.download import to_parsed_document
 
         cache = PaperCache(tmp_path / "cache")
         meta = _make_meta()
@@ -123,8 +123,8 @@ class TestToParsedDocument:
         assert doc.metadata.get("arxiv_url") == "https://arxiv.org/abs/2501.12345"
 
     def test_pdf_fallback_to_document(self, tmp_path: Path) -> None:
-        from shesha.experimental.arxiv.cache import PaperCache
-        from shesha.experimental.arxiv.download import to_parsed_document
+        from ananta.experimental.arxiv.cache import PaperCache
+        from ananta.experimental.arxiv.download import to_parsed_document
 
         cache = PaperCache(tmp_path / "cache")
         meta = _make_meta()
@@ -143,10 +143,10 @@ class TestToParsedDocument:
 class TestDownloadPaper:
     """Tests for the full download flow."""
 
-    @patch("shesha.experimental.arxiv.download.urllib.request.urlopen")
+    @patch("ananta.experimental.arxiv.download.urllib.request.urlopen")
     def test_download_tries_source_first(self, mock_urlopen: MagicMock, tmp_path: Path) -> None:
-        from shesha.experimental.arxiv.cache import PaperCache
-        from shesha.experimental.arxiv.download import download_paper
+        from ananta.experimental.arxiv.cache import PaperCache
+        from ananta.experimental.arxiv.download import download_paper
 
         cache = PaperCache(tmp_path / "cache")
         meta = _make_meta()
@@ -164,12 +164,12 @@ class TestDownloadPaper:
         assert cache.has("2501.12345")
         assert cache.get_source_files("2501.12345") is not None
 
-    @patch("shesha.experimental.arxiv.download.urllib.request.urlopen")
+    @patch("ananta.experimental.arxiv.download.urllib.request.urlopen")
     def test_download_falls_back_to_pdf(self, mock_urlopen: MagicMock, tmp_path: Path) -> None:
         from urllib.error import HTTPError
 
-        from shesha.experimental.arxiv.cache import PaperCache
-        from shesha.experimental.arxiv.download import download_paper
+        from ananta.experimental.arxiv.cache import PaperCache
+        from ananta.experimental.arxiv.download import download_paper
 
         cache = PaperCache(tmp_path / "cache")
         meta = _make_meta()
@@ -188,12 +188,12 @@ class TestDownloadPaper:
         assert result_meta.source_type == "pdf"
         assert cache.get_pdf_path("2501.12345") is not None
 
-    @patch("shesha.experimental.arxiv.download.urllib.request.urlopen")
+    @patch("ananta.experimental.arxiv.download.urllib.request.urlopen")
     def test_download_handles_timeout(self, mock_urlopen: MagicMock, tmp_path: Path) -> None:
         from urllib.error import URLError
 
-        from shesha.experimental.arxiv.cache import PaperCache
-        from shesha.experimental.arxiv.download import download_paper
+        from ananta.experimental.arxiv.cache import PaperCache
+        from ananta.experimental.arxiv.download import download_paper
 
         cache = PaperCache(tmp_path / "cache")
         meta = _make_meta()
@@ -206,10 +206,10 @@ class TestDownloadPaper:
         assert result_meta.source_type is None
         assert cache.has("2501.12345")
 
-    @patch("shesha.experimental.arxiv.download.urllib.request.urlopen")
+    @patch("ananta.experimental.arxiv.download.urllib.request.urlopen")
     def test_urlopen_called_with_timeout(self, mock_urlopen: MagicMock, tmp_path: Path) -> None:
-        from shesha.experimental.arxiv.cache import PaperCache
-        from shesha.experimental.arxiv.download import (
+        from ananta.experimental.arxiv.cache import PaperCache
+        from ananta.experimental.arxiv.download import (
             REQUEST_TIMEOUT_SECONDS,
             download_paper,
         )
@@ -230,8 +230,8 @@ class TestDownloadPaper:
         assert kwargs.get("timeout") == REQUEST_TIMEOUT_SECONDS
 
     def test_skip_download_if_cached(self, tmp_path: Path) -> None:
-        from shesha.experimental.arxiv.cache import PaperCache
-        from shesha.experimental.arxiv.download import download_paper
+        from ananta.experimental.arxiv.cache import PaperCache
+        from ananta.experimental.arxiv.download import download_paper
 
         cache = PaperCache(tmp_path / "cache")
         meta = _make_meta()

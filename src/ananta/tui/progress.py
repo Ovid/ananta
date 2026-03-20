@@ -1,6 +1,6 @@
 """Progress display helpers for TUI."""
 
-from shesha.rlm.trace import StepType
+from ananta.rlm.trace import StepType
 
 _STEP_NAMES: dict[StepType, str] = {
     StepType.CODE_GENERATED: "Generating code",

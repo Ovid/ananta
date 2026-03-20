@@ -7,7 +7,7 @@ remain specific to this explorer.
 
 from __future__ import annotations
 
-from shesha.experimental.shared.topics import BaseTopicManager, _slugify
+from ananta.experimental.shared.topics import BaseTopicManager, _slugify
 
 __all__ = ["DocumentTopicManager", "_slugify"]
 

@@ -1,6 +1,6 @@
 """Tests for web API schemas."""
 
-from shesha.experimental.web.schemas import (
+from ananta.experimental.web.schemas import (
     ContextBudget,
     DownloadTaskStatus,
     ExchangeSchema,

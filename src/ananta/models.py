@@ -1,4 +1,4 @@
-"""Core data models for Shesha."""
+"""Core data models for Ananta."""
 
 import json
 from collections.abc import Callable
@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
-    from shesha.project import Project
+    from ananta.project import Project
 
 
 @dataclass

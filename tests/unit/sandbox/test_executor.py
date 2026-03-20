@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from docker.errors import DockerException
 
-from shesha.sandbox.executor import (
+from ananta.sandbox.executor import (
     DEFAULT_SEND_TIMEOUT,
     MAX_BUFFER_SIZE,
     MAX_MESSAGE_SIZE,
@@ -21,7 +21,7 @@ from shesha.sandbox.executor import (
     ProtocolError,
     SubcallContentError,
 )
-from shesha.security.containers import ContainerSecurityConfig
+from ananta.security.containers import ContainerSecurityConfig
 
 
 class TestProtocolError:
@@ -319,7 +319,7 @@ class TestContainerExecutor:
         assert result.status == "ok"
         assert result.stdout == "Hello"
 
-    @patch("shesha.sandbox.executor.docker")
+    @patch("ananta.sandbox.executor.docker")
     def test_executor_creates_container(self, mock_docker: MagicMock):
         """Executor creates a Docker container."""
         mock_client = MagicMock()
@@ -327,13 +327,13 @@ class TestContainerExecutor:
         mock_container = MagicMock()
         mock_client.containers.run.return_value = mock_container
 
-        executor = ContainerExecutor(image="shesha-sandbox")
+        executor = ContainerExecutor(image="ananta-sandbox")
         executor.start()
 
         mock_client.containers.run.assert_called_once()
         assert executor._container is not None
 
-    @patch("shesha.sandbox.executor.docker")
+    @patch("ananta.sandbox.executor.docker")
     def test_executor_stops_container(self, mock_docker: MagicMock):
         """Executor stops and removes container on stop()."""
         mock_client = MagicMock()
@@ -341,14 +341,14 @@ class TestContainerExecutor:
         mock_container = MagicMock()
         mock_client.containers.run.return_value = mock_container
 
-        executor = ContainerExecutor(image="shesha-sandbox")
+        executor = ContainerExecutor(image="ananta-sandbox")
         executor.start()
         executor.stop()
 
         mock_container.stop.assert_called_once()
         mock_container.remove.assert_called_once()
 
-    @patch("shesha.sandbox.executor.docker")
+    @patch("ananta.sandbox.executor.docker")
     def test_executor_closes_docker_client_on_stop(self, mock_docker: MagicMock):
         """Executor closes the DockerClient on stop() to prevent resource leaks.
 
@@ -360,14 +360,14 @@ class TestContainerExecutor:
         mock_container = MagicMock()
         mock_client.containers.run.return_value = mock_container
 
-        executor = ContainerExecutor(image="shesha-sandbox")
+        executor = ContainerExecutor(image="ananta-sandbox")
         executor.start()
         executor.stop()
 
         # DockerClient.close() must be called to prevent urllib3 errors on exit
         mock_client.close.assert_called_once()
 
-    @patch("shesha.sandbox.executor.docker")
+    @patch("ananta.sandbox.executor.docker")
     def test_executor_closes_urllib3_pools_on_stop(self, mock_docker: MagicMock):
         """Executor closes urllib3 connection pools before closing DockerClient.
 
@@ -387,13 +387,13 @@ class TestContainerExecutor:
         mock_container = MagicMock()
         mock_client.containers.run.return_value = mock_container
 
-        executor = ContainerExecutor(image="shesha-sandbox")
+        executor = ContainerExecutor(image="ananta-sandbox")
         executor.start()
         executor.stop()
 
         mock_pool.close.assert_called_once()
 
-    @patch("shesha.sandbox.executor.docker")
+    @patch("ananta.sandbox.executor.docker")
     def test_start_raises_clear_error_when_docker_not_running(self, mock_docker: MagicMock):
         """Executor provides clear error message when Docker daemon is not running.
 
@@ -421,7 +421,7 @@ class TestContainerExecutor:
 class TestContainerSecurityIntegration:
     """Tests for container security integration."""
 
-    @patch("shesha.sandbox.executor.docker")
+    @patch("ananta.sandbox.executor.docker")
     def test_executor_uses_default_security(self, mock_docker: MagicMock) -> None:
         """Executor applies default security config."""
         mock_client = MagicMock()
@@ -441,7 +441,7 @@ class TestContainerSecurityIntegration:
 
         executor.stop()
 
-    @patch("shesha.sandbox.executor.docker")
+    @patch("ananta.sandbox.executor.docker")
     def test_executor_accepts_custom_security(self, mock_docker: MagicMock) -> None:
         """Executor accepts custom security config."""
         mock_client = MagicMock()
@@ -531,7 +531,7 @@ class TestReadDeadline:
             except StopIteration:
                 return start_time + 400
 
-        with patch("shesha.sandbox.executor.time.monotonic", mock_monotonic):
+        with patch("ananta.sandbox.executor.time.monotonic", mock_monotonic):
             with pytest.raises(ProtocolError) as exc_info:
                 executor._read_message(timeout=5)
 
@@ -576,7 +576,7 @@ class TestReadDeadline:
                 return start_time
             return start_time + 301
 
-        with patch("shesha.sandbox.executor.time.monotonic", mock_monotonic):
+        with patch("ananta.sandbox.executor.time.monotonic", mock_monotonic):
             with pytest.raises(ProtocolError) as exc_info:
                 executor._read_message(timeout=5)
 
@@ -1020,7 +1020,7 @@ class TestEffectiveDeadline:
                 return start_time
             return start_time + 16  # 16s exceeds effective deadline of 15s (5+10)
 
-        with patch("shesha.sandbox.executor.time.monotonic", mock_monotonic):
+        with patch("ananta.sandbox.executor.time.monotonic", mock_monotonic):
             with pytest.raises(ProtocolError):
                 executor._read_message(timeout=5)
 

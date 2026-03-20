@@ -2,8 +2,8 @@
 
 from unittest.mock import MagicMock, patch
 
-from shesha.rlm.engine import RLMEngine
-from shesha.sandbox.pool import ContainerPool
+from ananta.rlm.engine import RLMEngine
+from ananta.sandbox.pool import ContainerPool
 
 
 class TestPoolExecutorErrorHandling:
@@ -30,7 +30,7 @@ class TestPoolExecutorErrorHandling:
         engine = RLMEngine(model="test-model", pool=mock_pool)
         return engine, mock_pool
 
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_broken_executor_not_released_to_pool(
         self,
         mock_llm_cls: MagicMock,
@@ -54,7 +54,7 @@ class TestPoolExecutorErrorHandling:
         mock_pool.release.assert_not_called()
         mock_pool.discard.assert_called_once_with(mock_executor)
 
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_healthy_executor_released_to_pool(
         self,
         mock_llm_cls: MagicMock,
@@ -76,7 +76,7 @@ class TestPoolExecutorErrorHandling:
         mock_pool.release.assert_called_once_with(mock_executor)
         mock_executor.stop.assert_not_called()
 
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_query_result_not_masked_by_reset_failure(
         self,
         mock_llm_cls: MagicMock,
@@ -102,13 +102,13 @@ class TestPoolExecutorErrorHandling:
 class TestDeadExecutorRecovery:
     """Tests for mid-loop dead executor recovery with pool."""
 
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_dead_executor_replaced_from_pool(
         self,
         mock_llm_cls: MagicMock,
     ):
         """Dead executor is replaced from pool and query succeeds on next iteration."""
-        from shesha.sandbox.executor import ExecutionResult
+        from ananta.sandbox.executor import ExecutionResult
 
         mock_pool = MagicMock(spec=ContainerPool)
 
@@ -176,13 +176,13 @@ class TestDeadExecutorRecovery:
         assert mock_pool.acquire.call_count == 2
         mock_pool.discard.assert_called_once_with(dead_executor)
 
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_fresh_executor_gets_llm_query_handler(
         self,
         mock_llm_cls: MagicMock,
     ):
         """Fresh replacement executor gets llm_query_handler set."""
-        from shesha.sandbox.executor import ExecutionResult
+        from ananta.sandbox.executor import ExecutionResult
 
         mock_pool = MagicMock(spec=ContainerPool)
 

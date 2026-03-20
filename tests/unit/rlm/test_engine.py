@@ -7,13 +7,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from shesha.llm.client import LLMClient
-from shesha.rlm.engine import QueryResult, RLMEngine, extract_code_blocks, find_final_answer
-from shesha.rlm.trace import StepType, TokenUsage, Trace
-from shesha.rlm.verification import Citation, VerificationResult
-from shesha.sandbox.executor import ExecutionResult, SubcallContentError
-from shesha.sandbox.pool import ContainerPool
-from shesha.storage.filesystem import FilesystemStorage
+from ananta.llm.client import LLMClient
+from ananta.rlm.engine import QueryResult, RLMEngine, extract_code_blocks, find_final_answer
+from ananta.rlm.trace import StepType, TokenUsage, Trace
+from ananta.rlm.verification import Citation, VerificationResult
+from ananta.sandbox.executor import ExecutionResult, SubcallContentError
+from ananta.sandbox.pool import ContainerPool
+from ananta.storage.filesystem import FilesystemStorage
 
 
 def test_extract_code_blocks_finds_repl():
@@ -143,7 +143,7 @@ class TestSetPool:
         assert engine.pool is None
 
 
-@patch("shesha.rlm.engine.ContainerExecutor")
+@patch("ananta.rlm.engine.ContainerExecutor")
 def test_engine_uses_injected_llm_factory(mock_executor_cls: MagicMock):
     """Engine uses the injected factory instead of importing LLMClient directly."""
     mock_llm = MagicMock()
@@ -179,8 +179,8 @@ def test_engine_uses_injected_llm_factory(mock_executor_cls: MagicMock):
 class TestRLMEngine:
     """Tests for RLMEngine."""
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_engine_runs_until_final(
         self,
         mock_llm_cls: MagicMock,
@@ -217,8 +217,8 @@ class TestRLMEngine:
         assert result.answer == "The answer is 42"
         assert len(result.trace.steps) > 0
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_context_type_is_list_for_single_document(
         self,
         mock_llm_cls: MagicMock,
@@ -258,8 +258,8 @@ class TestRLMEngine:
         assert "list" in metadata_msgs[0]["content"]
         assert "string" not in metadata_msgs[0]["content"]
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_engine_honors_falsy_final_answer(
         self,
         mock_llm_cls: MagicMock,
@@ -296,8 +296,8 @@ class TestRLMEngine:
         # LLM should only be called once (not 5 times to max iterations)
         assert mock_llm.complete.call_count == 1
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_engine_calls_on_progress_callback(
         self,
         mock_llm_cls: MagicMock,
@@ -347,8 +347,8 @@ class TestRLMEngine:
         assert StepType.CODE_OUTPUT in step_types
         assert StepType.FINAL_ANSWER in step_types
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_on_progress_receives_token_usage_snapshot(
         self,
         mock_llm_cls: MagicMock,
@@ -396,8 +396,8 @@ class TestRLMEngine:
         assert last.prompt_tokens >= 100
         assert last.completion_tokens >= 50
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_on_progress_token_usage_is_snapshot_not_reference(
         self,
         mock_llm_cls: MagicMock,
@@ -441,7 +441,7 @@ class TestRLMEngine:
         ids = [id(u) for u in received_usages]
         assert len(set(ids)) == len(ids), "TokenUsage objects should be copies, not same reference"
 
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_engine_acquires_executor_from_pool(
         self,
         mock_llm_cls: MagicMock,
@@ -476,7 +476,7 @@ class TestRLMEngine:
         mock_pool.release.assert_called_once_with(mock_executor)
         mock_executor.stop.assert_not_called()
 
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_engine_resets_namespace_before_release(
         self,
         mock_llm_cls: MagicMock,
@@ -508,8 +508,8 @@ class TestRLMEngine:
 
         mock_executor.reset_namespace.assert_called_once()
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_engine_creates_executor_without_pool(
         self,
         mock_llm_cls: MagicMock,
@@ -543,7 +543,7 @@ class TestRLMEngine:
         mock_executor.start.assert_called_once()
         mock_executor.stop.assert_called_once()
 
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_engine_raises_for_oversized_subcall_content(
         self,
         mock_llm_cls: MagicMock,
@@ -575,7 +575,7 @@ class TestRLMEngine:
         assert "chunk" in error_msg.lower()  # guidance to chunk smaller
         mock_llm_cls.assert_not_called()  # No sub-LLM call made
 
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_engine_allows_subcall_content_under_limit(
         self,
         mock_llm_cls: MagicMock,
@@ -611,7 +611,7 @@ class TestRLMEngine:
         assert result == "Analysis result"
         mock_llm_cls.assert_called_once()  # Sub-LLM was called
 
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_engine_raises_for_oversized_instruction_when_content_empty(
         self,
         mock_llm_cls: MagicMock,
@@ -635,7 +635,7 @@ class TestRLMEngine:
 
         mock_llm_cls.assert_not_called()
 
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_engine_skips_wrapping_when_content_empty(
         self,
         mock_llm_cls: MagicMock,
@@ -670,7 +670,7 @@ class TestRLMEngine:
         assert "_BEGIN" not in prompt_text
         assert "What is 2+2?" in prompt_text
 
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_engine_wraps_subcall_content_in_untrusted_tags(
         self,
         mock_llm_cls: MagicMock,
@@ -706,8 +706,8 @@ class TestRLMEngine:
         assert "_END" in prompt_text
         assert "Untrusted document data" in prompt_text
 
-    @patch("shesha.rlm.engine.LLMClient")
-    @patch("shesha.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
     def test_engine_runs_semantic_verification_when_enabled(
         self,
         mock_executor_cls: MagicMock,
@@ -796,8 +796,8 @@ class TestRLMEngine:
         assert len(result.semantic_verification.findings) == 1
         assert result.semantic_verification.findings[0].confidence == "high"
 
-    @patch("shesha.rlm.engine.LLMClient")
-    @patch("shesha.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
     def test_engine_skips_semantic_verification_when_disabled(
         self,
         mock_executor_cls: MagicMock,
@@ -829,8 +829,8 @@ class TestRLMEngine:
 
         assert result.semantic_verification is None
 
-    @patch("shesha.rlm.engine.LLMClient")
-    @patch("shesha.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
     def test_engine_semantic_verification_failure_does_not_block_answer(
         self,
         mock_executor_cls: MagicMock,
@@ -883,8 +883,8 @@ class TestRLMEngine:
         last_step = sem_steps[-1].content
         assert "error" in last_step.lower() or "Could not parse" in last_step
 
-    @patch("shesha.rlm.engine.LLMClient")
-    @patch("shesha.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
     def test_semantic_verification_wraps_documents_in_untrusted_tags(
         self,
         mock_executor_cls: MagicMock,
@@ -949,8 +949,8 @@ class TestRLMEngine:
         assert "_BEGIN" in layer1_prompt
         assert "_END" in layer1_prompt
 
-    @patch("shesha.rlm.engine.LLMClient")
-    @patch("shesha.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
     def test_semantic_verification_skips_when_cited_docs_exceed_size_limit(
         self,
         mock_executor_cls: MagicMock,
@@ -998,8 +998,8 @@ class TestRLMEngine:
         # Only 1 LLM call (main query), no verification calls
         assert mock_llm.complete.call_count == 1
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_engine_handles_final_var(
         self,
         mock_llm_cls: MagicMock,
@@ -1036,7 +1036,7 @@ class TestRLMEngine:
 
         assert result.answer == "The computed answer"
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.ContainerExecutor")
     def test_engine_retries_when_code_block_final_var_value_is_none(
         self,
         mock_executor_cls: MagicMock,
@@ -1124,7 +1124,7 @@ class TestRLMEngine:
 class TestCodeBlockFinalVarRetryGuidance:
     """Tests for retry guidance when FINAL_VAR fails in code block."""
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.ContainerExecutor")
     def test_code_block_final_var_failure_sends_retry_guidance(
         self,
         mock_executor_cls: MagicMock,
@@ -1214,8 +1214,8 @@ class TestCodeBlockFinalVarRetryGuidance:
 class TestIterationQueryReminder:
     """Tests for query reminder appended to iteration messages."""
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_iteration_message_contains_query_reminder(
         self,
         mock_llm_cls: MagicMock,
@@ -1293,7 +1293,7 @@ class TestIterationQueryReminder:
 class TestCallbackIterationCapture:
     """Tests for llm_query_callback capturing the correct iteration."""
 
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_callback_captures_iteration_at_creation_time(
         self,
         mock_llm_cls: MagicMock,
@@ -1377,7 +1377,7 @@ class TestCallbackIterationCapture:
             f"Callback during iteration 0 should pass iteration=0, got {captured_iterations[0]}"
         )
 
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_recovery_callback_uses_current_iteration(
         self,
         mock_llm_cls: MagicMock,
@@ -1455,8 +1455,8 @@ class TestCallbackIterationCapture:
 class TestDeadExecutorNoPool:
     """Tests for early exit when executor dies without pool."""
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_only_one_llm_call_when_executor_dies(
         self,
         mock_llm_cls: MagicMock,
@@ -1495,8 +1495,8 @@ class TestDeadExecutorNoPool:
         # Should have only called LLM once, not continued for 20 iterations
         assert mock_llm.complete.call_count == 1
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_executor_died_answer_distinct_from_max_iterations(
         self,
         mock_llm_cls: MagicMock,
@@ -1540,7 +1540,7 @@ class TestDeadExecutorNoPool:
 class TestDeadExecutorWithPool:
     """Tests for dead executor recovery when pool is available."""
 
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_dead_executor_stopped_before_discard(
         self,
         mock_llm_cls: MagicMock,
@@ -1611,7 +1611,7 @@ class TestDeadExecutorWithPool:
 class TestDeadExecutorPoolStopped:
     """Test that pool.acquire() RuntimeError during recovery is handled gracefully."""
 
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_pool_acquire_raises_runtime_error_aborts_gracefully(
         self,
         mock_llm_cls: MagicMock,
@@ -1659,7 +1659,7 @@ class TestDeadExecutorPoolStopped:
 class TestPostLoopFinalVarRetryTrace:
     """Tests for trace/callback emission on post-loop FINAL_VAR retry."""
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.ContainerExecutor")
     def test_post_loop_retry_emits_trace_step_and_progress(self, mock_executor_cls: MagicMock):
         """When a FINAL_VAR fails initially but is resolved in the post-loop
         retry, a FINAL_ANSWER trace step and on_progress callback must be emitted."""
@@ -1738,7 +1738,7 @@ class TestPostLoopFinalVarRetryTrace:
 class TestResolveFinalVar:
     """Tests for _resolve_final_var edge cases."""
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.ContainerExecutor")
     def test_empty_string_is_valid_answer(self, mock_executor_cls: MagicMock):
         """A variable holding an empty string is a valid answer, not None."""
         engine = RLMEngine(model="test-model", llm_client_factory=MagicMock())
@@ -1751,7 +1751,7 @@ class TestResolveFinalVar:
         assert result is not None
         assert result == ""
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.ContainerExecutor")
     def test_none_variable_returns_none(self, mock_executor_cls: MagicMock):
         """S1: print(None) outputs 'None' — must return None, not the string."""
         engine = RLMEngine(model="test-model", llm_client_factory=MagicMock())
@@ -1762,8 +1762,8 @@ class TestResolveFinalVar:
         result = engine._resolve_final_var("my_var", mock_executor)
         assert result is None
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_bare_final_var_empty_string_accepted_without_code_blocks(
         self,
         mock_llm_cls: MagicMock,
@@ -1792,8 +1792,8 @@ class TestResolveFinalVar:
         # Should be one LLM call only (no retry)
         assert mock_llm.complete.call_count == 1
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_bare_final_var_empty_string_accepted_after_code_blocks(
         self,
         mock_llm_cls: MagicMock,
@@ -1839,8 +1839,8 @@ class TestResolveFinalVar:
 class TestEngineTraceWriterSuppression:
     """Tests for engine trace writer suppress_errors configuration."""
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_engine_creates_incremental_trace_writer_with_suppress_errors(
         self,
         mock_llm_cls: MagicMock,
@@ -1870,7 +1870,7 @@ class TestEngineTraceWriterSuppression:
         )
         mock_executor_cls.return_value = mock_executor
 
-        with patch("shesha.rlm.engine.IncrementalTraceWriter") as mock_inc_writer_cls:
+        with patch("ananta.rlm.engine.IncrementalTraceWriter") as mock_inc_writer_cls:
             mock_inc_writer = MagicMock()
             mock_inc_writer.path = None
             mock_inc_writer_cls.return_value = mock_inc_writer
@@ -1885,8 +1885,8 @@ class TestEngineTraceWriterSuppression:
 
             mock_inc_writer_cls.assert_called_once_with(storage, suppress_errors=True)
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_engine_creates_trace_writer_with_suppress_errors(
         self,
         mock_llm_cls: MagicMock,
@@ -1916,7 +1916,7 @@ class TestEngineTraceWriterSuppression:
         )
         mock_executor_cls.return_value = mock_executor
 
-        with patch("shesha.rlm.engine.TraceWriter") as mock_writer_cls:
+        with patch("ananta.rlm.engine.TraceWriter") as mock_writer_cls:
             mock_writer = MagicMock()
             mock_writer_cls.return_value = mock_writer
 
@@ -1934,8 +1934,8 @@ class TestEngineTraceWriterSuppression:
 class TestEngineTraceWriting:
     """Tests for trace writing integration."""
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_query_writes_trace_when_storage_provided(
         self,
         mock_llm_cls: MagicMock,
@@ -1977,8 +1977,8 @@ class TestEngineTraceWriting:
         traces = storage.list_traces("test-project")
         assert len(traces) == 1
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_query_writes_trace_incrementally(
         self,
         mock_llm_cls: MagicMock,
@@ -2031,8 +2031,8 @@ class TestEngineTraceWriting:
         assert summary["type"] == "summary"
         assert summary["status"] == "success"
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_query_writes_partial_trace_on_exception(
         self,
         mock_llm_cls: MagicMock,
@@ -2102,8 +2102,8 @@ class TestEngineTraceWriting:
 class TestEngineMaxTracesConfig:
     """Tests for max_traces_per_project plumbing."""
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_engine_passes_max_traces_to_cleanup(
         self,
         mock_llm_cls: MagicMock,
@@ -2133,7 +2133,7 @@ class TestEngineMaxTracesConfig:
         )
         mock_executor_cls.return_value = mock_executor
 
-        with patch("shesha.rlm.engine.TraceWriter") as mock_writer_cls:
+        with patch("ananta.rlm.engine.TraceWriter") as mock_writer_cls:
             mock_writer = MagicMock()
             mock_writer_cls.return_value = mock_writer
 
@@ -2151,8 +2151,8 @@ class TestEngineMaxTracesConfig:
 class TestEngineVerification:
     """Tests for post-FINAL citation verification."""
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_engine_runs_verification_after_final(
         self,
         mock_llm_cls: MagicMock,
@@ -2206,8 +2206,8 @@ class TestEngineVerification:
         assert result.verification.citations[0].found is True
         assert mock_executor.execute.call_count == 2
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_engine_skips_verification_when_disabled(
         self,
         mock_llm_cls: MagicMock,
@@ -2240,8 +2240,8 @@ class TestEngineVerification:
         assert result.verification is None
         assert mock_executor.execute.call_count == 1
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_engine_handles_verification_failure_gracefully(
         self,
         mock_llm_cls: MagicMock,
@@ -2285,8 +2285,8 @@ class TestEngineVerification:
         assert result.answer == "Doc 0 answer"
         assert result.verification is None
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_engine_adds_verification_trace_step(
         self,
         mock_llm_cls: MagicMock,
@@ -2335,8 +2335,8 @@ class TestEngineVerification:
         step_types = [s.type for s in result.trace.steps]
         assert StepType.VERIFICATION in step_types
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_engine_records_verification_error_in_trace(
         self,
         mock_llm_cls: MagicMock,
@@ -2429,7 +2429,7 @@ class TestHandleLlmQueryThreadSafety:
 class TestBoundaryNotSharedState:
     """Boundary must be per-query, not stored on the engine instance."""
 
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_handle_llm_query_uses_boundary_parameter(
         self,
         mock_llm_cls: MagicMock,
@@ -2464,7 +2464,7 @@ class TestBoundaryNotSharedState:
         prompt_text = messages[0]["content"]
         assert explicit_boundary in prompt_text
 
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_semantic_verification_uses_boundary_parameter(
         self,
         mock_llm_cls: MagicMock,
@@ -2769,8 +2769,8 @@ class TestFindFinalAnswerInText:
         result = find_final_answer(text)
         assert result == ("partial", "partial text")
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_engine_resolves_bare_final_identifier_from_sandbox(
         self,
         mock_llm_cls: MagicMock,
@@ -2838,8 +2838,8 @@ class TestFindFinalAnswerInText:
         assert result.answer == "The real detailed answer"
         assert mock_llm.complete.call_count == 2
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_engine_retries_when_bare_final_var_lookup_fails_no_code_blocks(
         self,
         mock_llm_cls: MagicMock,
@@ -2896,8 +2896,8 @@ class TestFindFinalAnswerInText:
         assert result.answer == "The real answer"
         assert mock_llm.complete.call_count == 2
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_engine_retries_when_bare_final_var_lookup_fails_after_code(
         self,
         mock_llm_cls: MagicMock,
@@ -2977,8 +2977,8 @@ class TestFindFinalAnswerInText:
         assert result.answer == "Actual report content"
         assert mock_llm.complete.call_count == 2
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_engine_accepts_empty_string_from_var_resolution(
         self,
         mock_llm_cls: MagicMock,
@@ -3023,8 +3023,8 @@ class TestFindFinalAnswerInText:
         assert result.answer == ""
         assert mock_llm.complete.call_count == 1
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_engine_detects_bare_final_var_in_response(
         self,
         mock_llm_cls: MagicMock,
@@ -3086,8 +3086,8 @@ class TestFindFinalAnswerInText:
         # Should only take 2 LLM calls, not burn through all 5 iterations
         assert mock_llm.complete.call_count == 2
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_engine_detects_bare_final_in_response(
         self,
         mock_llm_cls: MagicMock,
@@ -3117,8 +3117,8 @@ class TestFindFinalAnswerInText:
         # Only 1 LLM call needed
         assert mock_llm.complete.call_count == 1
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_engine_resolves_bare_final_after_code_blocks_in_same_response(
         self,
         mock_llm_cls: MagicMock,
@@ -3200,8 +3200,8 @@ class TestFindFinalAnswerInText:
 class TestMaxIterationsFallback:
     """Tests for max-iterations LLM fallback."""
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_max_iterations_asks_llm_for_final_answer(
         self,
         mock_llm_cls: MagicMock,
@@ -3251,8 +3251,8 @@ class TestMaxIterationsFallback:
         assert result.answer == "The answer is 42 based on my analysis."
         assert mock_llm.complete.call_count == 3
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_max_iterations_fallback_uses_user_role(
         self,
         mock_llm_cls: MagicMock,
@@ -3307,8 +3307,8 @@ class TestMaxIterationsFallback:
 class TestAllowBackgroundKnowledge:
     """Tests for allow_background_knowledge parameter on query()."""
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_query_passes_augmented_true_when_background_knowledge_allowed(
         self,
         mock_llm_cls: MagicMock,
@@ -3348,8 +3348,8 @@ class TestAllowBackgroundKnowledge:
             call_kwargs = spy.call_args[1]
             assert call_kwargs.get("augmented") is True
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_query_passes_augmented_false_by_default(
         self,
         mock_llm_cls: MagicMock,
@@ -3392,8 +3392,8 @@ class TestAllowBackgroundKnowledge:
 class TestGaveUpFlag:
     """Tests for QueryResult.gave_up flag propagation."""
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_engine_gave_up_false_for_final(
         self, mock_llm_cls: MagicMock, mock_exec_cls: MagicMock
     ):
@@ -3411,8 +3411,8 @@ class TestGaveUpFlag:
         result = engine.query(["doc content"], "question?")
         assert result.gave_up is False
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_engine_gave_up_true_for_bare_partial(
         self, mock_llm_cls: MagicMock, mock_exec_cls: MagicMock
     ):
@@ -3431,8 +3431,8 @@ class TestGaveUpFlag:
         assert result.gave_up is True
         assert result.answer == "Found 7 titles but no dates"
 
-    @patch("shesha.rlm.engine.ContainerExecutor")
-    @patch("shesha.rlm.engine.LLMClient")
+    @patch("ananta.rlm.engine.ContainerExecutor")
+    @patch("ananta.rlm.engine.LLMClient")
     def test_engine_gave_up_true_for_sandbox_partial(
         self, mock_llm_cls: MagicMock, mock_exec_cls: MagicMock
     ):

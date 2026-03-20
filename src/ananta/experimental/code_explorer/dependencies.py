@@ -5,12 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from shesha.experimental.code_explorer.topics import CodeExplorerTopicManager
-from shesha.experimental.shared.dependencies import (
+from ananta.experimental.code_explorer.topics import CodeExplorerTopicManager
+from ananta.experimental.shared.dependencies import (
     BaseExplorerState,
     get_topic_session,
 )
-from shesha.experimental.shared.dependencies import (
+from ananta.experimental.shared.dependencies import (
     create_app_state as _create_app_state,
 )
 
@@ -34,7 +34,7 @@ def create_app_state(
         model=model,
     )
     return CodeExplorerState(
-        shesha=base.shesha,
+        ananta=base.ananta,
         topic_mgr=base.topic_mgr,
         session=base.session,
         model=base.model,

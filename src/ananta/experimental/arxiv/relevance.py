@@ -7,7 +7,7 @@ import logging
 
 import litellm
 
-from shesha.experimental.arxiv.models import (
+from ananta.experimental.arxiv.models import (
     ExtractedCitation,
     VerificationResult,
     VerificationStatus,

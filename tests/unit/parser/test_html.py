@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from shesha.parser.html import HtmlParser
+from ananta.parser.html import HtmlParser
 
 
 @pytest.fixture

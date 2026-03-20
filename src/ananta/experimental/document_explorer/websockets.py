@@ -13,14 +13,14 @@ from typing import Any
 
 from fastapi import WebSocket
 
-from shesha.experimental.document_explorer.dependencies import (
+from ananta.experimental.document_explorer.dependencies import (
     DocumentExplorerState,
     get_topic_session,
 )
-from shesha.experimental.shared.websockets import (
+from ananta.experimental.shared.websockets import (
     handle_multi_project_query,
 )
-from shesha.experimental.shared.websockets import (
+from ananta.experimental.shared.websockets import (
     websocket_handler as shared_ws_handler,
 )
 

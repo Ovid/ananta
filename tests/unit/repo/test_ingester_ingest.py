@@ -6,10 +6,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from shesha.exceptions import ParseError, RepoIngestError
-from shesha.models import ParsedDocument
-from shesha.repo.ingester import RepoIngester
-from shesha.storage.filesystem import FilesystemStorage
+from ananta.exceptions import ParseError, RepoIngestError
+from ananta.models import ParsedDocument
+from ananta.repo.ingester import RepoIngester
+from ananta.storage.filesystem import FilesystemStorage
 
 
 @pytest.fixture

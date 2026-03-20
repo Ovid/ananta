@@ -1,7 +1,9 @@
-"""Shesha: Recursive Language Models for document querying."""
+"""Ananta: Recursive Language Models for document querying."""
 
-from shesha.config import SheshaConfig
-from shesha.exceptions import (
+from ananta.ananta import Ananta
+from ananta.config import AnantaConfig
+from ananta.exceptions import (
+    AnantaError,
     AuthenticationError,
     DocumentError,
     DocumentNotFoundError,
@@ -13,26 +15,24 @@ from shesha.exceptions import (
     ProjectNotFoundError,
     RepoError,
     RepoIngestError,
-    SheshaError,
     TraceWriteError,
 )
-from shesha.models import ParsedDocument, ProjectInfo, QueryContext, RepoProjectResult
-from shesha.project import Project
-from shesha.rlm import ProgressCallback, QueryResult, StepType, TokenUsage, Trace, TraceStep
-from shesha.shesha import Shesha
-from shesha.storage import FilesystemStorage
+from ananta.models import ParsedDocument, ProjectInfo, QueryContext, RepoProjectResult
+from ananta.project import Project
+from ananta.rlm import ProgressCallback, QueryResult, StepType, TokenUsage, Trace, TraceStep
+from ananta.storage import FilesystemStorage
 
 try:
-    from shesha._version import __version__
+    from ananta._version import __version__
 except ImportError:
     __version__ = "0.0.0.dev0"  # Fallback before package is built
 
 __all__ = [
     "__version__",
     # Main API
-    "Shesha",
+    "Ananta",
     "Project",
-    "SheshaConfig",
+    "AnantaConfig",
     # Query results
     "ProgressCallback",
     "QueryContext",
@@ -47,7 +47,7 @@ __all__ = [
     "ParsedDocument",
     "ProjectInfo",
     # Exceptions
-    "SheshaError",
+    "AnantaError",
     "ProjectError",
     "ProjectNotFoundError",
     "ProjectExistsError",

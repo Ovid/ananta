@@ -3,7 +3,7 @@
 import os
 from pathlib import Path
 
-from shesha.prompts.validator import PROMPT_SCHEMAS, validate_prompt
+from ananta.prompts.validator import PROMPT_SCHEMAS, validate_prompt
 
 
 def get_default_prompts_dir() -> Path:
@@ -26,7 +26,7 @@ def get_default_prompts_dir() -> Path:
     # Fallback: raise clear error
     raise FileNotFoundError(
         "Could not find prompts directory. "
-        "Set SHESHA_PROMPTS_DIR environment variable to specify location."
+        "Set ANANTA_PROMPTS_DIR environment variable to specify location."
     )
 
 
@@ -35,13 +35,13 @@ def resolve_prompts_dir(explicit_dir: Path | None = None) -> Path:
 
     Priority:
     1. explicit_dir argument
-    2. SHESHA_PROMPTS_DIR environment variable
+    2. ANANTA_PROMPTS_DIR environment variable
     3. Default bundled prompts directory
     """
     if explicit_dir is not None:
         return explicit_dir
 
-    env_dir = os.environ.get("SHESHA_PROMPTS_DIR")
+    env_dir = os.environ.get("ANANTA_PROMPTS_DIR")
     if env_dir:
         return Path(env_dir)
 
@@ -56,7 +56,7 @@ class PromptLoader:
 
         Args:
             prompts_dir: Directory containing prompt markdown files.
-                If None, uses SHESHA_PROMPTS_DIR env var or default.
+                If None, uses ANANTA_PROMPTS_DIR env var or default.
 
         Raises:
             PromptValidationError: If any prompt file is invalid.

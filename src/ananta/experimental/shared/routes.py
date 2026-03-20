@@ -1,4 +1,4 @@
-"""Generic API routes shared across Shesha experimental tools.
+"""Generic API routes shared across Ananta experimental tools.
 
 Provides ``create_shared_router()`` which returns a FastAPI ``APIRouter``
 containing topic CRUD, trace listing/retrieval, model management, and
@@ -16,7 +16,7 @@ import litellm
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, PlainTextResponse
 
-from shesha.experimental.shared.schemas import (
+from ananta.experimental.shared.schemas import (
     ContextBudget,
     ConversationHistory,
     ItemReorder,
@@ -29,8 +29,8 @@ from shesha.experimental.shared.schemas import (
     TraceListItem,
     TraceStepSchema,
 )
-from shesha.experimental.shared.session import WebConversationSession
-from shesha.experimental.shared.topics import BaseTopicManager
+from ananta.experimental.shared.session import WebConversationSession
+from ananta.experimental.shared.topics import BaseTopicManager
 
 # Context budget estimation constants
 BASE_PROMPT_TOKENS = 2000  # system prompt + context metadata overhead
@@ -213,9 +213,9 @@ def create_shared_router(
     list_trace_files:
         Optional callback ``(state, project_id) -> list[Path]``.
         When provided, overrides the default
-        ``state.shesha.storage.list_traces(project_id)`` call
+        ``state.ananta.storage.list_traces(project_id)`` call
         for trace routes.  Useful when trace files are stored in a
-        different storage backend (e.g. ``state.shesha.storage``).
+        different storage backend (e.g. ``state.ananta.storage``).
     include_topic_crud:
         When ``True`` (default), register topic CRUD routes (list, create,
         rename, delete).
@@ -234,7 +234,7 @@ def create_shared_router(
         if get_session is not None:
             return get_session(state, topic_name)
         project_id = resolve_topic_or_404(state, topic_name)
-        project_dir = state.shesha.storage.get_project_dir(project_id)
+        project_dir = state.ananta.storage.get_project_dir(project_id)
         return WebConversationSession(project_dir)
 
     def _get_project_ids(name: str) -> list[str]:
@@ -247,7 +247,7 @@ def create_shared_router(
         """Get trace files for a project, using callback or default."""
         if list_trace_files is not None:
             return list_trace_files(state, project_id)
-        return state.shesha.storage.list_traces(project_id)  # type: ignore[no-any-return]
+        return state.ananta.storage.list_traces(project_id)  # type: ignore[no-any-return]
 
     # --- Topics ---
 

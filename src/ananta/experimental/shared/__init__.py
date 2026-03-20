@@ -1,1 +1,1 @@
-"""Shared web infrastructure for Shesha experimental tools."""
+"""Shared web infrastructure for Ananta experimental tools."""

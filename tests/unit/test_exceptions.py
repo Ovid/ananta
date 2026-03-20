@@ -1,10 +1,10 @@
 """Tests for exception classes."""
 
-from shesha.exceptions import (
+from ananta.exceptions import (
+    AnantaError,
     AuthenticationError,
     EngineNotConfiguredError,
     RepoIngestError,
-    SheshaError,
     TraceWriteError,
 )
 
@@ -29,9 +29,9 @@ class TestRepoExceptions:
 class TestTraceWriteError:
     """Tests for TraceWriteError."""
 
-    def test_is_subclass_of_shesha_error(self):
-        """TraceWriteError is a SheshaError subclass."""
-        assert issubclass(TraceWriteError, SheshaError)
+    def test_is_subclass_of_ananta_error(self):
+        """TraceWriteError is a AnantaError subclass."""
+        assert issubclass(TraceWriteError, AnantaError)
 
     def test_accepts_message(self):
         """TraceWriteError can take a custom message."""
@@ -42,9 +42,9 @@ class TestTraceWriteError:
 class TestEngineNotConfiguredError:
     """Tests for EngineNotConfiguredError."""
 
-    def test_is_subclass_of_shesha_error(self):
-        """EngineNotConfiguredError is a SheshaError subclass."""
-        assert issubclass(EngineNotConfiguredError, SheshaError)
+    def test_is_subclass_of_ananta_error(self):
+        """EngineNotConfiguredError is a AnantaError subclass."""
+        assert issubclass(EngineNotConfiguredError, AnantaError)
 
     def test_default_message_mentions_engine(self):
         """EngineNotConfiguredError has default message mentioning engine."""

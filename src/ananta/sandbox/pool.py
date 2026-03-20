@@ -4,8 +4,8 @@ import logging
 import threading
 from collections import deque
 
-from shesha.sandbox.base import SandboxExecutor
-from shesha.sandbox.executor import ContainerExecutor
+from ananta.sandbox.base import SandboxExecutor
+from ananta.sandbox.executor import ContainerExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +16,7 @@ class ContainerPool:
     def __init__(
         self,
         size: int = 3,
-        image: str = "shesha-sandbox",
+        image: str = "ananta-sandbox",
         memory_limit: str = "512m",
     ) -> None:
         """Initialize pool settings."""
@@ -31,7 +31,7 @@ class ContainerPool:
     def start(self) -> None:
         """Start the pool and warm up containers."""
         # Note: _started check is not under self._lock. This is fine because
-        # start() is only called from the single-threaded Shesha.start() path.
+        # start() is only called from the single-threaded Ananta.start() path.
         if self._started:
             return
         logger.info("Starting container pool (size=%d, image=%s)", self.size, self.image)

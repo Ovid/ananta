@@ -1,9 +1,9 @@
-"""Generic FastAPI app factory for Shesha experimental tools.
+"""Generic FastAPI app factory for Ananta experimental tools.
 
 Provides ``create_app()`` which builds a FastAPI instance with common
 infrastructure: CORS middleware, a ``.well-known`` catch-all (suppresses
 Chrome DevTools probing), optional static file serving, optional WebSocket
-endpoint, and a lifespan hook that starts/stops the Shesha container pool.
+endpoint, and a lifespan hook that starts/stops the Ananta container pool.
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ def create_app(
     Parameters
     ----------
     state:
-        Application state object.  Must expose ``state.shesha`` with
+        Application state object.  Must expose ``state.ananta`` with
         ``start()`` and ``stop()`` methods.
     title:
         The title for the FastAPI app (shown in OpenAPI docs).
@@ -54,11 +54,11 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        state.shesha.start()
+        state.ananta.start()
         try:
             yield
         finally:
-            state.shesha.stop()
+            state.ananta.stop()
 
     app = FastAPI(title=title, lifespan=lifespan)
 

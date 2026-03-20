@@ -1,6 +1,6 @@
 """Tests for shared generic Pydantic schemas."""
 
-from shesha.experimental.shared.schemas import (
+from ananta.experimental.shared.schemas import (
     ContextBudget,
     ConversationHistory,
     ExchangeSchema,

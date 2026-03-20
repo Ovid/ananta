@@ -1,7 +1,7 @@
 """Tests for TUI progress helpers."""
 
-from shesha.rlm.trace import StepType
-from shesha.tui.progress import step_display_name
+from ananta.rlm.trace import StepType
+from ananta.tui.progress import step_display_name
 
 
 class TestStepDisplayName:

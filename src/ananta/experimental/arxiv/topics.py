@@ -1,4 +1,4 @@
-"""Topic management backed by Shesha projects."""
+"""Topic management backed by Ananta projects."""
 
 from __future__ import annotations
 
@@ -8,14 +8,14 @@ import re
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from shesha.exceptions import ProjectExistsError, ProjectNotFoundError
-from shesha.experimental.arxiv.models import TopicInfo
+from ananta.exceptions import ProjectExistsError, ProjectNotFoundError
+from ananta.experimental.arxiv.models import TopicInfo
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from shesha import Shesha
-    from shesha.storage.filesystem import FilesystemStorage
+    from ananta import Ananta
+    from ananta.storage.filesystem import FilesystemStorage
 
 
 def slugify(text: str) -> str:
@@ -29,16 +29,16 @@ def slugify(text: str) -> str:
 
 
 class TopicManager:
-    """Manage topics backed by Shesha projects."""
+    """Manage topics backed by Ananta projects."""
 
     TOPIC_META_FILE = "_topic.json"
 
     def __init__(
         self,
-        shesha: Shesha,
+        ananta: Ananta,
         storage: FilesystemStorage,
     ) -> None:
-        self._shesha = shesha
+        self._ananta = ananta
         self._storage = storage
 
     @property

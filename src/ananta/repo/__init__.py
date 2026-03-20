@@ -1,5 +1,5 @@
 """Repository ingestion module."""
 
-from shesha.repo.ingester import RepoIngester
+from ananta.repo.ingester import RepoIngester
 
 __all__ = ["RepoIngester"]

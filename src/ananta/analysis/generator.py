@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-from shesha.models import (
+from ananta.models import (
     AnalysisComponent,
     AnalysisExternalDep,
     RepoAnalysis,
@@ -16,7 +16,7 @@ from shesha.models import (
 )
 
 if TYPE_CHECKING:
-    from shesha.project import Project
+    from ananta.project import Project
 
 
 class AnalysisGenerator:

@@ -1,9 +1,9 @@
 """LLM-specific exceptions."""
 
-from shesha.exceptions import SheshaError
+from ananta.exceptions import AnantaError
 
 
-class LLMError(SheshaError):
+class LLMError(AnantaError):
     """Base class for LLM errors."""
 
     pass

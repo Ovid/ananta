@@ -1,6 +1,6 @@
 """Tests for TUI input history."""
 
-from shesha.tui.history import InputHistory
+from ananta.tui.history import InputHistory
 
 
 class TestInputHistory:

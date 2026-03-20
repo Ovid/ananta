@@ -12,15 +12,15 @@ from typing import Any
 
 from fastapi import WebSocket
 
-from shesha.exceptions import ProjectNotFoundError
-from shesha.experimental.code_explorer.dependencies import (
+from ananta.exceptions import ProjectNotFoundError
+from ananta.experimental.code_explorer.dependencies import (
     CodeExplorerState,
     get_topic_session,
 )
-from shesha.experimental.shared.websockets import (
+from ananta.experimental.shared.websockets import (
     handle_multi_project_query,
 )
-from shesha.experimental.shared.websockets import (
+from ananta.experimental.shared.websockets import (
     websocket_handler as shared_ws_handler,
 )
 
@@ -32,7 +32,7 @@ async def _build_code_context(state: Any, project_ids: list[str]) -> str:
     parts: list[str] = []
     for pid in project_ids:
         try:
-            analysis = state.shesha.get_analysis(pid)
+            analysis = state.ananta.get_analysis(pid)
         except ProjectNotFoundError:
             logger.warning("Project %s not found, skipping analysis", pid)
             continue

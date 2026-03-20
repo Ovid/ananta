@@ -5,9 +5,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from shesha.experimental.web.api import create_api
-from shesha.models import ParsedDocument
-from shesha.rlm.trace import TokenUsage, Trace
+from ananta.experimental.web.api import create_api
+from ananta.models import ParsedDocument
+from ananta.rlm.trace import TokenUsage, Trace
 
 
 def _make_doc(name: str) -> ParsedDocument:
@@ -48,12 +48,12 @@ def test_ws_query_returns_complete(client: TestClient, mock_state: MagicMock) ->
     mock_project.rlm_engine.query.return_value = mock_result
 
     mock_state.topic_mgr.resolve.return_value = "proj-id"
-    mock_state.shesha.get_project.return_value = mock_project
-    mock_state.shesha.storage.list_documents.return_value = ["doc1"]
-    mock_state.shesha.storage.get_document.side_effect = lambda pid, name: _make_doc(name)
-    mock_state.shesha.storage.list_traces.return_value = []
+    mock_state.ananta.get_project.return_value = mock_project
+    mock_state.ananta.storage.list_documents.return_value = ["doc1"]
+    mock_state.ananta.storage.get_document.side_effect = lambda pid, name: _make_doc(name)
+    mock_state.ananta.storage.list_traces.return_value = []
 
-    with patch("shesha.experimental.web.websockets.WebConversationSession") as mock_sess_cls:
+    with patch("ananta.experimental.web.websockets.WebConversationSession") as mock_sess_cls:
         mock_session = MagicMock()
         mock_session.format_history_prefix.return_value = ""
         mock_sess_cls.return_value = mock_session
@@ -97,11 +97,11 @@ def test_ws_query_engine_exception_sends_error(client: TestClient, mock_state: M
     mock_project.rlm_engine.query.side_effect = RuntimeError("engine exploded")
 
     mock_state.topic_mgr.resolve.return_value = "proj-id"
-    mock_state.shesha.get_project.return_value = mock_project
-    mock_state.shesha.storage.list_documents.return_value = ["doc1"]
-    mock_state.shesha.storage.get_document.side_effect = lambda pid, name: _make_doc(name)
+    mock_state.ananta.get_project.return_value = mock_project
+    mock_state.ananta.storage.list_documents.return_value = ["doc1"]
+    mock_state.ananta.storage.get_document.side_effect = lambda pid, name: _make_doc(name)
 
-    with patch("shesha.experimental.web.websockets.WebConversationSession") as mock_sess_cls:
+    with patch("ananta.experimental.web.websockets.WebConversationSession") as mock_sess_cls:
         mock_session = MagicMock()
         mock_session.format_history_prefix.return_value = ""
         mock_sess_cls.return_value = mock_session

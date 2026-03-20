@@ -2,8 +2,8 @@
 
 from unittest.mock import MagicMock
 
-from shesha.analysis import AnalysisGenerator
-from shesha.models import RepoAnalysis, coerce_to_str_list
+from ananta.analysis import AnalysisGenerator
+from ananta.models import RepoAnalysis, coerce_to_str_list
 
 
 class TestAnalysisPromptLoading:
@@ -11,9 +11,9 @@ class TestAnalysisPromptLoading:
 
     def testload_prompt_returns_string(self):
         """load_prompt returns prompt content as string."""
-        mock_shesha = MagicMock()
+        mock_ananta = MagicMock()
         generator = AnalysisGenerator(
-            get_project=mock_shesha.get_project, get_project_sha=mock_shesha.get_project_sha
+            get_project=mock_ananta.get_project, get_project_sha=mock_ananta.get_project_sha
         )
 
         prompt = generator.load_prompt("generate")
@@ -23,9 +23,9 @@ class TestAnalysisPromptLoading:
 
     def testload_prompt_contains_json_schema(self):
         """load_prompt for generate contains JSON schema example."""
-        mock_shesha = MagicMock()
+        mock_ananta = MagicMock()
         generator = AnalysisGenerator(
-            get_project=mock_shesha.get_project, get_project_sha=mock_shesha.get_project_sha
+            get_project=mock_ananta.get_project, get_project_sha=mock_ananta.get_project_sha
         )
 
         prompt = generator.load_prompt("generate")
@@ -39,7 +39,7 @@ class TestAnalysisGeneratorStructure:
     """Tests for AnalysisGenerator class structure."""
 
     def test_generator_can_be_imported(self):
-        """AnalysisGenerator can be imported from shesha.analysis."""
+        """AnalysisGenerator can be imported from ananta.analysis."""
         assert AnalysisGenerator is not None
 
     def test_generator_accepts_callables(self):
@@ -61,10 +61,10 @@ class TestAnalysisGeneration:
     def test_generate_returns_repo_analysis(self):
         """generate() returns a RepoAnalysis object."""
 
-        # Mock the shesha instance and project
-        mock_shesha = MagicMock()
+        # Mock the ananta instance and project
+        mock_ananta = MagicMock()
         mock_project = MagicMock()
-        mock_shesha.get_project.return_value = mock_project
+        mock_ananta.get_project.return_value = mock_project
 
         # Mock query result with valid JSON
         mock_result = MagicMock()
@@ -92,10 +92,10 @@ class TestAnalysisGeneration:
         mock_project.query.return_value = mock_result
 
         # Mock repo ingester for SHA
-        mock_shesha.get_project_sha.return_value = "abc123def"
+        mock_ananta.get_project_sha.return_value = "abc123def"
 
         generator = AnalysisGenerator(
-            get_project=mock_shesha.get_project, get_project_sha=mock_shesha.get_project_sha
+            get_project=mock_ananta.get_project, get_project_sha=mock_ananta.get_project_sha
         )
         result = generator.generate("test-project")
 
@@ -108,21 +108,21 @@ class TestAnalysisGeneration:
 
     def test_generate_calls_project_query(self):
         """generate() calls project.query with the generate prompt."""
-        mock_shesha = MagicMock()
+        mock_ananta = MagicMock()
         mock_project = MagicMock()
-        mock_shesha.get_project.return_value = mock_project
+        mock_ananta.get_project.return_value = mock_project
 
         mock_result = MagicMock()
         mock_result.answer = '{"overview": "Test", "components": [], "external_dependencies": []}'
         mock_project.query.return_value = mock_result
-        mock_shesha.get_project_sha.return_value = "sha123"
+        mock_ananta.get_project_sha.return_value = "sha123"
 
         generator = AnalysisGenerator(
-            get_project=mock_shesha.get_project, get_project_sha=mock_shesha.get_project_sha
+            get_project=mock_ananta.get_project, get_project_sha=mock_ananta.get_project_sha
         )
         generator.generate("test-project")
 
-        mock_shesha.get_project.assert_called_once_with("test-project")
+        mock_ananta.get_project.assert_called_once_with("test-project")
         mock_project.query.assert_called_once()
 
         # Verify prompt contains expected content
@@ -133,17 +133,17 @@ class TestAnalysisGeneration:
 
     def test_generate_handles_missing_sha(self):
         """generate() handles missing SHA gracefully."""
-        mock_shesha = MagicMock()
+        mock_ananta = MagicMock()
         mock_project = MagicMock()
-        mock_shesha.get_project.return_value = mock_project
+        mock_ananta.get_project.return_value = mock_project
 
         mock_result = MagicMock()
         mock_result.answer = '{"overview": "Test", "components": [], "external_dependencies": []}'
         mock_project.query.return_value = mock_result
-        mock_shesha.get_project_sha.return_value = None
+        mock_ananta.get_project_sha.return_value = None
 
         generator = AnalysisGenerator(
-            get_project=mock_shesha.get_project, get_project_sha=mock_shesha.get_project_sha
+            get_project=mock_ananta.get_project, get_project_sha=mock_ananta.get_project_sha
         )
         result = generator.generate("test-project")
 
@@ -151,9 +151,9 @@ class TestAnalysisGeneration:
 
     def test_generate_coerces_dict_overview_to_string(self):
         """generate() coerces a dict overview from the LLM to a string."""
-        mock_shesha = MagicMock()
+        mock_ananta = MagicMock()
         mock_project = MagicMock()
-        mock_shesha.get_project.return_value = mock_project
+        mock_ananta.get_project.return_value = mock_project
 
         mock_result = MagicMock()
         mock_result.answer = """
@@ -166,10 +166,10 @@ class TestAnalysisGeneration:
         ```
         """
         mock_project.query.return_value = mock_result
-        mock_shesha.get_project_sha.return_value = "sha789"
+        mock_ananta.get_project_sha.return_value = "sha789"
 
         generator = AnalysisGenerator(
-            get_project=mock_shesha.get_project, get_project_sha=mock_shesha.get_project_sha
+            get_project=mock_ananta.get_project, get_project_sha=mock_ananta.get_project_sha
         )
         result = generator.generate("test-project")
 
@@ -178,9 +178,9 @@ class TestAnalysisGeneration:
 
     def test_generate_coerces_dict_models_to_strings(self):
         """generate() coerces dict items in models/entry_points/internal_dependencies to strings."""
-        mock_shesha = MagicMock()
+        mock_ananta = MagicMock()
         mock_project = MagicMock()
-        mock_shesha.get_project.return_value = mock_project
+        mock_ananta.get_project.return_value = mock_project
 
         mock_result = MagicMock()
         mock_result.answer = """
@@ -203,10 +203,10 @@ class TestAnalysisGeneration:
         ```
         """
         mock_project.query.return_value = mock_result
-        mock_shesha.get_project_sha.return_value = "sha999"
+        mock_ananta.get_project_sha.return_value = "sha999"
 
         generator = AnalysisGenerator(
-            get_project=mock_shesha.get_project, get_project_sha=mock_shesha.get_project_sha
+            get_project=mock_ananta.get_project, get_project_sha=mock_ananta.get_project_sha
         )
         result = generator.generate("test-project")
 
@@ -234,9 +234,9 @@ class TestAnalysisGeneration:
 
     def test_generate_coerces_non_string_component_scalars(self):
         """generate() coerces non-string name/path/description in components."""
-        mock_shesha = MagicMock()
+        mock_ananta = MagicMock()
         mock_project = MagicMock()
-        mock_shesha.get_project.return_value = mock_project
+        mock_ananta.get_project.return_value = mock_project
 
         mock_result = MagicMock()
         mock_result.answer = """
@@ -259,10 +259,10 @@ class TestAnalysisGeneration:
         ```
         """
         mock_project.query.return_value = mock_result
-        mock_shesha.get_project_sha.return_value = "sha000"
+        mock_ananta.get_project_sha.return_value = "sha000"
 
         generator = AnalysisGenerator(
-            get_project=mock_shesha.get_project, get_project_sha=mock_shesha.get_project_sha
+            get_project=mock_ananta.get_project, get_project_sha=mock_ananta.get_project_sha
         )
         result = generator.generate("test-project")
 
@@ -273,9 +273,9 @@ class TestAnalysisGeneration:
 
     def test_generate_coerces_external_dep_fields(self):
         """generate() coerces non-string fields in external dependencies."""
-        mock_shesha = MagicMock()
+        mock_ananta = MagicMock()
         mock_project = MagicMock()
-        mock_shesha.get_project.return_value = mock_project
+        mock_ananta.get_project.return_value = mock_project
 
         mock_result = MagicMock()
         mock_result.answer = """
@@ -296,10 +296,10 @@ class TestAnalysisGeneration:
         ```
         """
         mock_project.query.return_value = mock_result
-        mock_shesha.get_project_sha.return_value = "sha111"
+        mock_ananta.get_project_sha.return_value = "sha111"
 
         generator = AnalysisGenerator(
-            get_project=mock_shesha.get_project, get_project_sha=mock_shesha.get_project_sha
+            get_project=mock_ananta.get_project, get_project_sha=mock_ananta.get_project_sha
         )
         result = generator.generate("test-project")
 
@@ -311,18 +311,18 @@ class TestAnalysisGeneration:
 
     def test_generate_handles_invalid_json(self):
         """generate() falls back to raw answer when JSON extraction fails."""
-        mock_shesha = MagicMock()
+        mock_ananta = MagicMock()
         mock_project = MagicMock()
-        mock_shesha.get_project.return_value = mock_project
+        mock_ananta.get_project.return_value = mock_project
 
         # Response with no valid JSON - just plain text
         mock_result = MagicMock()
         mock_result.answer = "This is a plain text response with no JSON."
         mock_project.query.return_value = mock_result
-        mock_shesha.get_project_sha.return_value = "sha456"
+        mock_ananta.get_project_sha.return_value = "sha456"
 
         generator = AnalysisGenerator(
-            get_project=mock_shesha.get_project, get_project_sha=mock_shesha.get_project_sha
+            get_project=mock_ananta.get_project, get_project_sha=mock_ananta.get_project_sha
         )
         result = generator.generate("test-project")
 

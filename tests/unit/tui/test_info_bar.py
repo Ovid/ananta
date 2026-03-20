@@ -2,8 +2,8 @@
 
 from unittest.mock import MagicMock
 
-from shesha.tui.app import SheshaTUI
-from shesha.tui.widgets.info_bar import InfoBar, InfoBarState, abbreviate_model
+from ananta.tui.app import AnantaTUI
+from ananta.tui.widgets.info_bar import InfoBar, InfoBarState, abbreviate_model
 
 
 class TestInfoBarState:
@@ -133,7 +133,7 @@ class TestInfoBarProjectNameUpdate:
 
     async def test_info_bar_update_project_name_widget(self) -> None:
         """update_project_name() updates the widget state."""
-        app = SheshaTUI(project=MagicMock(), project_name="test")
+        app = AnantaTUI(project=MagicMock(), project_name="test")
         async with app.run_test() as pilot:
             info_bar = pilot.app.query_one(InfoBar)
             info_bar.update_project_name("new-topic")

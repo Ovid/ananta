@@ -1,28 +1,28 @@
 """CLI for validating prompt files.
 
 Usage:
-    python -m shesha.prompts [--prompts-dir /path/to/prompts]
+    python -m ananta.prompts [--prompts-dir /path/to/prompts]
 """
 
 import argparse
 import sys
 from pathlib import Path
 
-from shesha.prompts.loader import resolve_prompts_dir
-from shesha.prompts.validator import PROMPT_SCHEMAS, PromptValidationError, validate_prompt
+from ananta.prompts.loader import resolve_prompts_dir
+from ananta.prompts.validator import PROMPT_SCHEMAS, PromptValidationError, validate_prompt
 
 
 def main() -> int:
     """Validate prompt files and report results."""
     parser = argparse.ArgumentParser(
-        description="Validate Shesha prompt files",
-        prog="python -m shesha.prompts",
+        description="Validate Ananta prompt files",
+        prog="python -m ananta.prompts",
     )
     parser.add_argument(
         "--prompts-dir",
         type=Path,
         default=None,
-        help="Directory containing prompt files (default: SHESHA_PROMPTS_DIR or bundled)",
+        help="Directory containing prompt files (default: ANANTA_PROMPTS_DIR or bundled)",
     )
     args = parser.parse_args()
 

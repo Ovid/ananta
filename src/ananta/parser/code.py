@@ -4,7 +4,7 @@ from pathlib import Path
 
 import chardet
 
-from shesha.models import ParsedDocument
+from ananta.models import ParsedDocument
 
 # Map extensions to language names
 EXTENSION_TO_LANGUAGE: dict[str, str] = {

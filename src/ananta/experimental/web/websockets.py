@@ -14,8 +14,8 @@ from typing import Any
 
 from fastapi import WebSocket
 
-from shesha.experimental.arxiv.cache import PaperCache
-from shesha.experimental.arxiv.citations import (
+from ananta.experimental.arxiv.cache import PaperCache
+from ananta.experimental.arxiv.citations import (
     ArxivVerifier,
     detect_llm_phrases,
     extract_citations_from_bbl,
@@ -23,23 +23,23 @@ from shesha.experimental.arxiv.citations import (
     extract_citations_from_text,
     format_check_report_json,
 )
-from shesha.experimental.arxiv.models import (
+from ananta.experimental.arxiv.models import (
     CheckReport,
     ExtractedCitation,
     VerificationResult,
     VerificationStatus,
 )
-from shesha.experimental.arxiv.relevance import check_topical_relevance
-from shesha.experimental.arxiv.verifiers import (
+from ananta.experimental.arxiv.relevance import check_topical_relevance
+from ananta.experimental.arxiv.verifiers import (
     CascadingVerifier,
     CrossRefVerifier,
     OpenAlexVerifier,
     SemanticScholarVerifier,
 )
-from shesha.experimental.shared.websockets import websocket_handler as shared_ws_handler
-from shesha.experimental.web.dependencies import AppState
-from shesha.experimental.web.session import WebConversationSession
-from shesha.models import ParsedDocument
+from ananta.experimental.shared.websockets import websocket_handler as shared_ws_handler
+from ananta.experimental.web.dependencies import AppState
+from ananta.experimental.web.session import WebConversationSession
+from ananta.models import ParsedDocument
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +109,7 @@ async def _handle_check_citations(ws: WebSocket, data: dict[str, object], state:
     email_str = str(polite_email) if polite_email else None
 
     loop = asyncio.get_running_loop()
-    api_key = state.shesha._config.api_key
+    api_key = state.ananta._config.api_key
     verifier = CascadingVerifier(
         arxiv_verifier=ArxivVerifier(searcher=state.searcher),
         crossref_verifier=CrossRefVerifier(polite_email=email_str),
@@ -218,7 +218,7 @@ def _check_single_paper(
         citations=citations,
         verified_keys=verified_keys,
         model=model,
-        api_key=state.shesha._config.api_key,
+        api_key=state.ananta._config.api_key,
     )
     results.extend(relevance_results)
 

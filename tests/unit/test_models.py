@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from shesha.models import (
+from ananta.models import (
     AnalysisComponent,
     AnalysisExternalDep,
     ProjectInfo,
@@ -280,7 +280,7 @@ class TestRepoAnalysis:
 
     def test_repo_analysis_all_fields(self):
         """RepoAnalysis stores all fields correctly."""
-        from shesha.models import AnalysisComponent, AnalysisExternalDep, RepoAnalysis
+        from ananta.models import AnalysisComponent, AnalysisExternalDep, RepoAnalysis
 
         comp = AnalysisComponent(
             name="API",
@@ -318,7 +318,7 @@ class TestRepoAnalysis:
 
     def test_repo_analysis_default_caveats(self):
         """RepoAnalysis has default caveats message."""
-        from shesha.models import RepoAnalysis
+        from ananta.models import RepoAnalysis
 
         analysis = RepoAnalysis(
             version="1",
@@ -334,7 +334,7 @@ class TestRepoAnalysis:
 
     def test_repo_analysis_custom_caveats(self):
         """RepoAnalysis can have custom caveats."""
-        from shesha.models import RepoAnalysis
+        from ananta.models import RepoAnalysis
 
         analysis = RepoAnalysis(
             version="1",
@@ -499,13 +499,13 @@ class TestCoercionHelpers:
 
     def test_coerce_to_str_with_string(self) -> None:
         """String input returns unchanged."""
-        from shesha.models import coerce_to_str
+        from ananta.models import coerce_to_str
 
         assert coerce_to_str("hello") == "hello"
 
     def test_coerce_to_str_with_dict(self) -> None:
         """Dict input returns JSON-encoded string."""
-        from shesha.models import coerce_to_str
+        from ananta.models import coerce_to_str
 
         result = coerce_to_str({"key": "value"})
         assert isinstance(result, str)
@@ -513,27 +513,27 @@ class TestCoercionHelpers:
 
     def test_coerce_to_str_with_list(self) -> None:
         """List input returns JSON-encoded string."""
-        from shesha.models import coerce_to_str
+        from ananta.models import coerce_to_str
 
         result = coerce_to_str(["a", "b"])
         assert isinstance(result, str)
 
     def test_coerce_to_str_list_with_strings(self) -> None:
         """String items pass through unchanged."""
-        from shesha.models import coerce_to_str_list
+        from ananta.models import coerce_to_str_list
 
         assert coerce_to_str_list(["a", "b"]) == ["a", "b"]
 
     def test_coerce_to_str_list_with_dict_name_key(self) -> None:
         """Dict items with 'name' key use the name value."""
-        from shesha.models import coerce_to_str_list
+        from ananta.models import coerce_to_str_list
 
         result = coerce_to_str_list([{"name": "User", "fields": ["id"]}])
         assert result == ["User"]
 
     def test_coerce_to_str_list_with_dict_no_name_key(self) -> None:
         """Dict items without 'name' key are JSON-encoded."""
-        from shesha.models import coerce_to_str_list
+        from ananta.models import coerce_to_str_list
 
         result = coerce_to_str_list([{"path": "/api", "method": "GET"}])
         assert len(result) == 1
@@ -542,7 +542,7 @@ class TestCoercionHelpers:
 
     def test_coerce_to_str_list_mixed(self) -> None:
         """Mixed list with strings and dicts."""
-        from shesha.models import coerce_to_str_list
+        from ananta.models import coerce_to_str_list
 
         result = coerce_to_str_list(["User", {"name": "Session"}, {"path": "/api"}])
         assert result[0] == "User"
@@ -551,7 +551,7 @@ class TestCoercionHelpers:
 
     def test_coerce_to_str_list_with_non_string_name_value(self) -> None:
         """Dict with 'name' key whose value is not a string is coerced."""
-        from shesha.models import coerce_to_str_list
+        from ananta.models import coerce_to_str_list
 
         result = coerce_to_str_list([{"name": 42}, {"name": ["a", "b"]}])
         assert all(isinstance(r, str) for r in result)

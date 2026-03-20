@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from shesha.experimental.document_explorer.__main__ import main, parse_args
+from ananta.experimental.document_explorer.__main__ import main, parse_args
 
 
 class TestParseArgs:
@@ -39,10 +39,10 @@ class TestParseArgs:
 
 
 class TestMain:
-    @patch("shesha.experimental.document_explorer.__main__.parse_args")
-    @patch("shesha.experimental.document_explorer.__main__.uvicorn")
-    @patch("shesha.experimental.document_explorer.__main__.create_api")
-    @patch("shesha.experimental.document_explorer.__main__.create_app_state")
+    @patch("ananta.experimental.document_explorer.__main__.parse_args")
+    @patch("ananta.experimental.document_explorer.__main__.uvicorn")
+    @patch("ananta.experimental.document_explorer.__main__.create_api")
+    @patch("ananta.experimental.document_explorer.__main__.create_app_state")
     def test_creates_state_with_args(
         self,
         mock_state: MagicMock,
@@ -58,10 +58,10 @@ class TestMain:
         main()
         mock_state.assert_called_once_with(data_dir=Path("/tmp/d"), model="gpt-5")
 
-    @patch("shesha.experimental.document_explorer.__main__.parse_args")
-    @patch("shesha.experimental.document_explorer.__main__.uvicorn")
-    @patch("shesha.experimental.document_explorer.__main__.create_api")
-    @patch("shesha.experimental.document_explorer.__main__.create_app_state")
+    @patch("ananta.experimental.document_explorer.__main__.parse_args")
+    @patch("ananta.experimental.document_explorer.__main__.uvicorn")
+    @patch("ananta.experimental.document_explorer.__main__.create_api")
+    @patch("ananta.experimental.document_explorer.__main__.create_app_state")
     def test_runs_uvicorn(
         self,
         mock_state: MagicMock,

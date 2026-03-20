@@ -7,16 +7,16 @@ test:
 	pytest
 
 test-frontend:
-	cd src/shesha/experimental/web/frontend && npx vitest run
+	cd src/ananta/experimental/web/frontend && npx vitest run
 
 lint:
 	ruff check src tests
 
 typecheck:
-	mypy src/shesha
+	mypy src/ananta
 
 typecheck-frontend:
-	cd src/shesha/experimental/shared/frontend && npx tsc --noEmit
+	cd src/ananta/experimental/shared/frontend && npx tsc --noEmit
 
 format:
 	ruff format src tests
@@ -25,7 +25,7 @@ format:
 all: format lint typecheck typecheck-frontend test test-frontend
 
 cover:
-	pytest --cov=src/shesha --cov-report=term-missing --cov-report=html
+	pytest --cov=src/ananta --cov-report=term-missing --cov-report=html
 
 loc:
 	@cloc src arxiv-explorer code-explorer document-explorer examples pyproject.toml Makefile \

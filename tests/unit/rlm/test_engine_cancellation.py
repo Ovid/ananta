@@ -4,7 +4,7 @@ import inspect
 import threading
 from unittest.mock import MagicMock
 
-from shesha.rlm.engine import RLMEngine
+from ananta.rlm.engine import RLMEngine
 
 
 def test_query_accepts_cancel_event():
@@ -95,7 +95,7 @@ def test_query_returns_interrupted_status_in_trace():
 
 def test_project_query_accepts_cancel_event():
     """Project.query() passes cancel_event to engine."""
-    from shesha.project import Project
+    from ananta.project import Project
 
     mock_engine = MagicMock(spec=RLMEngine)
     mock_storage = MagicMock()

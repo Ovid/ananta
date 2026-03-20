@@ -5,7 +5,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import PurePosixPath
 
-from shesha.rlm.verification import extract_citations
+from ananta.rlm.verification import extract_citations
 
 
 @dataclass

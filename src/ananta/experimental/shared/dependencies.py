@@ -5,19 +5,19 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from shesha import Shesha
-from shesha.config import SheshaConfig
-from shesha.experimental.shared.session import WebConversationSession
-from shesha.experimental.shared.topics import BaseTopicManager
-from shesha.repo.ingester import RepoIngester
-from shesha.storage.filesystem import FilesystemStorage
+from ananta import Ananta
+from ananta.config import AnantaConfig
+from ananta.experimental.shared.session import WebConversationSession
+from ananta.experimental.shared.topics import BaseTopicManager
+from ananta.repo.ingester import RepoIngester
+from ananta.storage.filesystem import FilesystemStorage
 
 
 @dataclass
 class BaseExplorerState:
     """Shared application state for explorers."""
 
-    shesha: Shesha
+    ananta: Ananta
     topic_mgr: BaseTopicManager
     session: WebConversationSession
     model: str
@@ -41,10 +41,10 @@ def create_app_state(
     extra_dirs: dict[str, str] | None = None,
 ) -> BaseExplorerState:
     """Initialize all components and return shared state."""
-    data_dir = data_dir or Path.home() / ".shesha" / app_name
-    shesha_data = data_dir / "shesha_data"
+    data_dir = data_dir or Path.home() / ".ananta" / app_name
+    ananta_data = data_dir / "ananta_data"
     topics_dir = data_dir / "topics"
-    shesha_data.mkdir(parents=True, exist_ok=True)
+    ananta_data.mkdir(parents=True, exist_ok=True)
     topics_dir.mkdir(parents=True, exist_ok=True)
 
     resolved_extra: dict[str, Path] = {}
@@ -54,21 +54,21 @@ def create_app_state(
             p.mkdir(parents=True, exist_ok=True)
             resolved_extra[key] = p
 
-    config = SheshaConfig.load(storage_path=str(shesha_data))
+    config = AnantaConfig.load(storage_path=str(ananta_data))
     if model:
         config.model = model
 
-    storage = FilesystemStorage(shesha_data)
+    storage = FilesystemStorage(ananta_data)
     repo_ingester = RepoIngester(
         storage_path=config.storage_path,
         allow_local_paths=False,
     )
-    shesha = Shesha(config=config, storage=storage, repo_ingester=repo_ingester)
+    ananta = Ananta(config=config, storage=storage, repo_ingester=repo_ingester)
     topic_mgr = topic_mgr_class(topics_dir)
     session = WebConversationSession(data_dir)
 
     return BaseExplorerState(
-        shesha=shesha,
+        ananta=ananta,
         topic_mgr=topic_mgr,
         session=session,
         model=config.model,

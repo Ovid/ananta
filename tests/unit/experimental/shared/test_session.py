@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from shesha.experimental.shared.session import WebConversationSession
+from ananta.experimental.shared.session import WebConversationSession
 
 
 @pytest.fixture

@@ -2,7 +2,7 @@
 
 from textual.app import App, ComposeResult
 
-from shesha.tui.widgets.output_area import OutputArea
+from ananta.tui.widgets.output_area import OutputArea
 
 
 class OutputAreaApp(App[None]):

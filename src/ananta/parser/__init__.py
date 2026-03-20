@@ -1,13 +1,13 @@
-"""Document parsers for Shesha."""
+"""Document parsers for Ananta."""
 
-from shesha.parser.base import DocumentParser
-from shesha.parser.code import CodeParser
-from shesha.parser.fallback import FallbackTextParser
-from shesha.parser.html import HtmlParser
-from shesha.parser.office import DocxParser
-from shesha.parser.pdf import PdfParser
-from shesha.parser.registry import ParserRegistry
-from shesha.parser.text import TextParser
+from ananta.parser.base import DocumentParser
+from ananta.parser.code import CodeParser
+from ananta.parser.fallback import FallbackTextParser
+from ananta.parser.html import HtmlParser
+from ananta.parser.office import DocxParser
+from ananta.parser.pdf import PdfParser
+from ananta.parser.registry import ParserRegistry
+from ananta.parser.text import TextParser
 
 
 def create_default_registry() -> ParserRegistry:

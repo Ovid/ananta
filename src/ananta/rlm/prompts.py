@@ -34,7 +34,7 @@ def format_code_echo(
     When ``boundary`` is provided, the REPL output is wrapped in
     randomized untrusted content markers.
     """
-    from shesha.rlm.boundary import wrap_untrusted  # Local import to avoid circular dependency
+    from ananta.rlm.boundary import wrap_untrusted  # Local import to avoid circular dependency
 
     if boundary is not None:
         output = wrap_untrusted(output, boundary)

@@ -6,15 +6,15 @@ import pytest
 from litellm.exceptions import AuthenticationError
 from litellm.exceptions import RateLimitError as LiteLLMRateLimit
 
-from shesha.llm.client import LLMClient, LLMResponse
-from shesha.llm.exceptions import PermanentError
-from shesha.llm.retry import RetryConfig
+from ananta.llm.client import LLMClient, LLMResponse
+from ananta.llm.exceptions import PermanentError
+from ananta.llm.retry import RetryConfig
 
 
 class TestLLMClient:
     """Tests for LLMClient."""
 
-    @patch("shesha.llm.client.litellm")
+    @patch("ananta.llm.client.litellm")
     def test_complete_returns_response(self, mock_litellm: MagicMock):
         """LLMClient.complete returns structured response."""
         mock_litellm.completion.return_value = MagicMock(
@@ -30,7 +30,7 @@ class TestLLMClient:
         assert response.prompt_tokens == 10
         assert response.completion_tokens == 5
 
-    @patch("shesha.llm.client.litellm")
+    @patch("ananta.llm.client.litellm")
     def test_complete_with_system_prompt(self, mock_litellm: MagicMock):
         """LLMClient prepends system prompt to messages."""
         mock_litellm.completion.return_value = MagicMock(
@@ -51,7 +51,7 @@ class TestLLMClient:
         client = LLMClient(model="claude-sonnet-4-20250514")
         assert client.model == "claude-sonnet-4-20250514"
 
-    @patch("shesha.llm.client.litellm")
+    @patch("ananta.llm.client.litellm")
     def test_complete_passes_timeout_to_litellm(self, mock_litellm: MagicMock):
         """LLMClient passes timeout to litellm.completion()."""
         mock_litellm.completion.return_value = MagicMock(
@@ -65,7 +65,7 @@ class TestLLMClient:
         call_kwargs = mock_litellm.completion.call_args.kwargs
         assert call_kwargs["timeout"] == 120
 
-    @patch("shesha.llm.client.litellm")
+    @patch("ananta.llm.client.litellm")
     def test_default_timeout(self, mock_litellm: MagicMock):
         """LLMClient uses a default timeout when none specified."""
         mock_litellm.completion.return_value = MagicMock(
@@ -80,7 +80,7 @@ class TestLLMClient:
         assert "timeout" in call_kwargs
         assert call_kwargs["timeout"] > 0
 
-    @patch("shesha.llm.client.litellm")
+    @patch("ananta.llm.client.litellm")
     def test_complete_returns_empty_string_when_content_is_none(self, mock_litellm: MagicMock):
         """LLMClient returns empty string when API returns content=None."""
         mock_litellm.completion.return_value = MagicMock(
@@ -97,7 +97,7 @@ class TestLLMClient:
 class TestLLMClientRetry:
     """Tests for LLM client retry integration."""
 
-    @patch("shesha.llm.client.litellm")
+    @patch("ananta.llm.client.litellm")
     def test_retries_on_rate_limit(self, mock_litellm: MagicMock) -> None:
         """Client retries on rate limit."""
         mock_response = MagicMock()
@@ -120,7 +120,7 @@ class TestLLMClientRetry:
         assert result.content == "response"
         assert mock_litellm.completion.call_count == 2
 
-    @patch("shesha.llm.client.litellm")
+    @patch("ananta.llm.client.litellm")
     def test_no_retry_on_auth_error(self, mock_litellm: MagicMock) -> None:
         """Client doesn't retry on auth error (4xx)."""
 

@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from shesha.experimental.web.api import create_api
+from ananta.experimental.web.api import create_api
 
 
 @pytest.fixture
@@ -68,7 +68,7 @@ def _make_trace_file(
 def test_list_traces(client: TestClient, mock_state: MagicMock, tmp_path: Path) -> None:
     mock_state.topic_mgr.resolve.return_value = "proj-id"
     trace_file = _make_trace_file(tmp_path)
-    mock_state.shesha.storage.list_traces.return_value = [trace_file]
+    mock_state.ananta.storage.list_traces.return_value = [trace_file]
 
     resp = client.get("/api/topics/test-topic/traces")
     assert resp.status_code == 200
@@ -89,7 +89,7 @@ def test_list_traces_topic_not_found(client: TestClient, mock_state: MagicMock) 
 def test_get_trace_full(client: TestClient, mock_state: MagicMock, tmp_path: Path) -> None:
     mock_state.topic_mgr.resolve.return_value = "proj-id"
     trace_file = _make_trace_file(tmp_path)
-    mock_state.shesha.storage.list_traces.return_value = [trace_file]
+    mock_state.ananta.storage.list_traces.return_value = [trace_file]
 
     # Fetch by filename stem (what ws.py stores and frontend sends)
     resp = client.get("/api/topics/test-topic/traces/2025-01-15T10-30-00-123_abc12345")
@@ -104,6 +104,6 @@ def test_get_trace_full(client: TestClient, mock_state: MagicMock, tmp_path: Pat
 
 def test_get_trace_not_found(client: TestClient, mock_state: MagicMock) -> None:
     mock_state.topic_mgr.resolve.return_value = "proj-id"
-    mock_state.shesha.storage.list_traces.return_value = []
+    mock_state.ananta.storage.list_traces.return_value = []
     resp = client.get("/api/topics/test-topic/traces/nonexistent")
     assert resp.status_code == 404

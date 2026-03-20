@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Interactive Barsoom novel explorer using Shesha.
+"""Interactive Barsoom novel explorer using Ananta.
 
 This script provides an interactive CLI for exploring Edgar Rice Burroughs'
-Barsoom (Mars) novel series using Shesha's Recursive Language Model (RLM)
+Barsoom (Mars) novel series using Ananta's Recursive Language Model (RLM)
 capabilities. The novels are in the public domain and included in the
 test-datasets directory.
 
@@ -37,12 +37,12 @@ Usage:
     python examples/barsoom.py --model gpt-4o
 
 Environment Variables:
-    SHESHA_API_KEY: Required. API key for your LLM provider.
-    SHESHA_MODEL: Optional. Model name (default: claude-sonnet-4-20250514).
+    ANANTA_API_KEY: Required. API key for your LLM provider.
+    ANANTA_MODEL: Optional. Model name (default: claude-sonnet-4-20250514).
                   Overridden by --model flag.
 
 Example:
-    $ export SHESHA_API_KEY="your-api-key"
+    $ export ANANTA_API_KEY="your-api-key"
     $ python examples/barsoom.py
     Setting up Barsoom project...
     Uploading: A Princess of Mars (barsoom-1.txt)
@@ -82,18 +82,18 @@ from script_utils import (
     install_urllib3_cleanup_hook,
 )
 
-from shesha import Shesha
-from shesha.config import SheshaConfig
-from shesha.exceptions import ProjectNotFoundError
-from shesha.rlm.trace import StepType
+from ananta import Ananta
+from ananta.config import AnantaConfig
+from ananta.exceptions import ProjectNotFoundError
+from ananta.rlm.trace import StepType
 
-# Guard TUI import: textual is an optional dependency (shesha[tui]).
+# Guard TUI import: textual is an optional dependency (ananta[tui]).
 try:
-    from shesha.tui import SheshaTUI
-    from shesha.tui.widgets.output_area import OutputArea
+    from ananta.tui import AnantaTUI
+    from ananta.tui.widgets.output_area import OutputArea
 except ModuleNotFoundError:
     if __name__ == "__main__":
-        print("This example requires the TUI extra: pip install shesha[tui]")
+        print("This example requires the TUI extra: pip install ananta[tui]")
         sys.exit(1)
     else:
         raise
@@ -121,7 +121,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             - prompt: Single query for non-interactive mode (optional)
             - verify: Enable semantic verification of results
     """
-    parser = argparse.ArgumentParser(description="Explore the Barsoom novels using Shesha RLM")
+    parser = argparse.ArgumentParser(description="Explore the Barsoom novels using Ananta RLM")
     parser.add_argument(
         "--setup",
         action="store_true",
@@ -146,7 +146,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--model",
         type=str,
-        help="LLM model name (overrides SHESHA_MODEL env var)",
+        help="LLM model name (overrides ANANTA_MODEL env var)",
     )
     return parser.parse_args(argv)
 
@@ -165,21 +165,21 @@ def get_datasets_dir() -> Path:
     return Path(__file__).parent.parent / "test-datasets" / "barsoom"
 
 
-def setup_project(shesha: Shesha) -> None:
+def setup_project(ananta: Ananta) -> None:
     """Set up the Barsoom project by uploading all 7 novels.
 
     Creates a new project named "barsoom" and uploads each novel from the
     test-datasets directory. Progress is printed for each file uploaded.
 
     Args:
-        shesha: Initialized Shesha instance to create the project in.
+        ananta: Initialized Ananta instance to create the project in.
 
     Note:
         This overwrites any existing "barsoom" project. The novels total
         approximately 2.8 million characters across all 7 books.
     """
     print("Setting up Barsoom project...")
-    project = shesha.create_project(PROJECT_NAME)
+    project = ananta.create_project(PROJECT_NAME)
     datasets_dir = get_datasets_dir()
 
     for filename, title in BOOKS.items():
@@ -194,24 +194,24 @@ def main() -> None:
     """Main entry point for the Barsoom explorer CLI.
 
     Orchestrates the complete workflow:
-    1. Validates environment (SHESHA_API_KEY required)
-    2. Initializes Shesha with local storage configuration
+    1. Validates environment (ANANTA_API_KEY required)
+    2. Initializes Ananta with local storage configuration
     3. Sets up the project on first run or if --setup is passed
     4. Handles single query (--prompt) or launches TUI for interactive mode
 
     Raises:
-        SystemExit: If SHESHA_API_KEY is not set or project cannot be loaded.
+        SystemExit: If ANANTA_API_KEY is not set or project cannot be loaded.
     """
     install_urllib3_cleanup_hook()
     args = parse_args()
 
     # Check for API key
-    if not os.environ.get("SHESHA_API_KEY"):
-        print("Error: SHESHA_API_KEY environment variable not set.")
+    if not os.environ.get("ANANTA_API_KEY"):
+        print("Error: ANANTA_API_KEY environment variable not set.")
         print()
         print("Environment variables:")
-        print("  SHESHA_API_KEY   (required) API key for your LLM provider")
-        print("  SHESHA_MODEL     (optional) Model name, e.g.:")
+        print("  ANANTA_API_KEY   (required) API key for your LLM provider")
+        print("  ANANTA_MODEL     (optional) Model name, e.g.:")
         print("                   - claude-sonnet-4-20250514 (default, Anthropic)")
         print("                   - gpt-4o (OpenAI)")
         print("                   - gemini/gemini-1.5-pro (Google)")
@@ -219,20 +219,20 @@ def main() -> None:
         print("The provider is auto-detected from the model name via LiteLLM.")
         sys.exit(1)
 
-    # Initialize Shesha with config from environment
-    config = SheshaConfig.load(storage_path=STORAGE_PATH, verify=args.verify, model=args.model)
-    shesha = Shesha(config=config)
+    # Initialize Ananta with config from environment
+    config = AnantaConfig.load(storage_path=STORAGE_PATH, verify=args.verify, model=args.model)
+    ananta = Ananta(config=config)
 
     # Check if project exists
-    project_exists = PROJECT_NAME in shesha.list_projects()
+    project_exists = PROJECT_NAME in ananta.list_projects()
 
     # Setup if needed
     if args.setup or not project_exists:
-        setup_project(shesha)
+        setup_project(ananta)
 
     # Get the project
     try:
-        project = shesha.get_project(PROJECT_NAME)
+        project = ananta.get_project(PROJECT_NAME)
     except ProjectNotFoundError as e:
         print(f"Error: {e}")
         sys.exit(1)
@@ -271,7 +271,7 @@ def main() -> None:
         return
 
     # Interactive mode - launch TUI
-    tui = SheshaTUI(project=project, project_name=PROJECT_NAME, model=config.model)
+    tui = AnantaTUI(project=project, project_name=PROJECT_NAME, model=config.model)
 
     def handle_clear(args: str) -> None:
         tui._session.clear_history()

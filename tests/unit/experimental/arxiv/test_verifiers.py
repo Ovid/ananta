@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from shesha.experimental.arxiv.models import (
+from ananta.experimental.arxiv.models import (
     ExtractedCitation,
     VerificationResult,
     VerificationStatus,
@@ -15,7 +15,7 @@ class TestCrossRefVerifier:
     """Tests for CrossRef DOI and title verification."""
 
     def test_verify_by_doi_verified(self) -> None:
-        from shesha.experimental.arxiv.verifiers import CrossRefVerifier
+        from ananta.experimental.arxiv.verifiers import CrossRefVerifier
 
         citation = ExtractedCitation(
             key="smith2023",
@@ -34,7 +34,7 @@ class TestCrossRefVerifier:
             },
         }
         with patch(
-            "shesha.experimental.arxiv.verifiers.httpx.get",
+            "ananta.experimental.arxiv.verifiers.httpx.get",
             return_value=mock_response,
         ):
             verifier = CrossRefVerifier()
@@ -43,7 +43,7 @@ class TestCrossRefVerifier:
         assert result.source == "crossref"
 
     def test_verify_by_doi_not_found(self) -> None:
-        from shesha.experimental.arxiv.verifiers import CrossRefVerifier
+        from ananta.experimental.arxiv.verifiers import CrossRefVerifier
 
         citation = ExtractedCitation(
             key="bad",
@@ -55,7 +55,7 @@ class TestCrossRefVerifier:
         mock_response = MagicMock()
         mock_response.status_code = 404
         with patch(
-            "shesha.experimental.arxiv.verifiers.httpx.get",
+            "ananta.experimental.arxiv.verifiers.httpx.get",
             return_value=mock_response,
         ):
             verifier = CrossRefVerifier()
@@ -63,7 +63,7 @@ class TestCrossRefVerifier:
         assert result.status == VerificationStatus.NOT_FOUND
 
     def test_verify_by_title_search(self) -> None:
-        from shesha.experimental.arxiv.verifiers import CrossRefVerifier
+        from ananta.experimental.arxiv.verifiers import CrossRefVerifier
 
         citation = ExtractedCitation(
             key="jones2023",
@@ -78,7 +78,7 @@ class TestCrossRefVerifier:
             "message": {"items": [{"title": ["Surface Codes Revisited"], "DOI": "10.5678/sc"}]},
         }
         with patch(
-            "shesha.experimental.arxiv.verifiers.httpx.get",
+            "ananta.experimental.arxiv.verifiers.httpx.get",
             return_value=mock_response,
         ):
             verifier = CrossRefVerifier()
@@ -87,7 +87,7 @@ class TestCrossRefVerifier:
         assert result.source == "crossref"
 
     def test_verify_no_identifiers_no_title(self) -> None:
-        from shesha.experimental.arxiv.verifiers import CrossRefVerifier
+        from ananta.experimental.arxiv.verifiers import CrossRefVerifier
 
         citation = ExtractedCitation(key="anon", title=None, authors=[], year=None)
         verifier = CrossRefVerifier()
@@ -95,7 +95,7 @@ class TestCrossRefVerifier:
         assert result.status == VerificationStatus.UNRESOLVED
 
     def test_verify_uses_polite_email_in_headers(self) -> None:
-        from shesha.experimental.arxiv.verifiers import CrossRefVerifier
+        from ananta.experimental.arxiv.verifiers import CrossRefVerifier
 
         citation = ExtractedCitation(
             key="x",
@@ -111,7 +111,7 @@ class TestCrossRefVerifier:
             "message": {"title": ["T"], "DOI": "10.1234/x"},
         }
         with patch(
-            "shesha.experimental.arxiv.verifiers.httpx.get",
+            "ananta.experimental.arxiv.verifiers.httpx.get",
             return_value=mock_response,
         ) as mock_get:
             verifier = CrossRefVerifier(polite_email="user@example.com")
@@ -122,11 +122,11 @@ class TestCrossRefVerifier:
         assert "mailto:user@example.com" in user_agent
 
     def test_verify_network_error_returns_unresolved(self) -> None:
-        from shesha.experimental.arxiv.verifiers import CrossRefVerifier
+        from ananta.experimental.arxiv.verifiers import CrossRefVerifier
 
         citation = ExtractedCitation(key="x", title="T", authors=[], year=None, doi="10.1234/x")
         with patch(
-            "shesha.experimental.arxiv.verifiers.httpx.get",
+            "ananta.experimental.arxiv.verifiers.httpx.get",
             side_effect=Exception("timeout"),
         ):
             verifier = CrossRefVerifier()
@@ -138,7 +138,7 @@ class TestOpenAlexVerifier:
     """Tests for OpenAlex title search verification."""
 
     def test_verify_title_match(self) -> None:
-        from shesha.experimental.arxiv.verifiers import OpenAlexVerifier
+        from ananta.experimental.arxiv.verifiers import OpenAlexVerifier
 
         citation = ExtractedCitation(
             key="smith2023",
@@ -157,7 +157,7 @@ class TestOpenAlexVerifier:
             ]
         }
         with patch(
-            "shesha.experimental.arxiv.verifiers.httpx.get",
+            "ananta.experimental.arxiv.verifiers.httpx.get",
             return_value=mock_response,
         ):
             verifier = OpenAlexVerifier()
@@ -166,7 +166,7 @@ class TestOpenAlexVerifier:
         assert result.source == "openalex"
 
     def test_verify_no_results(self) -> None:
-        from shesha.experimental.arxiv.verifiers import OpenAlexVerifier
+        from ananta.experimental.arxiv.verifiers import OpenAlexVerifier
 
         citation = ExtractedCitation(
             key="x", title="Nonexistent Paper Title", authors=[], year=None
@@ -175,7 +175,7 @@ class TestOpenAlexVerifier:
         mock_response.status_code = 200
         mock_response.json.return_value = {"results": []}
         with patch(
-            "shesha.experimental.arxiv.verifiers.httpx.get",
+            "ananta.experimental.arxiv.verifiers.httpx.get",
             return_value=mock_response,
         ):
             verifier = OpenAlexVerifier()
@@ -183,7 +183,7 @@ class TestOpenAlexVerifier:
         assert result.status == VerificationStatus.UNRESOLVED
 
     def test_verify_no_title_returns_unresolved(self) -> None:
-        from shesha.experimental.arxiv.verifiers import OpenAlexVerifier
+        from ananta.experimental.arxiv.verifiers import OpenAlexVerifier
 
         citation = ExtractedCitation(key="x", title=None, authors=[], year=None)
         verifier = OpenAlexVerifier()
@@ -191,14 +191,14 @@ class TestOpenAlexVerifier:
         assert result.status == VerificationStatus.UNRESOLVED
 
     def test_polite_email_in_query_params(self) -> None:
-        from shesha.experimental.arxiv.verifiers import OpenAlexVerifier
+        from ananta.experimental.arxiv.verifiers import OpenAlexVerifier
 
         citation = ExtractedCitation(key="x", title="Test", authors=[], year=None)
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {"results": []}
         with patch(
-            "shesha.experimental.arxiv.verifiers.httpx.get",
+            "ananta.experimental.arxiv.verifiers.httpx.get",
             return_value=mock_response,
         ) as mock_get:
             verifier = OpenAlexVerifier(polite_email="user@example.com")
@@ -212,7 +212,7 @@ class TestSemanticScholarVerifier:
     """Tests for Semantic Scholar title search verification."""
 
     def test_verify_title_match(self) -> None:
-        from shesha.experimental.arxiv.verifiers import SemanticScholarVerifier
+        from ananta.experimental.arxiv.verifiers import SemanticScholarVerifier
 
         citation = ExtractedCitation(
             key="x", title="Quantum Error Correction", authors=[], year=None
@@ -223,7 +223,7 @@ class TestSemanticScholarVerifier:
             "data": [{"title": "Quantum Error Correction", "paperId": "abc123"}]
         }
         with patch(
-            "shesha.experimental.arxiv.verifiers.httpx.get",
+            "ananta.experimental.arxiv.verifiers.httpx.get",
             return_value=mock_response,
         ):
             verifier = SemanticScholarVerifier()
@@ -232,14 +232,14 @@ class TestSemanticScholarVerifier:
         assert result.source == "semantic_scholar"
 
     def test_verify_no_results(self) -> None:
-        from shesha.experimental.arxiv.verifiers import SemanticScholarVerifier
+        from ananta.experimental.arxiv.verifiers import SemanticScholarVerifier
 
         citation = ExtractedCitation(key="x", title="Nonexistent Paper", authors=[], year=None)
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {"data": []}
         with patch(
-            "shesha.experimental.arxiv.verifiers.httpx.get",
+            "ananta.experimental.arxiv.verifiers.httpx.get",
             return_value=mock_response,
         ):
             verifier = SemanticScholarVerifier()
@@ -247,13 +247,13 @@ class TestSemanticScholarVerifier:
         assert result.status == VerificationStatus.UNRESOLVED
 
     def test_verify_rate_limited_returns_unresolved(self) -> None:
-        from shesha.experimental.arxiv.verifiers import SemanticScholarVerifier
+        from ananta.experimental.arxiv.verifiers import SemanticScholarVerifier
 
         citation = ExtractedCitation(key="x", title="Test", authors=[], year=None)
         mock_response = MagicMock()
         mock_response.status_code = 429
         with patch(
-            "shesha.experimental.arxiv.verifiers.httpx.get",
+            "ananta.experimental.arxiv.verifiers.httpx.get",
             return_value=mock_response,
         ):
             verifier = SemanticScholarVerifier()
@@ -261,7 +261,7 @@ class TestSemanticScholarVerifier:
         assert result.status == VerificationStatus.UNRESOLVED
 
     def test_respects_1_second_rate_limit(self) -> None:
-        from shesha.experimental.arxiv.verifiers import SemanticScholarVerifier
+        from ananta.experimental.arxiv.verifiers import SemanticScholarVerifier
 
         verifier = SemanticScholarVerifier()
         assert verifier._limiter._min_interval >= 1.0
@@ -271,7 +271,7 @@ class TestCascadingVerifier:
     """Tests for the cascading verification orchestrator."""
 
     def test_arxiv_id_uses_arxiv_verifier_first(self) -> None:
-        from shesha.experimental.arxiv.verifiers import CascadingVerifier
+        from ananta.experimental.arxiv.verifiers import CascadingVerifier
 
         citation = ExtractedCitation(
             key="x", title="T", authors=[], year=None, arxiv_id="2301.00001"
@@ -289,7 +289,7 @@ class TestCascadingVerifier:
         mock_arxiv.verify.assert_called_once()
 
     def test_arxiv_not_found_falls_through_to_external(self) -> None:
-        from shesha.experimental.arxiv.verifiers import CascadingVerifier
+        from ananta.experimental.arxiv.verifiers import CascadingVerifier
 
         citation = ExtractedCitation(
             key="x", title="Some Paper", authors=[], year=None, arxiv_id="2301.99999"
@@ -311,7 +311,7 @@ class TestCascadingVerifier:
         assert result.status == VerificationStatus.VERIFIED_EXTERNAL
 
     def test_doi_uses_crossref_first(self) -> None:
-        from shesha.experimental.arxiv.verifiers import CascadingVerifier
+        from ananta.experimental.arxiv.verifiers import CascadingVerifier
 
         citation = ExtractedCitation(
             key="x", title="T", authors=[], year=None, doi="10.1234/example"
@@ -329,7 +329,7 @@ class TestCascadingVerifier:
         assert result.source == "crossref"
 
     def test_title_only_cascades_through_external_verifiers(self) -> None:
-        from shesha.experimental.arxiv.verifiers import CascadingVerifier
+        from ananta.experimental.arxiv.verifiers import CascadingVerifier
 
         citation = ExtractedCitation(key="x", title="Some Paper", authors=[], year=None)
 
@@ -353,7 +353,7 @@ class TestCascadingVerifier:
         assert result.source == "semantic_scholar"
 
     def test_all_fail_returns_unresolved(self) -> None:
-        from shesha.experimental.arxiv.verifiers import CascadingVerifier
+        from ananta.experimental.arxiv.verifiers import CascadingVerifier
 
         citation = ExtractedCitation(key="x", title="Totally Unknown Paper", authors=[], year=None)
 
@@ -380,7 +380,7 @@ class TestCascadingVerifier:
         assert result.status == VerificationStatus.UNRESOLVED
 
     def test_stops_at_first_verified(self) -> None:
-        from shesha.experimental.arxiv.verifiers import CascadingVerifier
+        from ananta.experimental.arxiv.verifiers import CascadingVerifier
 
         citation = ExtractedCitation(key="x", title="Found Paper", authors=[], year=None)
 
@@ -398,7 +398,7 @@ class TestCascadingVerifier:
         mock_s2.verify.assert_not_called()
 
     def test_ambiguous_match_triggers_llm_judgment(self) -> None:
-        from shesha.experimental.arxiv.verifiers import CascadingVerifier
+        from ananta.experimental.arxiv.verifiers import CascadingVerifier
 
         citation = ExtractedCitation(
             key="x", title="Learning Chess from Text", authors=[], year=None
@@ -418,7 +418,7 @@ class TestCascadingVerifier:
         mock_completion.choices[0].message.content = "YES. These are the same paper."
 
         with patch(
-            "shesha.experimental.arxiv.verifiers.litellm.completion",
+            "ananta.experimental.arxiv.verifiers.litellm.completion",
             return_value=mock_completion,
         ):
             verifier = CascadingVerifier(openalex_verifier=mock_openalex, model="test-model")
@@ -428,7 +428,7 @@ class TestCascadingVerifier:
         assert "LLM title judgment" in (result.message or "")
 
     def test_ambiguous_match_passes_api_key_to_llm(self) -> None:
-        from shesha.experimental.arxiv.verifiers import CascadingVerifier
+        from ananta.experimental.arxiv.verifiers import CascadingVerifier
 
         citation = ExtractedCitation(
             key="x", title="Learning Chess from Text", authors=[], year=None
@@ -448,7 +448,7 @@ class TestCascadingVerifier:
         mock_completion.choices[0].message.content = "YES. Same paper."
 
         with patch(
-            "shesha.experimental.arxiv.verifiers.litellm.completion",
+            "ananta.experimental.arxiv.verifiers.litellm.completion",
             return_value=mock_completion,
         ) as mock_llm:
             verifier = CascadingVerifier(
@@ -462,7 +462,7 @@ class TestCascadingVerifier:
         assert call_kwargs["api_key"] == "sk-test-key-456"
 
     def test_ambiguous_match_llm_says_no(self) -> None:
-        from shesha.experimental.arxiv.verifiers import CascadingVerifier
+        from ananta.experimental.arxiv.verifiers import CascadingVerifier
 
         citation = ExtractedCitation(key="x", title="Chess Engine Analysis", authors=[], year=None)
 
@@ -485,7 +485,7 @@ class TestCascadingVerifier:
         mock_completion.choices[0].message.content = "NO. Different papers."
 
         with patch(
-            "shesha.experimental.arxiv.verifiers.litellm.completion",
+            "ananta.experimental.arxiv.verifiers.litellm.completion",
             return_value=mock_completion,
         ):
             verifier = CascadingVerifier(

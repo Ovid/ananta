@@ -1,7 +1,7 @@
-"""Storage backend for Shesha."""
+"""Storage backend for Ananta."""
 
-from shesha.models import ParsedDocument
-from shesha.storage.base import StorageBackend
-from shesha.storage.filesystem import FilesystemStorage
+from ananta.models import ParsedDocument
+from ananta.storage.base import StorageBackend
+from ananta.storage.filesystem import FilesystemStorage
 
 __all__ = ["FilesystemStorage", "ParsedDocument", "StorageBackend"]

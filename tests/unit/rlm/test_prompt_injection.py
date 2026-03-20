@@ -3,7 +3,7 @@
 
 import pytest
 
-from shesha.rlm.boundary import generate_boundary, wrap_untrusted
+from ananta.rlm.boundary import generate_boundary, wrap_untrusted
 
 
 class TestBoundaryEscape:

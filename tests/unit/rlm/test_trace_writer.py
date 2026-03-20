@@ -6,11 +6,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from shesha.exceptions import TraceWriteError
-from shesha.models import QueryContext
-from shesha.rlm.trace import StepType, TokenUsage, Trace
-from shesha.rlm.trace_writer import IncrementalTraceWriter, TraceWriter
-from shesha.storage.filesystem import FilesystemStorage
+from ananta.exceptions import TraceWriteError
+from ananta.models import QueryContext
+from ananta.rlm.trace import StepType, TokenUsage, Trace
+from ananta.rlm.trace_writer import IncrementalTraceWriter, TraceWriter
+from ananta.storage.filesystem import FilesystemStorage
 
 
 class TestTraceWriterCleanup:

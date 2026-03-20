@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock
 
-from shesha.experimental.web.websockets import build_citation_instructions
+from ananta.experimental.web.websockets import build_citation_instructions
 
 
 def test_build_citation_instructions_single_paper() -> None:

@@ -2,7 +2,7 @@
 
 from textual.app import App, ComposeResult
 
-from shesha.tui.widgets.info_bar import InfoBar
+from ananta.tui.widgets.info_bar import InfoBar
 
 
 class InfoBarApp(App[None]):

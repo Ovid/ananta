@@ -7,7 +7,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-from shesha.experimental.multi_repo.models import (
+from ananta.experimental.multi_repo.models import (
     AlignmentReport,
     HLDDraft,
     ImpactReport,
@@ -15,8 +15,8 @@ from shesha.experimental.multi_repo.models import (
 )
 
 if TYPE_CHECKING:
-    from shesha import Shesha
-    from shesha.models import RepoAnalysis
+    from ananta import Ananta
+    from ananta.models import RepoAnalysis
 
 logger = logging.getLogger(__name__)
 
@@ -36,18 +36,18 @@ class MultiRepoAnalyzer:
 
     def __init__(
         self,
-        shesha: "Shesha",
+        ananta: "Ananta",
         max_discovery_rounds: int = 2,
         max_revision_rounds: int = 2,
     ) -> None:
         """Initialize the analyzer.
 
         Args:
-            shesha: Shesha instance for project management.
+            ananta: Ananta instance for project management.
             max_discovery_rounds: Max rounds of discovering new repos (default 2).
             max_revision_rounds: Max rounds of HLD revision (default 2).
         """
-        self._shesha = shesha
+        self._ananta = ananta
         self._max_discovery_rounds = max_discovery_rounds
         self._max_revision_rounds = max_revision_rounds
 
@@ -89,7 +89,7 @@ class MultiRepoAnalyzer:
             The project_id for the added repository, or None if failed.
         """
         try:
-            result = self._shesha.create_project_from_repo(url_or_path)
+            result = self._ananta.create_project_from_repo(url_or_path)
 
             # Apply updates if available
             if result.status == "updates_available":
@@ -190,10 +190,10 @@ class MultiRepoAnalyzer:
         Returns:
             RepoSummary with extracted structure.
         """
-        project = self._shesha.get_project(project_id)
+        project = self._ananta.get_project(project_id)
 
         # Check for existing analysis
-        analysis = self._shesha.get_analysis(project_id)
+        analysis = self._ananta.get_analysis(project_id)
 
         if analysis:
             # Use analysis-enhanced prompt
@@ -233,7 +233,7 @@ class MultiRepoAnalyzer:
         summary: RepoSummary,
     ) -> ImpactReport:
         """Run Phase 2 impact analysis on a single project."""
-        project = self._shesha.get_project(project_id)
+        project = self._ananta.get_project(project_id)
         prompt_template = self._load_prompt("impact")
 
         prompt = prompt_template.replace("{prd}", prd)
@@ -276,7 +276,7 @@ class MultiRepoAnalyzer:
                 If provided, the synthesis will be guided to address gaps and
                 remove scope creep identified in the alignment.
         """
-        project = self._shesha.get_project(self._repos[0])
+        project = self._ananta.get_project(self._repos[0])
         prompt_template = self._load_prompt("synthesize")
 
         impact_text = "\n\n".join(
@@ -332,7 +332,7 @@ class MultiRepoAnalyzer:
         hld: HLDDraft,
     ) -> AlignmentReport:
         """Run Phase 4 alignment verification."""
-        project = self._shesha.get_project(self._repos[0])
+        project = self._ananta.get_project(self._repos[0])
         prompt_template = self._load_prompt("align")
 
         prompt = prompt_template.replace("{prd}", prd)

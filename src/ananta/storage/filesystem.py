@@ -4,12 +4,12 @@ import json
 import shutil
 from pathlib import Path
 
-from shesha.exceptions import (
+from ananta.exceptions import (
     DocumentNotFoundError,
     ProjectExistsError,
     ProjectNotFoundError,
 )
-from shesha.models import (
+from ananta.models import (
     AnalysisComponent,
     AnalysisExternalDep,
     ParsedDocument,
@@ -17,7 +17,7 @@ from shesha.models import (
     coerce_to_str,
     coerce_to_str_list,
 )
-from shesha.security.paths import safe_path
+from ananta.security.paths import safe_path
 
 
 class FilesystemStorage:

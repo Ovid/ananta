@@ -4,11 +4,11 @@ import logging
 import threading
 from pathlib import Path
 
-from shesha.exceptions import EngineNotConfiguredError
-from shesha.models import ParsedDocument
-from shesha.parser.registry import ParserRegistry
-from shesha.rlm.engine import ProgressCallback, QueryResult, RLMEngine
-from shesha.storage.base import StorageBackend
+from ananta.exceptions import EngineNotConfiguredError
+from ananta.models import ParsedDocument
+from ananta.parser.registry import ParserRegistry
+from ananta.rlm.engine import ProgressCallback, QueryResult, RLMEngine
+from ananta.storage.base import StorageBackend
 
 logger = logging.getLogger(__name__)
 

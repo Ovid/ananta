@@ -6,7 +6,7 @@ import logging
 import re
 from typing import TYPE_CHECKING
 
-from shesha.experimental.arxiv.models import (
+from ananta.experimental.arxiv.models import (
     CheckReport,
     ExtractedCitation,
     VerificationResult,
@@ -14,7 +14,7 @@ from shesha.experimental.arxiv.models import (
 )
 
 if TYPE_CHECKING:
-    from shesha.experimental.arxiv.search import ArxivSearcher
+    from ananta.experimental.arxiv.search import ArxivSearcher
 
 # Patterns that suggest LLM-generated text
 LLM_TELL_PATTERNS = [
@@ -166,8 +166,8 @@ class ArxivVerifier:
 
     def __init__(self, searcher: ArxivSearcher | None = None) -> None:
         if searcher is None:
-            # Late import: arxiv is an optional dependency (shesha[arxiv])
-            from shesha.experimental.arxiv.search import ArxivSearcher
+            # Late import: arxiv is an optional dependency (ananta[arxiv])
+            from ananta.experimental.arxiv.search import ArxivSearcher
 
             searcher = ArxivSearcher()
         self._searcher = searcher

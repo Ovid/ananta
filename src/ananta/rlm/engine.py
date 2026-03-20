@@ -13,31 +13,31 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from shesha.llm.client import LLMClient, LLMClientFactory
-from shesha.models import QueryContext
-from shesha.prompts import PromptLoader
-from shesha.rlm.boundary import generate_boundary, wrap_untrusted
-from shesha.rlm.prompts import (
+from ananta.llm.client import LLMClient, LLMClientFactory
+from ananta.models import QueryContext
+from ananta.prompts import PromptLoader
+from ananta.rlm.boundary import generate_boundary, wrap_untrusted
+from ananta.rlm.prompts import (
     format_code_echo,
     truncate_code_output,
 )
-from shesha.rlm.semantic_verification import (
+from ananta.rlm.semantic_verification import (
     SemanticVerificationReport,
     detect_content_type,
     gather_cited_documents,
     parse_verification_response,
 )
-from shesha.rlm.trace import StepType, TokenUsage, Trace, TraceStep
-from shesha.rlm.trace_writer import IncrementalTraceWriter, TraceWriter
-from shesha.rlm.verification import (
+from ananta.rlm.trace import StepType, TokenUsage, Trace, TraceStep
+from ananta.rlm.trace_writer import IncrementalTraceWriter, TraceWriter
+from ananta.rlm.verification import (
     VerificationResult,
     build_verification_code,
     parse_verification_output,
 )
-from shesha.sandbox.base import ExecutionResult, SandboxExecutor
-from shesha.sandbox.executor import ContainerExecutor, SubcallContentError
-from shesha.sandbox.pool import ContainerPool
-from shesha.storage.base import StorageBackend
+from ananta.sandbox.base import ExecutionResult, SandboxExecutor
+from ananta.sandbox.executor import ContainerExecutor, SubcallContentError
+from ananta.sandbox.pool import ContainerPool
+from ananta.storage.base import StorageBackend
 
 logger = logging.getLogger(__name__)
 
@@ -899,7 +899,7 @@ class RLMEngine:
 
         # Acquire executor from pool or create standalone.
         # Capture pool in a local so the finally block is immune to
-        # concurrent set_pool(None) from Shesha.stop().
+        # concurrent set_pool(None) from Ananta.stop().
         pool = self._pool
         if pool is not None:
             executor = pool.acquire()

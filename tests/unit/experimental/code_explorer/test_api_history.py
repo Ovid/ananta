@@ -13,27 +13,27 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from shesha.experimental.code_explorer.api import create_api
-from shesha.experimental.code_explorer.dependencies import (
+from ananta.experimental.code_explorer.api import create_api
+from ananta.experimental.code_explorer.dependencies import (
     CodeExplorerState,
     get_topic_session,
 )
-from shesha.experimental.code_explorer.topics import CodeExplorerTopicManager
-from shesha.experimental.shared.session import WebConversationSession
+from ananta.experimental.code_explorer.topics import CodeExplorerTopicManager
+from ananta.experimental.shared.session import WebConversationSession
 
 
 @pytest.fixture
-def mock_shesha(tmp_path: Path) -> MagicMock:
-    """Create a mock Shesha instance."""
-    shesha = MagicMock()
-    shesha.list_projects.return_value = []
-    shesha.storage = MagicMock()
-    shesha.storage.list_documents.return_value = []
-    shesha.storage.list_traces.return_value = []
+def mock_ananta(tmp_path: Path) -> MagicMock:
+    """Create a mock Ananta instance."""
+    ananta = MagicMock()
+    ananta.list_projects.return_value = []
+    ananta.storage = MagicMock()
+    ananta.storage.list_documents.return_value = []
+    ananta.storage.list_traces.return_value = []
     # Return a real Path so _build_repo_info's display-name lookup doesn't
     # produce a MagicMock string.  Individual tests can override this.
-    shesha.storage.get_project_dir.return_value = tmp_path / "default_project_dir"
-    return shesha
+    ananta.storage.get_project_dir.return_value = tmp_path / "default_project_dir"
+    return ananta
 
 
 @pytest.fixture
@@ -54,13 +54,13 @@ def session(tmp_path: Path) -> WebConversationSession:
 
 @pytest.fixture
 def state(
-    mock_shesha: MagicMock,
+    mock_ananta: MagicMock,
     topic_mgr: CodeExplorerTopicManager,
     session: WebConversationSession,
 ) -> CodeExplorerState:
-    """Create a CodeExplorerState with mock shesha and real session."""
+    """Create a CodeExplorerState with mock ananta and real session."""
     return CodeExplorerState(
-        shesha=mock_shesha,
+        ananta=mock_ananta,
         topic_mgr=topic_mgr,
         session=session,
         model="test-model",

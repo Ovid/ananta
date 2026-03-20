@@ -5,7 +5,7 @@ import json
 from io import StringIO
 from pathlib import Path
 
-from shesha.models import ParsedDocument
+from ananta.models import ParsedDocument
 
 
 class TextParser:

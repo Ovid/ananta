@@ -11,8 +11,8 @@ import docker
 from docker.errors import DockerException
 from docker.models.containers import Container
 
-from shesha.sandbox.base import ExecutionResult, LLMQueryHandler
-from shesha.security.containers import DEFAULT_SECURITY, ContainerSecurityConfig
+from ananta.sandbox.base import ExecutionResult, LLMQueryHandler
+from ananta.security.containers import DEFAULT_SECURITY, ContainerSecurityConfig
 
 __all__ = ["ContainerExecutor", "ExecutionResult", "LLMQueryHandler"]
 
@@ -44,7 +44,7 @@ class ContainerExecutor:
 
     def __init__(
         self,
-        image: str = "shesha-sandbox",
+        image: str = "ananta-sandbox",
         memory_limit: str = "512m",
         cpu_count: int = 1,
         llm_query_handler: LLMQueryHandler | None = None,

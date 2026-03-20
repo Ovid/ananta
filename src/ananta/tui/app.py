@@ -1,4 +1,4 @@
-"""Main Textual application for Shesha TUI."""
+"""Main Textual application for Ananta TUI."""
 
 from __future__ import annotations
 
@@ -18,31 +18,31 @@ from textual.timer import Timer
 from textual.widgets import Static, TextArea
 from textual.worker import Worker
 
-from shesha.analysis.shortcut import ShortcutResult, query_with_shortcut
-from shesha.rlm.trace import StepType, TokenUsage
-from shesha.tui.commands import CommandRegistry
-from shesha.tui.history import InputHistory
-from shesha.tui.progress import step_display_name
-from shesha.tui.session import ConversationSession
-from shesha.tui.widgets.completion_popup import CompletionPopup
-from shesha.tui.widgets.info_bar import InfoBar
-from shesha.tui.widgets.input_area import InputArea, InputSubmitted
-from shesha.tui.widgets.output_area import OutputArea
+from ananta.analysis.shortcut import ShortcutResult, query_with_shortcut
+from ananta.rlm.trace import StepType, TokenUsage
+from ananta.tui.commands import CommandRegistry
+from ananta.tui.history import InputHistory
+from ananta.tui.progress import step_display_name
+from ananta.tui.session import ConversationSession
+from ananta.tui.widgets.completion_popup import CompletionPopup
+from ananta.tui.widgets.info_bar import InfoBar
+from ananta.tui.widgets.input_area import InputArea, InputSubmitted
+from ananta.tui.widgets.output_area import OutputArea
 
 if TYPE_CHECKING:
-    from shesha.project import Project
-    from shesha.rlm.engine import QueryResult
+    from ananta.project import Project
+    from ananta.rlm.engine import QueryResult
 
 
-# Brand color matching the Shesha logo
-SHESHA_TEAL = "#00bcd4"
+# Brand color matching the Ananta logo
+ANANTA_TEAL = "#00bcd4"
 
 
-class SheshaTUI(App[None]):
-    """Textual app for interactive Shesha Q&A sessions.
+class AnantaTUI(App[None]):
+    """Textual app for interactive Ananta Q&A sessions.
 
     Args:
-        project: Shesha Project instance to query against.
+        project: Ananta Project instance to query against.
         project_name: Display name for the project.
         analysis_context: Optional analysis text prepended to queries.
     """
@@ -50,7 +50,7 @@ class SheshaTUI(App[None]):
     CSS = f"""
     Screen {{
         layout: vertical;
-        border: solid {SHESHA_TEAL};
+        border: solid {ANANTA_TEAL};
     }}
     #input-row {{
         height: auto;
@@ -58,12 +58,12 @@ class SheshaTUI(App[None]):
         max-height: 10;
     }}
     #input-row:focus-within {{
-        border: solid {SHESHA_TEAL};
+        border: solid {ANANTA_TEAL};
     }}
     #prompt {{
         width: 2;
         height: 1;
-        color: {SHESHA_TEAL};
+        color: {ANANTA_TEAL};
     }}
     #input-row InputArea {{
         width: 1fr;

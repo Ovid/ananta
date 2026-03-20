@@ -4,7 +4,7 @@ import time
 from dataclasses import dataclass, field
 from enum import Enum
 
-from shesha.security.redaction import RedactionConfig, redact
+from ananta.security.redaction import RedactionConfig, redact
 
 
 class StepType(Enum):

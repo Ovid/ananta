@@ -1,6 +1,6 @@
 """Tests for SHOW_VARS sandbox function."""
 
-from shesha.sandbox.runner import NAMESPACE, execute_code
+from ananta.sandbox.runner import NAMESPACE, execute_code
 
 
 class TestShowVars:
@@ -12,7 +12,7 @@ class TestShowVars:
 
     def test_show_vars_returns_user_variables(self) -> None:
         """SHOW_VARS returns user-created variables, not builtins."""
-        from shesha.sandbox.runner import show_vars
+        from ananta.sandbox.runner import show_vars
 
         # Simulate builtins
         NAMESPACE["llm_query"] = lambda x: x
@@ -35,7 +35,7 @@ class TestShowVars:
 
     def test_show_vars_empty_namespace(self) -> None:
         """SHOW_VARS returns helpful message when no user vars exist."""
-        from shesha.sandbox.runner import show_vars
+        from ananta.sandbox.runner import show_vars
 
         # Only builtins
         NAMESPACE["llm_query"] = lambda x: x
@@ -51,7 +51,7 @@ class TestShowVars:
 
     def test_show_vars_shows_types(self) -> None:
         """SHOW_VARS includes variable types."""
-        from shesha.sandbox.runner import show_vars
+        from ananta.sandbox.runner import show_vars
 
         NAMESPACE["llm_query"] = lambda x: x
         NAMESPACE["FINAL"] = lambda x: x
@@ -69,7 +69,7 @@ class TestShowVars:
 
     def test_show_vars_excludes_private_vars(self) -> None:
         """SHOW_VARS excludes variables starting with underscore."""
-        from shesha.sandbox.runner import show_vars
+        from ananta.sandbox.runner import show_vars
 
         NAMESPACE["llm_query"] = lambda x: x
         NAMESPACE["FINAL"] = lambda x: x

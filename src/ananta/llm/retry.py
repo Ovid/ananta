@@ -6,7 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TypeVar
 
-from shesha.llm.exceptions import PermanentError, RateLimitError, TransientError
+from ananta.llm.exceptions import PermanentError, RateLimitError, TransientError
 
 T = TypeVar("T")
 

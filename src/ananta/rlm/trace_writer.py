@@ -6,11 +6,11 @@ import logging
 import threading
 from pathlib import Path
 
-from shesha.exceptions import TraceWriteError
-from shesha.models import QueryContext
-from shesha.rlm.trace import TokenUsage, TraceStep
-from shesha.security.redaction import redact
-from shesha.storage.base import StorageBackend
+from ananta.exceptions import TraceWriteError
+from ananta.models import QueryContext
+from ananta.rlm.trace import TokenUsage, TraceStep
+from ananta.security.redaction import redact
+from ananta.storage.base import StorageBackend
 
 logger = logging.getLogger(__name__)
 

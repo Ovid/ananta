@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pdfplumber
 
-from shesha.models import ParsedDocument
+from ananta.models import ParsedDocument
 
 
 class PdfParser:

@@ -1,4 +1,4 @@
-"""FastAPI application for Shesha arXiv web interface.
+"""FastAPI application for Ananta arXiv web interface.
 
 Uses the shared app factory for boilerplate (lifespan, CORS, ``.well-known``
 catch-all, WebSocket endpoint, static file mounting) and registers
@@ -21,23 +21,23 @@ import arxiv
 from fastapi import APIRouter, FastAPI, HTTPException, WebSocket
 from fastapi.responses import JSONResponse
 
-from shesha.experimental.arxiv.download import to_parsed_document
-from shesha.experimental.shared.app_factory import create_app
-from shesha.experimental.shared.routes import (
+from ananta.experimental.arxiv.download import to_parsed_document
+from ananta.experimental.shared.app_factory import create_app
+from ananta.experimental.shared.routes import (
     create_shared_router,
     resolve_topic_or_404,
 )
-from shesha.experimental.shared.schemas import TopicInfo
-from shesha.experimental.web.dependencies import AppState
-from shesha.experimental.web.schemas import (
+from ananta.experimental.shared.schemas import TopicInfo
+from ananta.experimental.web.dependencies import AppState
+from ananta.experimental.web.schemas import (
     PaperAdd,
     PaperInfo,
     PaperRename,
     PaperReorder,
     SearchResult,
 )
-from shesha.experimental.web.session import WebConversationSession
-from shesha.experimental.web.websockets import websocket_handler
+from ananta.experimental.web.session import WebConversationSession
+from ananta.experimental.web.websockets import websocket_handler
 
 
 def _build_arxiv_topic_info(state: AppState) -> list[TopicInfo]:
@@ -128,7 +128,7 @@ def _create_arxiv_router(state: AppState) -> APIRouter:
             # Import here to avoid circular import at module level — the
             # download module imports from the cache module which may
             # trigger lazy initialization.
-            from shesha.experimental.arxiv.download import download_paper
+            from ananta.experimental.arxiv.download import download_paper
 
             task = state.download_tasks[task_id]
             papers_list = task["papers"]
@@ -291,7 +291,7 @@ def _make_ws_handler(state: AppState) -> Callable[[WebSocket], Awaitable[None]]:
 def create_api(state: AppState) -> FastAPI:
     """Create and configure the FastAPI app using the shared factory.
 
-    The shared ``create_app()`` provides: lifespan (starts/stops Shesha
+    The shared ``create_app()`` provides: lifespan (starts/stops Ananta
     container pool), CORS middleware, ``.well-known`` catch-all, optional
     WebSocket endpoint, and static file mounting.
 
@@ -309,21 +309,21 @@ def create_api(state: AppState) -> FastAPI:
         include_context_budget=True,
     )
 
-    # Wrap shesha.stop() to also close the arxiv searcher on shutdown.
-    original_stop = state.shesha.stop
+    # Wrap ananta.stop() to also close the arxiv searcher on shutdown.
+    original_stop = state.ananta.stop
 
     def _stop_with_searcher() -> None:
         original_stop()
         state.searcher.close()
 
-    state.shesha.stop = _stop_with_searcher  # type: ignore[method-assign]
+    state.ananta.stop = _stop_with_searcher  # type: ignore[method-assign]
 
     images_dir = Path(__file__).parent.parent.parent.parent.parent / "images"
     frontend_dist = Path(__file__).parent / "frontend" / "dist"
 
     return create_app(
         state,
-        title="Shesha arXiv Explorer",
+        title="Ananta arXiv Explorer",
         static_dir=frontend_dist,
         images_dir=images_dir,
         ws_handler=_make_ws_handler(state),

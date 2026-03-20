@@ -9,10 +9,10 @@ import urllib.request
 from pathlib import Path
 from urllib.error import URLError
 
-from shesha.experimental.arxiv.cache import PaperCache
-from shesha.experimental.arxiv.models import PaperMeta
-from shesha.experimental.arxiv.rate_limit import RateLimiter
-from shesha.models import ParsedDocument
+from ananta.experimental.arxiv.cache import PaperCache
+from ananta.experimental.arxiv.models import PaperMeta
+from ananta.experimental.arxiv.rate_limit import RateLimiter
+from ananta.models import ParsedDocument
 
 # File extensions to extract from LaTeX source archives
 TEXT_EXTENSIONS = {".tex", ".bib", ".bbl", ".bst", ".sty", ".cls", ".txt", ".md"}
@@ -55,7 +55,7 @@ def extract_source_files(data: bytes) -> dict[str, str]:
 
 
 def to_parsed_document(arxiv_id: str, cache: PaperCache) -> ParsedDocument:
-    """Convert a cached paper to a Shesha ParsedDocument."""
+    """Convert a cached paper to a Ananta ParsedDocument."""
     meta = cache.get_meta(arxiv_id)
     if meta is None:
         msg = f"Paper not in cache: {arxiv_id}"

@@ -1,4 +1,4 @@
-"""Main Shesha class - the public API."""
+"""Main Ananta class - the public API."""
 
 import atexit
 import logging
@@ -11,32 +11,32 @@ from typing import TYPE_CHECKING, Literal
 import docker
 from docker.errors import DockerException
 
-from shesha.analysis import AnalysisGenerator
-from shesha.config import SheshaConfig
-from shesha.exceptions import (
+from ananta.analysis import AnalysisGenerator
+from ananta.config import AnantaConfig
+from ananta.exceptions import (
     ProjectNotFoundError,
     RepoError,
     RepoIngestError,
 )
-from shesha.models import ProjectInfo, RepoProjectResult
-from shesha.parser import create_default_registry
-from shesha.parser.registry import ParserRegistry
-from shesha.project import Project
-from shesha.repo.ingester import RepoIngester
-from shesha.rlm.engine import RLMEngine
-from shesha.sandbox.pool import ContainerPool
-from shesha.storage.base import StorageBackend
-from shesha.storage.filesystem import FilesystemStorage
+from ananta.models import ProjectInfo, RepoProjectResult
+from ananta.parser import create_default_registry
+from ananta.parser.registry import ParserRegistry
+from ananta.project import Project
+from ananta.repo.ingester import RepoIngester
+from ananta.rlm.engine import RLMEngine
+from ananta.sandbox.pool import ContainerPool
+from ananta.storage.base import StorageBackend
+from ananta.storage.filesystem import FilesystemStorage
 
 if TYPE_CHECKING:
-    from shesha.models import RepoAnalysis
-    from shesha.parser.base import DocumentParser
+    from ananta.models import RepoAnalysis
+    from ananta.parser.base import DocumentParser
 
 logger = logging.getLogger(__name__)
 
 
-class Shesha:
-    """Main entry point for Shesha - Recursive Language Models."""
+class Ananta:
+    """Main entry point for Ananta - Recursive Language Models."""
 
     def __init__(
         self,
@@ -44,13 +44,13 @@ class Shesha:
         storage_path: str | Path | None = None,
         api_key: str | None = None,
         pool_size: int | None = None,
-        config: SheshaConfig | None = None,
+        config: AnantaConfig | None = None,
         storage: StorageBackend | None = None,
         engine: RLMEngine | None = None,
         parser_registry: ParserRegistry | None = None,
         repo_ingester: RepoIngester | None = None,
     ) -> None:
-        """Initialize Shesha.
+        """Initialize Ananta.
 
         Does not require Docker. Docker availability is checked lazily
         when start() is called, allowing ingest-only workflows without
@@ -64,7 +64,7 @@ class Shesha:
         """
         # Use provided config or create from args
         if config is None:
-            config = SheshaConfig.load()
+            config = AnantaConfig.load()
         if model is not None:
             config.model = model
         if storage_path is not None:
@@ -360,7 +360,7 @@ class Shesha:
         with self._start_lock:
             if self._pool is not None and not self._stopped:
                 return
-            logger.info("Starting Shesha (model=%s)", self._config.model)
+            logger.info("Starting Ananta (model=%s)", self._config.model)
             self._check_docker_available()
             self._stopped = False
             pool = ContainerPool(
@@ -382,7 +382,7 @@ class Shesha:
                 self._rlm_engine.set_pool(None)
                 self._pool.stop()
 
-    def __enter__(self) -> "Shesha":
+    def __enter__(self) -> "Ananta":
         """Context manager entry."""
         self.start()
         return self

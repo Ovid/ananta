@@ -8,18 +8,18 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from shesha.experimental.code_explorer.api import create_api
-from shesha.experimental.code_explorer.dependencies import CodeExplorerState
-from shesha.experimental.code_explorer.topics import CodeExplorerTopicManager
-from shesha.experimental.shared.session import WebConversationSession
+from ananta.experimental.code_explorer.api import create_api
+from ananta.experimental.code_explorer.dependencies import CodeExplorerState
+from ananta.experimental.code_explorer.topics import CodeExplorerTopicManager
+from ananta.experimental.shared.session import WebConversationSession
 
 
 @pytest.fixture()
 def state(tmp_path: Path) -> CodeExplorerState:
-    shesha = MagicMock()
-    shesha.list_projects.return_value = []
-    shesha.storage = MagicMock()
-    shesha.storage.list_traces.return_value = []
+    ananta = MagicMock()
+    ananta.list_projects.return_value = []
+    ananta.storage = MagicMock()
+    ananta.storage.list_traces.return_value = []
 
     topics_dir = tmp_path / "topics"
     topics_dir.mkdir()
@@ -29,7 +29,7 @@ def state(tmp_path: Path) -> CodeExplorerState:
 
     session = WebConversationSession(tmp_path)
     return CodeExplorerState(
-        shesha=shesha,
+        ananta=ananta,
         topic_mgr=topic_mgr,
         session=session,
         model="test-model",
@@ -59,7 +59,7 @@ class TestPerTopicHistory:
         self, client: TestClient, state: CodeExplorerState
     ) -> None:
         """Clearing one topic's history should not affect another."""
-        from shesha.experimental.code_explorer.dependencies import get_topic_session
+        from ananta.experimental.code_explorer.dependencies import get_topic_session
 
         alpha_session = get_topic_session(state, "Alpha")
         alpha_session.add_exchange(

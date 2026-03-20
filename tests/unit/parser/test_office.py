@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from shesha.parser.office import DocxParser
+from ananta.parser.office import DocxParser
 
 
 @pytest.fixture
@@ -25,7 +25,7 @@ class TestDocxParser:
         assert not parser.can_parse(Path("document.doc"))  # Old format not supported
         assert not parser.can_parse(Path("document.pdf"))
 
-    @patch("shesha.parser.office.Document")
+    @patch("ananta.parser.office.Document")
     def test_parse_docx_extracts_paragraphs(self, mock_document_cls: MagicMock, parser: DocxParser):
         """DocxParser extracts paragraphs from document."""
         mock_para1 = MagicMock()

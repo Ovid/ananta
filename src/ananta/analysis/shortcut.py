@@ -6,13 +6,13 @@ import threading
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from shesha.llm.client import LLMClient, LLMClientFactory
-from shesha.llm.exceptions import PermanentError
-from shesha.rlm.boundary import generate_boundary, wrap_untrusted
+from ananta.llm.client import LLMClient, LLMClientFactory
+from ananta.llm.exceptions import PermanentError
+from ananta.rlm.boundary import generate_boundary, wrap_untrusted
 
 if TYPE_CHECKING:
-    from shesha.project import Project
-    from shesha.rlm.engine import ProgressCallback, QueryResult
+    from ananta.project import Project
+    from ananta.rlm.engine import ProgressCallback, QueryResult
 
 
 @dataclass

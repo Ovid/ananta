@@ -49,14 +49,13 @@ export const RETRY_SEARCH_PROMPT =
 /**
  * Select the appropriate prompt for the "More" button based on conversation context.
  *
- * When the last exchange was a give-up answer (starts with "I cannot answer"),
- * returns a retry-focused prompt. Otherwise returns the default deeper-analysis
- * prompt. After one retry, the new answer replaces the give-up as the last
- * exchange, so subsequent clicks naturally revert to the default prompt.
+ * When the last exchange has the gave_up flag set (indicating the RLM called
+ * PARTIAL instead of FINAL), returns a retry-focused prompt. Otherwise returns
+ * the default deeper-analysis prompt. After one retry, the new exchange has
+ * gave_up=false, so subsequent clicks naturally revert to the default prompt.
  */
 export function getMorePrompt(exchanges: Exchange[]): string {
-  const lastAnswer = exchanges[exchanges.length - 1]?.answer ?? ''
-  if (lastAnswer.startsWith('I cannot answer')) {
+  if (exchanges[exchanges.length - 1]?.gave_up) {
     return RETRY_SEARCH_PROMPT
   }
   return DEEPER_ANALYSIS_PROMPT
@@ -275,7 +274,7 @@ export default function ChatArea({
 
       {/* Input */}
       <div className="border-t border-border bg-surface-1 px-4 py-3">
-        <div className="flex gap-2">
+        <div className="flex items-start gap-2">
           <textarea
             ref={textareaRef}
             value={input}
@@ -291,26 +290,10 @@ export default function ChatArea({
             style={{ maxHeight: '6rem' }}
             className="flex-1 bg-surface-2 border border-border rounded px-3 py-2 text-sm text-text-primary resize-none overflow-y-auto focus:outline-none focus:border-accent disabled:opacity-50"
           />
-          {!thinking && (
-            <button
-              onClick={handleMore}
-              disabled={!canSendMore}
-              aria-label="Request deeper analysis"
-              aria-disabled={!canSendMore}
-              className="px-4 py-2 bg-surface-2 border border-border text-text-primary rounded text-sm font-medium hover:bg-surface-3 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              More
-            </button>
-          )}
-          {!allowBackgroundKnowledge && exchanges.length > 0 && !thinking && (
-            <span className="text-[10px] text-text-dim">
-              Enable "Allow background knowledge" for more complete analysis
-            </span>
-          )}
           {thinking ? (
             <button
               onClick={() => wsSend({ type: 'cancel' })}
-              className="px-4 py-2 bg-red text-white rounded text-sm font-medium hover:bg-red/90 transition-colors"
+              className="w-20 py-2 border border-transparent bg-red text-white rounded text-sm font-medium hover:bg-red/90 transition-colors"
             >
               Cancel
             </button>
@@ -318,9 +301,20 @@ export default function ChatArea({
             <button
               onClick={handleSend}
               disabled={!canSend}
-              className="px-4 py-2 bg-accent text-surface-0 rounded text-sm font-medium hover:bg-accent/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              className="w-20 py-2 border border-transparent bg-accent text-surface-0 rounded text-sm font-medium hover:bg-accent/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             >
               Send
+            </button>
+          )}
+          {!thinking && (
+            <button
+              onClick={handleMore}
+              disabled={!canSendMore}
+              aria-label="Request deeper analysis"
+              aria-disabled={!canSendMore}
+              className="w-20 py-2 bg-surface-2 border border-border text-text-primary rounded text-sm font-medium hover:bg-surface-3 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              More
             </button>
           )}
           <button

@@ -25,8 +25,8 @@ import type { ChatAreaProps } from '../ChatArea'
 
 /**
  * Sample exchange for tests that need non-empty history (required for More button).
- * NOTE: The `answer` value intentionally does NOT start with "I cannot answer" —
- * this matters because getMorePrompt() checks the last exchange's answer prefix
+ * NOTE: The `gave_up` field is intentionally absent (defaults to undefined/falsy) —
+ * this matters because getMorePrompt() checks the last exchange's gave_up flag
  * to decide which prompt the More button sends. Tests that use this fixture
  * implicitly test the "normal answer → DEEPER_ANALYSIS_PROMPT" path.
  */
@@ -309,6 +309,15 @@ describe('ChatArea (shared) - renderAnswer passthrough', () => {
   })
 })
 
+describe('ChatArea (shared) - input row button alignment', () => {
+  it('input row flex container uses items-start so buttons stay fixed height', async () => {
+    await renderChatArea()
+    const textarea = screen.getByPlaceholderText('Ask a question...')
+    const container = textarea.parentElement!
+    expect(container.className).toContain('items-start')
+  })
+})
+
 describe('ChatArea (shared) - auto-growing textarea', () => {
   const baseProps = {
     topicName: 'chess',
@@ -349,7 +358,7 @@ describe('ChatArea (shared) - More button rendering', () => {
     expect(screen.getByRole('button', { name: /deeper analysis/i })).toBeInTheDocument()
   })
 
-  it('positions More button between textarea and Send button', async () => {
+  it('positions Send button before More button', async () => {
     await renderChatArea()
     const textarea = screen.getByPlaceholderText('Ask a question...')
     const moreBtn = screen.getByRole('button', { name: /deeper analysis/i })
@@ -359,11 +368,11 @@ describe('ChatArea (shared) - More button rendering', () => {
     const container = textarea.parentElement!
     const children = Array.from(container.children)
     const textareaIdx = children.indexOf(textarea)
-    const moreIdx = children.indexOf(moreBtn)
     const sendIdx = children.indexOf(sendBtn)
+    const moreIdx = children.indexOf(moreBtn)
 
-    expect(moreIdx).toBeGreaterThan(textareaIdx)
-    expect(moreIdx).toBeLessThan(sendIdx)
+    expect(sendIdx).toBeGreaterThan(textareaIdx)
+    expect(sendIdx).toBeLessThan(moreIdx)
   })
 
   it('hides More button when thinking is true', async () => {
@@ -508,7 +517,8 @@ describe('ChatArea (shared) - More button click behavior', () => {
     const wsSend = vi.fn()
     const giveUpExchange = {
       ...sampleExchangeForHistory,
-      answer: 'I cannot answer this question based on the provided documents.\n\n**Partial findings:**\n- Found some titles',
+      answer: 'Found some evidence but not enough.',
+      gave_up: true,
     }
     await renderChatArea({
       wsSend,
@@ -527,7 +537,7 @@ describe('ChatArea (shared) - More button click behavior', () => {
 })
 
 describe('ChatArea (shared) - More button accessibility', () => {
-  it('has correct tab order: textarea → More → Send → Clear', async () => {
+  it('has correct tab order: textarea → Send → More → Clear', async () => {
     const user = userEvent.setup()
     await renderChatArea()
 
@@ -535,8 +545,8 @@ describe('ChatArea (shared) - More button accessibility', () => {
     const textarea = screen.getByPlaceholderText('Ask a question...')
     await user.type(textarea, 'hello')
 
-    const moreBtn = screen.getByRole('button', { name: /deeper analysis/i })
     const sendBtn = screen.getByRole('button', { name: /send/i })
+    const moreBtn = screen.getByRole('button', { name: /deeper analysis/i })
     const clearBtn = screen.getByTitle('Clear conversation')
 
     // Start focus on textarea, then tab through
@@ -544,13 +554,23 @@ describe('ChatArea (shared) - More button accessibility', () => {
     expect(document.activeElement).toBe(textarea)
 
     await user.tab()
-    expect(document.activeElement).toBe(moreBtn)
-
-    await user.tab()
     expect(document.activeElement).toBe(sendBtn)
 
     await user.tab()
+    expect(document.activeElement).toBe(moreBtn)
+
+    await user.tab()
     expect(document.activeElement).toBe(clearBtn)
+  })
+
+  it('Send and More buttons have the same fixed width class', async () => {
+    await renderChatArea()
+    const sendBtn = screen.getByRole('button', { name: /send/i })
+    const moreBtn = screen.getByRole('button', { name: /deeper analysis/i })
+
+    // Both buttons should share a fixed width class for equal sizing
+    expect(sendBtn.className).toMatch(/w-20/)
+    expect(moreBtn.className).toMatch(/w-20/)
   })
 
   it('has visible focus indicator (focus ring classes)', async () => {
@@ -1080,22 +1100,14 @@ describe('ChatArea — allowBackgroundKnowledge', () => {
   })
 })
 
-describe('ChatArea — background knowledge hint', () => {
-  it('shows hint below More button when checkbox is off and exchanges exist', async () => {
+describe('ChatArea — background knowledge hint removed', () => {
+  it('does not show hint when checkbox is off and exchanges exist', async () => {
     await renderChatArea({ allowBackgroundKnowledge: false })
-    expect(screen.getByText(/Enable.*background knowledge/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Enable.*background knowledge/i)).not.toBeInTheDocument()
   })
 
   it('does not show hint when checkbox is on', async () => {
     await renderChatArea({ allowBackgroundKnowledge: true })
-    expect(screen.queryByText(/Enable.*background knowledge/i)).not.toBeInTheDocument()
-  })
-
-  it('does not show hint when no exchanges exist', async () => {
-    await renderChatArea({
-      allowBackgroundKnowledge: false,
-      loadHistory: vi.fn().mockResolvedValue([]),
-    })
     expect(screen.queryByText(/Enable.*background knowledge/i)).not.toBeInTheDocument()
   })
 })
@@ -1164,7 +1176,7 @@ describe('ChatArea (shared) - getMorePrompt context-sensitive selection', () => 
     expect(getMorePrompt([])).toBe(DEEPER_ANALYSIS_PROMPT)
   })
 
-  it('returns DEEPER_ANALYSIS_PROMPT when last answer is a normal response', () => {
+  it('returns DEEPER_ANALYSIS_PROMPT when last exchange has no gave_up flag', () => {
     const exchanges = [{
       ...sampleExchangeForHistory,
       answer: 'Here is a detailed analysis of the documents...',
@@ -1172,33 +1184,35 @@ describe('ChatArea (shared) - getMorePrompt context-sensitive selection', () => 
     expect(getMorePrompt(exchanges)).toBe(DEEPER_ANALYSIS_PROMPT)
   })
 
-  it('returns RETRY_SEARCH_PROMPT when last answer starts with "I cannot answer"', () => {
+  it('returns DEEPER_ANALYSIS_PROMPT when last exchange has gave_up=false', () => {
     const exchanges = [{
       ...sampleExchangeForHistory,
-      answer: 'I cannot answer this question based on the provided documents.',
+      gave_up: false,
+    }]
+    expect(getMorePrompt(exchanges)).toBe(DEEPER_ANALYSIS_PROMPT)
+  })
+
+  it('returns RETRY_SEARCH_PROMPT when last exchange has gave_up=true', () => {
+    const exchanges = [{
+      ...sampleExchangeForHistory,
+      answer: 'Found some titles but not enough to answer.',
+      gave_up: true,
     }]
     expect(getMorePrompt(exchanges)).toBe(RETRY_SEARCH_PROMPT)
   })
 
-  it('returns RETRY_SEARCH_PROMPT when last answer has partial evidence after "I cannot answer"', () => {
-    const exchanges = [{
-      ...sampleExchangeForHistory,
-      answer: 'I cannot answer this question based on the provided documents.\n\n**Partial findings:**\n- Found 7 titles\n- Missing publication dates',
-    }]
-    expect(getMorePrompt(exchanges)).toBe(RETRY_SEARCH_PROMPT)
-  })
-
-  it('returns DEEPER_ANALYSIS_PROMPT when only earlier exchange was a give-up but last is normal', () => {
+  it('returns DEEPER_ANALYSIS_PROMPT when only earlier exchange had gave_up but last is normal', () => {
     const exchanges = [
       {
         ...sampleExchangeForHistory,
         exchange_id: 'ex-fail',
-        answer: 'I cannot answer this question based on the provided documents.',
+        gave_up: true,
       },
       {
         ...sampleExchangeForHistory,
         exchange_id: 'ex-retry',
         answer: 'After retrying, here are the titles in order...',
+        gave_up: false,
       },
     ]
     expect(getMorePrompt(exchanges)).toBe(DEEPER_ANALYSIS_PROMPT)

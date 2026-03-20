@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # Adapted from https://github.com/alexzhang13/rlm/pull/34
-# to use SHESHA_* environment variables.
+# to use ANANTA_* environment variables.
 
 """
 Example: An example from the Oolong Benchmark from the RLM paper: https://arxiv.org/abs/2512.24601v1
@@ -35,12 +35,12 @@ def load_oolong_row(index: int = 1) -> dict:
 
 
 def main():
-    api_key = os.environ.get("SHESHA_API_KEY")
+    api_key = os.environ.get("ANANTA_API_KEY")
     if not api_key:
-        raise ValueError("SHESHA_API_KEY environment variable is not set.")
+        raise ValueError("ANANTA_API_KEY environment variable is not set.")
 
-    model = os.environ.get("SHESHA_MODEL", "claude-sonnet-4-20250514")
-    max_iterations = int(os.environ.get("SHESHA_MAX_ITERATIONS", "30"))
+    model = os.environ.get("ANANTA_MODEL", "claude-sonnet-4-20250514")
+    max_iterations = int(os.environ.get("ANANTA_MAX_ITERATIONS", "30"))
 
     print(f"Model: {model}")
     print(f"Max iterations: {max_iterations}")

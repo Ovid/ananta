@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Shared launcher logic for Shesha explorer scripts.
+# Shared launcher logic for Ananta explorer scripts.
 # Source this file after setting config variables — see individual launchers.
 
 # --- Derived paths ---
@@ -11,17 +11,17 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 NC='\033[0m'
 
-info()  { echo -e "${GREEN}[shesha]${NC} $*"; }
-error() { echo -e "${RED}[shesha]${NC} $*" >&2; }
+info()  { echo -e "${GREEN}[ananta]${NC} $*"; }
+error() { echo -e "${RED}[ananta]${NC} $*" >&2; }
 
 # --- Parse flags (strip --rebuild before passing to the explorer) ---
 REBUILD=false
-SHESHA_ARGS=()
+ANANTA_ARGS=()
 for arg in "$@"; do
     if [ "$arg" = "--rebuild" ]; then
         REBUILD=true
     else
-        SHESHA_ARGS+=("$arg")
+        ANANTA_ARGS+=("$arg")
     fi
 done
 
@@ -76,8 +76,8 @@ run_preflight() {
         require_command git "https://git-scm.com/"
     fi
     check_python_version
-    require_env SHESHA_API_KEY "export SHESHA_API_KEY=<your-key>"
-    require_env SHESHA_MODEL   "export SHESHA_MODEL=<model-name>"
+    require_env ANANTA_API_KEY "export ANANTA_API_KEY=<your-key>"
+    require_env ANANTA_MODEL   "export ANANTA_MODEL=<model-name>"
     check_docker_running
     report_and_exit
 }
@@ -137,5 +137,5 @@ launch() {
     install_python_deps
     build_frontend
     info "Starting $APP_NAME..."
-    "$ENTRY_POINT" ${SHESHA_ARGS[@]+"${SHESHA_ARGS[@]}"} 2> >(stderr_filter >&2)
+    "$ENTRY_POINT" ${ANANTA_ARGS[@]+"${ANANTA_ARGS[@]}"} 2> >(stderr_filter >&2)
 }

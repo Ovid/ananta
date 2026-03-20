@@ -1,5 +1,5 @@
 services:
-  shesha-web:
+  ananta-web:
     build:
       context: ..
       dockerfile: arxiv-explorer/Dockerfile
@@ -7,10 +7,10 @@ services:
       - "8000:8000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - shesha-data:/data
+      - ananta-data:/data
     environment:
-      - SHESHA_API_KEY=${SHESHA_API_KEY:?Set SHESHA_API_KEY before running (see README.md)}
-      - SHESHA_MODEL=${SHESHA_MODEL:?Set SHESHA_MODEL before running (see README.md)}
+      - ANANTA_API_KEY=${ANANTA_API_KEY:?Set ANANTA_API_KEY before running (see README.md)}
+      - ANANTA_MODEL=${ANANTA_MODEL:?Set ANANTA_MODEL before running (see README.md)}
 
 volumes:
-  shesha-data:
+  ananta-data:

@@ -1,6 +1,6 @@
-# Shesha Code Explorer
+# Ananta Code Explorer
 
-Shesha Code Explorer lets you ask plain-English questions about git repositories. Add a repository by URL, organize repos into topics, and ask questions. Shesha clones the repo, writes and runs code to explore the codebase, and iterates until it finds a real answer.
+Ananta Code Explorer lets you ask plain-English questions about git repositories. Add a repository by URL, organize repos into topics, and ask questions. Ananta clones the repo, writes and runs code to explore the codebase, and iterates until it finds a real answer.
 
 ## First Session
 
@@ -15,7 +15,7 @@ Shesha Code Explorer lets you ask plain-English questions about git repositories
 
 - **Docker** -- see [Installing Docker](#installing-docker) below if you don't have it
 - An **LLM API key** -- see [Getting an API Key](#getting-an-api-key) below
-- **Model selection** -- set `SHESHA_MODEL` (see [Choosing a Model](#choosing-a-model) below)
+- **Model selection** -- set `ANANTA_MODEL` (see [Choosing a Model](#choosing-a-model) below)
 
 ## Setup
 
@@ -23,7 +23,7 @@ If you're comfortable with software development, you can run `./code-explorer/co
 
 ### Installing Docker
 
-Docker runs the code sandbox that Shesha uses to safely execute LLM-generated code. If you already have Docker installed, skip to [Quick Start](#quick-start).
+Docker runs the code sandbox that Ananta uses to safely execute LLM-generated code. If you already have Docker installed, skip to [Quick Start](#quick-start).
 
 **macOS**
 
@@ -72,27 +72,27 @@ You need an API key from one of the supported LLM providers. Pick whichever you 
 
 1. Go to [platform.openai.com/api-keys](https://platform.openai.com/api-keys) and sign in (or create an account)
 2. Click "Create new secret key" and copy it
-3. Set it: `export SHESHA_API_KEY="sk-..."`
+3. Set it: `export ANANTA_API_KEY="sk-..."`
 
 **Anthropic (Claude)**
 
 1. Go to [console.anthropic.com](https://console.anthropic.com/) and sign in (or create an account)
 2. Go to Settings > API Keys, click "Create Key", and copy it
-3. Set it: `export SHESHA_API_KEY="sk-ant-..."`
+3. Set it: `export ANANTA_API_KEY="sk-ant-..."`
 
 **Google (Gemini)**
 
 1. Go to [aistudio.google.com/apikey](https://aistudio.google.com/apikey) and sign in with your Google account
 2. Click "Create API Key", select a project, and copy the key
-3. Set it: `export SHESHA_API_KEY="your-key-here"`
+3. Set it: `export ANANTA_API_KEY="your-key-here"`
 
 All three providers require billing to be set up for production use, though Google offers a free tier with up to 1,000 daily requests.
 
 ### Choosing a Model
 
-Set `SHESHA_MODEL` to tell Shesha which LLM to use. These are good budget-friendly options that work well for code exploration:
+Set `ANANTA_MODEL` to tell Ananta which LLM to use. These are good budget-friendly options that work well for code exploration:
 
-| Provider | Model | `SHESHA_MODEL` value | Approximate cost |
+| Provider | Model | `ANANTA_MODEL` value | Approximate cost |
 |----------|-------|---------------------|-----------------|
 | OpenAI | GPT-5 mini | `gpt-5-mini` | $0.25 / $2.00 per 1M tokens |
 | Anthropic | Claude Haiku 4.5 | `claude-haiku-4-5-20251001` | $1.00 / $5.00 per 1M tokens |
@@ -106,12 +106,12 @@ For the best balance of cost and quality, we recommend **`gpt-5-mini`** (OpenAI)
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/your-org/shesha.git
-cd shesha/code-explorer
+git clone https://github.com/your-org/ananta.git
+cd ananta/code-explorer
 
 # 2. Set your API key and model
-export SHESHA_API_KEY="sk-..."
-export SHESHA_MODEL="gpt-5-mini"   # recommended: inexpensive with great results
+export ANANTA_API_KEY="sk-..."
+export ANANTA_MODEL="gpt-5-mini"   # recommended: inexpensive with great results
 
 # 3. Run
 docker compose up
@@ -122,10 +122,10 @@ Visit `http://localhost:8001` in your browser.
 ## Troubleshooting
 
 **Docker not running**
-Shesha needs Docker to run code in a sandbox. On macOS and Windows, open Docker Desktop from your Applications/Start menu and wait for the whale icon to appear. On Linux, run `sudo systemctl start docker`.
+Ananta needs Docker to run code in a sandbox. On macOS and Windows, open Docker Desktop from your Applications/Start menu and wait for the whale icon to appear. On Linux, run `sudo systemctl start docker`.
 
 **API key not set**
-Set `SHESHA_API_KEY` as an environment variable before running.
+Set `ANANTA_API_KEY` as an environment variable before running.
 
 **Repository fails to clone**
 Check that the URL is a valid, accessible git repository. Private repositories require authentication to be configured in your git settings.

@@ -9,8 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- RLM now reports partial findings when it cannot answer a question, instead of a flat refusal
-- "More" button uses a retry-focused prompt after a give-up answer, then reverts to the default deeper-analysis prompt
+- RLM uses structured `PARTIAL()` callable instead of string-prefix detection for partial evidence answers
+- "More" button detects partial evidence via `gave_up` flag instead of parsing answer text
 
 ### Added
 

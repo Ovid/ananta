@@ -7,12 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-03-20
+
 ### Added
 
+- Startup migration warnings when legacy `shesha_data/`, `~/.shesha/`, or `~/.shesha-arxiv/` directories are detected
 - **`/release` skill** — Claude Code skill for merging feature branches with automatic semantic versioning, changelog finalization, `git done -y`, and git tagging
 
 ### Changed
 
+- **BREAKING:** Renamed project from "Shesha" to "Ananta" to avoid confusion
+  with "shisha" (hookah). Ananta is an alternate name for the same Hindu serpent
+  deity. All public APIs, environment variables, CLI commands, and data
+  directories have been renamed:
+  - Package: `shesha` → `ananta`
+  - Classes: `Shesha` → `Ananta`, `SheshaConfig` → `AnantaConfig`, `SheshaError` → `AnantaError`
+  - CLI: `shesha-web` → `ananta-web`, `shesha-code` → `ananta-code`, `shesha-document-explorer` → `ananta-document-explorer`
+  - Environment variables: `SHESHA_*` → `ANANTA_*`
+  - Data directories: `shesha_data` → `ananta_data`, `~/.shesha/` → `~/.ananta/`, `~/.shesha-arxiv/` → `~/.ananta-arxiv/`
+  - Docker image: `shesha-sandbox` → `ananta-sandbox`
 - Changelog rewritten with versioned sections for all 13 previously unversioned branch merges (v0.10.0–v0.21.1), with keepachangelog 1.1.0 comparison links
 - CLAUDE.md versioning section updated: `/release` is now the only sanctioned merge path, keepachangelog 1.1.0 format enforced, auto-increment version rules documented
 
@@ -616,7 +629,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Security hardening with untrusted content tagging
 - Network isolation with egress whitelist for LLM APIs
 
-[unreleased]: https://github.com/Ovid/shesha/compare/v0.21.1...HEAD
+[unreleased]: https://github.com/Ovid/shesha/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/Ovid/shesha/compare/v0.22.0...v1.0.0
 [0.21.1]: https://github.com/Ovid/shesha/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/Ovid/shesha/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/Ovid/shesha/compare/v0.19.0...v0.20.0

@@ -11,8 +11,21 @@ from shesha.experimental.arxiv.models import PaperMeta
 
 
 def extract_arxiv_id(entry_id: str) -> str:
-    """Extract the arXiv ID from an entry_id URL."""
+    """Extract the arXiv ID from an entry_id URL.
+
+    Old-style arXiv IDs (e.g. cs/9808001v1) contain slashes which break
+    document ID validation and create subdirectories in storage.  Replace
+    the slash with a hyphen so the ID is safe for both.
+    """
     # entry_id looks like "http://arxiv.org/abs/2501.12345v1"
+    match = re.search(r"/abs/(.+)$", entry_id)
+    if match:
+        return match.group(1).replace("/", "-")
+    return entry_id
+
+
+def _extract_raw_arxiv_id(entry_id: str) -> str:
+    """Extract the raw arXiv ID preserving slashes (for URL construction)."""
     match = re.search(r"/abs/(.+)$", entry_id)
     if match:
         return match.group(1)
@@ -22,6 +35,7 @@ def extract_arxiv_id(entry_id: str) -> str:
 def _result_to_meta(result: arxiv.Result) -> PaperMeta:
     """Convert an arxiv.Result to our PaperMeta model."""
     arxiv_id = extract_arxiv_id(result.entry_id)
+    raw_id = _extract_raw_arxiv_id(result.entry_id)
     return PaperMeta(
         arxiv_id=arxiv_id,
         title=result.title,
@@ -31,8 +45,8 @@ def _result_to_meta(result: arxiv.Result) -> PaperMeta:
         updated=result.updated,
         categories=result.categories,
         primary_category=result.primary_category,
-        pdf_url=result.pdf_url or f"https://arxiv.org/pdf/{arxiv_id}",
-        arxiv_url=f"https://arxiv.org/abs/{arxiv_id}",
+        pdf_url=result.pdf_url or f"https://arxiv.org/pdf/{raw_id}",
+        arxiv_url=f"https://arxiv.org/abs/{raw_id}",
         comment=result.comment,
         journal_ref=result.journal_ref,
         doi=result.doi,

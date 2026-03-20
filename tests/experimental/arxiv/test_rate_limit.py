@@ -7,7 +7,7 @@ import time
 
 import pytest
 
-from shesha.experimental.arxiv.rate_limit import RateLimiter
+from ananta.experimental.arxiv.rate_limit import RateLimiter
 
 
 class TestRateLimiter:

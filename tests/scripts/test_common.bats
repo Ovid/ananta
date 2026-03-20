@@ -89,35 +89,35 @@ setup() {
 # --- Error collection (multiple failures) ---
 
 @test "multiple failures are all collected" {
-    unset SHESHA_API_KEY
-    unset SHESHA_MODEL
+    unset ANANTA_API_KEY
+    unset ANANTA_MODEL
     source "$COMMON"
     ERRORS=()
     require_command "nonexistent_cmd_xyz" "https://example.com"
-    require_env "SHESHA_API_KEY" "export SHESHA_API_KEY=<your-key>"
-    require_env "SHESHA_MODEL" "export SHESHA_MODEL=<model-name>"
+    require_env "ANANTA_API_KEY" "export ANANTA_API_KEY=<your-key>"
+    require_env "ANANTA_MODEL" "export ANANTA_MODEL=<model-name>"
     [ ${#ERRORS[@]} -eq 3 ]
 }
 
 # --- Flag parsing ---
 
 @test "--rebuild flag is stripped from args" {
-    export SHESHA_API_KEY="test"
-    export SHESHA_MODEL="test"
+    export ANANTA_API_KEY="test"
+    export ANANTA_MODEL="test"
     set -- --port 9000 --rebuild --no-browser
     source "$COMMON"
     [ "$REBUILD" = true ]
-    [ ${#SHESHA_ARGS[@]} -eq 3 ]
-    [[ "${SHESHA_ARGS[*]}" == "--port 9000 --no-browser" ]]
+    [ ${#ANANTA_ARGS[@]} -eq 3 ]
+    [[ "${ANANTA_ARGS[*]}" == "--port 9000 --no-browser" ]]
 }
 
 @test "args without --rebuild are passed through" {
-    export SHESHA_API_KEY="test"
-    export SHESHA_MODEL="test"
+    export ANANTA_API_KEY="test"
+    export ANANTA_MODEL="test"
     set -- --port 9000
     source "$COMMON"
     [ "$REBUILD" = false ]
-    [ ${#SHESHA_ARGS[@]} -eq 2 ]
+    [ ${#ANANTA_ARGS[@]} -eq 2 ]
 }
 
 # --- stderr filter ---

@@ -1,6 +1,6 @@
-# Shesha Prompts
+# Ananta Prompts
 
-This directory contains the LLM prompt templates used by Shesha. You can customize these prompts to tune behavior for your use case.
+This directory contains the LLM prompt templates used by Ananta. You can customize these prompts to tune behavior for your use case.
 
 ## Prompt Files
 
@@ -47,14 +47,14 @@ No placeholders. Static message.
 
 3. Validate your changes:
    ```bash
-   python -m shesha.prompts --prompts-dir ./my-prompts
+   python -m ananta.prompts --prompts-dir ./my-prompts
    ```
 
 4. Use your custom prompts:
    ```bash
-   export SHESHA_PROMPTS_DIR=./my-prompts
+   export ANANTA_PROMPTS_DIR=./my-prompts
    # or
-   shesha query --prompts-dir ./my-prompts ...
+   ananta query --prompts-dir ./my-prompts ...
    ```
 
 ## Validation
@@ -62,7 +62,7 @@ No placeholders. Static message.
 After editing prompts, validate them:
 
 ```bash
-python -m shesha.prompts --prompts-dir ./prompts
+python -m ananta.prompts --prompts-dir ./prompts
 ```
 
 The validator checks:
@@ -72,10 +72,10 @@ The validator checks:
 
 ## Environment Variable
 
-Set `SHESHA_PROMPTS_DIR` to use a custom prompts directory by default:
+Set `ANANTA_PROMPTS_DIR` to use a custom prompts directory by default:
 
 ```bash
-export SHESHA_PROMPTS_DIR=/path/to/my-prompts
+export ANANTA_PROMPTS_DIR=/path/to/my-prompts
 ```
 
 CLI `--prompts-dir` overrides the environment variable when specified.

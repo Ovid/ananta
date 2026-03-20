@@ -2,7 +2,7 @@
 
 from textual.app import App, ComposeResult
 
-from shesha.tui.widgets.input_area import InputArea, InputSubmitted
+from ananta.tui.widgets.input_area import InputArea, InputSubmitted
 
 
 class InputAreaApp(App[None]):

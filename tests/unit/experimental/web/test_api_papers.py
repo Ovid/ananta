@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from shesha.experimental.web.api import create_api
+from ananta.experimental.web.api import create_api
 
 
 @pytest.fixture
@@ -25,7 +25,7 @@ def client(mock_state: MagicMock) -> TestClient:
 def test_list_papers_in_topic(client: TestClient, mock_state: MagicMock) -> None:
     from datetime import datetime
 
-    from shesha.experimental.arxiv.models import PaperMeta
+    from ananta.experimental.arxiv.models import PaperMeta
 
     mock_state.topic_mgr.resolve.return_value = "proj-id"
     mock_state.topic_mgr.storage.list_documents.return_value = ["2501.08753"]
@@ -61,7 +61,7 @@ def test_add_paper_cached(client: TestClient, mock_state: MagicMock) -> None:
     mock_state.topic_mgr.resolve.side_effect = lambda name: f"proj-{name}"
 
     mock_doc = MagicMock()
-    with patch("shesha.experimental.web.api.to_parsed_document", return_value=mock_doc):
+    with patch("ananta.experimental.web.api.to_parsed_document", return_value=mock_doc):
         resp = client.post(
             "/api/papers/add",
             json={"arxiv_id": "2501.08753", "topics": ["Chess"]},
@@ -92,7 +92,7 @@ def test_add_paper_multi_topic_cached(client: TestClient, mock_state: MagicMock)
     mock_state.topic_mgr.resolve.side_effect = lambda name: f"proj-{name}"
 
     mock_doc = MagicMock()
-    with patch("shesha.experimental.web.api.to_parsed_document", return_value=mock_doc):
+    with patch("ananta.experimental.web.api.to_parsed_document", return_value=mock_doc):
         resp = client.post(
             "/api/papers/add",
             json={"arxiv_id": "2501.08753", "topics": ["Chess", "Education"]},
@@ -145,7 +145,7 @@ def test_add_paper_download_fetches_meta_from_searcher(
     import threading
     from datetime import datetime
 
-    from shesha.experimental.arxiv.models import PaperMeta
+    from ananta.experimental.arxiv.models import PaperMeta
 
     mock_state.cache.has.return_value = False
     mock_state.topic_mgr.resolve.side_effect = lambda name: f"proj-{name}"
@@ -177,9 +177,9 @@ def test_add_paper_download_fetches_meta_from_searcher(
     with (
         patch.object(threading.Thread, "__init__", capture_thread),
         patch(
-            "shesha.experimental.arxiv.download.download_paper", return_value=meta
+            "ananta.experimental.arxiv.download.download_paper", return_value=meta
         ) as mock_download,
-        patch("shesha.experimental.arxiv.download.to_parsed_document", return_value=mock_doc),
+        patch("ananta.experimental.arxiv.download.to_parsed_document", return_value=mock_doc),
     ):
         resp = client.post(
             "/api/papers/add",
@@ -236,7 +236,7 @@ def test_add_paper_download_errors_when_searcher_returns_none(
 def test_rename_paper_updates_title(client: TestClient, mock_state: MagicMock) -> None:
     from datetime import datetime
 
-    from shesha.experimental.arxiv.models import PaperMeta
+    from ananta.experimental.arxiv.models import PaperMeta
 
     meta = PaperMeta(
         arxiv_id="2501.08753",
@@ -279,7 +279,7 @@ def test_rename_paper_not_found(client: TestClient, mock_state: MagicMock) -> No
 def test_rename_paper_empty_name_returns_422(client: TestClient, mock_state: MagicMock) -> None:
     from datetime import datetime
 
-    from shesha.experimental.arxiv.models import PaperMeta
+    from ananta.experimental.arxiv.models import PaperMeta
 
     meta = PaperMeta(
         arxiv_id="2501.08753",
@@ -347,7 +347,7 @@ def test_list_papers_respects_order(client: TestClient, mock_state: MagicMock) -
     """list_papers sorts results according to stored doc_order."""
     from datetime import datetime
 
-    from shesha.experimental.arxiv.models import PaperMeta
+    from ananta.experimental.arxiv.models import PaperMeta
 
     mock_state.topic_mgr.resolve.return_value = "proj-id"
     mock_state.topic_mgr.storage.list_documents.return_value = [
@@ -385,7 +385,7 @@ def test_list_papers_without_order(client: TestClient, mock_state: MagicMock) ->
     """When no doc_order is stored, list_papers returns filesystem order."""
     from datetime import datetime
 
-    from shesha.experimental.arxiv.models import PaperMeta
+    from ananta.experimental.arxiv.models import PaperMeta
 
     mock_state.topic_mgr.resolve.return_value = "proj-id"
     mock_state.topic_mgr.storage.list_documents.return_value = [

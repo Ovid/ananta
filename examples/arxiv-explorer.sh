@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Launch the Shesha arXiv Web Explorer.
+# Launch the Ananta arXiv Web Explorer.
 # Handles venv creation, dependency installation, frontend build, and startup.
 #
 # Usage:
 #   ./examples/arxiv-explorer.sh                      # defaults
-#   ./examples/arxiv-explorer.sh --model gpt-5-mini   # pass args to shesha-web
+#   ./examples/arxiv-explorer.sh --model gpt-5-mini   # pass args to ananta-web
 #   ./examples/arxiv-explorer.sh --port 8080          # custom port
 #   ./examples/arxiv-explorer.sh --no-browser         # don't open browser
 #   ./examples/arxiv-explorer.sh --rebuild            # force frontend rebuild
@@ -14,7 +14,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 VENV_DIR="$PROJECT_ROOT/.venv"
-FRONTEND_DIR="$PROJECT_ROOT/src/shesha/experimental/web/frontend"
+FRONTEND_DIR="$PROJECT_ROOT/src/ananta/experimental/web/frontend"
 FRONTEND_DIST="$FRONTEND_DIR/dist"
 
 RED='\033[0;31m'
@@ -22,18 +22,18 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-info()  { echo -e "${GREEN}[shesha]${NC} $*"; }
-warn()  { echo -e "${YELLOW}[shesha]${NC} $*"; }
-error() { echo -e "${RED}[shesha]${NC} $*" >&2; }
+info()  { echo -e "${GREEN}[ananta]${NC} $*"; }
+warn()  { echo -e "${YELLOW}[ananta]${NC} $*"; }
+error() { echo -e "${RED}[ananta]${NC} $*" >&2; }
 
-# --- Parse our own flags (strip --rebuild before passing to shesha-web) ---
+# --- Parse our own flags (strip --rebuild before passing to ananta-web) ---
 REBUILD=false
-SHESHA_ARGS=()
+ANANTA_ARGS=()
 for arg in "$@"; do
     if [ "$arg" = "--rebuild" ]; then
         REBUILD=true
     else
-        SHESHA_ARGS+=("$arg")
+        ANANTA_ARGS+=("$arg")
     fi
 done
 
@@ -60,8 +60,8 @@ if [ "$PYMAJOR" -lt 3 ] || { [ "$PYMAJOR" -eq 3 ] && [ "$PYMINOR" -lt 12 ]; }; t
 fi
 
 # Check for an API key
-if [ -z "${SHESHA_API_KEY:-}" ]; then
-    warn "No SHESHA_API_KEY detected. Set it before querying papers. Continuing anyway..."
+if [ -z "${ANANTA_API_KEY:-}" ]; then
+    warn "No ANANTA_API_KEY detected. Set it before querying papers. Continuing anyway..."
 fi
 
 # Check Docker is running
@@ -79,8 +79,8 @@ fi
 source "$VENV_DIR/bin/activate"
 
 # --- Python dependencies ---
-# Install/update if shesha-web command doesn't exist or pyproject.toml is newer
-MARKER="$VENV_DIR/.shesha-web-installed"
+# Install/update if ananta-web command doesn't exist or pyproject.toml is newer
+MARKER="$VENV_DIR/.ananta-web-installed"
 if [ ! -f "$MARKER" ] || [ "$PROJECT_ROOT/pyproject.toml" -nt "$MARKER" ]; then
     info "Installing Python dependencies..."
     pip install -q -e "$PROJECT_ROOT[web]"
@@ -98,5 +98,5 @@ else
 fi
 
 # --- Launch ---
-info "Starting Shesha arXiv Web Explorer..."
-exec shesha-web ${SHESHA_ARGS[@]+"${SHESHA_ARGS[@]}"}
+info "Starting Ananta arXiv Web Explorer..."
+exec ananta-web ${ANANTA_ARGS[@]+"${ANANTA_ARGS[@]}"}

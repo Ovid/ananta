@@ -1,4 +1,4 @@
-"""Tests for main SheshaTUI app."""
+"""Tests for main AnantaTUI app."""
 
 import threading
 from datetime import datetime
@@ -8,23 +8,23 @@ from unittest.mock import MagicMock, patch
 import pytest
 from textual.widgets import Static
 
-from shesha.analysis.shortcut import ShortcutResult
-from shesha.rlm.engine import QueryResult
-from shesha.rlm.trace import StepType, TokenUsage, Trace
-from shesha.tui.app import SheshaTUI
-from shesha.tui.widgets.completion_popup import CompletionPopup
-from shesha.tui.widgets.info_bar import InfoBar
-from shesha.tui.widgets.input_area import InputArea
-from shesha.tui.widgets.output_area import OutputArea
+from ananta.analysis.shortcut import ShortcutResult
+from ananta.rlm.engine import QueryResult
+from ananta.rlm.trace import StepType, TokenUsage, Trace
+from ananta.tui.app import AnantaTUI
+from ananta.tui.widgets.completion_popup import CompletionPopup
+from ananta.tui.widgets.info_bar import InfoBar
+from ananta.tui.widgets.input_area import InputArea
+from ananta.tui.widgets.output_area import OutputArea
 
 
-class TestSheshaTUIComposition:
-    """Tests for SheshaTUI app layout."""
+class TestAnantaTUIComposition:
+    """Tests for AnantaTUI app layout."""
 
     async def test_app_has_four_widgets(self) -> None:
         """App composes output area, info bar, completion popup, and input area."""
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         async with app.run_test() as pilot:
             assert pilot.app.query_one(OutputArea)
             assert pilot.app.query_one(InfoBar)
@@ -34,7 +34,7 @@ class TestSheshaTUIComposition:
     async def test_builtin_commands_registered(self) -> None:
         """Built-in commands are registered on startup."""
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         async with app.run_test() as pilot:
             commands = pilot.app._command_registry.list_commands()
             names = [name for name, _desc in commands]
@@ -47,7 +47,7 @@ class TestSheshaTUIComposition:
     async def test_register_custom_command(self) -> None:
         """Custom commands can be registered before run."""
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         app.register_command("/custom", lambda args: None, "Custom command")
         async with app.run_test() as pilot:
             commands = pilot.app._command_registry.list_commands()
@@ -57,7 +57,7 @@ class TestSheshaTUIComposition:
     async def test_set_group_help_handler(self) -> None:
         """set_group_help_handler is a public method that delegates to CommandRegistry."""
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         app.register_group("/grp", "A group")
         captured: list[str] = []
         app.set_group_help_handler("/grp", lambda args: captured.append(args))
@@ -71,7 +71,7 @@ class TestSheshaTUIComposition:
     async def test_help_command_shows_output(self) -> None:
         """The /help command adds a message to the output area."""
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         async with app.run_test() as pilot:
             input_area = pilot.app.query_one(InputArea)
             input_area.text = "/help"
@@ -88,12 +88,12 @@ class TestSheshaTUIComposition:
 
 
 class TestCompletionIntegration:
-    """Tests for slash command auto-complete in SheshaTUI."""
+    """Tests for slash command auto-complete in AnantaTUI."""
 
     async def test_typing_slash_shows_completion_popup(self) -> None:
         """Typing '/' shows the completion popup with all commands."""
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         async with app.run_test() as pilot:
             input_area = pilot.app.query_one(InputArea)
             popup = pilot.app.query_one(CompletionPopup)
@@ -108,7 +108,7 @@ class TestCompletionIntegration:
     async def test_completion_popup_filters_as_typing(self) -> None:
         """Popup filters to matching commands as user types."""
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         async with app.run_test() as pilot:
             input_area = pilot.app.query_one(InputArea)
             popup = pilot.app.query_one(CompletionPopup)
@@ -121,7 +121,7 @@ class TestCompletionIntegration:
     async def test_completion_accept_fills_input(self) -> None:
         """Accepting a completion fills the input with the command."""
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         async with app.run_test() as pilot:
             input_area = pilot.app.query_one(InputArea)
             popup = pilot.app.query_one(CompletionPopup)
@@ -139,7 +139,7 @@ class TestCompletionIntegration:
     async def test_completion_popup_hidden_for_non_slash_text(self) -> None:
         """Popup stays hidden for non-slash text."""
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         async with app.run_test() as pilot:
             input_area = pilot.app.query_one(InputArea)
             popup = pilot.app.query_one(CompletionPopup)
@@ -154,7 +154,7 @@ class TestFocusToggle:
     async def test_tab_moves_focus_to_output_area(self) -> None:
         """Tab from InputArea moves focus to OutputArea."""
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         async with app.run_test() as pilot:
             # InputArea has focus on startup
             assert pilot.app.query_one(InputArea).has_focus
@@ -165,7 +165,7 @@ class TestFocusToggle:
     async def test_tab_moves_focus_back_to_input_area(self) -> None:
         """Tab from OutputArea moves focus back to InputArea."""
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         async with app.run_test() as pilot:
             # Move to OutputArea first
             await pilot.press("tab")
@@ -179,7 +179,7 @@ class TestFocusToggle:
     async def test_input_area_has_focus_on_startup(self) -> None:
         """InputArea has focus when app starts."""
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         async with app.run_test() as pilot:
             assert pilot.app.query_one(InputArea).has_focus
 
@@ -190,7 +190,7 @@ class TestHelpBar:
     async def test_help_bar_exists(self) -> None:
         """App includes a help bar with keyboard hints."""
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         async with app.run_test() as pilot:
             help_bar = pilot.app.query_one("#help-bar", Static)
             text = str(help_bar.render())
@@ -205,7 +205,7 @@ class TestHistoryNavigation:
     async def test_up_arrow_fills_previous_input(self) -> None:
         """Up arrow fills the input with the previous history entry."""
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         async with app.run_test() as pilot:
             input_area = pilot.app.query_one(InputArea)
             # Submit a query (add to history manually since no real query runs)
@@ -223,7 +223,7 @@ class TestHistoryNavigation:
     async def test_down_arrow_navigates_forward(self) -> None:
         """Down arrow navigates forward through history."""
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         async with app.run_test() as pilot:
             input_area = pilot.app.query_one(InputArea)
             pilot.app._input_history.add("first")
@@ -242,7 +242,7 @@ class TestHistoryNavigation:
     async def test_down_past_end_clears_input(self) -> None:
         """Down arrow past end of history clears the input."""
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         async with app.run_test() as pilot:
             input_area = pilot.app.query_one(InputArea)
             pilot.app._input_history.add("query")
@@ -261,7 +261,7 @@ class TestQueryGuard:
     async def test_query_rejected_while_in_progress(self) -> None:
         """Submitting a query while one is running shows a system message."""
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         async with app.run_test() as pilot:
             output = pilot.app.query_one(OutputArea)
             # Simulate a query already running
@@ -278,7 +278,7 @@ class TestQueryGuard:
     async def test_query_not_added_to_history_while_in_progress(self) -> None:
         """A rejected query should not be added to input history."""
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         async with app.run_test() as pilot:
             pilot.app._query_in_progress = True
             input_area = pilot.app.query_one(InputArea)
@@ -290,7 +290,7 @@ class TestQueryGuard:
     async def test_commands_still_work_while_query_in_progress(self) -> None:
         """Commands like /help should still work during a running query."""
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         async with app.run_test() as pilot:
             pilot.app._query_in_progress = True
             input_area = pilot.app.query_one(InputArea)
@@ -313,7 +313,7 @@ class TestIncrementalTokenDisplay:
     async def test_on_progress_updates_cumulative_tokens(self) -> None:
         """Progress callback with TokenUsage updates app cumulative token fields."""
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         async with app.run_test() as pilot:
             # Verify initial state
             assert pilot.app._cumulative_prompt_tokens == 0
@@ -347,7 +347,7 @@ class TestIncrementalTokenDisplay:
     async def test_query_complete_does_not_double_count_tokens(self) -> None:
         """_on_query_complete must not double-count tokens already reported by _on_progress."""
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         async with app.run_test() as pilot:
             pilot.app._query_in_progress = True
             pilot.app._query_start_time = 0.0
@@ -380,7 +380,7 @@ class TestIncrementalTokenDisplay:
     async def test_tokens_accumulate_across_queries(self) -> None:
         """Token totals accumulate across multiple queries in a session."""
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         async with app.run_test() as pilot:
             # First query
             pilot.app._query_in_progress = True
@@ -423,7 +423,7 @@ class TestQueryCancellation:
     async def test_double_escape_cancels_query(self) -> None:
         """Double-escape stops a running query and shows Cancelled."""
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         async with app.run_test() as pilot:
             input_area = pilot.app.query_one(InputArea)
             info_bar = pilot.app.query_one(InfoBar)
@@ -446,7 +446,7 @@ class TestQueryCancellation:
     async def test_cancellation_bumps_query_id(self) -> None:
         """Cancelling a query increments _query_id so stale workers are ignored."""
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         async with app.run_test() as pilot:
             id_before = pilot.app._query_id
             # Simulate a query in progress and cancel it
@@ -461,7 +461,7 @@ class TestQueryCancellation:
     async def test_stale_worker_result_ignored_after_cancel_and_new_query(self) -> None:
         """A stale worker completing after cancellation doesn't corrupt state."""
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         async with app.run_test() as pilot:
             # Simulate: query A started at id=0, then cancelled (id bumped)
             pilot.app._query_in_progress = True
@@ -481,7 +481,7 @@ class TestQueryCancellation:
         project.query.side_effect = lambda *a, **kw: (_ for _ in ()).throw(
             RuntimeError("should not be called in this test")
         )
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         async with app.run_test() as pilot:
             # Simulate query A in progress, then cancel it
             pilot.app._query_in_progress = True
@@ -509,7 +509,7 @@ class TestQueryCancellation:
     async def test_cancel_sets_cancel_event(self) -> None:
         """Double-escape sets the cancel_event on the running query."""
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         async with app.run_test() as pilot:
             # Set up a cancel_event as if a query were running
             cancel_event = threading.Event()
@@ -533,7 +533,7 @@ class TestQueryCancellation:
             token_usage=TokenUsage(prompt_tokens=10, completion_tokens=5),
             execution_time=0.1,
         )
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         async with app.run_test() as pilot:
             # Create a cancel event and assign it
             cancel_event = threading.Event()
@@ -560,7 +560,7 @@ class TestQueryCancellation:
             token_usage=TokenUsage(prompt_tokens=10, completion_tokens=5),
             execution_time=0.1,
         )
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         async with app.run_test() as pilot:
             original_event = threading.Event()
             pilot.app._cancel_event = original_event
@@ -585,7 +585,7 @@ class TestAnalysisShortcutTokenDisplay:
         """When shortcut answers a query, token counts appear in the info bar."""
 
         project = MagicMock()
-        app = SheshaTUI(
+        app = AnantaTUI(
             project=project,
             project_name="test",
             model="test-model",
@@ -599,7 +599,7 @@ class TestAnalysisShortcutTokenDisplay:
                     answer="Shortcut answer", prompt_tokens=200, completion_tokens=50
                 )
 
-            with patch("shesha.tui.app.query_with_shortcut", mock_qws):
+            with patch("ananta.tui.app.query_with_shortcut", mock_qws):
                 pilot.app._run_query("What does this do?")
                 await pilot.app._worker_handle.wait()
                 await pilot.pause()
@@ -618,7 +618,7 @@ class TestAnalysisShortcutTokenDisplay:
         """Shortcut session stats include token counts, matching normal query path."""
 
         project = MagicMock()
-        app = SheshaTUI(
+        app = AnantaTUI(
             project=project,
             project_name="test",
             model="test-model",
@@ -632,7 +632,7 @@ class TestAnalysisShortcutTokenDisplay:
                     answer="Shortcut answer", prompt_tokens=200, completion_tokens=50
                 )
 
-            with patch("shesha.tui.app.query_with_shortcut", mock_qws):
+            with patch("ananta.tui.app.query_with_shortcut", mock_qws):
                 pilot.app._run_query("What does this do?")
                 await pilot.app._worker_handle.wait()
                 await pilot.pause()
@@ -647,7 +647,7 @@ class TestAnalysisShortcutTokenDisplay:
         """Shortcut answer displays 'Thought for N seconds' above the response."""
 
         project = MagicMock()
-        app = SheshaTUI(
+        app = AnantaTUI(
             project=project,
             project_name="test",
             model="test-model",
@@ -661,7 +661,7 @@ class TestAnalysisShortcutTokenDisplay:
                     answer="Shortcut answer", prompt_tokens=200, completion_tokens=50
                 )
 
-            with patch("shesha.tui.app.query_with_shortcut", mock_qws):
+            with patch("ananta.tui.app.query_with_shortcut", mock_qws):
                 pilot.app._run_query("What does this do?")
                 await pilot.app._worker_handle.wait()
                 await pilot.pause()
@@ -687,7 +687,7 @@ class TestAnalysisShortcutHistoryContext:
         """When conversation history exists, shortcut question includes it."""
 
         project = MagicMock()
-        app = SheshaTUI(
+        app = AnantaTUI(
             project=project,
             project_name="test",
             model="test-model",
@@ -708,7 +708,7 @@ class TestAnalysisShortcutHistoryContext:
                     answer="Shortcut answer", prompt_tokens=100, completion_tokens=25
                 )
 
-            with patch("shesha.tui.app.query_with_shortcut", mock_qws):
+            with patch("ananta.tui.app.query_with_shortcut", mock_qws):
                 pilot.app._run_query("What about module B?")
                 await pilot.app._worker_handle.wait()
                 await pilot.pause()
@@ -728,7 +728,7 @@ class TestWriteOverwriteProtection:
     async def test_write_force_flag_strips_bang(self, tmp_path: Path) -> None:
         """Trailing ! is stripped and write_transcript is called with clean filename."""
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         async with app.run_test() as pilot:
             # Add an exchange so write is allowed
             pilot.app._session.add_exchange("q", "a", "stats")
@@ -743,7 +743,7 @@ class TestWriteOverwriteProtection:
     async def test_write_force_flag_with_md_extension(self, tmp_path: Path) -> None:
         """notes.md! results in write_transcript('notes.md')."""
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         async with app.run_test() as pilot:
             pilot.app._session.add_exchange("q", "a", "stats")
             target = tmp_path / "notes.md"
@@ -756,7 +756,7 @@ class TestWriteOverwriteProtection:
     async def test_write_blocked_when_file_exists(self, tmp_path: Path) -> None:
         """Existing file blocks write and shows 'already exists' message."""
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         async with app.run_test() as pilot:
             pilot.app._session.add_exchange("q", "a", "stats")
             # Create the file on disk
@@ -777,7 +777,7 @@ class TestWriteOverwriteProtection:
     async def test_write_force_overwrites_existing(self, tmp_path: Path) -> None:
         """Force flag bypasses existence check and writes."""
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         async with app.run_test() as pilot:
             pilot.app._session.add_exchange("q", "a", "stats")
             target = tmp_path / "notes.md"
@@ -791,7 +791,7 @@ class TestWriteOverwriteProtection:
     async def test_write_shows_actual_filename_on_collision(self, tmp_path: Path) -> None:
         """Case-insensitive collision shows actual on-disk name."""
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         async with app.run_test() as pilot:
             pilot.app._session.add_exchange("q", "a", "stats")
             # Create NOTES.md on disk
@@ -811,7 +811,7 @@ class TestWriteOverwriteProtection:
     async def test_write_iterdir_permission_error_falls_back(self, tmp_path: Path) -> None:
         """PermissionError from iterdir() still shows warning, not a crash."""
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         async with app.run_test() as pilot:
             pilot.app._session.add_exchange("q", "a", "stats")
             target = tmp_path / "notes.md"
@@ -831,7 +831,7 @@ class TestWriteOverwriteProtection:
         """Auto-generated filename collision is blocked."""
         monkeypatch.chdir(tmp_path)
         project = MagicMock()
-        app = SheshaTUI(project=project, project_name="test")
+        app = AnantaTUI(project=project, project_name="test")
         async with app.run_test() as pilot:
             pilot.app._session.add_exchange("q", "a", "stats")
             frozen = datetime(2025, 6, 15, 14, 30, 45)
@@ -840,7 +840,7 @@ class TestWriteOverwriteProtection:
             auto_path = tmp_path / auto_name
             auto_path.write_text("existing")
             with (
-                patch("shesha.tui.app.datetime") as mock_dt,
+                patch("ananta.tui.app.datetime") as mock_dt,
                 patch.object(pilot.app._session, "write_transcript") as mock_write,
             ):
                 mock_dt.now.return_value = frozen

@@ -2,7 +2,7 @@
 
 import re
 
-from shesha.security.redaction import RedactionConfig, redact
+from ananta.security.redaction import RedactionConfig, redact
 
 
 class TestRedact:

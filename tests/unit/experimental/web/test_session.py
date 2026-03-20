@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from shesha.experimental.web.session import WebConversationSession
+from ananta.experimental.web.session import WebConversationSession
 
 
 @pytest.fixture
@@ -244,7 +244,7 @@ def test_uses_underscore_conversation_file(session_dir: Path) -> None:
 
 def test_inherits_from_shared_session() -> None:
     """WebConversationSession is a subclass of the shared session."""
-    from shesha.experimental.shared.session import (
+    from ananta.experimental.shared.session import (
         WebConversationSession as SharedSession,
     )
 

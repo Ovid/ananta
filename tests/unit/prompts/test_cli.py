@@ -22,7 +22,7 @@ def test_cli_validates_valid_prompts(tmp_path: Path):
     (prompts_dir / "verify_code.md").write_text("{previous_results} {findings} {documents}")
 
     result = subprocess.run(
-        [sys.executable, "-m", "shesha.prompts", "--prompts-dir", str(prompts_dir)],
+        [sys.executable, "-m", "ananta.prompts", "--prompts-dir", str(prompts_dir)],
         capture_output=True,
         text=True,
     )
@@ -46,7 +46,7 @@ def test_cli_fails_invalid_prompts(tmp_path: Path):
     (prompts_dir / "verify_code.md").write_text("{previous_results} {findings} {documents}")
 
     result = subprocess.run(
-        [sys.executable, "-m", "shesha.prompts", "--prompts-dir", str(prompts_dir)],
+        [sys.executable, "-m", "ananta.prompts", "--prompts-dir", str(prompts_dir)],
         capture_output=True,
         text=True,
     )

@@ -1,6 +1,6 @@
 """Tests for completion popup widget."""
 
-from shesha.tui.widgets.completion_popup import CompletionPopup
+from ananta.tui.widgets.completion_popup import CompletionPopup
 
 
 class TestCompletionPopup:

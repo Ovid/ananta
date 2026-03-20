@@ -14,12 +14,12 @@ from unittest.mock import MagicMock
 from fastapi import FastAPI, WebSocket
 from fastapi.testclient import TestClient
 
-from shesha.experimental.shared.websockets import (
+from ananta.experimental.shared.websockets import (
     handle_multi_project_query,
     websocket_handler,
 )
-from shesha.models import ParsedDocument
-from shesha.rlm.trace import TokenUsage
+from ananta.models import ParsedDocument
+from ananta.rlm.trace import TokenUsage
 
 
 def _make_doc(name: str) -> ParsedDocument:
@@ -53,7 +53,7 @@ def _make_state(
     state.session = MagicMock()
     state.session.format_history_prefix.return_value = ""
 
-    storage = state.shesha.storage
+    storage = state.ananta.storage
     storage.list_documents.return_value = doc_names or ["doc1.txt"]
     storage.get_document.side_effect = lambda pid, name: _make_doc(name)
     storage.list_traces.return_value = []
@@ -63,7 +63,7 @@ def _make_state(
         project.rlm_engine.query.return_value = _make_query_result(answer)
     else:
         project.rlm_engine = None
-    state.shesha.get_project.return_value = project
+    state.ananta.get_project.return_value = project
 
     return state
 
@@ -183,7 +183,7 @@ class TestMultiProjectHappyPath:
         assert complete["type"] == "complete"
 
         # Engine should have been called with docs from both projects
-        engine = state.shesha.get_project.return_value.rlm_engine
+        engine = state.ananta.get_project.return_value.rlm_engine
         call_kwargs = engine.query.call_args.kwargs
         # 2 projects x 1 doc each = 2 documents
         assert len(call_kwargs["documents"]) == 2
@@ -235,7 +235,7 @@ class TestMultiProjectEngineSelection:
             project.rlm_engine.query.return_value = _make_query_result("fallback answer")
             return project
 
-        state.shesha.get_project.side_effect = get_project_side_effect
+        state.ananta.get_project.side_effect = get_project_side_effect
         app = _make_app(state, item_noun="documents")
         client = TestClient(app)
 
@@ -255,7 +255,7 @@ class TestMultiProjectEngineSelection:
 
     def test_engine_query_failure_sends_error(self) -> None:
         state = _make_state()
-        engine = state.shesha.get_project.return_value.rlm_engine
+        engine = state.ananta.get_project.return_value.rlm_engine
         engine.query.side_effect = RuntimeError("engine exploded")
         app = _make_app(state, item_noun="documents")
         client = TestClient(app)
@@ -273,7 +273,7 @@ class TestMultiProjectDocumentLoading:
     def test_partial_doc_load_failure_still_queries(self) -> None:
         """If some documents fail to load, handler proceeds with the rest."""
         state = _make_state(doc_names=["good.txt", "bad.txt"])
-        storage = state.shesha.storage
+        storage = state.ananta.storage
 
         def get_doc_side_effect(pid: str, name: str) -> ParsedDocument:
             if name == "bad.txt":
@@ -293,7 +293,7 @@ class TestMultiProjectDocumentLoading:
 
     def test_all_docs_fail_sends_error(self) -> None:
         state = _make_state()
-        storage = state.shesha.storage
+        storage = state.ananta.storage
         storage.get_document.side_effect = RuntimeError("Disk error")
         app = _make_app(state, item_noun="documents")
         client = TestClient(app)
@@ -309,7 +309,7 @@ class TestMultiProjectDocumentLoading:
     def test_list_documents_fails_skips_project(self) -> None:
         """If list_documents raises for a project, handler skips it."""
         state = _make_state()
-        storage = state.shesha.storage
+        storage = state.ananta.storage
 
         call_count = 0
 
@@ -352,7 +352,7 @@ class TestMultiProjectCallbacks:
             ws.send_json({"type": "query", "question": "What?", "document_ids": ["proj1"]})
             _collect_messages(ws)
 
-        engine = state.shesha.get_project.return_value.rlm_engine
+        engine = state.ananta.get_project.return_value.rlm_engine
         call_kwargs = engine.query.call_args.kwargs
         assert "EXTRA MULTI CONTEXT" in call_kwargs["question"]
 
@@ -378,7 +378,7 @@ class TestMultiProjectCallbacks:
             )
             _collect_messages(ws)
 
-        engine = state.shesha.get_project.return_value.rlm_engine
+        engine = state.ananta.get_project.return_value.rlm_engine
         call_kwargs = engine.query.call_args.kwargs
         assert call_kwargs["question"].startswith("HISTORY: ")
         custom_session.add_exchange.assert_called_once()
@@ -399,7 +399,7 @@ class TestMultiProjectCallbacks:
             )
             _collect_messages(ws)
 
-        engine = state.shesha.get_project.return_value.rlm_engine
+        engine = state.ananta.get_project.return_value.rlm_engine
         call_kwargs = engine.query.call_args.kwargs
         assert call_kwargs["allow_background_knowledge"] is True
 
@@ -440,7 +440,7 @@ class TestMultiProjectSessionRecording:
 
     def test_trace_id_from_storage(self) -> None:
         state = _make_state()
-        storage = state.shesha.storage
+        storage = state.ananta.storage
         storage.list_traces.return_value = [Path("/traces/abc123.jsonl")]
         app = _make_app(state, item_noun="documents")
         client = TestClient(app)

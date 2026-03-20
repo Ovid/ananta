@@ -5,31 +5,31 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from shesha.experimental.code_explorer.dependencies import (
+from ananta.experimental.code_explorer.dependencies import (
     CodeExplorerState,
     create_app_state,
 )
-from shesha.experimental.code_explorer.topics import CodeExplorerTopicManager
-from shesha.experimental.shared.session import WebConversationSession
+from ananta.experimental.code_explorer.topics import CodeExplorerTopicManager
+from ananta.experimental.shared.session import WebConversationSession
 
 
 class TestCodeExplorerState:
     """Tests for the CodeExplorerState dataclass."""
 
-    def test_has_shesha_attribute(self) -> None:
-        """CodeExplorerState has a shesha attribute."""
+    def test_has_ananta_attribute(self) -> None:
+        """CodeExplorerState has an ananta attribute."""
         state = CodeExplorerState(
-            shesha=MagicMock(),
+            ananta=MagicMock(),
             topic_mgr=MagicMock(),
             session=MagicMock(),
             model="test-model",
         )
-        assert hasattr(state, "shesha")
+        assert hasattr(state, "ananta")
 
     def test_has_topic_mgr_attribute(self) -> None:
         """CodeExplorerState has a topic_mgr attribute."""
         state = CodeExplorerState(
-            shesha=MagicMock(),
+            ananta=MagicMock(),
             topic_mgr=MagicMock(),
             session=MagicMock(),
             model="test-model",
@@ -39,7 +39,7 @@ class TestCodeExplorerState:
     def test_has_session_attribute(self) -> None:
         """CodeExplorerState has a session attribute."""
         state = CodeExplorerState(
-            shesha=MagicMock(),
+            ananta=MagicMock(),
             topic_mgr=MagicMock(),
             session=MagicMock(),
             model="test-model",
@@ -49,7 +49,7 @@ class TestCodeExplorerState:
     def test_has_model_attribute(self) -> None:
         """CodeExplorerState has a model attribute."""
         state = CodeExplorerState(
-            shesha=MagicMock(),
+            ananta=MagicMock(),
             topic_mgr=MagicMock(),
             session=MagicMock(),
             model="test-model",
@@ -60,58 +60,58 @@ class TestCodeExplorerState:
 class TestCreateAppState:
     """Tests for create_app_state factory function."""
 
-    @patch("shesha.experimental.shared.dependencies.Shesha")
-    def test_returns_code_explorer_state(self, mock_shesha_cls: MagicMock, tmp_path: Path) -> None:
+    @patch("ananta.experimental.shared.dependencies.Ananta")
+    def test_returns_code_explorer_state(self, mock_ananta_cls: MagicMock, tmp_path: Path) -> None:
         """create_app_state returns a CodeExplorerState instance."""
         state = create_app_state(data_dir=tmp_path)
         assert isinstance(state, CodeExplorerState)
 
-    @patch("shesha.experimental.shared.dependencies.Shesha")
-    def test_creates_shesha_data_dir(self, mock_shesha_cls: MagicMock, tmp_path: Path) -> None:
-        """create_app_state creates the shesha_data subdirectory."""
+    @patch("ananta.experimental.shared.dependencies.Ananta")
+    def test_creates_ananta_data_dir(self, mock_ananta_cls: MagicMock, tmp_path: Path) -> None:
+        """create_app_state creates the ananta_data subdirectory."""
         create_app_state(data_dir=tmp_path)
-        assert (tmp_path / "shesha_data").is_dir()
+        assert (tmp_path / "ananta_data").is_dir()
 
-    @patch("shesha.experimental.shared.dependencies.Shesha")
-    def test_creates_topics_dir(self, mock_shesha_cls: MagicMock, tmp_path: Path) -> None:
+    @patch("ananta.experimental.shared.dependencies.Ananta")
+    def test_creates_topics_dir(self, mock_ananta_cls: MagicMock, tmp_path: Path) -> None:
         """create_app_state creates the topics subdirectory."""
         create_app_state(data_dir=tmp_path)
         assert (tmp_path / "topics").is_dir()
 
-    @patch("shesha.experimental.shared.dependencies.Shesha")
-    @patch("shesha.experimental.shared.dependencies.Path.home")
+    @patch("ananta.experimental.shared.dependencies.Ananta")
+    @patch("ananta.experimental.shared.dependencies.Path.home")
     def test_default_data_dir(
-        self, mock_home: MagicMock, mock_shesha_cls: MagicMock, tmp_path: Path
+        self, mock_home: MagicMock, mock_ananta_cls: MagicMock, tmp_path: Path
     ) -> None:
-        """create_app_state uses ~/.shesha/code-explorer/ as default data_dir."""
+        """create_app_state uses ~/.ananta/code-explorer/ as default data_dir."""
         mock_home.return_value = tmp_path
         state = create_app_state(data_dir=None)
-        expected_data_dir = tmp_path / ".shesha" / "code-explorer"
-        assert (expected_data_dir / "shesha_data").is_dir()
+        expected_data_dir = tmp_path / ".ananta" / "code-explorer"
+        assert (expected_data_dir / "ananta_data").is_dir()
         assert (expected_data_dir / "topics").is_dir()
         assert isinstance(state, CodeExplorerState)
 
-    @patch("shesha.experimental.shared.dependencies.Shesha")
-    def test_model_override(self, mock_shesha_cls: MagicMock, tmp_path: Path) -> None:
+    @patch("ananta.experimental.shared.dependencies.Ananta")
+    def test_model_override(self, mock_ananta_cls: MagicMock, tmp_path: Path) -> None:
         """create_app_state passes model override to config."""
         state = create_app_state(data_dir=tmp_path, model="custom-model")
         assert state.model == "custom-model"
 
-    @patch("shesha.experimental.shared.dependencies.Shesha")
-    def test_state_has_topic_mgr(self, mock_shesha_cls: MagicMock, tmp_path: Path) -> None:
+    @patch("ananta.experimental.shared.dependencies.Ananta")
+    def test_state_has_topic_mgr(self, mock_ananta_cls: MagicMock, tmp_path: Path) -> None:
         """create_app_state creates a CodeExplorerTopicManager."""
         state = create_app_state(data_dir=tmp_path)
         assert isinstance(state.topic_mgr, CodeExplorerTopicManager)
 
-    @patch("shesha.experimental.shared.dependencies.Shesha")
-    def test_state_has_session(self, mock_shesha_cls: MagicMock, tmp_path: Path) -> None:
+    @patch("ananta.experimental.shared.dependencies.Ananta")
+    def test_state_has_session(self, mock_ananta_cls: MagicMock, tmp_path: Path) -> None:
         """create_app_state creates a WebConversationSession."""
         state = create_app_state(data_dir=tmp_path)
         assert isinstance(state.session, WebConversationSession)
 
-    @patch("shesha.experimental.shared.dependencies.Shesha")
+    @patch("ananta.experimental.shared.dependencies.Ananta")
     def test_session_project_dir_is_data_dir(
-        self, mock_shesha_cls: MagicMock, tmp_path: Path
+        self, mock_ananta_cls: MagicMock, tmp_path: Path
     ) -> None:
         """Session's backing file is at data_dir/conversation.json (global)."""
         state = create_app_state(data_dir=tmp_path)

@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from shesha.parser.pdf import PdfParser
+from ananta.parser.pdf import PdfParser
 
 
 @pytest.fixture
@@ -25,7 +25,7 @@ class TestPdfParser:
         assert not parser.can_parse(Path("document.txt"))
         assert not parser.can_parse(Path("document.docx"))
 
-    @patch("shesha.parser.pdf.pdfplumber")
+    @patch("ananta.parser.pdf.pdfplumber")
     def test_parse_pdf_extracts_text(self, mock_pdfplumber: MagicMock, parser: PdfParser):
         """PdfParser extracts text from PDF pages."""
         # Mock PDF page

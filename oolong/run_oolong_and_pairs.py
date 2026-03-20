@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""OOLONG & OOLONG-Pairs benchmark for Shesha RLM.
+"""OOLONG & OOLONG-Pairs benchmark for Ananta RLM.
 
 Reproduces the OOLONG and OOLONG-Pairs evaluations from the Recursive Language
 Models paper (arXiv:2512.24601).  Uses the trec_coarse split of the
@@ -12,7 +12,7 @@ Two evaluation modes are supported and can be enabled independently:
 
   "base"  — single-shot: the full context + question is sent to the LLM in one
             call via LiteLLM.  Tests the model's raw long-context ability.
-  "rlm"   — Shesha RLM: the context is uploaded as a document and the RLM loop
+  "rlm"   — Ananta RLM: the context is uploaded as a document and the RLM loop
             explores it programmatically before answering.  Tests whether the
             recursive approach outperforms raw context.
 
@@ -25,29 +25,29 @@ Environment variables:
 
   Required
   ────────
-  SHESHA_API_KEY        API key passed to Shesha / LiteLLM.
+  ANANTA_API_KEY        API key passed to Ananta / LiteLLM.
 
   Model
   ─────
-  SHESHA_MODEL          LLM to use for both base and RLM modes.
+  ANANTA_MODEL          LLM to use for both base and RLM modes.
                         Default: gpt-5.2
 
   Evaluation scope
   ────────────────
   RUN_BASE              Set to 1 to enable the base-model (single-shot) runs.
                         Default: 0  (off — only RLM runs by default)
-  RUN_RLM               Set to 1 to enable Shesha RLM runs.
+  RUN_RLM               Set to 1 to enable Ananta RLM runs.
                         Default: 1
   MAX_WINDOWS_PER_LEN   How many context windows to evaluate per context length.
                         Lower = faster / cheaper.  The dataset has ~50 windows
                         per length; set higher for more statistical power.
                         Default: 1
 
-  Shesha tuning
+  Ananta tuning
   ─────────────
-  SHESHA_STORAGE        Directory for Shesha's project storage.
-                        Default: ./shesha_data
-  SHESHA_MAX_ITER       Maximum RLM loop iterations before forced stop.
+  ANANTA_STORAGE        Directory for Ananta's project storage.
+                        Default: ./ananta_data
+  ANANTA_MAX_ITER       Maximum RLM loop iterations before forced stop.
                         Increase if the model is truncated mid-reasoning.
                         Default: 40
 
@@ -58,19 +58,19 @@ Environment variables:
 
   CLI arguments
   ─────────────
-  --model MODEL         LLM to use (overrides SHESHA_MODEL env var).
+  --model MODEL         LLM to use (overrides ANANTA_MODEL env var).
 
 Usage examples:
 
   # Minimal RLM-only run (one window per length, cheapest)
-  export SHESHA_API_KEY="sk-..."
+  export ANANTA_API_KEY="sk-..."
   python oolong/run_oolong_and_pairs.py
 
   # Use a specific model via CLI flag
   python oolong/run_oolong_and_pairs.py --model gpt-4o
 
   # Compare base vs RLM with more statistical power
-  export SHESHA_API_KEY="sk-..."
+  export ANANTA_API_KEY="sk-..."
   export RUN_BASE=1
   export MAX_WINDOWS_PER_LEN=5
   python oolong/run_oolong_and_pairs.py
@@ -109,8 +109,8 @@ from datasets import load_dataset  # noqa: E402
 from dateutil import parser as dateparser  # noqa: E402
 from litellm import completion  # noqa: E402
 
-from shesha import Shesha, SheshaConfig  # noqa: E402
-from shesha.exceptions import ProjectExistsError  # noqa: E402
+from ananta import Ananta, AnantaConfig  # noqa: E402
+from ananta.exceptions import ProjectExistsError  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -656,12 +656,12 @@ def plot_results(csv_path: Path, plot_path: Path) -> None:
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="OOLONG & OOLONG-Pairs benchmark for Shesha RLM.",
+        description="OOLONG & OOLONG-Pairs benchmark for Ananta RLM.",
     )
     parser.add_argument(
         "--model",
         default=None,
-        help="LLM model to use (overrides SHESHA_MODEL env var, default: gpt-5.2)",
+        help="LLM model to use (overrides ANANTA_MODEL env var, default: gpt-5.2)",
     )
     return parser.parse_args()
 
@@ -699,7 +699,7 @@ def main() -> None:
         return
 
     t_start = time.monotonic()
-    model = args.model or os.getenv("SHESHA_MODEL", "gpt-5.2")
+    model = args.model or os.getenv("ANANTA_MODEL", "gpt-5.2")
     run_base = os.getenv("RUN_BASE", "0") == "1"
     run_rlm = os.getenv("RUN_RLM", "1") == "1"
     max_win = int(os.getenv("MAX_WINDOWS_PER_LEN", "1"))
@@ -728,17 +728,17 @@ def main() -> None:
         status("Nothing to run (RUN_BASE=0 and RUN_RLM=0)")
         return
 
-    # --- Shesha setup ---
+    # --- Ananta setup ---
     sh = None
     if run_rlm:
-        cfg = SheshaConfig(
+        cfg = AnantaConfig(
             model=model,
-            api_key=os.getenv("SHESHA_API_KEY"),
-            storage_path=os.getenv("SHESHA_STORAGE", "./shesha_data"),
-            max_iterations=int(os.getenv("SHESHA_MAX_ITER", "30")),
+            api_key=os.getenv("ANANTA_API_KEY"),
+            storage_path=os.getenv("ANANTA_STORAGE", "./ananta_data"),
+            max_iterations=int(os.getenv("ANANTA_MAX_ITER", "30")),
         )
-        sh = Shesha(config=cfg)
-        log.info("Shesha initialized: %s", cfg)
+        sh = Ananta(config=cfg)
+        log.info("Ananta initialized: %s", cfg)
 
     # --- Load dataset (cached locally after first fetch) ---
     if CACHE_PATH.exists():
@@ -850,7 +850,7 @@ def main() -> None:
                 context = g["context_window_text"].iloc[0]
                 context_labeled = g["context_window_text_with_labels"].iloc[0]
 
-                # One Shesha project per context window (queries are independent)
+                # One Ananta project per context window (queries are independent)
                 rlm_project = None
                 if run_rlm and sh is not None:
                     proj_name = f"oolong_{ctx_len}_{ctx_id}"
@@ -866,7 +866,7 @@ def main() -> None:
                             f.write(context)
                         rlm_project.upload(fpath)
                     log.info(
-                        "Shesha project '%s' created (%d chars)",
+                        "Ananta project '%s' created (%d chars)",
                         proj_name, len(context),
                     )
 

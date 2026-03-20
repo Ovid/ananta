@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from shesha.experimental.shared.topics import BaseTopicManager, _slugify
+from ananta.experimental.shared.topics import BaseTopicManager, _slugify
 
 _SAFE_ID_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 
-from shesha.experimental.arxiv.rate_limit import RateLimiter
+from ananta.experimental.arxiv.rate_limit import RateLimiter
 
 
 class TestRateLimiter:

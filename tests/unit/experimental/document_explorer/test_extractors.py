@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from shesha.experimental.document_explorer.extractors import extract_text, get_page_count
+from ananta.experimental.document_explorer.extractors import extract_text, get_page_count
 
 
 class TestPlainTextExtraction:
@@ -84,7 +84,7 @@ class TestPdfExtraction:
         f = tmp_path / "doc.pdf"
         f.write_bytes(b"%PDF-1.4 fake")
 
-        with patch("shesha.experimental.document_explorer.extractors.pdfplumber") as mock_plumber:
+        with patch("ananta.experimental.document_explorer.extractors.pdfplumber") as mock_plumber:
             mock_plumber.open.return_value = mock_pdf
             result = extract_text(f)
 
@@ -104,7 +104,7 @@ class TestPdfExtraction:
         f = tmp_path / "multi.pdf"
         f.write_bytes(b"%PDF-1.4 fake")
 
-        with patch("shesha.experimental.document_explorer.extractors.pdfplumber") as mock_plumber:
+        with patch("ananta.experimental.document_explorer.extractors.pdfplumber") as mock_plumber:
             mock_plumber.open.return_value = mock_pdf
             result = extract_text(f)
 
@@ -126,7 +126,7 @@ class TestDocxExtraction:
         f = tmp_path / "report.docx"
         f.write_bytes(b"PK fake docx")
 
-        with patch("shesha.experimental.document_explorer.extractors.DocxDocument") as mock_cls:
+        with patch("ananta.experimental.document_explorer.extractors.DocxDocument") as mock_cls:
             mock_cls.return_value = mock_doc
             result = extract_text(f)
 
@@ -149,7 +149,7 @@ class TestPptxExtraction:
         f = tmp_path / "deck.pptx"
         f.write_bytes(b"PK fake pptx")
 
-        with patch("shesha.experimental.document_explorer.extractors.PptxPresentation") as mock_cls:
+        with patch("ananta.experimental.document_explorer.extractors.PptxPresentation") as mock_cls:
             mock_cls.return_value = mock_prs
             result = extract_text(f)
 
@@ -173,7 +173,7 @@ class TestXlsxExtraction:
         f = tmp_path / "data.xlsx"
         f.write_bytes(b"PK fake xlsx")
 
-        with patch("shesha.experimental.document_explorer.extractors.load_workbook") as mock_load:
+        with patch("ananta.experimental.document_explorer.extractors.load_workbook") as mock_load:
             mock_load.return_value = mock_wb
             result = extract_text(f)
 
@@ -190,7 +190,7 @@ class TestXlsxExtraction:
         f = tmp_path / "data.xlsx"
         f.write_bytes(b"PK fake xlsx")
 
-        with patch("shesha.experimental.document_explorer.extractors.load_workbook") as mock_load:
+        with patch("ananta.experimental.document_explorer.extractors.load_workbook") as mock_load:
             mock_load.return_value = mock_wb
             extract_text(f)
 
@@ -204,7 +204,7 @@ class TestRtfExtraction:
         f = tmp_path / "doc.rtf"
         f.write_text(r"{\rtf1 Hello RTF}")
 
-        with patch("shesha.experimental.document_explorer.extractors.rtf_to_text") as mock_rtf:
+        with patch("ananta.experimental.document_explorer.extractors.rtf_to_text") as mock_rtf:
             mock_rtf.return_value = "Hello RTF"
             result = extract_text(f)
 
@@ -223,7 +223,7 @@ class TestGetPageCount:
         f = tmp_path / "doc.pdf"
         f.write_bytes(b"%PDF-1.4 fake")
 
-        with patch("shesha.experimental.document_explorer.extractors.pdfplumber") as mock_plumber:
+        with patch("ananta.experimental.document_explorer.extractors.pdfplumber") as mock_plumber:
             mock_plumber.open.return_value = mock_pdf
             assert get_page_count(f) == 3
 
@@ -234,7 +234,7 @@ class TestGetPageCount:
         f = tmp_path / "deck.pptx"
         f.write_bytes(b"PK fake pptx")
 
-        with patch("shesha.experimental.document_explorer.extractors.PptxPresentation") as mock_cls:
+        with patch("ananta.experimental.document_explorer.extractors.PptxPresentation") as mock_cls:
             mock_cls.return_value = mock_prs
             assert get_page_count(f) == 2
 
@@ -245,7 +245,7 @@ class TestGetPageCount:
         f = tmp_path / "data.xlsx"
         f.write_bytes(b"PK fake xlsx")
 
-        with patch("shesha.experimental.document_explorer.extractors.load_workbook") as mock_load:
+        with patch("ananta.experimental.document_explorer.extractors.load_workbook") as mock_load:
             mock_load.return_value = mock_wb
             assert get_page_count(f) == 3
 
@@ -256,7 +256,7 @@ class TestGetPageCount:
         f = tmp_path / "data.xlsx"
         f.write_bytes(b"PK fake xlsx")
 
-        with patch("shesha.experimental.document_explorer.extractors.load_workbook") as mock_load:
+        with patch("ananta.experimental.document_explorer.extractors.load_workbook") as mock_load:
             mock_load.return_value = mock_wb
             get_page_count(f)
 

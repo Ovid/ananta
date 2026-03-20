@@ -80,22 +80,22 @@ class TestShowPicker:
         """No projects should prompt for URL, not show picker."""
         from examples.repo import show_picker
 
-        mock_shesha = MagicMock()
-        mock_shesha.list_projects.return_value = []
+        mock_ananta = MagicMock()
+        mock_ananta.list_projects.return_value = []
 
         # Should return None when no projects (prompt_for_repo handles that case)
-        result = show_picker(mock_shesha)
+        result = show_picker(mock_ananta)
         assert result is None
 
     def test_with_projects_shows_list(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Projects should be listed with numbers."""
         from examples.repo import show_picker
 
-        mock_shesha = MagicMock()
-        mock_shesha.list_projects.return_value = ["project-a", "project-b"]
+        mock_ananta = MagicMock()
+        mock_ananta.list_projects.return_value = ["project-a", "project-b"]
 
         with patch("builtins.input", return_value="1"):
-            value, is_existing = show_picker(mock_shesha)
+            value, is_existing = show_picker(mock_ananta)
 
         captured = capsys.readouterr()
         assert "1. project-a" in captured.out
@@ -107,11 +107,11 @@ class TestShowPicker:
         """Selecting a number returns corresponding project name with is_existing=True."""
         from examples.repo import show_picker
 
-        mock_shesha = MagicMock()
-        mock_shesha.list_projects.return_value = ["project-a", "project-b"]
+        mock_ananta = MagicMock()
+        mock_ananta.list_projects.return_value = ["project-a", "project-b"]
 
         with patch("builtins.input", return_value="2"):
-            value, is_existing = show_picker(mock_shesha)
+            value, is_existing = show_picker(mock_ananta)
 
         assert value == "project-b"
         assert is_existing is True
@@ -120,11 +120,11 @@ class TestShowPicker:
         """Entering a URL should return it with is_existing=False."""
         from examples.repo import show_picker
 
-        mock_shesha = MagicMock()
-        mock_shesha.list_projects.return_value = ["project-a"]
+        mock_ananta = MagicMock()
+        mock_ananta.list_projects.return_value = ["project-a"]
 
         with patch("builtins.input", return_value="https://github.com/new/repo"):
-            value, is_existing = show_picker(mock_shesha)
+            value, is_existing = show_picker(mock_ananta)
 
         assert value == "https://github.com/new/repo"
         assert is_existing is False
@@ -133,11 +133,11 @@ class TestShowPicker:
         """Typing 'exit' should return empty string to trigger exit."""
         from examples.repo import show_picker
 
-        mock_shesha = MagicMock()
-        mock_shesha.list_projects.return_value = ["project-a"]
+        mock_ananta = MagicMock()
+        mock_ananta.list_projects.return_value = ["project-a"]
 
         with patch("builtins.input", return_value="exit"):
-            value, is_existing = show_picker(mock_shesha)
+            value, is_existing = show_picker(mock_ananta)
 
         assert value == ""
         assert is_existing is False
@@ -146,11 +146,11 @@ class TestShowPicker:
         """Typing 'quit' should return empty string to trigger exit."""
         from examples.repo import show_picker
 
-        mock_shesha = MagicMock()
-        mock_shesha.list_projects.return_value = ["project-a"]
+        mock_ananta = MagicMock()
+        mock_ananta.list_projects.return_value = ["project-a"]
 
         with patch("builtins.input", return_value="quit"):
-            value, is_existing = show_picker(mock_shesha)
+            value, is_existing = show_picker(mock_ananta)
 
         assert value == ""
         assert is_existing is False
@@ -159,13 +159,13 @@ class TestShowPicker:
         """Invalid input like 'asdf' should show error and reprompt."""
         from examples.repo import show_picker
 
-        mock_shesha = MagicMock()
-        mock_shesha.list_projects.return_value = ["project-a"]
+        mock_ananta = MagicMock()
+        mock_ananta.list_projects.return_value = ["project-a"]
 
         # First input is invalid, second is valid exit
         inputs = iter(["asdf", "exit"])
         with patch("builtins.input", side_effect=lambda _: next(inputs)):
-            value, is_existing = show_picker(mock_shesha)
+            value, is_existing = show_picker(mock_ananta)
 
         captured = capsys.readouterr()
         assert "Invalid input" in captured.out
@@ -175,11 +175,11 @@ class TestShowPicker:
         """HTTPS URLs should be accepted."""
         from examples.repo import show_picker
 
-        mock_shesha = MagicMock()
-        mock_shesha.list_projects.return_value = ["project-a"]
+        mock_ananta = MagicMock()
+        mock_ananta.list_projects.return_value = ["project-a"]
 
         with patch("builtins.input", return_value="https://github.com/org/repo"):
-            value, is_existing = show_picker(mock_shesha)
+            value, is_existing = show_picker(mock_ananta)
 
         assert value == "https://github.com/org/repo"
         assert is_existing is False
@@ -188,11 +188,11 @@ class TestShowPicker:
         """SSH URLs should be accepted."""
         from examples.repo import show_picker
 
-        mock_shesha = MagicMock()
-        mock_shesha.list_projects.return_value = ["project-a"]
+        mock_ananta = MagicMock()
+        mock_ananta.list_projects.return_value = ["project-a"]
 
         with patch("builtins.input", return_value="git@github.com:org/repo.git"):
-            value, is_existing = show_picker(mock_shesha)
+            value, is_existing = show_picker(mock_ananta)
 
         assert value == "git@github.com:org/repo.git"
         assert is_existing is False
@@ -201,11 +201,11 @@ class TestShowPicker:
         """Absolute paths should be accepted."""
         from examples.repo import show_picker
 
-        mock_shesha = MagicMock()
-        mock_shesha.list_projects.return_value = ["project-a"]
+        mock_ananta = MagicMock()
+        mock_ananta.list_projects.return_value = ["project-a"]
 
         with patch("builtins.input", return_value="/path/to/repo"):
-            value, is_existing = show_picker(mock_shesha)
+            value, is_existing = show_picker(mock_ananta)
 
         assert value == "/path/to/repo"
         assert is_existing is False
@@ -214,11 +214,11 @@ class TestShowPicker:
         """Paths starting with ~ should be accepted."""
         from examples.repo import show_picker
 
-        mock_shesha = MagicMock()
-        mock_shesha.list_projects.return_value = ["project-a"]
+        mock_ananta = MagicMock()
+        mock_ananta.list_projects.return_value = ["project-a"]
 
         with patch("builtins.input", return_value="~/projects/repo"):
-            value, is_existing = show_picker(mock_shesha)
+            value, is_existing = show_picker(mock_ananta)
 
         assert value == "~/projects/repo"
         assert is_existing is False
@@ -227,11 +227,11 @@ class TestShowPicker:
         """Paths starting with ./ or ../ should be accepted."""
         from examples.repo import show_picker
 
-        mock_shesha = MagicMock()
-        mock_shesha.list_projects.return_value = ["project-a"]
+        mock_ananta = MagicMock()
+        mock_ananta.list_projects.return_value = ["project-a"]
 
         with patch("builtins.input", return_value="./local-repo"):
-            value, is_existing = show_picker(mock_shesha)
+            value, is_existing = show_picker(mock_ananta)
 
         assert value == "./local-repo"
         assert is_existing is False
@@ -338,10 +338,10 @@ class TestMain:
         from examples.repo import main
 
         with patch.object(sys, "argv", ["repo.py", "https://github.com/test/repo"]):
-            with patch.dict(os.environ, {"SHESHA_API_KEY": "test-key"}, clear=True):
-                with patch("examples.repo.SheshaConfig"):
+            with patch.dict(os.environ, {"ANANTA_API_KEY": "test-key"}, clear=True):
+                with patch("examples.repo.AnantaConfig"):
                     with patch(
-                        "examples.repo.Shesha",
+                        "examples.repo.Ananta",
                         side_effect=RuntimeError(
                             "Docker is not running. Please start Docker Desktop and try again."
                         ),
@@ -371,7 +371,7 @@ class TestMain:
 
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
-        assert "SHESHA_API_KEY" in captured.out
+        assert "ANANTA_API_KEY" in captured.out
 
     def test_picker_existing_project_launches_tui(self) -> None:
         """Selecting existing project via picker should launch TUI."""
@@ -386,23 +386,23 @@ class TestMain:
         mock_result.project = MagicMock()
         mock_result.project.project_id = "existing-project"
 
-        mock_shesha = MagicMock()
-        mock_shesha.list_projects.return_value = ["existing-project"]
-        mock_shesha.check_repo_for_updates.return_value = mock_result
-        mock_shesha.get_analysis.return_value = None
+        mock_ananta = MagicMock()
+        mock_ananta.list_projects.return_value = ["existing-project"]
+        mock_ananta.check_repo_for_updates.return_value = mock_result
+        mock_ananta.get_analysis.return_value = None
 
         with patch.object(sys, "argv", ["repo.py"]):
-            with patch.dict(os.environ, {"SHESHA_API_KEY": "test-key"}, clear=True):
-                with patch("examples.repo.Shesha", return_value=mock_shesha):
-                    with patch("examples.repo.SheshaConfig"):
-                        with patch("examples.repo.SheshaTUI") as mock_tui_class:
+            with patch.dict(os.environ, {"ANANTA_API_KEY": "test-key"}, clear=True):
+                with patch("examples.repo.Ananta", return_value=mock_ananta):
+                    with patch("examples.repo.AnantaConfig"):
+                        with patch("examples.repo.AnantaTUI") as mock_tui_class:
                             mock_tui = MagicMock()
                             mock_tui_class.return_value = mock_tui
                             with patch("builtins.input", return_value="1"):
                                 main()
 
         # Should check for updates when loading existing project
-        mock_shesha.check_repo_for_updates.assert_called_once_with("existing-project")
+        mock_ananta.check_repo_for_updates.assert_called_once_with("existing-project")
         # Should create TUI and run it
         mock_tui_class.assert_called_once()
         mock_tui.run.assert_called_once()
@@ -430,16 +430,16 @@ class TestMain:
         updated_result.project = mock_result.project
         mock_result.apply_updates.return_value = updated_result
 
-        mock_shesha = MagicMock()
-        mock_shesha.list_projects.return_value = ["existing-project"]
-        mock_shesha.check_repo_for_updates.return_value = mock_result
-        mock_shesha.get_analysis.return_value = None
+        mock_ananta = MagicMock()
+        mock_ananta.list_projects.return_value = ["existing-project"]
+        mock_ananta.check_repo_for_updates.return_value = mock_result
+        mock_ananta.get_analysis.return_value = None
 
         with patch.object(sys, "argv", ["repo.py", "--update"]):
-            with patch.dict(os.environ, {"SHESHA_API_KEY": "test-key"}, clear=True):
-                with patch("examples.repo.Shesha", return_value=mock_shesha):
-                    with patch("examples.repo.SheshaConfig"):
-                        with patch("examples.repo.SheshaTUI") as mock_tui_class:
+            with patch.dict(os.environ, {"ANANTA_API_KEY": "test-key"}, clear=True):
+                with patch("examples.repo.Ananta", return_value=mock_ananta):
+                    with patch("examples.repo.AnantaConfig"):
+                        with patch("examples.repo.AnantaTUI") as mock_tui_class:
                             mock_tui = MagicMock()
                             mock_tui_class.return_value = mock_tui
                             with patch("builtins.input", return_value="1"):
@@ -463,16 +463,16 @@ class TestMain:
         mock_result.project = MagicMock()
         mock_result.project.project_id = "new-repo"
 
-        mock_shesha = MagicMock()
-        mock_shesha.list_projects.return_value = ["existing-project"]
-        mock_shesha.create_project_from_repo.return_value = mock_result
-        mock_shesha.get_analysis.return_value = None
+        mock_ananta = MagicMock()
+        mock_ananta.list_projects.return_value = ["existing-project"]
+        mock_ananta.create_project_from_repo.return_value = mock_result
+        mock_ananta.get_analysis.return_value = None
 
         with patch.object(sys, "argv", ["repo.py"]):
-            with patch.dict(os.environ, {"SHESHA_API_KEY": "test-key"}, clear=True):
-                with patch("examples.repo.Shesha", return_value=mock_shesha):
-                    with patch("examples.repo.SheshaConfig"):
-                        with patch("examples.repo.SheshaTUI") as mock_tui_class:
+            with patch.dict(os.environ, {"ANANTA_API_KEY": "test-key"}, clear=True):
+                with patch("examples.repo.Ananta", return_value=mock_ananta):
+                    with patch("examples.repo.AnantaConfig"):
+                        with patch("examples.repo.AnantaTUI") as mock_tui_class:
                             mock_tui = MagicMock()
                             mock_tui_class.return_value = mock_tui
                             with patch(
@@ -482,8 +482,8 @@ class TestMain:
                                 main()
 
         # Should use create_project_from_repo for new URL, NOT get_project
-        mock_shesha.create_project_from_repo.assert_called_once_with("https://github.com/new/repo")
-        mock_shesha.get_project.assert_not_called()
+        mock_ananta.create_project_from_repo.assert_called_once_with("https://github.com/new/repo")
+        mock_ananta.get_project.assert_not_called()
 
     def test_tui_created_with_analysis_context(self) -> None:
         """TUI should be created with analysis_context when analysis exists."""
@@ -498,7 +498,7 @@ class TestMain:
         mock_result.project = MagicMock()
         mock_result.project.project_id = "test-project"
 
-        from shesha.models import RepoAnalysis
+        from ananta.models import RepoAnalysis
 
         mock_analysis = RepoAnalysis(
             version="1",
@@ -509,17 +509,17 @@ class TestMain:
             external_dependencies=[],
         )
 
-        mock_shesha = MagicMock()
-        mock_shesha.list_projects.return_value = ["test-project"]
-        mock_shesha.check_repo_for_updates.return_value = mock_result
-        mock_shesha.get_analysis.return_value = mock_analysis
-        mock_shesha.get_analysis_status.return_value = "current"
+        mock_ananta = MagicMock()
+        mock_ananta.list_projects.return_value = ["test-project"]
+        mock_ananta.check_repo_for_updates.return_value = mock_result
+        mock_ananta.get_analysis.return_value = mock_analysis
+        mock_ananta.get_analysis_status.return_value = "current"
 
         with patch.object(sys, "argv", ["repo.py"]):
-            with patch.dict(os.environ, {"SHESHA_API_KEY": "test-key"}, clear=True):
-                with patch("examples.repo.Shesha", return_value=mock_shesha):
-                    with patch("examples.repo.SheshaConfig"):
-                        with patch("examples.repo.SheshaTUI") as mock_tui_class:
+            with patch.dict(os.environ, {"ANANTA_API_KEY": "test-key"}, clear=True):
+                with patch("examples.repo.Ananta", return_value=mock_ananta):
+                    with patch("examples.repo.AnantaConfig"):
+                        with patch("examples.repo.AnantaTUI") as mock_tui_class:
                             mock_tui = MagicMock()
                             mock_tui_class.return_value = mock_tui
                             with patch("builtins.input", return_value="1"):
@@ -543,16 +543,16 @@ class TestMain:
         mock_result.project = MagicMock()
         mock_result.project.project_id = "test-project"
 
-        mock_shesha = MagicMock()
-        mock_shesha.list_projects.return_value = ["test-project"]
-        mock_shesha.check_repo_for_updates.return_value = mock_result
-        mock_shesha.get_analysis_status.return_value = "current"
+        mock_ananta = MagicMock()
+        mock_ananta.list_projects.return_value = ["test-project"]
+        mock_ananta.check_repo_for_updates.return_value = mock_result
+        mock_ananta.get_analysis_status.return_value = "current"
 
         with patch.object(sys, "argv", ["repo.py", "--pristine"]):
-            with patch.dict(os.environ, {"SHESHA_API_KEY": "test-key"}, clear=True):
-                with patch("examples.repo.Shesha", return_value=mock_shesha):
-                    with patch("examples.repo.SheshaConfig"):
-                        with patch("examples.repo.SheshaTUI") as mock_tui_class:
+            with patch.dict(os.environ, {"ANANTA_API_KEY": "test-key"}, clear=True):
+                with patch("examples.repo.Ananta", return_value=mock_ananta):
+                    with patch("examples.repo.AnantaConfig"):
+                        with patch("examples.repo.AnantaTUI") as mock_tui_class:
                             mock_tui = MagicMock()
                             mock_tui_class.return_value = mock_tui
                             with patch("builtins.input", return_value="1"):
@@ -575,16 +575,16 @@ class TestMain:
         mock_result.project = MagicMock()
         mock_result.project.project_id = "test-project"
 
-        mock_shesha = MagicMock()
-        mock_shesha.list_projects.return_value = ["test-project"]
-        mock_shesha.check_repo_for_updates.return_value = mock_result
-        mock_shesha.get_analysis.return_value = None
+        mock_ananta = MagicMock()
+        mock_ananta.list_projects.return_value = ["test-project"]
+        mock_ananta.check_repo_for_updates.return_value = mock_result
+        mock_ananta.get_analysis.return_value = None
 
         with patch.object(sys, "argv", ["repo.py"]):
-            with patch.dict(os.environ, {"SHESHA_API_KEY": "test-key"}, clear=True):
-                with patch("examples.repo.Shesha", return_value=mock_shesha):
-                    with patch("examples.repo.SheshaConfig"):
-                        with patch("examples.repo.SheshaTUI") as mock_tui_class:
+            with patch.dict(os.environ, {"ANANTA_API_KEY": "test-key"}, clear=True):
+                with patch("examples.repo.Ananta", return_value=mock_ananta):
+                    with patch("examples.repo.AnantaConfig"):
+                        with patch("examples.repo.AnantaTUI") as mock_tui_class:
                             mock_tui = MagicMock()
                             mock_tui_class.return_value = mock_tui
                             with patch("builtins.input", return_value="1"):
@@ -598,18 +598,18 @@ class TestMain:
 
     def test_show_picker_shows_missing_marker(self, capsys: pytest.CaptureFixture[str]) -> None:
         """show_picker marks projects with missing local repos."""
+        from ananta import ProjectInfo
         from examples.repo import show_picker
-        from shesha import ProjectInfo
 
-        mock_shesha = MagicMock()
-        mock_shesha.list_projects.return_value = ["remote-repo", "missing-local"]
-        mock_shesha.get_project_info.side_effect = [
+        mock_ananta = MagicMock()
+        mock_ananta.list_projects.return_value = ["remote-repo", "missing-local"]
+        mock_ananta.get_project_info.side_effect = [
             ProjectInfo("remote-repo", "https://github.com/org/repo", False, True),
             ProjectInfo("missing-local", "/old/path", True, False),
         ]
 
         with patch("builtins.input", return_value="1"):
-            show_picker(mock_shesha)
+            show_picker(mock_ananta)
 
         captured = capsys.readouterr()
         assert "missing-local (missing - /old/path)" in captured.out
@@ -618,17 +618,17 @@ class TestMain:
         self, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """show_picker handles 'd<N>' delete commands."""
+        from ananta import ProjectInfo
         from examples.repo import show_picker
-        from shesha import ProjectInfo
 
-        mock_shesha = MagicMock()
+        mock_ananta = MagicMock()
         # First call: show list with 2 items, user enters 'd1'
         # Second call: show list with 1 item, user enters '1'
-        mock_shesha.list_projects.side_effect = [
+        mock_ananta.list_projects.side_effect = [
             ["project-a", "project-b"],
             ["project-b"],
         ]
-        mock_shesha.get_project_info.side_effect = [
+        mock_ananta.get_project_info.side_effect = [
             ProjectInfo("project-a", "https://github.com/org/a", False, True),
             ProjectInfo("project-b", "https://github.com/org/b", False, True),
             # After deletion:
@@ -638,9 +638,9 @@ class TestMain:
         inputs = iter(["d1", "y", "1"])
         monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
-        result = show_picker(mock_shesha)
+        result = show_picker(mock_ananta)
 
-        mock_shesha.delete_project.assert_called_once_with("project-a")
+        mock_ananta.delete_project.assert_called_once_with("project-a")
         assert result == ("project-b", True)
         captured = capsys.readouterr()
         assert "Deleted 'project-a'" in captured.out
@@ -649,39 +649,39 @@ class TestMain:
         self, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """show_picker cancels delete when user says no."""
+        from ananta import ProjectInfo
         from examples.repo import show_picker
-        from shesha import ProjectInfo
 
-        mock_shesha = MagicMock()
-        mock_shesha.list_projects.side_effect = [
+        mock_ananta = MagicMock()
+        mock_ananta.list_projects.side_effect = [
             ["project-a"],
             ["project-a"],
         ]
-        mock_shesha.get_project_info.return_value = ProjectInfo(
+        mock_ananta.get_project_info.return_value = ProjectInfo(
             "project-a", "https://github.com/org/a", False, True
         )
 
         inputs = iter(["d1", "n", "1"])
         monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
-        result = show_picker(mock_shesha)
+        result = show_picker(mock_ananta)
 
-        mock_shesha.delete_project.assert_not_called()
+        mock_ananta.delete_project.assert_not_called()
         assert result == ("project-a", True)
 
     def test_show_picker_delete_local_project_shows_correct_message(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """show_picker shows correct confirmation message for local projects."""
+        from ananta import ProjectInfo
         from examples.repo import show_picker
-        from shesha import ProjectInfo
 
-        mock_shesha = MagicMock()
-        mock_shesha.list_projects.side_effect = [
+        mock_ananta = MagicMock()
+        mock_ananta.list_projects.side_effect = [
             ["local-project"],
             [],
         ]
-        mock_shesha.get_project_info.return_value = ProjectInfo(
+        mock_ananta.get_project_info.return_value = ProjectInfo(
             "local-project", "/path/to/local", True, True
         )
 
@@ -697,7 +697,7 @@ class TestMain:
         monkeypatch.setattr("builtins.input", mock_input)
 
         # After deletion, no projects remain so returns None
-        show_picker(mock_shesha)
+        show_picker(mock_ananta)
 
         # Local projects shouldn't mention "cloned repository"
         confirmation_prompt = prompts[1]  # Second prompt is the confirmation
@@ -708,15 +708,15 @@ class TestMain:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """show_picker shows correct confirmation message for remote projects."""
+        from ananta import ProjectInfo
         from examples.repo import show_picker
-        from shesha import ProjectInfo
 
-        mock_shesha = MagicMock()
-        mock_shesha.list_projects.side_effect = [
+        mock_ananta = MagicMock()
+        mock_ananta.list_projects.side_effect = [
             ["remote-project"],
             [],
         ]
-        mock_shesha.get_project_info.return_value = ProjectInfo(
+        mock_ananta.get_project_info.return_value = ProjectInfo(
             "remote-project", "https://github.com/org/repo", False, True
         )
 
@@ -731,7 +731,7 @@ class TestMain:
 
         monkeypatch.setattr("builtins.input", mock_input)
 
-        show_picker(mock_shesha)
+        show_picker(mock_ananta)
 
         # Remote projects should mention "cloned repository"
         confirmation_prompt = prompts[1]  # Second prompt is the confirmation
@@ -742,20 +742,20 @@ class TestMain:
         import os
         import sys
 
+        from ananta.exceptions import RepoIngestError
         from examples.repo import main
-        from shesha.exceptions import RepoIngestError
 
-        mock_shesha = MagicMock()
-        mock_shesha.list_projects.return_value = []
-        mock_shesha.create_project_from_repo.side_effect = RepoIngestError(
+        mock_ananta = MagicMock()
+        mock_ananta.list_projects.return_value = []
+        mock_ananta.create_project_from_repo.side_effect = RepoIngestError(
             "/path/to/non-git",
             RuntimeError("'/path/to/non-git' is not a git repository"),
         )
 
         with patch.object(sys, "argv", ["repo.py", "/path/to/non-git"]):
-            with patch.dict(os.environ, {"SHESHA_API_KEY": "test-key"}, clear=True):
-                with patch("examples.repo.Shesha", return_value=mock_shesha):
-                    with patch("examples.repo.SheshaConfig"):
+            with patch.dict(os.environ, {"ANANTA_API_KEY": "test-key"}, clear=True):
+                with patch("examples.repo.Ananta", return_value=mock_ananta):
+                    with patch("examples.repo.AnantaConfig"):
                         with pytest.raises(SystemExit) as exc_info:
                             main()
 

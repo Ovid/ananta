@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from shesha.rlm.semantic_verification import (
+from ananta.rlm.semantic_verification import (
     FindingVerification,
     SemanticVerificationReport,
     detect_content_type,

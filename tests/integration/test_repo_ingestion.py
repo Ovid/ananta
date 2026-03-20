@@ -6,11 +6,11 @@ from unittest.mock import patch
 
 import pytest
 
-from shesha import Shesha
-from shesha.exceptions import RepoIngestError
-from shesha.parser import create_default_registry
-from shesha.repo.ingester import RepoIngester
-from shesha.storage.filesystem import FilesystemStorage
+from ananta import Ananta
+from ananta.exceptions import RepoIngestError
+from ananta.parser import create_default_registry
+from ananta.repo.ingester import RepoIngester
+from ananta.storage.filesystem import FilesystemStorage
 
 
 @pytest.fixture
@@ -94,12 +94,12 @@ class TestRepoIngestion:
 
     def test_ingest_local_repo(self, sample_git_repo: Path, tmp_path: Path):
         """Can ingest a local git repository."""
-        storage_path = tmp_path / "shesha-storage"
+        storage_path = tmp_path / "ananta-storage"
 
-        with patch("shesha.shesha.ContainerPool"):
-            shesha = Shesha(model="test-model", storage_path=storage_path)
+        with patch("ananta.ananta.ContainerPool"):
+            ananta = Ananta(model="test-model", storage_path=storage_path)
 
-            result = shesha.create_project_from_repo(
+            result = ananta.create_project_from_repo(
                 url=str(sample_git_repo),
                 name="sample-project",
             )
@@ -110,17 +110,17 @@ class TestRepoIngestion:
 
     def test_ingest_with_line_numbers(self, sample_git_repo: Path, tmp_path: Path):
         """Ingested files have line numbers."""
-        storage_path = tmp_path / "shesha-storage"
+        storage_path = tmp_path / "ananta-storage"
 
-        with patch("shesha.shesha.ContainerPool"):
-            shesha = Shesha(model="test-model", storage_path=storage_path)
+        with patch("ananta.ananta.ContainerPool"):
+            ananta = Ananta(model="test-model", storage_path=storage_path)
 
-            shesha.create_project_from_repo(
+            ananta.create_project_from_repo(
                 url=str(sample_git_repo),
                 name="sample-project",
             )
 
-            docs = shesha.storage.load_all_documents("sample-project")
+            docs = ananta.storage.load_all_documents("sample-project")
             main_doc = next(d for d in docs if "main.py" in d.name)
 
             assert "=== FILE:" in main_doc.content
@@ -128,19 +128,19 @@ class TestRepoIngestion:
 
     def test_unchanged_on_second_call(self, sample_git_repo: Path, tmp_path: Path):
         """Second call returns unchanged when no changes."""
-        storage_path = tmp_path / "shesha-storage"
+        storage_path = tmp_path / "ananta-storage"
 
-        with patch("shesha.shesha.ContainerPool"):
-            shesha = Shesha(model="test-model", storage_path=storage_path)
+        with patch("ananta.ananta.ContainerPool"):
+            ananta = Ananta(model="test-model", storage_path=storage_path)
 
             # First call
-            shesha.create_project_from_repo(
+            ananta.create_project_from_repo(
                 url=str(sample_git_repo),
                 name="sample-project",
             )
 
             # Second call
-            result = shesha.create_project_from_repo(
+            result = ananta.create_project_from_repo(
                 url=str(sample_git_repo),
                 name="sample-project",
             )
@@ -149,13 +149,13 @@ class TestRepoIngestion:
 
     def test_updates_available_after_change(self, sample_git_repo: Path, tmp_path: Path):
         """Returns updates_available after repo changes."""
-        storage_path = tmp_path / "shesha-storage"
+        storage_path = tmp_path / "ananta-storage"
 
-        with patch("shesha.shesha.ContainerPool"):
-            shesha = Shesha(model="test-model", storage_path=storage_path)
+        with patch("ananta.ananta.ContainerPool"):
+            ananta = Ananta(model="test-model", storage_path=storage_path)
 
             # First call
-            shesha.create_project_from_repo(
+            ananta.create_project_from_repo(
                 url=str(sample_git_repo),
                 name="sample-project",
             )
@@ -170,7 +170,7 @@ class TestRepoIngestion:
             )
 
             # Second call
-            result = shesha.create_project_from_repo(
+            result = ananta.create_project_from_repo(
                 url=str(sample_git_repo),
                 name="sample-project",
             )

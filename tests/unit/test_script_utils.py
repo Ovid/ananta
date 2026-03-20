@@ -2,7 +2,7 @@
 
 import sys
 
-from shesha.rlm.trace import StepType, TokenUsage, Trace
+from ananta.rlm.trace import StepType, TokenUsage, Trace
 
 
 class TestThinkingSpinner:
@@ -139,8 +139,8 @@ class TestFormatAnalysisAsContext:
 
     def test_includes_header_and_overview(self) -> None:
         """Context string includes header and overview text."""
+        from ananta.models import RepoAnalysis
         from examples.script_utils import format_analysis_as_context
-        from shesha.models import RepoAnalysis
 
         analysis = RepoAnalysis(
             version="1",
@@ -159,8 +159,8 @@ class TestFormatAnalysisAsContext:
 
     def test_includes_components(self) -> None:
         """Context string includes component details."""
+        from ananta.models import AnalysisComponent, RepoAnalysis
         from examples.script_utils import format_analysis_as_context
-        from shesha.models import AnalysisComponent, RepoAnalysis
 
         comp = AnalysisComponent(
             name="API Server",
@@ -190,8 +190,8 @@ class TestFormatAnalysisAsContext:
 
     def test_handles_dict_endpoints(self) -> None:
         """Context string handles endpoints that are dicts, not strings."""
+        from ananta.models import AnalysisComponent, RepoAnalysis
         from examples.script_utils import format_analysis_as_context
-        from shesha.models import AnalysisComponent, RepoAnalysis
 
         comp = AnalysisComponent(
             name="API Server",
@@ -226,8 +226,8 @@ class TestFormatAnalysisAsContext:
 
     def test_includes_external_dependencies(self) -> None:
         """Context string includes external dependencies."""
+        from ananta.models import AnalysisExternalDep, RepoAnalysis
         from examples.script_utils import format_analysis_as_context
-        from shesha.models import AnalysisExternalDep, RepoAnalysis
 
         dep = AnalysisExternalDep(
             name="PostgreSQL",
@@ -252,8 +252,8 @@ class TestFormatAnalysisAsContext:
 
     def test_empty_analysis_still_valid(self) -> None:
         """Minimal analysis with no components or deps still produces valid output."""
+        from ananta.models import RepoAnalysis
         from examples.script_utils import format_analysis_as_context
-        from shesha.models import RepoAnalysis
 
         analysis = RepoAnalysis(
             version="1",
@@ -278,11 +278,11 @@ class TestFormatVerifiedOutput:
 
     def test_formats_summary_and_appendix(self) -> None:
         """Output contains both verified findings and appendix."""
-        from examples.script_utils import format_verified_output
-        from shesha.rlm.semantic_verification import (
+        from ananta.rlm.semantic_verification import (
             FindingVerification,
             SemanticVerificationReport,
         )
+        from examples.script_utils import format_verified_output
 
         report = SemanticVerificationReport(
             findings=[
@@ -316,11 +316,11 @@ class TestFormatVerifiedOutput:
 
     def test_no_high_confidence_shows_message(self) -> None:
         """When no findings are high/medium confidence, shows appropriate message."""
-        from examples.script_utils import format_verified_output
-        from shesha.rlm.semantic_verification import (
+        from ananta.rlm.semantic_verification import (
             FindingVerification,
             SemanticVerificationReport,
         )
+        from examples.script_utils import format_verified_output
 
         report = SemanticVerificationReport(
             findings=[
@@ -340,11 +340,11 @@ class TestFormatVerifiedOutput:
 
     def test_all_high_confidence_no_appendix_content(self) -> None:
         """When all findings are high confidence, appendix says none filtered."""
-        from examples.script_utils import format_verified_output
-        from shesha.rlm.semantic_verification import (
+        from ananta.rlm.semantic_verification import (
             FindingVerification,
             SemanticVerificationReport,
         )
+        from examples.script_utils import format_verified_output
 
         report = SemanticVerificationReport(
             findings=[
@@ -373,8 +373,8 @@ class TestFormatAnalysisForDisplay:
 
     def test_format_analysis_includes_header(self) -> None:
         """Formatted analysis includes header with date."""
+        from ananta.models import RepoAnalysis
         from examples.script_utils import format_analysis_for_display
-        from shesha.models import RepoAnalysis
 
         analysis = RepoAnalysis(
             version="1",
@@ -392,8 +392,8 @@ class TestFormatAnalysisForDisplay:
 
     def test_format_analysis_includes_overview(self) -> None:
         """Formatted analysis includes overview section."""
+        from ananta.models import RepoAnalysis
         from examples.script_utils import format_analysis_for_display
-        from shesha.models import RepoAnalysis
 
         analysis = RepoAnalysis(
             version="1",
@@ -411,8 +411,8 @@ class TestFormatAnalysisForDisplay:
 
     def test_format_analysis_includes_components(self) -> None:
         """Formatted analysis includes components."""
+        from ananta.models import AnalysisComponent, RepoAnalysis
         from examples.script_utils import format_analysis_for_display
-        from shesha.models import AnalysisComponent, RepoAnalysis
 
         comp = AnalysisComponent(
             name="API Server",
@@ -441,8 +441,8 @@ class TestFormatAnalysisForDisplay:
 
     def test_format_analysis_handles_dict_endpoints(self) -> None:
         """Formatted analysis handles endpoints that are dicts, not strings."""
+        from ananta.models import AnalysisComponent, RepoAnalysis
         from examples.script_utils import format_analysis_for_display
-        from shesha.models import AnalysisComponent, RepoAnalysis
 
         comp = AnalysisComponent(
             name="API Server",
@@ -477,8 +477,8 @@ class TestFormatAnalysisForDisplay:
 
     def test_format_analysis_includes_caveats(self) -> None:
         """Formatted analysis includes caveats warning."""
+        from ananta.models import RepoAnalysis
         from examples.script_utils import format_analysis_for_display
-        from shesha.models import RepoAnalysis
 
         analysis = RepoAnalysis(
             version="1",
@@ -496,8 +496,8 @@ class TestFormatAnalysisForDisplay:
 
     def test_format_analysis_includes_external_dependencies(self) -> None:
         """Formatted analysis includes external dependencies."""
+        from ananta.models import AnalysisExternalDep, RepoAnalysis
         from examples.script_utils import format_analysis_for_display
-        from shesha.models import AnalysisExternalDep, RepoAnalysis
 
         dep = AnalysisExternalDep(
             name="PostgreSQL",
@@ -535,8 +535,8 @@ class TestFormatPipelineContract:
 
     def test_complex_valid_analysis_formats_successfully(self) -> None:
         """A realistic RepoAnalysis with multiple components formats without error."""
+        from ananta.models import AnalysisComponent, AnalysisExternalDep, RepoAnalysis
         from examples.script_utils import format_analysis_as_context, format_analysis_for_display
-        from shesha.models import AnalysisComponent, AnalysisExternalDep, RepoAnalysis
 
         comp1 = AnalysisComponent(
             name="API Server",

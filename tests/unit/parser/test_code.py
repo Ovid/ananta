@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from shesha.parser.code import CodeParser
+from ananta.parser.code import CodeParser
 
 
 @pytest.fixture

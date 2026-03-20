@@ -1,1 +1,1 @@
-"""Example scripts for Shesha."""
+"""Example scripts for Ananta."""

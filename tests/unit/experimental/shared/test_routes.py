@@ -11,9 +11,9 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from shesha.experimental.shared.routes import create_shared_router
-from shesha.experimental.shared.session import WebConversationSession
-from shesha.experimental.shared.topics import BaseTopicManager
+from ananta.experimental.shared.routes import create_shared_router
+from ananta.experimental.shared.session import WebConversationSession
+from ananta.experimental.shared.topics import BaseTopicManager
 
 
 @dataclass
@@ -189,7 +189,7 @@ def _make_trace_file(
 def test_list_traces(client: TestClient, mock_state: MagicMock, tmp_path: Path) -> None:
     mock_state.topic_mgr.resolve.return_value = "proj-id"
     trace_file = _make_trace_file(tmp_path)
-    mock_state.shesha.storage.list_traces.return_value = [trace_file]
+    mock_state.ananta.storage.list_traces.return_value = [trace_file]
 
     resp = client.get("/api/topics/test-topic/traces")
     assert resp.status_code == 200
@@ -228,7 +228,7 @@ def test_list_traces_multi_project(
             return [trace_b]
         return []
 
-    mock_state.shesha.storage.list_traces.side_effect = mock_list_traces
+    mock_state.ananta.storage.list_traces.side_effect = mock_list_traces
 
     resp = client.get("/api/topics/test-topic/traces")
     assert resp.status_code == 200
@@ -241,7 +241,7 @@ def test_list_traces_multi_project(
 def test_get_trace_full(client: TestClient, mock_state: MagicMock, tmp_path: Path) -> None:
     mock_state.topic_mgr.resolve.return_value = "proj-id"
     trace_file = _make_trace_file(tmp_path)
-    mock_state.shesha.storage.list_traces.return_value = [trace_file]
+    mock_state.ananta.storage.list_traces.return_value = [trace_file]
 
     resp = client.get("/api/topics/test-topic/traces/2025-01-15T10-30-00-123_abc12345")
     assert resp.status_code == 200
@@ -255,7 +255,7 @@ def test_get_trace_full(client: TestClient, mock_state: MagicMock, tmp_path: Pat
 
 def test_get_trace_not_found(client: TestClient, mock_state: MagicMock) -> None:
     mock_state.topic_mgr.resolve.return_value = "proj-id"
-    mock_state.shesha.storage.list_traces.return_value = []
+    mock_state.ananta.storage.list_traces.return_value = []
     resp = client.get("/api/topics/test-topic/traces/nonexistent")
     assert resp.status_code == 404
 
@@ -267,7 +267,7 @@ def test_get_trace_not_found(client: TestClient, mock_state: MagicMock) -> None:
 
 def test_get_history(client: TestClient, mock_state: MagicMock, tmp_path: Path) -> None:
     mock_state.topic_mgr.resolve.return_value = "proj-id"
-    mock_state.shesha.storage.get_project_dir.return_value = tmp_path
+    mock_state.ananta.storage.get_project_dir.return_value = tmp_path
 
     session = WebConversationSession(tmp_path)
     session.add_exchange(
@@ -288,7 +288,7 @@ def test_get_history(client: TestClient, mock_state: MagicMock, tmp_path: Path) 
 
 def test_clear_history(client: TestClient, mock_state: MagicMock, tmp_path: Path) -> None:
     mock_state.topic_mgr.resolve.return_value = "proj-id"
-    mock_state.shesha.storage.get_project_dir.return_value = tmp_path
+    mock_state.ananta.storage.get_project_dir.return_value = tmp_path
 
     session = WebConversationSession(tmp_path)
     session.add_exchange(
@@ -311,7 +311,7 @@ def test_clear_history(client: TestClient, mock_state: MagicMock, tmp_path: Path
 
 def test_export_transcript(client: TestClient, mock_state: MagicMock, tmp_path: Path) -> None:
     mock_state.topic_mgr.resolve.return_value = "proj-id"
-    mock_state.shesha.storage.get_project_dir.return_value = tmp_path
+    mock_state.ananta.storage.get_project_dir.return_value = tmp_path
 
     session = WebConversationSession(tmp_path)
     session.add_exchange(
@@ -383,12 +383,12 @@ def test_update_model(client: TestClient, mock_state: MagicMock) -> None:
 
 def test_context_budget(client: TestClient, mock_state: MagicMock, tmp_path: Path) -> None:
     mock_state.topic_mgr.resolve.return_value = "proj-id"
-    mock_state.shesha.storage.get_project_dir.return_value = tmp_path
+    mock_state.ananta.storage.get_project_dir.return_value = tmp_path
 
     # Empty session
     WebConversationSession(tmp_path)
 
-    with patch("shesha.experimental.shared.routes.litellm") as mock_litellm:
+    with patch("ananta.experimental.shared.routes.litellm") as mock_litellm:
         mock_litellm.get_model_info.return_value = {"max_input_tokens": 100000}
         resp = client.get("/api/topics/test-topic/context-budget")
 
@@ -404,7 +404,7 @@ def test_context_budget_uses_named_constants(
     client: TestClient, mock_state: MagicMock, tmp_path: Path
 ) -> None:
     """Context budget calculation uses named constants, not magic numbers."""
-    from shesha.experimental.shared.routes import (
+    from ananta.experimental.shared.routes import (
         BASE_PROMPT_TOKENS,
         CHARS_PER_TOKEN,
         DEFAULT_MAX_CONTEXT_TOKENS,
@@ -416,10 +416,10 @@ def test_context_budget_uses_named_constants(
 
     # Verify the constants are actually used in the calculation
     mock_state.topic_mgr.resolve.return_value = "proj-id"
-    mock_state.shesha.storage.get_project_dir.return_value = tmp_path
+    mock_state.ananta.storage.get_project_dir.return_value = tmp_path
     WebConversationSession(tmp_path)
 
-    with patch("shesha.experimental.shared.routes.litellm") as mock_litellm:
+    with patch("ananta.experimental.shared.routes.litellm") as mock_litellm:
         mock_litellm.get_model_info.side_effect = Exception("no model info")
         resp = client.get("/api/topics/test-topic/context-budget")
 
@@ -459,7 +459,7 @@ def test_get_trace_multi_project(client: TestClient, mock_state: MagicMock, tmp_
             return [trace_b]
         return []
 
-    mock_state.shesha.storage.list_traces.side_effect = mock_list_traces
+    mock_state.ananta.storage.list_traces.side_effect = mock_list_traces
 
     resp = client.get("/api/topics/test-topic/traces/2025-01-16T10-30-00-123_bbb")
     assert resp.status_code == 200
@@ -474,17 +474,17 @@ def test_get_trace_multi_project(client: TestClient, mock_state: MagicMock, tmp_
 
 class TestTopicErrorToStatus:
     def test_already_exists_returns_409(self) -> None:
-        from shesha.experimental.shared.routes import _topic_error_to_status
+        from ananta.experimental.shared.routes import _topic_error_to_status
 
         assert _topic_error_to_status(ValueError("Topic 'X' already exists")) == 409
 
     def test_not_found_returns_404(self) -> None:
-        from shesha.experimental.shared.routes import _topic_error_to_status
+        from ananta.experimental.shared.routes import _topic_error_to_status
 
         assert _topic_error_to_status(ValueError("Topic not found: X")) == 404
 
     def test_slug_collision_returns_422(self) -> None:
-        from shesha.experimental.shared.routes import _topic_error_to_status
+        from ananta.experimental.shared.routes import _topic_error_to_status
 
         msg = (
             "A topic with a different display name already uses "
@@ -493,7 +493,7 @@ class TestTopicErrorToStatus:
         assert _topic_error_to_status(ValueError(msg)) == 422
 
     def test_other_error_returns_422(self) -> None:
-        from shesha.experimental.shared.routes import _topic_error_to_status
+        from ananta.experimental.shared.routes import _topic_error_to_status
 
         assert _topic_error_to_status(ValueError("empty slug")) == 422
 
@@ -510,7 +510,7 @@ class TestCreateItemRouter:
 
     @pytest.fixture
     def client(self, topic_mgr: BaseTopicManager) -> TestClient:
-        from shesha.experimental.shared.routes import create_item_router
+        from ananta.experimental.shared.routes import create_item_router
 
         app = FastAPI()
         router = create_item_router(topic_mgr)

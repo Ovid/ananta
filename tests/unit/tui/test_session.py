@@ -2,7 +2,7 @@
 
 import pytest
 
-from shesha.tui.session import ConversationSession
+from ananta.tui.session import ConversationSession
 
 
 class TestConversationSession:

@@ -5,7 +5,7 @@ from __future__ import annotations
 import pydantic
 import pytest
 
-from shesha.experimental.code_explorer.schemas import (
+from ananta.experimental.code_explorer.schemas import (
     AnalysisResponse,
     ContextBudget,
     ExchangeSchema,

@@ -2,9 +2,9 @@
 
 from pathlib import Path
 
-from shesha.parser.base import DocumentParser
-from shesha.parser.registry import ParserRegistry
-from shesha.storage.base import ParsedDocument
+from ananta.parser.base import DocumentParser
+from ananta.parser.registry import ParserRegistry
+from ananta.storage.base import ParsedDocument
 
 
 class MockParser(DocumentParser):

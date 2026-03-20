@@ -1,0 +1,77 @@
+{
+  "quickStart": [
+    {
+      "step": 1,
+      "title": "Create a topic",
+      "description": "Click the + button in the left sidebar to create a new research topic."
+    },
+    {
+      "step": 2,
+      "title": "Search for papers",
+      "description": "Click the search icon in the header to search arXiv. Use filters for author, category, or sort order."
+    },
+    {
+      "step": 3,
+      "title": "Add papers",
+      "description": "Select papers from search results and click Add. Papers download in the background with a 3-second rate limit delay."
+    },
+    {
+      "step": 4,
+      "title": "Ask questions",
+      "description": "Type a question in the chat area. The LLM will write code to explore your papers and iterate until it finds an answer."
+    },
+    {
+      "step": 5,
+      "title": "Inspect traces",
+      "description": "Click 'View trace' on any answer to see the step-by-step reasoning process."
+    }
+  ],
+  "faq": [
+    {
+      "question": "How do I add papers to multiple topics?",
+      "answer": "Use the search panel's topic picker when adding papers. Each paper can belong to multiple topics simultaneously."
+    },
+    {
+      "question": "What does the context budget indicator mean?",
+      "answer": "It estimates how much of the model's context window is used by your documents and conversation history. Green (<50%), amber (<80%), red (>=80%). When red, consider clearing history or using fewer papers."
+    },
+    {
+      "question": "Why do queries take so long?",
+      "answer": "Ananta uses Recursive Language Models: the LLM writes Python code to explore your documents, runs it in a Docker sandbox, examines the output, and repeats. This multi-step approach takes 1-3 minutes but produces more accurate results."
+    },
+    {
+      "question": "Can I cancel a running query?",
+      "answer": "Yes. Press Escape while a query is running, or the query will be interrupted at the next iteration boundary."
+    },
+    {
+      "question": "What is the citation check?",
+      "answer": "It verifies that claims in the LLM's answer are actually supported by the source documents. The report shows verified, unverified, and missing citations."
+    },
+    {
+      "question": "How do I export my conversation?",
+      "answer": "Click the export button (download icon) in the header to download a Markdown transcript of the current topic's conversation."
+    },
+    {
+      "question": "Why do papers take a while to download?",
+      "answer": "arXiv has rate limits. Ananta waits 3.1 seconds between downloads to avoid being blocked. LaTeX papers also need parsing which takes additional time."
+    },
+    {
+      "question": "Can I change the LLM model?",
+      "answer": "Click the model name in the status bar at the bottom to change the model. Any model supported by LiteLLM can be used."
+    }
+  ],
+  "shortcuts": [
+    {
+      "key": "Enter",
+      "description": "Send message"
+    },
+    {
+      "key": "Shift+Enter",
+      "description": "New line in message input"
+    },
+    {
+      "key": "Escape",
+      "description": "Cancel running query"
+    }
+  ]
+}

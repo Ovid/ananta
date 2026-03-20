@@ -1,6 +1,6 @@
 """Tests for multi-repo data models."""
 
-from shesha.experimental.multi_repo.models import (
+from ananta.experimental.multi_repo.models import (
     AlignmentReport,
     HLDDraft,
     ImpactReport,

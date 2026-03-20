@@ -1,8 +1,8 @@
 # Overview Guide
 
-## How Shesha Works
+## How Ananta Works
 
-Shesha implements Recursive Language Models (RLMs). The core idea: instead of feeding documents directly to an LLM, give the LLM a Python REPL and let it write code to explore the documents iteratively.
+Ananta implements Recursive Language Models (RLMs). The core idea: instead of feeding documents directly to an LLM, give the LLM a Python REPL and let it write code to explore the documents iteratively.
 
 **The Query Loop** (`rlm/engine.py`):
 
@@ -21,10 +21,10 @@ Shesha implements Recursive Language Models (RLMs). The core idea: instead of fe
 ## Code Organization
 
 ```
-src/shesha/
-├── shesha.py          # Main entry point - creates projects, manages lifecycle
+src/ananta/
+├── ananta.py          # Main entry point - creates projects, manages lifecycle
 ├── project.py         # Project class - upload docs, run queries
-├── config.py          # SheshaConfig - loads from env/file/args
+├── config.py          # AnantaConfig - loads from env/file/args
 ├── models.py          # Data classes (ParsedDocument, RepoProjectResult, etc.)
 ├── exceptions.py      # Exception hierarchy
 │
@@ -83,10 +83,10 @@ src/shesha/
 → `repo/ingester.py` - clone, pull, SHA tracking, file listing
 
 **"I want to change the public API"**
-→ `shesha.py` (top-level) or `project.py` (project operations)
+→ `ananta.py` (top-level) or `project.py` (project operations)
 
 **"I want to change configuration options"**
-→ `config.py` - `SheshaConfig` dataclass, env var loading
+→ `config.py` - `AnantaConfig` dataclass, env var loading
 
 **"I want to add a new LLM provider"**
 → You probably don't need to - LiteLLM handles this. Check `llm/client.py` if you need custom behavior.

@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from shesha.parser import create_default_registry
+from ananta.parser import create_default_registry
 
 
 def test_default_registry_has_text_parser():

@@ -1,3 +1,24 @@
+- I see this in arXiv, but needs to be everywhere:
+  "Ask a question about the documents in this topic."
+  it needs to name the topic because it's hard to know which topic you have.
+  Current topic also should be highligthed in left sidebar.
+- When adding papers on arxiv, you should have the option of adding them to an
+  existing topic or create a new topic.
+- Bug: arXiv citation links render as plain text when LLM omits version
+  suffix. Root cause: `buildCitationComponents` in
+  `src/ananta/experimental/web/frontend/src/utils/citations.tsx:38` does
+  exact match `p.arxiv_id === arxivId`, but topicPapers has "1103.0225v1"
+  while LLM cites "1103.0225" (no version). Fix: strip trailing `vN`
+  from both sides before comparing.
+- Bug: arXiv explorer forces topic names to lowercase on rename. Renaming
+  "mars" to "Mars" silently lowercases it back.
+- Bug: Can't drag-and-drop uncategorized repos onto a topic in the code
+  explorer sidebar. "Ovid-tramp-freighter" in Uncategorized can't be
+  dragged onto the "PAAD" topic.
+- Consolidate frontend localStorage keys under a single top-level namespace
+  key (e.g., `ananta-settings`) instead of four separate flat keys
+  (`ananta-theme`, `ananta-welcome-dismissed`, `ananta-polite-email`,
+  `ananta-email-skipped`).
 - Can we have the bug report button go straight to a new github issue with
   the explorer name filled in? What about a bug report template? I could use
   guidance on what works best here.

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Interactive git repository explorer using Shesha.
+"""Interactive git repository explorer using Ananta.
 
 This script provides an interactive TUI for exploring git repositories using
-Shesha's Recursive Language Model (RLM) capabilities. It supports both remote
+Ananta's Recursive Language Model (RLM) capabilities. It supports both remote
 repositories (GitHub, GitLab, Bitbucket) and local git repos.
 
 Features:
@@ -29,14 +29,14 @@ Usage:
     python examples/repo.py --model gpt-4o
 
 Environment Variables:
-    SHESHA_API_KEY: Required. API key for your LLM provider.
-    SHESHA_MODEL: Optional. Model name (default: claude-sonnet-4-20250514).
+    ANANTA_API_KEY: Required. API key for your LLM provider.
+    ANANTA_MODEL: Optional. Model name (default: claude-sonnet-4-20250514).
                   Overridden by --model flag.
 
 Example:
-    $ export SHESHA_API_KEY="your-api-key"
-    $ python examples/repo.py https://github.com/Ovid/shesha
-    Loading repository: https://github.com/Ovid/shesha
+    $ export ANANTA_API_KEY="your-api-key"
+    $ python examples/repo.py https://github.com/Ovid/ananta
+    Loading repository: https://github.com/Ovid/ananta
     Loaded 42 files.
 
     Ask questions about the codebase. Type /help for commands.
@@ -72,25 +72,25 @@ from script_utils import (
     is_exit_command,
 )
 
-from shesha import Shesha, SheshaConfig
-from shesha.exceptions import ProjectNotFoundError, RepoIngestError
+from ananta import Ananta, AnantaConfig
+from ananta.exceptions import ProjectNotFoundError, RepoIngestError
 
-# Guard TUI imports: textual is an optional dependency (shesha[tui]).
+# Guard TUI imports: textual is an optional dependency (ananta[tui]).
 try:
-    from shesha.tui import SheshaTUI
-    from shesha.tui.widgets.output_area import OutputArea
+    from ananta.tui import AnantaTUI
+    from ananta.tui.widgets.output_area import OutputArea
 except ModuleNotFoundError:
     if __name__ == "__main__":
-        print("This example requires the TUI extra: pip install shesha[tui]")
+        print("This example requires the TUI extra: pip install ananta[tui]")
         sys.exit(1)
     else:
         raise
 
 # Storage path for repo projects (not "repos" - that collides with RepoIngester's subdirectory)
-STORAGE_PATH = Path.home() / ".shesha" / "repo-explorer"
+STORAGE_PATH = Path.home() / ".ananta" / "repo-explorer"
 
 if TYPE_CHECKING:
-    from shesha.models import RepoProjectResult
+    from ananta.models import RepoProjectResult
 
 
 def _looks_like_repo_url_or_path(value: str) -> bool:
@@ -128,7 +128,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             - repo: Git repository URL or local path (optional)
             - update: Whether to auto-apply updates without prompting
     """
-    parser = argparse.ArgumentParser(description="Explore git repositories using Shesha RLM")
+    parser = argparse.ArgumentParser(description="Explore git repositories using Ananta RLM")
     parser.add_argument(
         "repo",
         nargs="?",
@@ -158,12 +158,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--model",
         type=str,
-        help="LLM model name (overrides SHESHA_MODEL env var)",
+        help="LLM model name (overrides ANANTA_MODEL env var)",
     )
     return parser.parse_args(argv)
 
 
-def show_picker(shesha: Shesha) -> tuple[str, bool] | None:
+def show_picker(ananta: Ananta) -> tuple[str, bool] | None:
     """Show interactive repository picker for previously indexed repos.
 
     Displays a numbered list of previously indexed repositories and prompts
@@ -171,7 +171,7 @@ def show_picker(shesha: Shesha) -> tuple[str, bool] | None:
     enter a new URL/path.
 
     Args:
-        shesha: Initialized Shesha instance to query for existing projects.
+        ananta: Initialized Ananta instance to query for existing projects.
 
     Returns:
         None: If no projects exist in storage.
@@ -190,14 +190,14 @@ def show_picker(shesha: Shesha) -> tuple[str, bool] | None:
         -> Returns ("https://github.com/new/repo", False)
     """
     while True:
-        projects = shesha.list_projects()
+        projects = ananta.list_projects()
         if not projects:
             return None
 
         print("Available repositories:")
         project_infos = []
         for i, name in enumerate(projects, 1):
-            info = shesha.get_project_info(name)
+            info = ananta.get_project_info(name)
             project_infos.append(info)
             if info.is_local and not info.source_exists:
                 print(f"  {i}. {name} (missing - {info.source_url})")
@@ -226,7 +226,7 @@ def show_picker(shesha: Shesha) -> tuple[str, bool] | None:
 
                     confirm = input(msg).strip().lower()
                     if confirm == "y":
-                        shesha.delete_project(project_name)
+                        ananta.delete_project(project_name)
                         print(f"Deleted '{project_name}'.")
                     print()
                     continue  # Re-show picker
@@ -303,15 +303,15 @@ def handle_updates(result: RepoProjectResult, auto_update: bool) -> RepoProjectR
     return result
 
 
-def check_and_prompt_analysis(shesha: Shesha, project_id: str) -> None:
+def check_and_prompt_analysis(ananta: Ananta, project_id: str) -> None:
     """Check analysis status and prompt user if needed.
 
     Args:
-        shesha: Shesha instance.
+        ananta: Ananta instance.
         project_id: Project to check.
     """
     try:
-        status = shesha.get_analysis_status(project_id)
+        status = ananta.get_analysis_status(project_id)
     except ProjectNotFoundError:
         return  # Project may not exist yet; skip analysis check gracefully
 
@@ -321,7 +321,7 @@ def check_and_prompt_analysis(shesha: Shesha, project_id: str) -> None:
             response = input("Generate analysis? (y/n): ").strip().lower()
             if response == "y":
                 print("Generating analysis (this may take a minute)...")
-                analysis = shesha.generate_analysis(project_id)
+                analysis = ananta.generate_analysis(project_id)
                 print("Analysis complete.\n")
                 print(format_analysis_for_display(analysis))
                 print()
@@ -333,7 +333,7 @@ def check_and_prompt_analysis(shesha: Shesha, project_id: str) -> None:
             response = input("Regenerate analysis? (y/n): ").strip().lower()
             if response == "y":
                 print("Regenerating analysis...")
-                analysis = shesha.generate_analysis(project_id)
+                analysis = ananta.generate_analysis(project_id)
                 print("Analysis updated.\n")
                 print(format_analysis_for_display(analysis))
                 print()
@@ -345,25 +345,25 @@ def main() -> None:
     """Main entry point for the repository explorer CLI.
 
     Orchestrates the complete workflow:
-    1. Validates environment (SHESHA_API_KEY required)
-    2. Initializes Shesha with storage configuration
+    1. Validates environment (ANANTA_API_KEY required)
+    2. Initializes Ananta with storage configuration
     3. Determines repository source (argument, picker, or prompt)
     4. Loads or creates the repository project
     5. Handles any available updates
     6. Launches the TUI for interactive querying
 
     Raises:
-        SystemExit: If SHESHA_API_KEY is not set or Docker is unavailable.
+        SystemExit: If ANANTA_API_KEY is not set or Docker is unavailable.
     """
     install_urllib3_cleanup_hook()
     args = parse_args()
 
-    if not os.environ.get("SHESHA_API_KEY"):
-        print("Error: SHESHA_API_KEY environment variable not set.")
+    if not os.environ.get("ANANTA_API_KEY"):
+        print("Error: ANANTA_API_KEY environment variable not set.")
         print()
         print("Environment variables:")
-        print("  SHESHA_API_KEY   (required) API key for your LLM provider")
-        print("  SHESHA_MODEL     (optional) Model name, e.g.:")
+        print("  ANANTA_API_KEY   (required) API key for your LLM provider")
+        print("  ANANTA_MODEL     (optional) Model name, e.g.:")
         print("                   - claude-sonnet-4-20250514 (default, Anthropic)")
         print("                   - gpt-4o (OpenAI)")
         print("                   - gemini/gemini-1.5-pro (Google)")
@@ -371,15 +371,15 @@ def main() -> None:
         print("The provider is auto-detected from the model name via LiteLLM.")
         sys.exit(1)
 
-    config = SheshaConfig.load(storage_path=STORAGE_PATH, verify=args.verify, model=args.model)
+    config = AnantaConfig.load(storage_path=STORAGE_PATH, verify=args.verify, model=args.model)
     try:
-        shesha = Shesha(config=config)
+        ananta = Ananta(config=config)
     except RuntimeError as e:
         if "Docker" in str(e):
             print(f"Error: {e}")
             print()
             print("To build the sandbox container, run:")
-            print("  docker build -t shesha-sandbox sandbox/")
+            print("  docker build -t ananta-sandbox sandbox/")
             sys.exit(1)
         raise
 
@@ -389,14 +389,14 @@ def main() -> None:
         repo_url = args.repo
     else:
         # Interactive picker mode
-        picker_result = show_picker(shesha)
+        picker_result = show_picker(ananta)
         if picker_result is None:
             repo_url = prompt_for_repo()
         elif picker_result[1]:
             # User selected existing project by number - check for updates
             project_name = picker_result[0]
             print(f"Loading project: {project_name}")
-            result = shesha.check_repo_for_updates(project_name)
+            result = ananta.check_repo_for_updates(project_name)
 
             # Handle status
             if result.status == "unchanged":
@@ -420,7 +420,7 @@ def main() -> None:
     if project is None:
         print(f"Loading repository: {repo_url}")
         try:
-            result = shesha.create_project_from_repo(repo_url)
+            result = ananta.create_project_from_repo(repo_url)
         except RepoIngestError as e:
             print(f"Error: {e}")
             sys.exit(1)
@@ -439,19 +439,19 @@ def main() -> None:
         project = result.project
 
     # Check analysis status
-    check_and_prompt_analysis(shesha, project.project_id)
+    check_and_prompt_analysis(ananta, project.project_id)
 
     # Load analysis context for query injection
     analysis_context = None
     if not args.pristine:
-        analysis = shesha.get_analysis(project.project_id)
+        analysis = ananta.get_analysis(project.project_id)
         if analysis:
             analysis_context = format_analysis_as_context(analysis)
 
     # Create and launch TUI
-    model = args.model or os.environ.get("SHESHA_MODEL", "claude-sonnet-4-20250514")
-    api_key = os.environ.get("SHESHA_API_KEY")
-    tui = SheshaTUI(
+    model = args.model or os.environ.get("ANANTA_MODEL", "claude-sonnet-4-20250514")
+    api_key = os.environ.get("ANANTA_API_KEY")
+    tui = AnantaTUI(
         project=project,
         project_name=project.project_id,
         analysis_context=analysis_context,
@@ -461,7 +461,7 @@ def main() -> None:
 
     # Register custom commands
     def handle_summary(args: str) -> None:
-        analysis = shesha.get_analysis(project.project_id)
+        analysis = ananta.get_analysis(project.project_id)
         if analysis is None:
             tui.query_one(OutputArea).add_system_message(
                 "No analysis. Use /analyze to generate."
@@ -480,7 +480,7 @@ def main() -> None:
     def handle_analyze(args: str) -> None:
         _post_message("Generating analysis...")
         try:
-            shesha.generate_analysis(project.project_id)
+            ananta.generate_analysis(project.project_id)
             _post_message("Analysis complete. Use /summary to view.")
         except Exception as e:
             _post_message(f"Error: {e}")

@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
-"""Shared utilities for Shesha example scripts."""
+"""Shared utilities for Ananta example scripts."""
 
 import sys
 import threading
 import time
 from typing import TYPE_CHECKING
 
-from shesha.rlm.semantic_verification import SemanticVerificationReport
-from shesha.rlm.trace import StepType, TokenUsage, Trace
+from ananta.rlm.semantic_verification import SemanticVerificationReport
+from ananta.rlm.trace import StepType, TokenUsage, Trace
 
 if TYPE_CHECKING:
     from sys import UnraisableHookArgs
 
-    from shesha.models import RepoAnalysis
+    from ananta.models import RepoAnalysis
 
 
 class ThinkingSpinner:

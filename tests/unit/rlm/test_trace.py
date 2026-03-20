@@ -1,6 +1,6 @@
 """Tests for trace data classes."""
 
-from shesha.rlm.trace import StepType, TokenUsage, Trace, TraceStep
+from ananta.rlm.trace import StepType, TokenUsage, Trace, TraceStep
 
 
 def test_trace_step_creation():
@@ -100,7 +100,7 @@ class TestTraceRedaction:
         trace = Trace()
         trace.add_step(StepType.CODE_OUTPUT, "custom-secret-123", 0)
 
-        from shesha.security.redaction import RedactionConfig
+        from ananta.security.redaction import RedactionConfig
 
         config = RedactionConfig(
             patterns=[re.compile(r"custom-secret-\d+")],

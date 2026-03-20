@@ -171,17 +171,17 @@ class TestCollectReposFromStorages:
         mock_multi.list_projects.return_value = []
 
         mock_explorer = MagicMock()
-        mock_explorer.list_projects.return_value = ["Ovid-shesha"]
+        mock_explorer.list_projects.return_value = ["Ovid-ananta"]
         mock_explorer.get_project_info.return_value = MagicMock(
-            project_id="Ovid-shesha",
-            source_url="https://github.com/Ovid/shesha/",
+            project_id="Ovid-ananta",
+            source_url="https://github.com/Ovid/ananta/",
             is_local=False,
             source_exists=True,
         )
 
         repos = collect_repos_from_storages(mock_multi, mock_explorer)
         assert len(repos) == 1
-        assert repos[0][0] == "Ovid-shesha"
+        assert repos[0][0] == "Ovid-ananta"
         assert repos[0][2] == "repo-explorer"
 
 
@@ -286,9 +286,9 @@ class TestMainIntegration:
 
         from multi_repo import main
 
-        mock_shesha = MagicMock()
-        mock_shesha.list_projects.return_value = ["org-auth"]
-        mock_shesha.get_project_info.return_value = MagicMock(
+        mock_ananta = MagicMock()
+        mock_ananta.list_projects.return_value = ["org-auth"]
+        mock_ananta.get_project_info.return_value = MagicMock(
             project_id="org-auth",
             source_url="https://github.com/org/auth",
             is_local=False,
@@ -299,9 +299,9 @@ class TestMainIntegration:
             ("org-auth", "https://github.com/org/auth", "multi-repo"),
         ]
         with patch.object(sys_mod, "argv", ["multi_repo.py"]):
-            with patch.dict(os.environ, {"SHESHA_API_KEY": "test-key"}, clear=True):
-                with patch("multi_repo.Shesha", return_value=mock_shesha):
-                    with patch("multi_repo.SheshaConfig"):
+            with patch.dict(os.environ, {"ANANTA_API_KEY": "test-key"}, clear=True):
+                with patch("multi_repo.Ananta", return_value=mock_ananta):
+                    with patch("multi_repo.AnantaConfig"):
                         with patch(
                             "multi_repo.show_multi_picker",
                             return_value=picker_result,
@@ -331,12 +331,12 @@ class TestMainIntegration:
 
         from multi_repo import main
 
-        mock_shesha = MagicMock()
+        mock_ananta = MagicMock()
 
         with patch.object(sys_mod, "argv", ["multi_repo.py", "https://github.com/org/auth"]):
-            with patch.dict(os.environ, {"SHESHA_API_KEY": "test-key"}, clear=True):
-                with patch("multi_repo.Shesha", return_value=mock_shesha):
-                    with patch("multi_repo.SheshaConfig"):
+            with patch.dict(os.environ, {"ANANTA_API_KEY": "test-key"}, clear=True):
+                with patch("multi_repo.Ananta", return_value=mock_ananta):
+                    with patch("multi_repo.AnantaConfig"):
                         with patch("multi_repo.show_multi_picker") as mock_picker:
                             with patch("multi_repo.MultiRepoAnalyzer") as mock_analyzer_cls:
                                 mock_analyzer = MagicMock()
@@ -366,4 +366,4 @@ class TestMainIntegration:
 
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
-        assert "SHESHA_API_KEY" in captured.out
+        assert "ANANTA_API_KEY" in captured.out

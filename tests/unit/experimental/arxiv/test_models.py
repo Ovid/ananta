@@ -9,7 +9,7 @@ class TestPaperMeta:
     """Tests for PaperMeta dataclass."""
 
     def test_create_paper_meta(self) -> None:
-        from shesha.experimental.arxiv.models import PaperMeta
+        from ananta.experimental.arxiv.models import PaperMeta
 
         meta = PaperMeta(
             arxiv_id="2501.12345",
@@ -29,7 +29,7 @@ class TestPaperMeta:
         assert meta.primary_category == "cs.AI"
 
     def test_paper_meta_optional_fields(self) -> None:
-        from shesha.experimental.arxiv.models import PaperMeta
+        from ananta.experimental.arxiv.models import PaperMeta
 
         meta = PaperMeta(
             arxiv_id="2501.12345",
@@ -50,7 +50,7 @@ class TestPaperMeta:
 
     def test_paper_meta_to_dict_roundtrip(self) -> None:
         """PaperMeta can serialize to dict and back for JSON storage."""
-        from shesha.experimental.arxiv.models import PaperMeta
+        from ananta.experimental.arxiv.models import PaperMeta
 
         meta = PaperMeta(
             arxiv_id="2501.12345",
@@ -77,7 +77,7 @@ class TestExtractedCitation:
     """Tests for ExtractedCitation dataclass."""
 
     def test_create_citation(self) -> None:
-        from shesha.experimental.arxiv.models import ExtractedCitation
+        from ananta.experimental.arxiv.models import ExtractedCitation
 
         cite = ExtractedCitation(
             key="smith2023",
@@ -90,7 +90,7 @@ class TestExtractedCitation:
         assert cite.arxiv_id == "2301.04567"
 
     def test_citation_without_arxiv_id(self) -> None:
-        from shesha.experimental.arxiv.models import ExtractedCitation
+        from ananta.experimental.arxiv.models import ExtractedCitation
 
         cite = ExtractedCitation(
             key="doe2022",
@@ -106,7 +106,7 @@ class TestVerificationResult:
     """Tests for VerificationResult dataclass."""
 
     def test_verified_citation(self) -> None:
-        from shesha.experimental.arxiv.models import VerificationResult, VerificationStatus
+        from ananta.experimental.arxiv.models import VerificationResult, VerificationStatus
 
         result = VerificationResult(
             citation_key="smith2023",
@@ -116,7 +116,7 @@ class TestVerificationResult:
         assert result.message is None
 
     def test_mismatched_citation(self) -> None:
-        from shesha.experimental.arxiv.models import VerificationResult, VerificationStatus
+        from ananta.experimental.arxiv.models import VerificationResult, VerificationStatus
 
         result = VerificationResult(
             citation_key="smith2023",
@@ -133,7 +133,7 @@ class TestTopicInfo:
     """Tests for TopicInfo dataclass."""
 
     def test_create_topic_info(self) -> None:
-        from shesha.experimental.arxiv.models import TopicInfo
+        from ananta.experimental.arxiv.models import TopicInfo
 
         info = TopicInfo(
             name="quantum-error-correction",
@@ -146,7 +146,7 @@ class TestTopicInfo:
         assert info.paper_count == 3
 
     def test_topic_info_formatted_size(self) -> None:
-        from shesha.experimental.arxiv.models import TopicInfo
+        from ananta.experimental.arxiv.models import TopicInfo
 
         info = TopicInfo(
             name="test",
@@ -158,7 +158,7 @@ class TestTopicInfo:
         assert info.formatted_size == "12.4 MB"
 
     def test_topic_info_formatted_size_kb(self) -> None:
-        from shesha.experimental.arxiv.models import TopicInfo
+        from ananta.experimental.arxiv.models import TopicInfo
 
         info = TopicInfo(
             name="test",
@@ -174,7 +174,7 @@ class TestCheckReport:
     """Tests for CheckReport dataclass."""
 
     def test_create_check_report(self) -> None:
-        from shesha.experimental.arxiv.models import (
+        from ananta.experimental.arxiv.models import (
             CheckReport,
             ExtractedCitation,
             VerificationResult,
@@ -200,7 +200,7 @@ class TestCitationVerifierProtocol:
 
     def test_arxiv_verifier_satisfies_protocol(self) -> None:
         """ArxivVerifier should satisfy the CitationVerifier Protocol."""
-        from shesha.experimental.arxiv.models import CitationVerifier
+        from ananta.experimental.arxiv.models import CitationVerifier
 
         # Verify the protocol has the expected method signature
         assert hasattr(CitationVerifier, "verify")

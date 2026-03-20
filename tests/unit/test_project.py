@@ -5,10 +5,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from shesha.exceptions import EngineNotConfiguredError
-from shesha.models import ParsedDocument
-from shesha.project import Project
-from shesha.rlm.trace import StepType, TokenUsage
+from ananta.exceptions import EngineNotConfiguredError
+from ananta.models import ParsedDocument
+from ananta.project import Project
+from ananta.rlm.trace import StepType, TokenUsage
 
 
 @pytest.fixture

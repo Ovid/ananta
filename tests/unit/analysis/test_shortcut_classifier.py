@@ -4,12 +4,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from shesha.analysis.shortcut import (
+from ananta.analysis.shortcut import (
     _CLASSIFIER_PROMPT,
     classify_query,
     try_answer_from_analysis,
 )
-from shesha.llm.exceptions import PermanentError, TransientError
+from ananta.llm.exceptions import PermanentError, TransientError
 
 
 class TestClassifyQuery:
@@ -20,7 +20,7 @@ class TestClassifyQuery:
         mock_response = MagicMock()
         mock_response.content = "NEED_DEEPER"
 
-        with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+        with patch("ananta.analysis.shortcut.LLMClient") as mock_cls:
             mock_cls.return_value.complete.return_value = mock_response
             result = classify_query(
                 question="Does SECURITY.md exist?",
@@ -35,7 +35,7 @@ class TestClassifyQuery:
         mock_response = MagicMock()
         mock_response.content = "NEED_DEEPER"
 
-        with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+        with patch("ananta.analysis.shortcut.LLMClient") as mock_cls:
             mock_cls.return_value.complete.return_value = mock_response
             result = classify_query(
                 question="How accurate is the README?",
@@ -50,7 +50,7 @@ class TestClassifyQuery:
         mock_response = MagicMock()
         mock_response.content = "NEED_DEEPER"
 
-        with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+        with patch("ananta.analysis.shortcut.LLMClient") as mock_cls:
             mock_cls.return_value.complete.return_value = mock_response
             result = classify_query(
                 question="I think it's out of date.",
@@ -65,7 +65,7 @@ class TestClassifyQuery:
         mock_response = MagicMock()
         mock_response.content = "NEED_DEEPER"
 
-        with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+        with patch("ananta.analysis.shortcut.LLMClient") as mock_cls:
             mock_cls.return_value.complete.return_value = mock_response
             result = classify_query(
                 question="What's in the Makefile?",
@@ -80,7 +80,7 @@ class TestClassifyQuery:
         mock_response = MagicMock()
         mock_response.content = "ANALYSIS_OK"
 
-        with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+        with patch("ananta.analysis.shortcut.LLMClient") as mock_cls:
             mock_cls.return_value.complete.return_value = mock_response
             result = classify_query(
                 question="What does this project do?",
@@ -95,7 +95,7 @@ class TestClassifyQuery:
         mock_response = MagicMock()
         mock_response.content = "ANALYSIS_OK"
 
-        with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+        with patch("ananta.analysis.shortcut.LLMClient") as mock_cls:
             mock_cls.return_value.complete.return_value = mock_response
             result = classify_query(
                 question="What external services does this use?",
@@ -107,7 +107,7 @@ class TestClassifyQuery:
 
     def test_returns_true_on_transient_exception(self):
         """Transient LLM exception -> True (graceful fallback, allow shortcut attempt)."""
-        with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+        with patch("ananta.analysis.shortcut.LLMClient") as mock_cls:
             mock_cls.return_value.complete.side_effect = TransientError("timeout")
             result = classify_query(
                 question="What does this do?",
@@ -119,7 +119,7 @@ class TestClassifyQuery:
 
     def test_raises_permanent_error(self):
         """PermanentError (auth failure) propagates instead of being swallowed."""
-        with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+        with patch("ananta.analysis.shortcut.LLMClient") as mock_cls:
             mock_cls.return_value.complete.side_effect = PermanentError("invalid key")
             with pytest.raises(PermanentError):
                 classify_query(
@@ -136,7 +136,7 @@ class TestClassifyQuery:
             mock_response.prompt_tokens = 10
             mock_response.completion_tokens = 5
 
-            with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+            with patch("ananta.analysis.shortcut.LLMClient") as mock_cls:
                 mock_cls.return_value.complete.return_value = mock_response
                 result = classify_query(
                     question="Any question",
@@ -151,7 +151,7 @@ class TestClassifyQuery:
         mock_response = MagicMock()
         mock_response.content = "I'm not sure how to classify this question."
 
-        with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+        with patch("ananta.analysis.shortcut.LLMClient") as mock_cls:
             mock_cls.return_value.complete.return_value = mock_response
             result = classify_query(
                 question="What does this do?",
@@ -166,7 +166,7 @@ class TestClassifyQuery:
         mock_response = MagicMock()
         mock_response.content = "ANALYSIS_OK"
 
-        with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+        with patch("ananta.analysis.shortcut.LLMClient") as mock_cls:
             mock_client = mock_cls.return_value
             mock_client.complete.return_value = mock_response
             classify_query(
@@ -185,7 +185,7 @@ class TestClassifyQuery:
         mock_response = MagicMock()
         mock_response.content = "ANALYSIS_OK"
 
-        with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+        with patch("ananta.analysis.shortcut.LLMClient") as mock_cls:
             mock_client = mock_cls.return_value
             mock_client.complete.return_value = mock_response
             classify_query(
@@ -215,7 +215,7 @@ class TestClassifyQuery:
         mock_response = MagicMock()
         mock_response.content = "ANALYSIS_OK"
 
-        with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+        with patch("ananta.analysis.shortcut.LLMClient") as mock_cls:
             mock_cls.return_value.complete.return_value = mock_response
             classify_query(
                 question="What does this do?",
@@ -311,8 +311,8 @@ class TestTryAnswerFromAnalysisWithClassifier:
 
     def test_skips_shortcut_when_classifier_returns_false(self):
         """When classify_query returns False, shortcut returns None without calling shortcut LLM."""
-        with patch("shesha.analysis.shortcut.classify_query", return_value=(False, 0, 0)):
-            with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+        with patch("ananta.analysis.shortcut.classify_query", return_value=(False, 0, 0)):
+            with patch("ananta.analysis.shortcut.LLMClient") as mock_cls:
                 result = try_answer_from_analysis(
                     question="Does SECURITY.md exist?",
                     analysis_context="Some analysis",
@@ -331,8 +331,8 @@ class TestTryAnswerFromAnalysisWithClassifier:
         mock_response.prompt_tokens = 50
         mock_response.completion_tokens = 10
 
-        with patch("shesha.analysis.shortcut.classify_query", return_value=(True, 0, 0)):
-            with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+        with patch("ananta.analysis.shortcut.classify_query", return_value=(True, 0, 0)):
+            with patch("ananta.analysis.shortcut.LLMClient") as mock_cls:
                 mock_cls.return_value.complete.return_value = mock_response
                 result = try_answer_from_analysis(
                     question="What does this project do?",
@@ -355,7 +355,7 @@ class TestTryAnswerFromAnalysisWithClassifier:
         answer_response.prompt_tokens = 50
         answer_response.completion_tokens = 10
 
-        with patch("shesha.analysis.shortcut.LLMClient") as mock_cls:
+        with patch("ananta.analysis.shortcut.LLMClient") as mock_cls:
             # First LLMClient instance = classifier, second = answer
             classifier_client = MagicMock()
             classifier_client.complete.return_value = classifier_response
@@ -380,7 +380,7 @@ class TestTryAnswerFromAnalysisWithClassifier:
 
     def test_no_classifier_when_analysis_context_is_none(self):
         """When analysis_context is None, skip classifier and return None immediately."""
-        with patch("shesha.analysis.shortcut.classify_query") as mock_classify:
+        with patch("ananta.analysis.shortcut.classify_query") as mock_classify:
             result = try_answer_from_analysis(
                 question="What does this do?",
                 analysis_context=None,

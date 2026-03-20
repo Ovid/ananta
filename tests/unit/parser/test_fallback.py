@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from shesha.parser.fallback import FallbackTextParser
+from ananta.parser.fallback import FallbackTextParser
 
 
 class TestFallbackCanParse:

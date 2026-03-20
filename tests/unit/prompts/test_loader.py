@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from shesha.prompts.loader import PromptLoader, resolve_prompts_dir
-from shesha.prompts.validator import PromptValidationError
+from ananta.prompts.loader import PromptLoader, resolve_prompts_dir
+from ananta.prompts.validator import PromptValidationError
 
 
 @pytest.fixture
@@ -131,8 +131,8 @@ def test_loader_render_code_required(valid_prompts_dir: Path):
 
 
 def test_resolve_prompts_dir_uses_env_var(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    """resolve_prompts_dir uses SHESHA_PROMPTS_DIR env var."""
-    monkeypatch.setenv("SHESHA_PROMPTS_DIR", str(tmp_path))
+    """resolve_prompts_dir uses ANANTA_PROMPTS_DIR env var."""
+    monkeypatch.setenv("ANANTA_PROMPTS_DIR", str(tmp_path))
     result = resolve_prompts_dir()
     assert result == tmp_path
 

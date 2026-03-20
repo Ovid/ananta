@@ -6,8 +6,8 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from shesha.experimental.arxiv.models import PaperMeta
-from shesha.experimental.web.api import create_api
+from ananta.experimental.arxiv.models import PaperMeta
+from ananta.experimental.web.api import create_api
 
 
 @pytest.fixture
@@ -63,7 +63,7 @@ def test_search_arxiv_with_filters(client: TestClient, mock_state: MagicMock) ->
 
 
 def test_search_arxiv_marks_existing_papers(client: TestClient, mock_state: MagicMock) -> None:
-    from shesha.experimental.arxiv.models import TopicInfo
+    from ananta.experimental.arxiv.models import TopicInfo
 
     mock_state.searcher.search.return_value = [_make_meta("2501.08753")]
     mock_state.topic_mgr.list_topics.return_value = [
@@ -84,7 +84,7 @@ def test_search_arxiv_marks_existing_papers(client: TestClient, mock_state: Magi
 
 
 def test_search_local(client: TestClient, mock_state: MagicMock) -> None:
-    from shesha.experimental.arxiv.models import TopicInfo
+    from ananta.experimental.arxiv.models import TopicInfo
 
     mock_state.topic_mgr.list_topics.return_value = [
         TopicInfo(
@@ -107,7 +107,7 @@ def test_search_local(client: TestClient, mock_state: MagicMock) -> None:
 
 
 def test_search_local_matches_author(client: TestClient, mock_state: MagicMock) -> None:
-    from shesha.experimental.arxiv.models import TopicInfo
+    from ananta.experimental.arxiv.models import TopicInfo
 
     mock_state.topic_mgr.list_topics.return_value = [
         TopicInfo(
@@ -130,7 +130,7 @@ def test_search_local_matches_author(client: TestClient, mock_state: MagicMock) 
 
 
 def test_search_local_matches_arxiv_id(client: TestClient, mock_state: MagicMock) -> None:
-    from shesha.experimental.arxiv.models import TopicInfo
+    from ananta.experimental.arxiv.models import TopicInfo
 
     mock_state.topic_mgr.list_topics.return_value = [
         TopicInfo(
@@ -153,7 +153,7 @@ def test_search_local_matches_arxiv_id(client: TestClient, mock_state: MagicMock
 
 def test_search_local_reports_all_topics(client: TestClient, mock_state: MagicMock) -> None:
     """A paper in multiple topics should list all of them in in_topics."""
-    from shesha.experimental.arxiv.models import TopicInfo
+    from ananta.experimental.arxiv.models import TopicInfo
 
     mock_state.topic_mgr.list_topics.return_value = [
         TopicInfo(

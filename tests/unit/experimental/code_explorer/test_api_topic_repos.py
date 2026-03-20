@@ -8,22 +8,22 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from shesha.experimental.code_explorer.api import create_api
-from shesha.experimental.code_explorer.dependencies import CodeExplorerState
-from shesha.experimental.code_explorer.topics import CodeExplorerTopicManager
+from ananta.experimental.code_explorer.api import create_api
+from ananta.experimental.code_explorer.dependencies import CodeExplorerState
+from ananta.experimental.code_explorer.topics import CodeExplorerTopicManager
 
 
 @pytest.fixture
-def mock_shesha(tmp_path: Path) -> MagicMock:
-    """Create a mock Shesha instance."""
-    shesha = MagicMock()
-    shesha.list_projects.return_value = []
-    shesha.storage = MagicMock()
-    shesha.storage.list_documents.return_value = []
+def mock_ananta(tmp_path: Path) -> MagicMock:
+    """Create a mock Ananta instance."""
+    ananta = MagicMock()
+    ananta.list_projects.return_value = []
+    ananta.storage = MagicMock()
+    ananta.storage.list_documents.return_value = []
     # Return a real Path so _build_repo_info's display-name lookup doesn't
     # produce a MagicMock string.  Individual tests can override this.
-    shesha.storage.get_project_dir.return_value = tmp_path / "default_project_dir"
-    return shesha
+    ananta.storage.get_project_dir.return_value = tmp_path / "default_project_dir"
+    return ananta
 
 
 @pytest.fixture
@@ -33,10 +33,10 @@ def topic_mgr(tmp_path: Path) -> CodeExplorerTopicManager:
 
 
 @pytest.fixture
-def state(mock_shesha: MagicMock, topic_mgr: CodeExplorerTopicManager) -> CodeExplorerState:
-    """Create a CodeExplorerState with mock shesha and real topic manager."""
+def state(mock_ananta: MagicMock, topic_mgr: CodeExplorerTopicManager) -> CodeExplorerState:
+    """Create a CodeExplorerState with mock ananta and real topic manager."""
     return CodeExplorerState(
-        shesha=mock_shesha,
+        ananta=mock_ananta,
         topic_mgr=topic_mgr,
         session=MagicMock(),
         model="test-model",
@@ -136,18 +136,18 @@ class TestRemoveRepoFromTopic:
     def test_removing_last_reference_does_not_delete_repo(
         self,
         client: TestClient,
-        mock_shesha: MagicMock,
+        mock_ananta: MagicMock,
         topic_mgr: CodeExplorerTopicManager,
     ) -> None:
-        """DELETE does NOT delete the repo from shesha even when it's the last reference."""
+        """DELETE does NOT delete the repo from ananta even when it's the last reference."""
         topic_mgr.create("Frontend")
         topic_mgr.add_item("Frontend", "owner-myrepo")
 
         resp = client.delete("/api/topics/Frontend/items/owner-myrepo")
         assert resp.status_code == 200
 
-        # Shesha.delete_project should NOT have been called
-        mock_shesha.delete_project.assert_not_called()
+        # Ananta.delete_project should NOT have been called
+        mock_ananta.delete_project.assert_not_called()
 
     def test_remove_repo_topic_not_found(
         self,
@@ -177,7 +177,7 @@ class TestListTopicRepos:
         self,
         client: TestClient,
         topic_mgr: CodeExplorerTopicManager,
-        mock_shesha: MagicMock,
+        mock_ananta: MagicMock,
     ) -> None:
         """GET /api/topics/{name}/items returns RepoInfo objects, not bare IDs."""
         topic_mgr.create("RLMs")
@@ -186,8 +186,8 @@ class TestListTopicRepos:
         proj_info = MagicMock()
         proj_info.source_url = "https://github.com/owner/myrepo"
         proj_info.analysis_status = "none"
-        mock_shesha.get_project_info.return_value = proj_info
-        mock_shesha.storage.list_documents.return_value = ["f1", "f2"]
+        mock_ananta.get_project_info.return_value = proj_info
+        mock_ananta.storage.list_documents.return_value = ["f1", "f2"]
 
         resp = client.get("/api/topics/RLMs/items")
         assert resp.status_code == 200
@@ -218,7 +218,7 @@ class TestListTopicRepos:
         self,
         client: TestClient,
         topic_mgr: CodeExplorerTopicManager,
-        mock_shesha: MagicMock,
+        mock_ananta: MagicMock,
     ) -> None:
         """GET /api/topics/{name}/items only returns items in that specific topic."""
         topic_mgr.create("RLMs")
@@ -228,8 +228,8 @@ class TestListTopicRepos:
         proj_info = MagicMock()
         proj_info.source_url = "https://example.com/repo-a"
         proj_info.analysis_status = "none"
-        mock_shesha.get_project_info.return_value = proj_info
-        mock_shesha.storage.list_documents.return_value = []
+        mock_ananta.get_project_info.return_value = proj_info
+        mock_ananta.storage.list_documents.return_value = []
 
         resp = client.get("/api/topics/RLMs/items")
         assert resp.status_code == 200

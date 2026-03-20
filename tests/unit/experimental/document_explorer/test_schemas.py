@@ -5,7 +5,7 @@ from __future__ import annotations
 import pydantic
 import pytest
 
-from shesha.experimental.document_explorer.schemas import (
+from ananta.experimental.document_explorer.schemas import (
     ContextBudget,
     DocumentInfo,
     DocumentUploadResponse,

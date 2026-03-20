@@ -6,8 +6,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from shesha.experimental.web.api import create_api
-from shesha.experimental.web.session import WebConversationSession
+from ananta.experimental.web.api import create_api
+from ananta.experimental.web.session import WebConversationSession
 
 
 @pytest.fixture
@@ -146,7 +146,7 @@ def test_context_budget(client: TestClient, mock_state: MagicMock, tmp_path: Pat
     WebConversationSession(tmp_path)
 
     # Mock max_input_tokens via litellm (route now lives in shared router)
-    with patch("shesha.experimental.shared.routes.litellm") as mock_litellm:
+    with patch("ananta.experimental.shared.routes.litellm") as mock_litellm:
         mock_litellm.get_model_info.return_value = {"max_input_tokens": 100000}
         resp = client.get("/api/topics/test-topic/context-budget")
 

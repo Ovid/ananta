@@ -8,24 +8,24 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from shesha.exceptions import ProjectNotFoundError
-from shesha.experimental.code_explorer.api import create_api
-from shesha.experimental.code_explorer.dependencies import CodeExplorerState
-from shesha.experimental.code_explorer.topics import CodeExplorerTopicManager
-from shesha.models import AnalysisComponent, AnalysisExternalDep, RepoAnalysis
+from ananta.exceptions import ProjectNotFoundError
+from ananta.experimental.code_explorer.api import create_api
+from ananta.experimental.code_explorer.dependencies import CodeExplorerState
+from ananta.experimental.code_explorer.topics import CodeExplorerTopicManager
+from ananta.models import AnalysisComponent, AnalysisExternalDep, RepoAnalysis
 
 
 @pytest.fixture
-def mock_shesha(tmp_path: Path) -> MagicMock:
-    """Create a mock Shesha instance."""
-    shesha = MagicMock()
-    shesha.list_projects.return_value = []
-    shesha.storage = MagicMock()
-    shesha.storage.list_documents.return_value = []
+def mock_ananta(tmp_path: Path) -> MagicMock:
+    """Create a mock Ananta instance."""
+    ananta = MagicMock()
+    ananta.list_projects.return_value = []
+    ananta.storage = MagicMock()
+    ananta.storage.list_documents.return_value = []
     # Return a real Path so _build_repo_info's display-name lookup doesn't
     # produce a MagicMock string.  Individual tests can override this.
-    shesha.storage.get_project_dir.return_value = tmp_path / "default_project_dir"
-    return shesha
+    ananta.storage.get_project_dir.return_value = tmp_path / "default_project_dir"
+    return ananta
 
 
 @pytest.fixture
@@ -35,10 +35,10 @@ def topic_mgr(tmp_path: Path) -> CodeExplorerTopicManager:
 
 
 @pytest.fixture
-def state(mock_shesha: MagicMock, topic_mgr: CodeExplorerTopicManager) -> CodeExplorerState:
-    """Create a CodeExplorerState with mock shesha and real topic manager."""
+def state(mock_ananta: MagicMock, topic_mgr: CodeExplorerTopicManager) -> CodeExplorerState:
+    """Create a CodeExplorerState with mock ananta and real topic manager."""
     return CodeExplorerState(
-        shesha=mock_shesha,
+        ananta=mock_ananta,
         topic_mgr=topic_mgr,
         session=MagicMock(),
         model="test-model",
@@ -86,10 +86,10 @@ def _make_analysis() -> RepoAnalysis:
 
 
 class TestGenerateAnalysis:
-    def test_generate_analysis_success(self, client: TestClient, mock_shesha: MagicMock) -> None:
+    def test_generate_analysis_success(self, client: TestClient, mock_ananta: MagicMock) -> None:
         """POST /api/repos/{id}/analyze returns AnalysisResponse on success."""
         analysis = _make_analysis()
-        mock_shesha.generate_analysis.return_value = analysis
+        mock_ananta.generate_analysis.return_value = analysis
 
         resp = client.post("/api/repos/owner-myrepo/analyze")
         assert resp.status_code == 200
@@ -103,13 +103,13 @@ class TestGenerateAnalysis:
         assert len(data["external_dependencies"]) == 1
         assert data["external_dependencies"][0]["name"] == "PostgreSQL"
         assert data["caveats"] == "Test caveats."
-        mock_shesha.generate_analysis.assert_called_once_with("owner-myrepo")
+        mock_ananta.generate_analysis.assert_called_once_with("owner-myrepo")
 
     def test_generate_analysis_project_not_found(
-        self, client: TestClient, mock_shesha: MagicMock
+        self, client: TestClient, mock_ananta: MagicMock
     ) -> None:
         """POST /api/repos/{id}/analyze returns 404 for missing project."""
-        mock_shesha.generate_analysis.side_effect = ProjectNotFoundError("nonexistent")
+        mock_ananta.generate_analysis.side_effect = ProjectNotFoundError("nonexistent")
 
         resp = client.post("/api/repos/nonexistent/analyze")
         assert resp.status_code == 404
@@ -119,10 +119,10 @@ class TestGenerateAnalysis:
 
 
 class TestGetAnalysis:
-    def test_get_analysis_success(self, client: TestClient, mock_shesha: MagicMock) -> None:
+    def test_get_analysis_success(self, client: TestClient, mock_ananta: MagicMock) -> None:
         """GET /api/repos/{id}/analysis returns AnalysisResponse when analysis exists."""
         analysis = _make_analysis()
-        mock_shesha.get_analysis.return_value = analysis
+        mock_ananta.get_analysis.return_value = analysis
 
         resp = client.get("/api/repos/owner-myrepo/analysis")
         assert resp.status_code == 200
@@ -136,22 +136,22 @@ class TestGetAnalysis:
         assert len(data["external_dependencies"]) == 1
         assert data["external_dependencies"][0]["name"] == "PostgreSQL"
         assert data["caveats"] == "Test caveats."
-        mock_shesha.get_analysis.assert_called_once_with("owner-myrepo")
+        mock_ananta.get_analysis.assert_called_once_with("owner-myrepo")
 
     def test_get_analysis_no_analysis_exists(
-        self, client: TestClient, mock_shesha: MagicMock
+        self, client: TestClient, mock_ananta: MagicMock
     ) -> None:
         """GET /api/repos/{id}/analysis returns 404 when no analysis exists."""
-        mock_shesha.get_analysis.return_value = None
+        mock_ananta.get_analysis.return_value = None
 
         resp = client.get("/api/repos/owner-myrepo/analysis")
         assert resp.status_code == 404
 
     def test_get_analysis_project_not_found(
-        self, client: TestClient, mock_shesha: MagicMock
+        self, client: TestClient, mock_ananta: MagicMock
     ) -> None:
         """GET /api/repos/{id}/analysis returns 404 for missing project."""
-        mock_shesha.get_analysis.side_effect = ProjectNotFoundError("nonexistent")
+        mock_ananta.get_analysis.side_effect = ProjectNotFoundError("nonexistent")
 
         resp = client.get("/api/repos/nonexistent/analysis")
         assert resp.status_code == 404

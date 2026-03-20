@@ -1,6 +1,6 @@
 """Tests for container security configuration."""
 
-from shesha.security.containers import DEFAULT_SECURITY, ContainerSecurityConfig
+from ananta.security.containers import DEFAULT_SECURITY, ContainerSecurityConfig
 
 
 class TestContainerSecurityConfig:

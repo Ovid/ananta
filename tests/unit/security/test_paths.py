@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from shesha.security.paths import PathTraversalError, safe_path
+from ananta.security.paths import PathTraversalError, safe_path
 
 
 class TestSafePath:

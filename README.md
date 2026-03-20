@@ -1,15 +1,15 @@
-# Shesha
+# Ananta
 
 <p align="center">
-  <img src="images/shesha.png" alt="Shesha logo" width="200">
+  <img src="images/ananta.png" alt="Ananta logo" width="200">
 </p>
 
 **Ask complex questions across large document collections—and get answers with citations**
 
-Shesha lets AI explore your documents, [even large codebases](examples/repo.py), the way a researcher would: reading, searching, cross-referencing, and iterating until it finds the answer. Most AI search tools grab a few relevant paragraphs and hope for the best. Shesha reads everything, designs its own research strategy for your specific question, and keeps digging until it's confident.
+Ananta lets AI explore your documents, [even large codebases](examples/repo.py), the way a researcher would: reading, searching, cross-referencing, and iterating until it finds the answer. Most AI search tools grab a few relevant paragraphs and hope for the best. Ananta reads everything, designs its own research strategy for your specific question, and keeps digging until it's confident.
 
 <p align="center">
-  <img src="images/tui.png" alt="Shesha TUI screenshot (examples/repo.py screenshot)">
+  <img src="images/tui.png" alt="Ananta TUI screenshot (examples/repo.py screenshot)">
 </p>
 
 _**Note** for fans of [Perl's Dancer2 framework](https://github.com/PerlDancer/Dancer2): I'm not seriously proposing the above._
@@ -95,15 +95,15 @@ Works with 100+ LLM providers via [LiteLLM](https://github.com/BerriAI/litellm) 
 ### From PyPI (when published)
 
 ```bash
-pip install shesha
+pip install ananta
 ```
 
 ### From Source
 
 
 ```bash
-git clone https://github.com/Ovid/shesha.git
-cd shesha
+git clone https://github.com/Ovid/ananta.git
+cd ananta
 
 # Create and activate a virtual environment
 python3 -m venv .venv
@@ -118,13 +118,13 @@ pip install -e ".[dev]"
 The sandbox container is required for code execution:
 
 ```bash
-docker build -t shesha-sandbox -f src/shesha/sandbox/Dockerfile src/shesha/sandbox/
+docker build -t ananta-sandbox -f src/ananta/sandbox/Dockerfile src/ananta/sandbox/
 ```
 
 Verify the build:
 
 ```bash
-echo '{"action": "ping"}' | docker run -i --rm shesha-sandbox
+echo '{"action": "ping"}' | docker run -i --rm ananta-sandbox
 # Should output: {"status": "ok", "message": "pong"}
 ```
 
@@ -133,22 +133,39 @@ echo '{"action": "ping"}' | docker run -i --rm shesha-sandbox
 Set your API key and optionally specify a model:
 
 ```bash
-export SHESHA_API_KEY="your-api-key-here"
-export SHESHA_MODEL="claude-sonnet-4-20250514"  # Default model
+export ANANTA_API_KEY="your-api-key-here"
+export ANANTA_MODEL="claude-sonnet-4-20250514"  # Default model
 ```
 
-Shesha also supports programmatic configuration, YAML config files, and per-provider API keys. See [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) for all options.
+Ananta also supports programmatic configuration, YAML config files, and per-provider API keys. See [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) for all options.
+
+## Migrating from Shesha
+
+If you used a previous version of this project (when it was called "Shesha"),
+run the migration script to rename your data directories:
+
+```bash
+python -m ananta.migrate
+```
+
+The script finds legacy directories, shows what it will rename, and asks for
+confirmation before making changes. After running it, update your environment
+variables from `SHESHA_*` to `ANANTA_*` and rebuild the sandbox container:
+
+```bash
+docker build -t ananta-sandbox src/ananta/sandbox/
+```
 
 ## Quick Start
 
 ```python
-from shesha import Shesha
+from ananta import Ananta
 
-# Initialize (uses SHESHA_API_KEY from environment)
-shesha = Shesha(model="claude-sonnet-4-20250514")
+# Initialize (uses ANANTA_API_KEY from environment)
+ananta = Ananta(model="claude-sonnet-4-20250514")
 
 # Create a project and upload documents
-project = shesha.create_project("research")
+project = ananta.create_project("research")
 project.upload("papers/", recursive=True)
 project.upload("notes.md")
 
@@ -171,14 +188,14 @@ The repo includes an interactive example that lets you query the Barsoom novels 
 
 ```bash
 # Make sure you're in the project directory with venv activated
-cd shesha
+cd ananta
 source .venv/bin/activate
 
 # Set your API key
-export SHESHA_API_KEY="your-api-key-here"
+export ANANTA_API_KEY="your-api-key-here"
 
 # Optional: specify a model (defaults to claude-sonnet-4-20250514)
-export SHESHA_MODEL="gpt-4o"  # or claude-sonnet-4-20250514, gemini/gemini-1.5-pro, etc.
+export ANANTA_MODEL="gpt-4o"  # or claude-sonnet-4-20250514, gemini/gemini-1.5-pro, etc.
 
 # Run the interactive explorer
 python examples/barsoom.py
@@ -205,12 +222,12 @@ python examples/barsoom.py --prompt "How does John Carter travel to Mars?"
 
 ## Analyzing Codebases
 
-Shesha can ingest entire git repositories for deep code analysis with accurate file:line citations:
+Ananta can ingest entire git repositories for deep code analysis with accurate file:line citations:
 
 ```python
-from shesha import Shesha
+from ananta import Ananta
 
-with Shesha() as s:
+with Ananta() as s:
     # Ingest a GitHub repository
     result = s.create_project_from_repo(
         url="https://github.com/org/repo",
@@ -243,10 +260,10 @@ For interactive codebase exploration, use the `repo.py` example script:
 
 ```bash
 # Set your API key
-export SHESHA_API_KEY="your-api-key-here"
+export ANANTA_API_KEY="your-api-key-here"
 
 # Optional: specify a model (defaults to claude-sonnet-4-20250514)
-export SHESHA_MODEL="gpt-4o"  # or gemini/gemini-1.5-pro, ollama/llama3, etc.
+export ANANTA_MODEL="gpt-4o"  # or gemini/gemini-1.5-pro, ollama/llama3, etc.
 
 # Explore a GitHub repository
 python examples/repo.py https://github.com/org/repo
@@ -289,37 +306,37 @@ python examples/repo.py https://github.com/org/repo --update --verbose
 
 ## arXiv Explorer
 
-The [arXiv Explorer](arxiv-explorer/) is a web-based research tool that lets you search arXiv, add papers to topics, and ask plain-English questions across dozens of papers at once. Shesha writes and runs code to dig through your documents, iterating until it finds a real answer with citations you can verify against the source.
+The [arXiv Explorer](arxiv-explorer/) is a web-based research tool that lets you search arXiv, add papers to topics, and ask plain-English questions across dozens of papers at once. Ananta writes and runs code to dig through your documents, iterating until it finds a real answer with citations you can verify against the source.
 
 <p align="center">
   <img src="images/arxiv_explorer.png" alt="arXiv Explorer screenshot — searching nearly 25 MB of papers to answer a complex question">
 </p>
 
-_The screenshot above shows Shesha searching through nearly 25 MB of research papers to answer a complex question._
+_The screenshot above shows Ananta searching through nearly 25 MB of research papers to answer a complex question._
 
 ## Document Explorer (Experimental)
 
-A web-based interface for uploading documents, organizing them into topics, and querying them with Shesha. Upload PDFs, Word documents, PowerPoint, Excel, RTF, or plain text files, group them by topic, then ask questions across your collection.
+A web-based interface for uploading documents, organizing them into topics, and querying them with Ananta. Upload PDFs, Word documents, PowerPoint, Excel, RTF, or plain text files, group them by topic, then ask questions across your collection.
 
 ```bash
 # Launch the Document Explorer (opens browser automatically)
-python -m shesha.experimental.document_explorer
+python -m ananta.experimental.document_explorer
 
 # Options
-python -m shesha.experimental.document_explorer --port 8003 --no-browser --model gpt-4o
+python -m ananta.experimental.document_explorer --port 8003 --no-browser --model gpt-4o
 ```
 
 The explorer provides:
 - **Drag-and-drop upload** with automatic text extraction
 - **Topic organization** — group related documents and query within a topic
-- **Live query streaming** via WebSocket — watch Shesha think in real time
+- **Live query streaming** via WebSocket — watch Ananta think in real time
 - **Conversation history** per topic for follow-up questions
 
 > **Note:** This is experimental and under active development.
 
 ## DeepWiki
 
-We love DeepWiki — it's an amazing tool that covers much of the same ground. But there are reasons you might prefer Shesha:
+We love DeepWiki — it's an amazing tool that covers much of the same ground. But there are reasons you might prefer Ananta:
 
 1. **Your code, your schedule** — update whenever you want, not once a week
 2. **Your model, your choice** — pick any provider, or run locally with Ollama so nothing leaves your machine
@@ -356,10 +373,10 @@ pip install -e ".[dev]"
 pytest
 
 # Run with coverage
-pytest --cov=shesha
+pytest --cov=ananta
 
 # Type checking
-mypy src/shesha
+mypy src/ananta
 
 # Linting
 ruff check src tests
@@ -378,11 +395,11 @@ See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for local tooling and GitHub Copi
 ## Project Structure
 
 ```
-src/shesha/
+src/ananta/
 ├── __init__.py          # Public API exports
-├── shesha.py            # Main Shesha class
+├── ananta.py            # Main Ananta class
 ├── project.py           # Project class
-├── config.py            # SheshaConfig
+├── config.py            # AnantaConfig
 ├── models.py            # ParsedDocument
 ├── exceptions.py        # Exception hierarchy
 ├── storage/             # Document storage backends
@@ -409,26 +426,32 @@ See [SECURITY.md](SECURITY.md) for details on:
 - Docker sandbox isolation
 - Network policies
 
-## Who is Shesha?
+## Who is Ananta?
 
-[Shesha](https://en.wikipedia.org/wiki/Shesha), also known as Ananta, is a Hindu deity who embodies the concept of infinity and the eternal cycle of existence. He is famously depicted with a thousand heads that support the planets of the universe, representing a foundational stability that allows for the maintenance of vast, complex structures. As the celestial couch of the preserver deity Vishnu, he remains constant even as the world undergoes cycles of creation and dissolution, mirroring the ability of recursive models to manage essentially unbounded-length reasoning chains.
+In Hindu mythology, **Ananta** (अनन्त, "the infinite one") is an alternate name
+for Shesha — the cosmic serpent who coils beneath the god Vishnu. The name was
+chosen because a Recursive Language Model can loop indefinitely, exploring a
+document until it finds the answer. The project was originally called "Shesha"
+but was renamed to avoid confusion with "shisha" (hookah).
+
+Learn more: https://en.wikipedia.org/wiki/Ananta_(infinite)
 
 # RLM Reference
 
 Internal engine borrows heavily from [this reference implementation](https://github.com/alexzhang13/rlm) by the authors of the original paper.
 
-## Using the Reference RLM or Shesha?
+## Using the Reference RLM or Ananta?
 
 Choose Reference RLM if you:
 
-- Want a lightweight library to integrate into your own application (Shesha is a bit heavier-weight, but can also be embedded)
+- Want a lightweight library to integrate into your own application (Ananta is a bit heavier-weight, but can also be embedded)
 - Need cloud sandbox support (Modal, Prime Intellect, Daytona)
 - Want to use different models for root vs. sub-LM calls
 - Prefer minimal dependencies
 - Are doing research and want the exact paper implementation
 - Want the React trajectory visualizer
 
-Choose Shesha if you:
+Choose Ananta if you:
 
 - Need conversation history and follow-up questions
 - Want answer verification (citation + semantic)
@@ -444,13 +467,13 @@ Choose Shesha if you:
 
 Most AI document tools use Retrieval-Augmented Generation (RAG): they find a few relevant paragraphs, feed them to the AI, and hope the answer is in there. That works great when the answer lives in one or two passages and you need fast, predictable responses.
 
-Shesha takes a different approach. Instead of retrieving snippets, the AI reads your documents directly, writes code to search and cross-reference them, and keeps iterating until it's confident. This matters when:
+Ananta takes a different approach. Instead of retrieving snippets, the AI reads your documents directly, writes code to search and cross-reference them, and keeps iterating until it's confident. This matters when:
 
 - The answer spans many documents or requires connecting information across them
 - Your documents are too large for an AI to read in one pass
 - The question requires reasoning, not just lookup — like tracking a character across 7 novels or understanding how an authentication system works across dozens of source files
 
-The tradeoff: Shesha is slower and uses more tokens than RAG. But for questions that RAG gets wrong — because the answer isn't in any single chunk — Shesha gets them right.
+The tradeoff: Ananta is slower and uses more tokens than RAG. But for questions that RAG gets wrong — because the answer isn't in any single chunk — Ananta gets them right.
 
 ## License
 

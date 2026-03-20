@@ -40,10 +40,10 @@ def _mock_arxiv_result(
 class TestArxivSearcher:
     """Tests for ArxivSearcher."""
 
-    @patch("shesha.experimental.arxiv.search.arxiv")
+    @patch("ananta.experimental.arxiv.search.arxiv")
     def test_search_returns_paper_metas(self, mock_arxiv: MagicMock) -> None:
         # Late import: module under test must be imported after patch is active
-        from shesha.experimental.arxiv.search import ArxivSearcher
+        from ananta.experimental.arxiv.search import ArxivSearcher
 
         mock_client = MagicMock()
         mock_arxiv.Client.return_value = mock_client
@@ -55,10 +55,10 @@ class TestArxivSearcher:
         assert results[0].arxiv_id == "2501.12345"
         assert results[0].title == "Test Paper"
 
-    @patch("shesha.experimental.arxiv.search.arxiv")
+    @patch("ananta.experimental.arxiv.search.arxiv")
     def test_search_with_category(self, mock_arxiv: MagicMock) -> None:
         # Late import: module under test must be imported after patch is active
-        from shesha.experimental.arxiv.search import ArxivSearcher
+        from ananta.experimental.arxiv.search import ArxivSearcher
 
         mock_client = MagicMock()
         mock_arxiv.Client.return_value = mock_client
@@ -72,10 +72,10 @@ class TestArxivSearcher:
             "query", search_call.args[0] if search_call.args else ""
         )
 
-    @patch("shesha.experimental.arxiv.search.arxiv")
+    @patch("ananta.experimental.arxiv.search.arxiv")
     def test_search_by_author(self, mock_arxiv: MagicMock) -> None:
         # Late import: module under test must be imported after patch is active
-        from shesha.experimental.arxiv.search import ArxivSearcher
+        from ananta.experimental.arxiv.search import ArxivSearcher
 
         mock_client = MagicMock()
         mock_arxiv.Client.return_value = mock_client
@@ -87,10 +87,10 @@ class TestArxivSearcher:
         query = search_call.kwargs.get("query", search_call.args[0] if search_call.args else "")
         assert "au:" in query
 
-    @patch("shesha.experimental.arxiv.search.arxiv")
+    @patch("ananta.experimental.arxiv.search.arxiv")
     def test_search_with_start_offset(self, mock_arxiv: MagicMock) -> None:
         # Late import: module under test must be imported after patch is active
-        from shesha.experimental.arxiv.search import ArxivSearcher
+        from ananta.experimental.arxiv.search import ArxivSearcher
 
         mock_client = MagicMock()
         mock_arxiv.Client.return_value = mock_client
@@ -105,10 +105,10 @@ class TestArxivSearcher:
         search_call = mock_arxiv.Search.call_args
         assert search_call.kwargs.get("max_results") == 20
 
-    @patch("shesha.experimental.arxiv.search.arxiv")
+    @patch("ananta.experimental.arxiv.search.arxiv")
     def test_search_recent_days(self, mock_arxiv: MagicMock) -> None:
         # Late import: module under test must be imported after patch is active
-        from shesha.experimental.arxiv.search import ArxivSearcher
+        from ananta.experimental.arxiv.search import ArxivSearcher
 
         mock_client = MagicMock()
         mock_arxiv.Client.return_value = mock_client
@@ -120,10 +120,10 @@ class TestArxivSearcher:
         query = search_call.kwargs.get("query", search_call.args[0] if search_call.args else "")
         assert "submittedDate:" in query
 
-    @patch("shesha.experimental.arxiv.search.arxiv")
+    @patch("ananta.experimental.arxiv.search.arxiv")
     def test_get_by_id(self, mock_arxiv: MagicMock) -> None:
         # Late import: module under test must be imported after patch is active
-        from shesha.experimental.arxiv.search import ArxivSearcher
+        from ananta.experimental.arxiv.search import ArxivSearcher
 
         mock_client = MagicMock()
         mock_arxiv.Client.return_value = mock_client
@@ -134,10 +134,10 @@ class TestArxivSearcher:
         assert meta is not None
         assert meta.arxiv_id == "2501.12345"
 
-    @patch("shesha.experimental.arxiv.search.arxiv")
+    @patch("ananta.experimental.arxiv.search.arxiv")
     def test_get_by_id_not_found(self, mock_arxiv: MagicMock) -> None:
         # Late import: module under test must be imported after patch is active
-        from shesha.experimental.arxiv.search import ArxivSearcher
+        from ananta.experimental.arxiv.search import ArxivSearcher
 
         mock_client = MagicMock()
         mock_arxiv.Client.return_value = mock_client
@@ -147,11 +147,11 @@ class TestArxivSearcher:
         meta = searcher.get_by_id("0000.00000")
         assert meta is None
 
-    @patch("shesha.experimental.arxiv.search.arxiv")
+    @patch("ananta.experimental.arxiv.search.arxiv")
     def test_get_by_id_http_error_returns_none(self, mock_arxiv: MagicMock) -> None:
         """Invalid IDs that cause HTTP errors should return None, not crash."""
         # Late import: module under test must be imported after patch is active
-        from shesha.experimental.arxiv.search import ArxivSearcher
+        from ananta.experimental.arxiv.search import ArxivSearcher
 
         mock_client = MagicMock()
         mock_arxiv.Client.return_value = mock_client
@@ -163,8 +163,8 @@ class TestArxivSearcher:
 
     def test_format_result(self) -> None:
         # Late import: module under test
-        from shesha.experimental.arxiv.models import PaperMeta
-        from shesha.experimental.arxiv.search import format_result
+        from ananta.experimental.arxiv.models import PaperMeta
+        from ananta.experimental.arxiv.search import format_result
 
         meta = PaperMeta(
             arxiv_id="2501.12345",
@@ -186,10 +186,10 @@ class TestArxivSearcher:
         assert "cs.QI" in output
         assert "https://arxiv.org/abs/2501.12345" in output
 
-    @patch("shesha.experimental.arxiv.search.arxiv")
+    @patch("ananta.experimental.arxiv.search.arxiv")
     def test_search_sort_by_date(self, mock_arxiv: MagicMock) -> None:
         # Late import: module under test must be imported after patch is active
-        from shesha.experimental.arxiv.search import ArxivSearcher
+        from ananta.experimental.arxiv.search import ArxivSearcher
 
         mock_client = MagicMock()
         mock_arxiv.Client.return_value = mock_client
@@ -200,10 +200,10 @@ class TestArxivSearcher:
         search_call = mock_arxiv.Search.call_args
         assert search_call.kwargs.get("sort_by") == mock_arxiv.SortCriterion.SubmittedDate
 
-    @patch("shesha.experimental.arxiv.search.arxiv")
+    @patch("ananta.experimental.arxiv.search.arxiv")
     def test_search_sort_by_defaults_to_relevance(self, mock_arxiv: MagicMock) -> None:
         # Late import: module under test must be imported after patch is active
-        from shesha.experimental.arxiv.search import ArxivSearcher
+        from ananta.experimental.arxiv.search import ArxivSearcher
 
         mock_client = MagicMock()
         mock_arxiv.Client.return_value = mock_client
@@ -214,12 +214,12 @@ class TestArxivSearcher:
         search_call = mock_arxiv.Search.call_args
         assert search_call.kwargs.get("sort_by") == mock_arxiv.SortCriterion.Relevance
 
-    @patch("shesha.experimental.arxiv.search.arxiv")
+    @patch("ananta.experimental.arxiv.search.arxiv")
     def test_search_wildcard_query_with_author_omits_all_prefix(
         self, mock_arxiv: MagicMock
     ) -> None:
         """query='*' with author should produce 'au:X', not 'all:* AND au:X'."""
-        from shesha.experimental.arxiv.search import ArxivSearcher
+        from ananta.experimental.arxiv.search import ArxivSearcher
 
         mock_client = MagicMock()
         mock_arxiv.Client.return_value = mock_client
@@ -232,10 +232,10 @@ class TestArxivSearcher:
         assert "all:*" not in query
         assert "au:Nicolas Gisin" in query
 
-    @patch("shesha.experimental.arxiv.search.arxiv")
+    @patch("ananta.experimental.arxiv.search.arxiv")
     def test_search_wildcard_query_alone_raises(self, mock_arxiv: MagicMock) -> None:
         """query='*' with no other filters should raise ValueError."""
-        from shesha.experimental.arxiv.search import ArxivSearcher
+        from ananta.experimental.arxiv.search import ArxivSearcher
 
         mock_client = MagicMock()
         mock_arxiv.Client.return_value = mock_client
@@ -246,7 +246,7 @@ class TestArxivSearcher:
 
     def test_extract_arxiv_id_from_entry_id(self) -> None:
         # Late import: module under test
-        from shesha.experimental.arxiv.search import extract_arxiv_id
+        from ananta.experimental.arxiv.search import extract_arxiv_id
 
         assert extract_arxiv_id("http://arxiv.org/abs/2501.12345v1") == "2501.12345v1"
         assert extract_arxiv_id("http://arxiv.org/abs/2501.12345") == "2501.12345"
@@ -257,16 +257,16 @@ class TestArxivSearcher:
         Slashes in IDs break _SAFE_ID_RE validation and create subdirectories
         in the storage layer.
         """
-        from shesha.experimental.arxiv.search import extract_arxiv_id
+        from ananta.experimental.arxiv.search import extract_arxiv_id
 
         assert extract_arxiv_id("http://arxiv.org/abs/cs/9808001v1") == "cs-9808001v1"
         assert extract_arxiv_id("http://arxiv.org/abs/astro-ph/0601001v1") == "astro-ph-0601001v1"
         assert extract_arxiv_id("http://arxiv.org/abs/math/0703001") == "math-0703001"
 
-    @patch("shesha.experimental.arxiv.search.arxiv")
+    @patch("ananta.experimental.arxiv.search.arxiv")
     def test_old_style_id_preserves_slash_in_urls(self, mock_arxiv: MagicMock) -> None:
         """Old-style IDs get sanitized for arxiv_id but URLs keep the slash."""
-        from shesha.experimental.arxiv.search import ArxivSearcher
+        from ananta.experimental.arxiv.search import ArxivSearcher
 
         mock_client = MagicMock()
         mock_arxiv.Client.return_value = mock_client
@@ -277,10 +277,10 @@ class TestArxivSearcher:
         assert results[0].arxiv_id == "cs-9808001v1"
         assert results[0].arxiv_url == "https://arxiv.org/abs/cs/9808001v1"
 
-    @patch("shesha.experimental.arxiv.search.arxiv")
+    @patch("ananta.experimental.arxiv.search.arxiv")
     def test_close_closes_underlying_session(self, mock_arxiv: MagicMock) -> None:
         """close() should close the arxiv.Client's requests session."""
-        from shesha.experimental.arxiv.search import ArxivSearcher
+        from ananta.experimental.arxiv.search import ArxivSearcher
 
         mock_pool = MagicMock()
         mock_pools_container = MagicMock()

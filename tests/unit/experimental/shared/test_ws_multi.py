@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from shesha.experimental.shared.websockets import handle_multi_project_query
+from ananta.experimental.shared.websockets import handle_multi_project_query
 
 
 @pytest.fixture
@@ -23,11 +23,11 @@ def mock_state() -> MagicMock:
     state.model = "test-model"
     state.session = MagicMock()
     state.session.format_history_prefix.return_value = ""
-    state.shesha.storage.list_documents.return_value = ["doc1.txt"]
+    state.ananta.storage.list_documents.return_value = ["doc1.txt"]
     doc = MagicMock()
     doc.content = "Hello"
     doc.name = "doc1.txt"
-    state.shesha.storage.get_document.return_value = doc
+    state.ananta.storage.get_document.return_value = doc
     project = MagicMock()
     project.rlm_engine = MagicMock()
     result = MagicMock()
@@ -38,8 +38,8 @@ def mock_state() -> MagicMock:
     result.execution_time = 1.5
     result.gave_up = False
     project.rlm_engine.query.return_value = result
-    state.shesha.get_project.return_value = project
-    state.shesha.storage.list_traces.return_value = []
+    state.ananta.get_project.return_value = project
+    state.ananta.storage.list_traces.return_value = []
     return state
 
 
@@ -110,7 +110,7 @@ class TestValidation:
 class TestNoDocsLoaded:
     @pytest.mark.asyncio
     async def test_no_docs_sends_error(self, mock_ws: AsyncMock, mock_state: MagicMock) -> None:
-        mock_state.shesha.storage.list_documents.return_value = []
+        mock_state.ananta.storage.list_documents.return_value = []
         data: dict[str, object] = {"question": "hi", "document_ids": ["empty-proj"]}
         await handle_multi_project_query(
             mock_ws,
@@ -143,7 +143,7 @@ class TestAllowBackgroundKnowledge:
             threading.Event(),
             item_noun="documents",
         )
-        engine = mock_state.shesha.get_project.return_value.rlm_engine
+        engine = mock_state.ananta.get_project.return_value.rlm_engine
         call_kwargs = engine.query.call_args
         assert call_kwargs.kwargs.get("allow_background_knowledge") is True
 
@@ -163,7 +163,7 @@ class TestAllowBackgroundKnowledge:
             threading.Event(),
             item_noun="documents",
         )
-        engine = mock_state.shesha.get_project.return_value.rlm_engine
+        engine = mock_state.ananta.get_project.return_value.rlm_engine
         call_kwargs = engine.query.call_args
         assert call_kwargs.kwargs.get("allow_background_knowledge") is False
 

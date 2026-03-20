@@ -5,29 +5,29 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from shesha.experimental.multi_repo import MultiRepoAnalyzer
-from shesha.experimental.multi_repo.models import HLDDraft, ImpactReport, RepoSummary
-from shesha.models import AnalysisComponent, RepoAnalysis
+from ananta.experimental.multi_repo import MultiRepoAnalyzer
+from ananta.experimental.multi_repo.models import HLDDraft, ImpactReport, RepoSummary
+from ananta.models import AnalysisComponent, RepoAnalysis
 
 
 class TestMultiRepoAnalyzerInit:
     """Tests for analyzer initialization."""
 
-    def test_init_with_shesha_instance(self):
-        """Analyzer initializes with a Shesha instance."""
-        mock_shesha = MagicMock()
-        analyzer = MultiRepoAnalyzer(mock_shesha)
+    def test_init_with_ananta_instance(self):
+        """Analyzer initializes with an Ananta instance."""
+        mock_ananta = MagicMock()
+        analyzer = MultiRepoAnalyzer(mock_ananta)
 
-        assert analyzer._shesha is mock_shesha
+        assert analyzer._ananta is mock_ananta
         assert analyzer._repos == []
         assert analyzer._summaries == {}
         assert analyzer._impacts == {}
 
     def test_init_with_custom_config(self):
         """Analyzer accepts custom configuration."""
-        mock_shesha = MagicMock()
+        mock_ananta = MagicMock()
         analyzer = MultiRepoAnalyzer(
-            mock_shesha,
+            mock_ananta,
             max_discovery_rounds=3,
             max_revision_rounds=4,
         )
@@ -37,8 +37,8 @@ class TestMultiRepoAnalyzerInit:
 
     def test_init_default_config(self):
         """Analyzer has sensible defaults."""
-        mock_shesha = MagicMock()
-        analyzer = MultiRepoAnalyzer(mock_shesha)
+        mock_ananta = MagicMock()
+        analyzer = MultiRepoAnalyzer(mock_ananta)
 
         assert analyzer._max_discovery_rounds == 2
         assert analyzer._max_revision_rounds == 2
@@ -49,16 +49,16 @@ class TestMultiRepoAnalyzerProperties:
 
     def test_repos_property(self):
         """repos property returns list of project_ids."""
-        mock_shesha = MagicMock()
-        analyzer = MultiRepoAnalyzer(mock_shesha)
+        mock_ananta = MagicMock()
+        analyzer = MultiRepoAnalyzer(mock_ananta)
         analyzer._repos = ["repo-a", "repo-b"]
 
         assert analyzer.repos == ["repo-a", "repo-b"]
 
     def test_summaries_property(self):
         """summaries property returns dict of RepoSummary."""
-        mock_shesha = MagicMock()
-        analyzer = MultiRepoAnalyzer(mock_shesha)
+        mock_ananta = MagicMock()
+        analyzer = MultiRepoAnalyzer(mock_ananta)
 
         summary = RepoSummary(project_id="test", raw_summary="text")
         analyzer._summaries = {"test": summary}
@@ -67,8 +67,8 @@ class TestMultiRepoAnalyzerProperties:
 
     def test_impacts_property(self):
         """impacts property returns dict of ImpactReport."""
-        mock_shesha = MagicMock()
-        analyzer = MultiRepoAnalyzer(mock_shesha)
+        mock_ananta = MagicMock()
+        analyzer = MultiRepoAnalyzer(mock_ananta)
 
         report = ImpactReport(project_id="test", affected=True, raw_analysis="text")
         analyzer._impacts = {"test": report}
@@ -80,29 +80,29 @@ class TestMultiRepoAnalyzerAddRepo:
     """Tests for add_repo method."""
 
     def test_add_repo_creates_project(self):
-        """add_repo creates a project via Shesha."""
-        mock_shesha = MagicMock()
+        """add_repo creates a project vian Ananta."""
+        mock_ananta = MagicMock()
         mock_result = MagicMock()
         mock_result.project.project_id = "org-repo"
         mock_result.status = "created"
-        mock_shesha.create_project_from_repo.return_value = mock_result
+        mock_ananta.create_project_from_repo.return_value = mock_result
 
-        analyzer = MultiRepoAnalyzer(mock_shesha)
+        analyzer = MultiRepoAnalyzer(mock_ananta)
         project_id = analyzer.add_repo("https://github.com/org/repo")
 
         assert project_id == "org-repo"
         assert "org-repo" in analyzer.repos
-        mock_shesha.create_project_from_repo.assert_called_once_with("https://github.com/org/repo")
+        mock_ananta.create_project_from_repo.assert_called_once_with("https://github.com/org/repo")
 
     def test_add_repo_reuses_existing(self):
         """add_repo reuses existing project if unchanged."""
-        mock_shesha = MagicMock()
+        mock_ananta = MagicMock()
         mock_result = MagicMock()
         mock_result.project.project_id = "org-repo"
         mock_result.status = "unchanged"
-        mock_shesha.create_project_from_repo.return_value = mock_result
+        mock_ananta.create_project_from_repo.return_value = mock_result
 
-        analyzer = MultiRepoAnalyzer(mock_shesha)
+        analyzer = MultiRepoAnalyzer(mock_ananta)
         project_id = analyzer.add_repo("https://github.com/org/repo")
 
         assert project_id == "org-repo"
@@ -110,7 +110,7 @@ class TestMultiRepoAnalyzerAddRepo:
 
     def test_add_repo_handles_updates(self):
         """add_repo applies updates if available."""
-        mock_shesha = MagicMock()
+        mock_ananta = MagicMock()
         mock_result = MagicMock()
         mock_result.project.project_id = "org-repo"
         mock_result.status = "updates_available"
@@ -118,9 +118,9 @@ class TestMultiRepoAnalyzerAddRepo:
         mock_updated_result.project.project_id = "org-repo"
         mock_updated_result.status = "created"
         mock_result.apply_updates.return_value = mock_updated_result
-        mock_shesha.create_project_from_repo.return_value = mock_result
+        mock_ananta.create_project_from_repo.return_value = mock_result
 
-        analyzer = MultiRepoAnalyzer(mock_shesha)
+        analyzer = MultiRepoAnalyzer(mock_ananta)
         project_id = analyzer.add_repo("https://github.com/org/repo")
 
         assert project_id == "org-repo"
@@ -128,13 +128,13 @@ class TestMultiRepoAnalyzerAddRepo:
 
     def test_add_repo_avoids_duplicates(self):
         """add_repo doesn't add the same repo twice."""
-        mock_shesha = MagicMock()
+        mock_ananta = MagicMock()
         mock_result = MagicMock()
         mock_result.project.project_id = "org-repo"
         mock_result.status = "unchanged"
-        mock_shesha.create_project_from_repo.return_value = mock_result
+        mock_ananta.create_project_from_repo.return_value = mock_result
 
-        analyzer = MultiRepoAnalyzer(mock_shesha)
+        analyzer = MultiRepoAnalyzer(mock_ananta)
         analyzer.add_repo("https://github.com/org/repo")
         analyzer.add_repo("https://github.com/org/repo")
 
@@ -146,7 +146,7 @@ class TestMultiRepoAnalyzerRecon:
 
     def test_run_recon_queries_project(self):
         """Recon phase queries the project with recon prompt."""
-        mock_shesha = MagicMock()
+        mock_ananta = MagicMock()
         mock_project = MagicMock()
         mock_project.project_id = "test-repo"
         mock_query_result = MagicMock()
@@ -162,9 +162,9 @@ class TestMultiRepoAnalyzerRecon:
             + "\n\nThis is a user service."
         )
         mock_project.query.return_value = mock_query_result
-        mock_shesha.get_project.return_value = mock_project
+        mock_ananta.get_project.return_value = mock_project
 
-        analyzer = MultiRepoAnalyzer(mock_shesha)
+        analyzer = MultiRepoAnalyzer(mock_ananta)
         analyzer._repos = ["test-repo"]
 
         summary = analyzer._run_recon("test-repo")
@@ -176,15 +176,15 @@ class TestMultiRepoAnalyzerRecon:
 
     def test_run_recon_handles_malformed_json(self):
         """Recon gracefully handles non-JSON responses."""
-        mock_shesha = MagicMock()
+        mock_ananta = MagicMock()
         mock_project = MagicMock()
         mock_project.project_id = "test-repo"
         mock_query_result = MagicMock()
         mock_query_result.answer = "This repo contains user management code."
         mock_project.query.return_value = mock_query_result
-        mock_shesha.get_project.return_value = mock_project
+        mock_ananta.get_project.return_value = mock_project
 
-        analyzer = MultiRepoAnalyzer(mock_shesha)
+        analyzer = MultiRepoAnalyzer(mock_ananta)
         analyzer._repos = ["test-repo"]
 
         summary = analyzer._run_recon("test-repo")
@@ -200,7 +200,7 @@ class TestMultiRepoAnalyzerImpact:
 
     def test_run_impact_queries_with_prd_and_summary(self):
         """Impact phase queries with PRD and repo summary."""
-        mock_shesha = MagicMock()
+        mock_ananta = MagicMock()
         mock_project = MagicMock()
         mock_project.project_id = "test-repo"
         mock_query_result = MagicMock()
@@ -217,9 +217,9 @@ class TestMultiRepoAnalyzerImpact:
             + "\n\nNeeds changes for OAuth."
         )
         mock_project.query.return_value = mock_query_result
-        mock_shesha.get_project.return_value = mock_project
+        mock_ananta.get_project.return_value = mock_project
 
-        analyzer = MultiRepoAnalyzer(mock_shesha)
+        analyzer = MultiRepoAnalyzer(mock_ananta)
 
         summary = RepoSummary(
             project_id="test-repo",
@@ -236,7 +236,7 @@ class TestMultiRepoAnalyzerImpact:
 
     def test_run_impact_not_affected(self):
         """Impact correctly identifies unaffected repos."""
-        mock_shesha = MagicMock()
+        mock_ananta = MagicMock()
         mock_project = MagicMock()
         mock_project.project_id = "test-repo"
         mock_query_result = MagicMock()
@@ -253,9 +253,9 @@ class TestMultiRepoAnalyzerImpact:
             + "\n\nNo changes needed."
         )
         mock_project.query.return_value = mock_query_result
-        mock_shesha.get_project.return_value = mock_project
+        mock_ananta.get_project.return_value = mock_project
 
-        analyzer = MultiRepoAnalyzer(mock_shesha)
+        analyzer = MultiRepoAnalyzer(mock_ananta)
 
         summary = RepoSummary(project_id="test-repo", raw_summary="Logging service")
 
@@ -270,7 +270,7 @@ class TestMultiRepoAnalyzerSynthesize:
 
     def test_run_synthesize_creates_hld(self):
         """Synthesize phase creates HLD from impact reports."""
-        mock_shesha = MagicMock()
+        mock_ananta = MagicMock()
         mock_project = MagicMock()
         mock_query_result = MagicMock()
         mock_query_result.answer = (
@@ -286,9 +286,9 @@ class TestMultiRepoAnalyzerSynthesize:
             + "\n\n# Full HLD\n\n## Changes\n..."
         )
         mock_project.query.return_value = mock_query_result
-        mock_shesha.get_project.return_value = mock_project
+        mock_ananta.get_project.return_value = mock_project
 
-        analyzer = MultiRepoAnalyzer(mock_shesha)
+        analyzer = MultiRepoAnalyzer(mock_ananta)
         analyzer._repos = ["auth"]
 
         impacts = {
@@ -313,7 +313,7 @@ class TestMultiRepoAnalyzerAlign:
 
     def test_run_align_checks_coverage(self):
         """Align phase verifies HLD covers PRD."""
-        mock_shesha = MagicMock()
+        mock_ananta = MagicMock()
         mock_project = MagicMock()
         mock_query_result = MagicMock()
         mock_query_result.answer = (
@@ -329,9 +329,9 @@ class TestMultiRepoAnalyzerAlign:
             + "\n\nFully aligned."
         )
         mock_project.query.return_value = mock_query_result
-        mock_shesha.get_project.return_value = mock_project
+        mock_ananta.get_project.return_value = mock_project
 
-        analyzer = MultiRepoAnalyzer(mock_shesha)
+        analyzer = MultiRepoAnalyzer(mock_ananta)
         analyzer._repos = ["test"]
 
         hld = HLDDraft(raw_hld="# HLD\n...")
@@ -345,7 +345,7 @@ class TestMultiRepoAnalyzerAlign:
 
     def test_run_align_finds_gaps(self):
         """Align phase identifies missing requirements."""
-        mock_shesha = MagicMock()
+        mock_ananta = MagicMock()
         mock_project = MagicMock()
         mock_query_result = MagicMock()
         mock_query_result.answer = (
@@ -361,9 +361,9 @@ class TestMultiRepoAnalyzerAlign:
             + "\n\nNeeds revision."
         )
         mock_project.query.return_value = mock_query_result
-        mock_shesha.get_project.return_value = mock_project
+        mock_ananta.get_project.return_value = mock_project
 
-        analyzer = MultiRepoAnalyzer(mock_shesha)
+        analyzer = MultiRepoAnalyzer(mock_ananta)
         analyzer._repos = ["test"]
 
         hld = HLDDraft(raw_hld="# HLD\n...")
@@ -380,15 +380,15 @@ class TestMultiRepoAnalyzerAnalyze:
 
     def test_analyze_without_repos_raises_valueerror(self):
         """analyze() raises ValueError when no repos added."""
-        mock_shesha = MagicMock()
-        analyzer = MultiRepoAnalyzer(mock_shesha)
+        mock_ananta = MagicMock()
+        analyzer = MultiRepoAnalyzer(mock_ananta)
 
         with pytest.raises(ValueError, match="No repos added"):
             analyzer.analyze("Some PRD")
 
     def test_analyze_runs_all_phases(self):
         """analyze() runs all four phases."""
-        mock_shesha = MagicMock()
+        mock_ananta = MagicMock()
         mock_project = MagicMock()
         mock_project.project_id = "test-repo"
 
@@ -448,9 +448,9 @@ class TestMultiRepoAnalyzerAnalyze:
             synth_result,
             align_result,
         ]
-        mock_shesha.get_project.return_value = mock_project
+        mock_ananta.get_project.return_value = mock_project
 
-        analyzer = MultiRepoAnalyzer(mock_shesha)
+        analyzer = MultiRepoAnalyzer(mock_ananta)
         analyzer._repos = ["test-repo"]
 
         hld, alignment = analyzer.analyze("Add a feature")
@@ -461,7 +461,7 @@ class TestMultiRepoAnalyzerAnalyze:
 
     def test_analyze_calls_discovery_callback(self):
         """analyze() invokes on_discovery when deps found."""
-        mock_shesha = MagicMock()
+        mock_ananta = MagicMock()
         mock_project = MagicMock()
         mock_project.project_id = "test-repo"
 
@@ -521,11 +521,11 @@ class TestMultiRepoAnalyzerAnalyze:
             synth_result,
             align_result,
         ]
-        mock_shesha.get_project.return_value = mock_project
+        mock_ananta.get_project.return_value = mock_project
 
         discovery_callback = MagicMock(return_value=None)  # None = skip adding
 
-        analyzer = MultiRepoAnalyzer(mock_shesha)
+        analyzer = MultiRepoAnalyzer(mock_ananta)
         analyzer._repos = ["test-repo"]
 
         analyzer.analyze("PRD", on_discovery=discovery_callback)
@@ -534,7 +534,7 @@ class TestMultiRepoAnalyzerAnalyze:
 
     def test_analyze_adds_discovered_repo_when_url_returned(self):
         """analyze() adds discovered repo when callback returns URL."""
-        mock_shesha = MagicMock()
+        mock_ananta = MagicMock()
         mock_project = MagicMock()
         mock_project.project_id = "test-repo"
 
@@ -607,20 +607,20 @@ class TestMultiRepoAnalyzerAnalyze:
                 return mock_discovered_project
             return mock_project
 
-        mock_shesha.get_project.side_effect = get_project
-        mock_shesha.create_project_from_repo.return_value = mock_discovered_result
+        mock_ananta.get_project.side_effect = get_project
+        mock_ananta.create_project_from_repo.return_value = mock_discovered_result
         mock_discovered_project.query.side_effect = [recon_result, impact_result]
 
         # Discovery callback returns URL for the discovered service
         discovery_callback = MagicMock(return_value="https://github.com/org/other-service")
 
-        analyzer = MultiRepoAnalyzer(mock_shesha)
+        analyzer = MultiRepoAnalyzer(mock_ananta)
         analyzer._repos = ["test-repo"]
 
         analyzer.analyze("PRD", on_discovery=discovery_callback)
 
         # Should have called add_repo with the URL
-        mock_shesha.create_project_from_repo.assert_called_once_with(
+        mock_ananta.create_project_from_repo.assert_called_once_with(
             "https://github.com/org/other-service"
         )
         # Discovered repo should be in the repos list
@@ -628,7 +628,7 @@ class TestMultiRepoAnalyzerAnalyze:
 
     def test_analyze_calls_progress_callback(self):
         """analyze() invokes on_progress during phases."""
-        mock_shesha = MagicMock()
+        mock_ananta = MagicMock()
         mock_project = MagicMock()
         mock_project.project_id = "test-repo"
 
@@ -658,11 +658,11 @@ class TestMultiRepoAnalyzerAnalyze:
             }
         )
         mock_project.query.return_value = simple_result
-        mock_shesha.get_project.return_value = mock_project
+        mock_ananta.get_project.return_value = mock_project
 
         progress_callback = MagicMock()
 
-        analyzer = MultiRepoAnalyzer(mock_shesha)
+        analyzer = MultiRepoAnalyzer(mock_ananta)
         analyzer._repos = ["test-repo"]
 
         analyzer.analyze("PRD", on_progress=progress_callback)
@@ -680,7 +680,7 @@ class TestMultiRepoAnalyzerRevisionLoop:
 
     def test_revision_loop_runs_when_callback_returns_revise(self):
         """Revision loop re-synthesizes when on_alignment_issue returns 'revise'."""
-        mock_shesha = MagicMock()
+        mock_ananta = MagicMock()
         mock_project = MagicMock()
         mock_project.project_id = "test-repo"
 
@@ -769,12 +769,12 @@ class TestMultiRepoAnalyzerRevisionLoop:
             synth_result_2,
             align_result_2,
         ]
-        mock_shesha.get_project.return_value = mock_project
+        mock_ananta.get_project.return_value = mock_project
 
         # Callback returns "revise" once
         alignment_callback = MagicMock(return_value="revise")
 
-        analyzer = MultiRepoAnalyzer(mock_shesha)
+        analyzer = MultiRepoAnalyzer(mock_ananta)
         analyzer._repos = ["test-repo"]
 
         hld, alignment = analyzer.analyze("PRD", on_alignment_issue=alignment_callback)
@@ -787,7 +787,7 @@ class TestMultiRepoAnalyzerRevisionLoop:
 
     def test_revision_loop_passes_alignment_feedback(self):
         """Revision loop passes alignment gaps to synthesis prompt."""
-        mock_shesha = MagicMock()
+        mock_ananta = MagicMock()
         mock_project = MagicMock()
         mock_project.project_id = "test-repo"
 
@@ -866,11 +866,11 @@ class TestMultiRepoAnalyzerRevisionLoop:
             synth_result_2,
             align_result_2,
         ]
-        mock_shesha.get_project.return_value = mock_project
+        mock_ananta.get_project.return_value = mock_project
 
         alignment_callback = MagicMock(return_value="revise")
 
-        analyzer = MultiRepoAnalyzer(mock_shesha)
+        analyzer = MultiRepoAnalyzer(mock_ananta)
         analyzer._repos = ["test-repo"]
 
         analyzer.analyze("PRD", on_alignment_issue=alignment_callback)
@@ -886,7 +886,7 @@ class TestMultiRepoAnalyzerRevisionLoop:
 
     def test_revision_loop_stops_on_accept(self):
         """Revision loop stops immediately when callback returns 'accept'."""
-        mock_shesha = MagicMock()
+        mock_ananta = MagicMock()
         mock_project = MagicMock()
         mock_project.project_id = "test-repo"
 
@@ -933,12 +933,12 @@ class TestMultiRepoAnalyzerRevisionLoop:
         )
 
         mock_project.query.side_effect = [recon_result, impact_result, synth_result, align_result]
-        mock_shesha.get_project.return_value = mock_project
+        mock_ananta.get_project.return_value = mock_project
 
         # Callback returns "accept" - stop loop
         alignment_callback = MagicMock(return_value="accept")
 
-        analyzer = MultiRepoAnalyzer(mock_shesha)
+        analyzer = MultiRepoAnalyzer(mock_ananta)
         analyzer._repos = ["test-repo"]
 
         _, alignment = analyzer.analyze("PRD", on_alignment_issue=alignment_callback)
@@ -950,7 +950,7 @@ class TestMultiRepoAnalyzerRevisionLoop:
 
     def test_revision_loop_respects_max_rounds(self):
         """Revision loop stops after max_revision_rounds even if issues remain."""
-        mock_shesha = MagicMock()
+        mock_ananta = MagicMock()
         mock_project = MagicMock()
         mock_project.project_id = "test-repo"
 
@@ -1010,12 +1010,12 @@ class TestMultiRepoAnalyzerRevisionLoop:
             synth_result,
             align_result,
         ]
-        mock_shesha.get_project.return_value = mock_project
+        mock_ananta.get_project.return_value = mock_project
 
         # Always returns "revise"
         alignment_callback = MagicMock(return_value="revise")
 
-        analyzer = MultiRepoAnalyzer(mock_shesha, max_revision_rounds=2)
+        analyzer = MultiRepoAnalyzer(mock_ananta, max_revision_rounds=2)
         analyzer._repos = ["test-repo"]
 
         _, alignment = analyzer.analyze("PRD", on_alignment_issue=alignment_callback)
@@ -1029,7 +1029,7 @@ class TestMultiRepoAnalyzerRevisionLoop:
 
     def test_major_gaps_triggers_alignment_callback(self):
         """Alignment callback fires for 'major_gaps', not just 'revise'."""
-        mock_shesha = MagicMock()
+        mock_ananta = MagicMock()
         mock_project = MagicMock()
         mock_project.project_id = "test-repo"
 
@@ -1081,12 +1081,12 @@ class TestMultiRepoAnalyzerRevisionLoop:
             synth_result,
             align_result,
         ]
-        mock_shesha.get_project.return_value = mock_project
+        mock_ananta.get_project.return_value = mock_project
 
         # Callback returns "accept" — user sees the issue, accepts as-is
         alignment_callback = MagicMock(return_value="accept")
 
-        analyzer = MultiRepoAnalyzer(mock_shesha)
+        analyzer = MultiRepoAnalyzer(mock_ananta)
         analyzer._repos = ["test-repo"]
 
         _, alignment = analyzer.analyze("PRD", on_alignment_issue=alignment_callback)
@@ -1101,10 +1101,10 @@ class TestMultiRepoAnalyzerErrorHandling:
 
     def test_add_repo_failure_is_tracked(self):
         """add_repo tracks failures without raising."""
-        mock_shesha = MagicMock()
-        mock_shesha.create_project_from_repo.side_effect = Exception("Clone failed")
+        mock_ananta = MagicMock()
+        mock_ananta.create_project_from_repo.side_effect = Exception("Clone failed")
 
-        analyzer = MultiRepoAnalyzer(mock_shesha)
+        analyzer = MultiRepoAnalyzer(mock_ananta)
         project_id = analyzer.add_repo("https://github.com/org/bad-repo")
 
         assert project_id is None
@@ -1113,7 +1113,7 @@ class TestMultiRepoAnalyzerErrorHandling:
 
     def test_analyze_warns_on_large_context(self):
         """analyze warns when context approaches limits."""
-        mock_shesha = MagicMock()
+        mock_ananta = MagicMock()
         mock_project = MagicMock()
         mock_project.project_id = "test-repo"
 
@@ -1175,14 +1175,14 @@ class TestMultiRepoAnalyzerErrorHandling:
             synth_result,
             align_result,
         ]
-        mock_shesha.get_project.return_value = mock_project
+        mock_ananta.get_project.return_value = mock_project
 
         progress_messages = []
 
         def on_progress(phase: str, message: str) -> None:
             progress_messages.append((phase, message))
 
-        analyzer = MultiRepoAnalyzer(mock_shesha)
+        analyzer = MultiRepoAnalyzer(mock_ananta)
         analyzer._repos = ["test-repo"]
 
         analyzer.analyze("PRD", on_progress=on_progress)
@@ -1201,10 +1201,10 @@ class TestAnalyzerWithAnalysis:
 
     def test_run_recon_uses_analysis_when_available(self):
         """_run_recon injects analysis context when available."""
-        mock_shesha = MagicMock()
+        mock_ananta = MagicMock()
         mock_project = MagicMock()
         mock_project.project_id = "test-repo"
-        mock_shesha.get_project.return_value = mock_project
+        mock_ananta.get_project.return_value = mock_project
 
         # Mock query result
         mock_query_result = MagicMock()
@@ -1232,9 +1232,9 @@ class TestAnalyzerWithAnalysis:
             ],
             external_dependencies=[],
         )
-        mock_shesha.get_analysis.return_value = analysis
+        mock_ananta.get_analysis.return_value = analysis
 
-        analyzer = MultiRepoAnalyzer(mock_shesha)
+        analyzer = MultiRepoAnalyzer(mock_ananta)
         analyzer._repos = ["test-repo"]
 
         # Run recon
@@ -1247,10 +1247,10 @@ class TestAnalyzerWithAnalysis:
 
     def test_run_recon_without_analysis_uses_standard_prompt(self):
         """_run_recon uses standard prompt when no analysis exists."""
-        mock_shesha = MagicMock()
+        mock_ananta = MagicMock()
         mock_project = MagicMock()
         mock_project.project_id = "test-repo"
-        mock_shesha.get_project.return_value = mock_project
+        mock_ananta.get_project.return_value = mock_project
 
         mock_query_result = MagicMock()
         mock_query_result.answer = (
@@ -1259,9 +1259,9 @@ class TestAnalyzerWithAnalysis:
         mock_project.query.return_value = mock_query_result
 
         # No analysis available
-        mock_shesha.get_analysis.return_value = None
+        mock_ananta.get_analysis.return_value = None
 
-        analyzer = MultiRepoAnalyzer(mock_shesha)
+        analyzer = MultiRepoAnalyzer(mock_ananta)
         analyzer._repos = ["test-repo"]
 
         analyzer._run_recon("test-repo")

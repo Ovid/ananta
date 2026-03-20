@@ -7,28 +7,28 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from shesha.experimental.shared.dependencies import (
+from ananta.experimental.shared.dependencies import (
     BaseExplorerState,
     create_app_state,
     get_topic_session,
 )
-from shesha.experimental.shared.session import WebConversationSession
-from shesha.experimental.shared.topics import BaseTopicManager
+from ananta.experimental.shared.session import WebConversationSession
+from ananta.experimental.shared.topics import BaseTopicManager
 
 
 class TestBaseExplorerState:
-    def test_has_shesha_attribute(self) -> None:
+    def test_has_ananta_attribute(self) -> None:
         state = BaseExplorerState(
-            shesha=MagicMock(),
+            ananta=MagicMock(),
             topic_mgr=MagicMock(),
             session=MagicMock(),
             model="test-model",
         )
-        assert hasattr(state, "shesha")
+        assert hasattr(state, "ananta")
 
     def test_has_topic_mgr_attribute(self) -> None:
         state = BaseExplorerState(
-            shesha=MagicMock(),
+            ananta=MagicMock(),
             topic_mgr=MagicMock(),
             session=MagicMock(),
             model="test-model",
@@ -37,7 +37,7 @@ class TestBaseExplorerState:
 
     def test_has_session_attribute(self) -> None:
         state = BaseExplorerState(
-            shesha=MagicMock(),
+            ananta=MagicMock(),
             topic_mgr=MagicMock(),
             session=MagicMock(),
             model="test-model",
@@ -46,7 +46,7 @@ class TestBaseExplorerState:
 
     def test_has_model_attribute(self) -> None:
         state = BaseExplorerState(
-            shesha=MagicMock(),
+            ananta=MagicMock(),
             topic_mgr=MagicMock(),
             session=MagicMock(),
             model="gpt-5",
@@ -55,8 +55,8 @@ class TestBaseExplorerState:
 
 
 class TestCreateAppState:
-    @patch("shesha.experimental.shared.dependencies.Shesha")
-    def test_returns_base_explorer_state(self, mock_shesha_cls: MagicMock, tmp_path: Path) -> None:
+    @patch("ananta.experimental.shared.dependencies.Ananta")
+    def test_returns_base_explorer_state(self, mock_ananta_cls: MagicMock, tmp_path: Path) -> None:
         state = create_app_state(
             app_name="test-explorer",
             topic_mgr_class=BaseTopicManager,
@@ -64,17 +64,17 @@ class TestCreateAppState:
         )
         assert isinstance(state, BaseExplorerState)
 
-    @patch("shesha.experimental.shared.dependencies.Shesha")
-    def test_creates_shesha_data_dir(self, mock_shesha_cls: MagicMock, tmp_path: Path) -> None:
+    @patch("ananta.experimental.shared.dependencies.Ananta")
+    def test_creates_ananta_data_dir(self, mock_ananta_cls: MagicMock, tmp_path: Path) -> None:
         create_app_state(
             app_name="test-explorer",
             topic_mgr_class=BaseTopicManager,
             data_dir=tmp_path,
         )
-        assert (tmp_path / "shesha_data").is_dir()
+        assert (tmp_path / "ananta_data").is_dir()
 
-    @patch("shesha.experimental.shared.dependencies.Shesha")
-    def test_creates_topics_dir(self, mock_shesha_cls: MagicMock, tmp_path: Path) -> None:
+    @patch("ananta.experimental.shared.dependencies.Ananta")
+    def test_creates_topics_dir(self, mock_ananta_cls: MagicMock, tmp_path: Path) -> None:
         create_app_state(
             app_name="test-explorer",
             topic_mgr_class=BaseTopicManager,
@@ -82,8 +82,8 @@ class TestCreateAppState:
         )
         assert (tmp_path / "topics").is_dir()
 
-    @patch("shesha.experimental.shared.dependencies.Shesha")
-    def test_creates_extra_dirs(self, mock_shesha_cls: MagicMock, tmp_path: Path) -> None:
+    @patch("ananta.experimental.shared.dependencies.Ananta")
+    def test_creates_extra_dirs(self, mock_ananta_cls: MagicMock, tmp_path: Path) -> None:
         state = create_app_state(
             app_name="test-explorer",
             topic_mgr_class=BaseTopicManager,
@@ -93,22 +93,22 @@ class TestCreateAppState:
         assert (tmp_path / "uploads").is_dir()
         assert state.extra_dirs["uploads"] == tmp_path / "uploads"
 
-    @patch("shesha.experimental.shared.dependencies.Shesha")
-    @patch("shesha.experimental.shared.dependencies.Path.home")
+    @patch("ananta.experimental.shared.dependencies.Ananta")
+    @patch("ananta.experimental.shared.dependencies.Path.home")
     def test_default_data_dir(
-        self, mock_home: MagicMock, mock_shesha_cls: MagicMock, tmp_path: Path
+        self, mock_home: MagicMock, mock_ananta_cls: MagicMock, tmp_path: Path
     ) -> None:
         mock_home.return_value = tmp_path
         create_app_state(
             app_name="my-explorer",
             topic_mgr_class=BaseTopicManager,
         )
-        expected = tmp_path / ".shesha" / "my-explorer"
-        assert (expected / "shesha_data").is_dir()
+        expected = tmp_path / ".ananta" / "my-explorer"
+        assert (expected / "ananta_data").is_dir()
         assert (expected / "topics").is_dir()
 
-    @patch("shesha.experimental.shared.dependencies.Shesha")
-    def test_model_override(self, mock_shesha_cls: MagicMock, tmp_path: Path) -> None:
+    @patch("ananta.experimental.shared.dependencies.Ananta")
+    def test_model_override(self, mock_ananta_cls: MagicMock, tmp_path: Path) -> None:
         state = create_app_state(
             app_name="test-explorer",
             topic_mgr_class=BaseTopicManager,
@@ -117,8 +117,8 @@ class TestCreateAppState:
         )
         assert state.model == "custom-model"
 
-    @patch("shesha.experimental.shared.dependencies.Shesha")
-    def test_state_has_topic_mgr(self, mock_shesha_cls: MagicMock, tmp_path: Path) -> None:
+    @patch("ananta.experimental.shared.dependencies.Ananta")
+    def test_state_has_topic_mgr(self, mock_ananta_cls: MagicMock, tmp_path: Path) -> None:
         state = create_app_state(
             app_name="test-explorer",
             topic_mgr_class=BaseTopicManager,
@@ -126,8 +126,8 @@ class TestCreateAppState:
         )
         assert isinstance(state.topic_mgr, BaseTopicManager)
 
-    @patch("shesha.experimental.shared.dependencies.Shesha")
-    def test_state_has_session(self, mock_shesha_cls: MagicMock, tmp_path: Path) -> None:
+    @patch("ananta.experimental.shared.dependencies.Ananta")
+    def test_state_has_session(self, mock_ananta_cls: MagicMock, tmp_path: Path) -> None:
         state = create_app_state(
             app_name="test-explorer",
             topic_mgr_class=BaseTopicManager,
@@ -141,7 +141,7 @@ class TestGetTopicSession:
         mgr = BaseTopicManager(tmp_path / "topics")
         mgr.create("Research")
         state = BaseExplorerState(
-            shesha=MagicMock(),
+            ananta=MagicMock(),
             topic_mgr=mgr,
             session=MagicMock(),
             model="test",
@@ -152,7 +152,7 @@ class TestGetTopicSession:
     def test_raises_for_nonexistent_topic(self, tmp_path: Path) -> None:
         mgr = BaseTopicManager(tmp_path / "topics")
         state = BaseExplorerState(
-            shesha=MagicMock(),
+            ananta=MagicMock(),
             topic_mgr=mgr,
             session=MagicMock(),
             model="test",

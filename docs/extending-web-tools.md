@@ -1,18 +1,18 @@
 # Extending the Web Tool Ecosystem
 
 This guide walks through creating a new experimental web tool using the shared
-infrastructure in `src/shesha/experimental/shared/`.
+infrastructure in `src/ananta/experimental/shared/`.
 
 Existing tools built on this infrastructure:
 
-- **arXiv Explorer** (`shesha.experimental.web`) -- search, download, and query arXiv papers
-- **Code Explorer** (`shesha.experimental.code_explorer`) -- ingest and query git repositories
+- **arXiv Explorer** (`ananta.experimental.web`) -- search, download, and query arXiv papers
+- **Code Explorer** (`ananta.experimental.code_explorer`) -- ingest and query git repositories
 
 ## 1. Overview
 
 The shared module provides two layers of reusable infrastructure:
 
-**Backend** (`src/shesha/experimental/shared/`):
+**Backend** (`src/ananta/experimental/shared/`):
 
 | Module            | Purpose                                                       |
 |-------------------|---------------------------------------------------------------|
@@ -22,7 +22,7 @@ The shared module provides two layers of reusable infrastructure:
 | `session.py`      | `WebConversationSession` -- JSON-persisted conversation history |
 | `websockets.py`   | `websocket_handler()` -- query dispatch loop with cancellation |
 
-**Frontend** (`src/shesha/experimental/shared/frontend/`, published as `@shesha/shared-ui`):
+**Frontend** (`src/ananta/experimental/shared/frontend/`, published as `@ananta/shared-ui`):
 
 | Export             | Purpose                                         |
 |--------------------|-------------------------------------------------|
@@ -45,7 +45,7 @@ The shared module provides two layers of reusable infrastructure:
 ### Step 1: Create the backend module
 
 ```
-src/shesha/experimental/your_tool/
+src/ananta/experimental/your_tool/
     __init__.py
     __main__.py      # CLI entry point
     dependencies.py  # AppState dataclass + create_app_state()
@@ -63,8 +63,8 @@ function. See Section 3 for details.
 ### Step 3: Create the frontend
 
 ```
-src/shesha/experimental/your_tool/frontend/
-    package.json     # depends on @shesha/shared-ui
+src/ananta/experimental/your_tool/frontend/
+    package.json     # depends on @ananta/shared-ui
     vite.config.ts
     src/
         App.tsx
@@ -86,7 +86,7 @@ Add to `pyproject.toml`:
 
 ```toml
 [project.scripts]
-shesha-yourtool = "shesha.experimental.your_tool.__main__:main"
+ananta-yourtool = "ananta.experimental.your_tool.__main__:main"
 ```
 
 ## 3. Backend
@@ -98,12 +98,12 @@ WebSocket handler access fields by attribute name, so these fields are required:
 
 ```python
 from dataclasses import dataclass
-from shesha import Shesha
-from shesha.experimental.shared.session import WebConversationSession
+from ananta import Ananta
+from ananta.experimental.shared.session import WebConversationSession
 
 @dataclass
 class YourToolState:
-    shesha: Shesha                  # Required -- lifespan calls start()/stop()
+    ananta: Ananta                  # Required -- lifespan calls start()/stop()
     topic_mgr: YourTopicManager     # Required -- shared routes use this
     session: WebConversationSession  # Required for global history
     model: str                      # Required -- model get/set routes use this
@@ -116,23 +116,23 @@ def create_app_state(
     data_dir: Path | None = None,
     model: str | None = None,
 ) -> YourToolState:
-    data_dir = data_dir or Path.home() / ".shesha" / "your-tool"
-    shesha_data = data_dir / "shesha_data"
+    data_dir = data_dir or Path.home() / ".ananta" / "your-tool"
+    ananta_data = data_dir / "ananta_data"
     topics_dir = data_dir / "topics"
-    shesha_data.mkdir(parents=True, exist_ok=True)
+    ananta_data.mkdir(parents=True, exist_ok=True)
     topics_dir.mkdir(parents=True, exist_ok=True)
 
-    config = SheshaConfig.load(storage_path=str(shesha_data))
+    config = AnantaConfig.load(storage_path=str(ananta_data))
     if model:
         config.model = model
 
-    storage = FilesystemStorage(shesha_data)
-    shesha = Shesha(config=config, storage=storage)
+    storage = FilesystemStorage(ananta_data)
+    ananta = Ananta(config=config, storage=storage)
     topic_mgr = YourTopicManager(topics_dir)
     session = WebConversationSession(data_dir)
 
     return YourToolState(
-        shesha=shesha, topic_mgr=topic_mgr,
+        ananta=ananta, topic_mgr=topic_mgr,
         session=session, model=config.model,
     )
 ```
@@ -142,11 +142,11 @@ def create_app_state(
 `create_app()` builds a FastAPI instance with common middleware:
 
 ```python
-from shesha.experimental.shared.app_factory import create_app
+from ananta.experimental.shared.app_factory import create_app
 
 app = create_app(
     state,
-    title="Shesha Your Tool",
+    title="Ananta Your Tool",
     static_dir=Path("frontend/dist"),   # SPA catch-all (optional)
     images_dir=Path("images"),           # mounted at /static (optional)
     ws_handler=lambda ws: my_ws(ws, state),  # /api/ws (optional)
@@ -156,7 +156,7 @@ app = create_app(
 
 What it provides automatically:
 
-- Lifespan hook calling `state.shesha.start()` / `state.shesha.stop()`
+- Lifespan hook calling `state.ananta.start()` / `state.ananta.stop()`
 - CORS middleware (allow all origins)
 - `.well-known` catch-all (suppresses Chrome DevTools probes)
 - Optional WebSocket endpoint at `/api/ws`
@@ -169,7 +169,7 @@ context budget routes. Both the arXiv and code explorer use it via callbacks
 to adapt the shared routes to their domain models:
 
 ```python
-from shesha.experimental.shared.routes import create_shared_router
+from ananta.experimental.shared.routes import create_shared_router
 
 shared_router = create_shared_router(
     state,
@@ -226,7 +226,7 @@ def create_api(state: YourToolState) -> FastAPI:
     tool_router = _create_tool_router(state)
     return create_app(
         state,
-        title="Shesha Your Tool",
+        title="Ananta Your Tool",
         ws_handler=lambda ws: handle_ws(ws, state),
         extra_routers=[tool_router],
     )
@@ -238,7 +238,7 @@ The shared `websocket_handler()` handles the dispatch loop (query, cancel) and
 accepts two extension points:
 
 ```python
-from shesha.experimental.shared.websockets import websocket_handler
+from ananta.experimental.shared.websockets import websocket_handler
 
 await websocket_handler(
     websocket, state,
@@ -265,7 +265,7 @@ from pathlib import Path
 import uvicorn
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Shesha Your Tool")
+    parser = argparse.ArgumentParser(description="Ananta Your Tool")
     parser.add_argument("--port", type=int, default=8002)
     parser.add_argument("--data-dir", type=str, default=None)
     parser.add_argument("--no-browser", action="store_true")
@@ -290,7 +290,7 @@ Your frontend's `package.json` references the shared UI as a local dependency:
 ```json
 {
   "dependencies": {
-    "@shesha/shared-ui": "file:../../shared/frontend",
+    "@ananta/shared-ui": "file:../../shared/frontend",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   }
@@ -304,7 +304,7 @@ extracts all common state management (theme, WebSocket, model loading, tokens,
 sidebar drag, topic selection, trace viewing) into a single hook:
 
 ```tsx
-import { AppShell, useAppState, StatusBar, TraceViewer, ToastContainer, showToast } from '@shesha/shared-ui'
+import { AppShell, useAppState, StatusBar, TraceViewer, ToastContainer, showToast } from '@ananta/shared-ui'
 
 export default function App() {
   const {
@@ -339,11 +339,11 @@ export default function App() {
 
 ### Importing shared components
 
-Import components from `@shesha/shared-ui` and adapt as needed:
+Import components from `@ananta/shared-ui` and adapt as needed:
 
 ```tsx
 import { Header, TopicSidebar, ChatArea, ChatMessage, StatusBar,
-  TraceViewer, ToastContainer, ConfirmDialog } from '@shesha/shared-ui'
+  TraceViewer, ToastContainer, ConfirmDialog } from '@ananta/shared-ui'
 ```
 
 The shared components accept props for domain-specific customization. For
@@ -355,7 +355,7 @@ the arXiv explorer can show papers while the code explorer shows repos.
 Extend `sharedApi` with tool-specific endpoints:
 
 ```ts
-import { request, sharedApi } from '@shesha/shared-ui'
+import { request, sharedApi } from '@ananta/shared-ui'
 
 export const api = {
   ...sharedApi,
@@ -411,12 +411,12 @@ export default defineConfig({
 
 ## 5. Storage Conventions
 
-Each tool stores data under `~/.shesha/<tool-name>/` by default (overridden via
+Each tool stores data under `~/.ananta/<tool-name>/` by default (overridden via
 `--data-dir`). Standard layout:
 
 ```
-~/.shesha/your-tool/
-    shesha_data/         # Shesha storage (documents, traces, analyses)
+~/.ananta/your-tool/
+    ananta_data/         # Ananta storage (documents, traces, analyses)
     topics/              # Topic manager data
     conversation.json    # Global conversation session
 ```
@@ -425,7 +425,7 @@ Rules:
 
 - No leading underscores on metadata files. The arXiv explorer's legacy
   `_conversation.json` predates this convention.
-- The `shesha_data/` subdirectory is passed to `SheshaConfig.load(storage_path=...)`
+- The `ananta_data/` subdirectory is passed to `AnantaConfig.load(storage_path=...)`
   and `FilesystemStorage()`.
 - Topics are stored under `topics/` with tool-specific structure (e.g.,
   `topic.json` in the code explorer, directory-per-topic in the arXiv explorer).
@@ -440,17 +440,17 @@ FROM node:20-slim AS frontend
 WORKDIR /build
 
 # Copy shared UI library first (local dependency)
-COPY src/shesha/experimental/shared/frontend/ /shared-ui/
+COPY src/ananta/experimental/shared/frontend/ /shared-ui/
 
 # Copy tool frontend
-COPY src/shesha/experimental/your_tool/frontend/package.json \
-     src/shesha/experimental/your_tool/frontend/package-lock.json ./
+COPY src/ananta/experimental/your_tool/frontend/package.json \
+     src/ananta/experimental/your_tool/frontend/package-lock.json ./
 
 # Rewrite the local dependency path for the Docker build context
 RUN sed -i 's|file:../../shared/frontend|file:/shared-ui|' package.json
 
 RUN npm ci --silent
-COPY src/shesha/experimental/your_tool/frontend/ ./
+COPY src/ananta/experimental/your_tool/frontend/ ./
 RUN npm run build
 
 # --- Stage 2: Runtime ---
@@ -459,19 +459,19 @@ WORKDIR /app
 COPY . .
 
 # Copy built frontend into the source tree
-COPY --from=frontend /build/dist src/shesha/experimental/your_tool/frontend/dist
+COPY --from=frontend /build/dist src/ananta/experimental/your_tool/frontend/dist
 
 ENV SETUPTOOLS_SCM_PRETEND_VERSION=0.0.0
 RUN pip install --no-cache-dir -e ".[web]"
 
 EXPOSE 8002
-ENTRYPOINT ["shesha-yourtool", "--no-browser", "--data-dir", "/data"]
+ENTRYPOINT ["ananta-yourtool", "--no-browser", "--data-dir", "/data"]
 ```
 
 Key points:
 
 - The shared frontend must be copied into the build stage so that
-  `@shesha/shared-ui` resolves during `npm ci`.
+  `@ananta/shared-ui` resolves during `npm ci`.
 - The `sed` command rewrites the local file path to match the Docker layout.
 - `SETUPTOOLS_SCM_PRETEND_VERSION` is needed because `.git` is excluded by
   `.dockerignore`.
@@ -480,7 +480,7 @@ Key points:
 
 ```yaml
 services:
-  shesha-yourtool:
+  ananta-yourtool:
     build:
       context: ..                          # project root
       dockerfile: your-tool/Dockerfile
@@ -488,17 +488,17 @@ services:
       - "8002:8002"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - shesha-yourtool-data:/data
+      - ananta-yourtool-data:/data
     environment:
-      - SHESHA_API_KEY=${SHESHA_API_KEY:?Set SHESHA_API_KEY}
-      - SHESHA_MODEL=${SHESHA_MODEL:?Set SHESHA_MODEL}
+      - ANANTA_API_KEY=${ANANTA_API_KEY:?Set ANANTA_API_KEY}
+      - ANANTA_MODEL=${ANANTA_MODEL:?Set ANANTA_MODEL}
 
 volumes:
-  shesha-yourtool-data:
+  ananta-yourtool-data:
 ```
 
 The build context must be the project root (not the tool directory) because the
-Dockerfile copies from `src/shesha/experimental/`.
+Dockerfile copies from `src/ananta/experimental/`.
 
 ## 7. Testing
 
@@ -509,18 +509,18 @@ policy.
 
 ### Backend tests
 
-Use pytest with `MagicMock` for the Shesha instance and a real topic manager
+Use pytest with `MagicMock` for the Ananta instance and a real topic manager
 backed by `tmp_path`:
 
 ```python
 from unittest.mock import MagicMock
-from shesha.experimental.your_tool.dependencies import YourToolState
+from ananta.experimental.your_tool.dependencies import YourToolState
 
 def test_list_repos(tmp_path):
-    shesha = MagicMock()
-    shesha.list_projects.return_value = ["proj-1"]
+    ananta = MagicMock()
+    ananta.list_projects.return_value = ["proj-1"]
     topic_mgr = YourTopicManager(tmp_path / "topics")
-    state = YourToolState(shesha=shesha, topic_mgr=topic_mgr, ...)
+    state = YourToolState(ananta=ananta, topic_mgr=topic_mgr, ...)
     # test route behavior using TestClient
 ```
 
@@ -547,6 +547,6 @@ vi.mock('../api', () => ({
 Run frontend tests:
 
 ```bash
-cd src/shesha/experimental/your_tool/frontend
+cd src/ananta/experimental/your_tool/frontend
 npm test
 ```

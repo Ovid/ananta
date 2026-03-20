@@ -9,9 +9,9 @@ from unittest.mock import MagicMock
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from shesha.experimental.shared.routes import create_shared_router
-from shesha.experimental.shared.schemas import TopicInfo
-from shesha.experimental.shared.session import WebConversationSession
+from ananta.experimental.shared.routes import create_shared_router
+from ananta.experimental.shared.schemas import TopicInfo
+from ananta.experimental.shared.session import WebConversationSession
 
 
 def _make_state(tmp_path: Path) -> MagicMock:
@@ -20,8 +20,8 @@ def _make_state(tmp_path: Path) -> MagicMock:
     state.model = "test-model"
     state.topic_mgr.list_topics.return_value = []
     state.topic_mgr.resolve.return_value = None
-    # Shared routes now access storage via state.shesha.storage (public API)
-    state.shesha.storage.list_traces.return_value = []
+    # Shared routes now access storage via state.ananta.storage (public API)
+    state.ananta.storage.list_traces.return_value = []
     return state
 
 
@@ -77,7 +77,7 @@ class TestGetSessionCallback:
         state.topic_mgr.resolve.return_value = "proj-1"
         project_dir = tmp_path / "proj-1"
         project_dir.mkdir()
-        state.shesha.storage.get_project_dir.return_value = project_dir
+        state.ananta.storage.get_project_dir.return_value = project_dir
 
         app = _make_app(state)
         client = TestClient(app)
@@ -201,7 +201,7 @@ class TestResolveProjectIdsCallback:
     def test_default_uses_resolve_all(self, tmp_path: Path) -> None:
         state = _make_state(tmp_path)
         state.topic_mgr.resolve_all = MagicMock(return_value=["p1", "p2"])
-        state.shesha.storage.list_traces.return_value = []
+        state.ananta.storage.list_traces.return_value = []
 
         app = _make_app(state)
         client = TestClient(app)
@@ -211,7 +211,7 @@ class TestResolveProjectIdsCallback:
 
     def test_custom_callback_overrides_resolution(self, tmp_path: Path) -> None:
         state = _make_state(tmp_path)
-        state.shesha.storage.list_traces.return_value = []
+        state.ananta.storage.list_traces.return_value = []
 
         def custom_resolve(s: object, name: str) -> list[str]:
             return ["custom-proj"]
@@ -220,23 +220,23 @@ class TestResolveProjectIdsCallback:
         client = TestClient(app)
         resp = client.get("/api/topics/my-topic/traces")
         assert resp.status_code == 200
-        state.shesha.storage.list_traces.assert_called_once_with("custom-proj")
+        state.ananta.storage.list_traces.assert_called_once_with("custom-proj")
 
 
 class TestListTraceFilesCallback:
     """The list_trace_files callback controls trace file retrieval."""
 
     def test_default_uses_topic_mgr_storage(self, tmp_path: Path) -> None:
-        """Default behavior accesses state.shesha.storage.list_traces()."""
+        """Default behavior accesses state.ananta.storage.list_traces()."""
         state = _make_state(tmp_path)
         state.topic_mgr.resolve_all = MagicMock(return_value=["p1"])
-        state.shesha.storage.list_traces.return_value = []
+        state.ananta.storage.list_traces.return_value = []
 
         app = _make_app(state)
         client = TestClient(app)
         resp = client.get("/api/topics/my-topic/traces")
         assert resp.status_code == 200
-        state.shesha.storage.list_traces.assert_called_once_with("p1")
+        state.ananta.storage.list_traces.assert_called_once_with("p1")
 
     def test_custom_callback_overrides_trace_retrieval(self, tmp_path: Path) -> None:
         """Custom list_trace_files callback bypasses default storage access."""
@@ -259,8 +259,8 @@ class TestListTraceFilesCallback:
         resp = client.get("/api/topics/my-topic/traces")
         assert resp.status_code == 200
         custom_storage.list_traces.assert_called_once_with("my-proj")
-        # The default state.shesha.storage should NOT be called
-        state.shesha.storage.list_traces.assert_not_called()
+        # The default state.ananta.storage should NOT be called
+        state.ananta.storage.list_traces.assert_not_called()
 
 
 class TestIncludeTopicCrud:
@@ -376,7 +376,7 @@ class TestTraceDownload:
         state.topic_mgr.resolve.return_value = "proj-1"
         state.topic_mgr.resolve_all = MagicMock(return_value=["proj-1"])
         trace_file = self._make_trace_file(tmp_path)
-        state.shesha.storage.list_traces.return_value = [trace_file]
+        state.ananta.storage.list_traces.return_value = [trace_file]
 
         app = _make_app(state)
         client = TestClient(app)
@@ -396,7 +396,7 @@ class TestTraceDownload:
         state.topic_mgr.resolve.return_value = "proj-1"
         state.topic_mgr.resolve_all = MagicMock(return_value=["proj-1"])
         trace_file = self._make_trace_file(tmp_path)
-        state.shesha.storage.list_traces.return_value = [trace_file]
+        state.ananta.storage.list_traces.return_value = [trace_file]
 
         app = _make_app(state)
         client = TestClient(app)
@@ -408,7 +408,7 @@ class TestTraceDownload:
         state = _make_state(tmp_path)
         state.topic_mgr.resolve.return_value = "proj-1"
         state.topic_mgr.resolve_all = MagicMock(return_value=["proj-1"])
-        state.shesha.storage.list_traces.return_value = []
+        state.ananta.storage.list_traces.return_value = []
 
         app = _make_app(state)
         client = TestClient(app)

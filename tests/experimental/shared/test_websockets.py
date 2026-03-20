@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from shesha.experimental.shared.websockets import _handle_query, handle_multi_project_query
+from ananta.experimental.shared.websockets import _handle_query, handle_multi_project_query
 
 
 def _make_ws() -> AsyncMock:
@@ -26,17 +26,17 @@ def _make_state() -> MagicMock:
     """Build a minimal mock state for _handle_query."""
     state = MagicMock()
     state.topic_mgr.resolve.return_value = "proj-1"
-    state.shesha.storage.list_documents.return_value = ["doc-a"]
-    state.shesha.storage.get_document.return_value = MagicMock(name="doc-a", content="hello")
-    state.shesha.storage.get_project_dir.return_value = "/tmp/proj"
-    state.shesha.storage.list_traces.return_value = []
+    state.ananta.storage.list_documents.return_value = ["doc-a"]
+    state.ananta.storage.get_document.return_value = MagicMock(name="doc-a", content="hello")
+    state.ananta.storage.get_project_dir.return_value = "/tmp/proj"
+    state.ananta.storage.list_traces.return_value = []
     state.model = "test-model"
 
     # RLM engine mock
     engine = MagicMock()
     project = MagicMock()
     project.rlm_engine = engine
-    state.shesha.get_project.return_value = project
+    state.ananta.get_project.return_value = project
 
     return state
 
@@ -62,7 +62,7 @@ class TestHandleQueryDocIdValidation:
         assert len(error_msgs) == 1
         assert "invalid" in error_msgs[0]["message"].lower()
         # Must NOT reach the storage layer
-        state.shesha.storage.get_document.assert_not_called()
+        state.ananta.storage.get_document.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_rejects_document_id_with_special_chars(self) -> None:
@@ -80,7 +80,7 @@ class TestHandleQueryDocIdValidation:
 
         error_msgs = [m for m in ws.sent if m.get("type") == "error"]
         assert len(error_msgs) == 1
-        state.shesha.storage.get_document.assert_not_called()
+        state.ananta.storage.get_document.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_accepts_valid_document_ids(self) -> None:
@@ -99,16 +99,16 @@ class TestHandleQueryDocIdValidation:
         }
 
         with patch(
-            "shesha.experimental.shared.websockets.WebConversationSession",
+            "ananta.experimental.shared.websockets.WebConversationSession",
             return_value=mock_session,
         ):
             # Make the query raise to short-circuit execution after validation
-            project = state.shesha.get_project.return_value
+            project = state.ananta.get_project.return_value
             project.rlm_engine.query.side_effect = RuntimeError("stop here")
             await _handle_query(ws, data, state, cancel)
 
         # Should have reached the storage layer (validation passed)
-        assert state.shesha.storage.get_document.call_count >= 1
+        assert state.ananta.storage.get_document.call_count >= 1
 
     @pytest.mark.asyncio
     async def test_accepts_old_style_arxiv_ids_with_slash(self) -> None:
@@ -127,15 +127,15 @@ class TestHandleQueryDocIdValidation:
         }
 
         with patch(
-            "shesha.experimental.shared.websockets.WebConversationSession",
+            "ananta.experimental.shared.websockets.WebConversationSession",
             return_value=mock_session,
         ):
-            project = state.shesha.get_project.return_value
+            project = state.ananta.get_project.return_value
             project.rlm_engine.query.side_effect = RuntimeError("stop here")
             await _handle_query(ws, data, state, cancel)
 
         # Should have passed validation and reached storage
-        assert state.shesha.storage.get_document.call_count >= 1
+        assert state.ananta.storage.get_document.call_count >= 1
         # No "Invalid document id" errors
         error_msgs = [m for m in ws.sent if m.get("type") == "error"]
         invalid_errors = [m for m in error_msgs if "invalid" in m["message"].lower()]
@@ -163,11 +163,11 @@ class TestHandleQueryExceptionLeakage:
         sensitive_message = (
             "ConnectionError: failed to connect to /internal/db:5432 with password=s3cret"
         )
-        project = state.shesha.get_project.return_value
+        project = state.ananta.get_project.return_value
         project.rlm_engine.query.side_effect = RuntimeError(sensitive_message)
 
         with patch(
-            "shesha.experimental.shared.websockets.WebConversationSession",
+            "ananta.experimental.shared.websockets.WebConversationSession",
             return_value=mock_session,
         ):
             await _handle_query(ws, data, state, cancel)
@@ -187,16 +187,16 @@ class TestHandleQueryExceptionLeakage:
 
         # Set up state for multi-project handler
         storage = MagicMock()
-        state.shesha.storage = storage
+        state.ananta.storage = storage
         storage.list_documents.return_value = ["doc-a"]
         storage.get_document.return_value = MagicMock(name="doc-a", content="hello")
 
         project = MagicMock()
         engine = MagicMock()
-        sensitive_message = "OSError: /opt/shesha/config.yaml not found"
+        sensitive_message = "OSError: /opt/ananta/config.yaml not found"
         engine.query.side_effect = RuntimeError(sensitive_message)
         project.rlm_engine = engine
-        state.shesha.get_project.return_value = project
+        state.ananta.get_project.return_value = project
         state.session = MagicMock()
         state.session.format_history_prefix.return_value = ""
 
@@ -211,4 +211,4 @@ class TestHandleQueryExceptionLeakage:
         error_msgs = [m for m in ws.sent if m.get("type") == "error"]
         assert len(error_msgs) == 1
         assert sensitive_message not in error_msgs[0]["message"]
-        assert "/opt/shesha/config.yaml" not in error_msgs[0]["message"]
+        assert "/opt/ananta/config.yaml" not in error_msgs[0]["message"]

@@ -8,7 +8,7 @@ __pycache__
 *.pyc
 **/node_modules
 **/dist
-shesha_data
+ananta_data
 research
 scratch
 docs

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Launch the Shesha Document Explorer.
+# Launch the Ananta Document Explorer.
 # Usage:
 #   ./document-explorer/document-explorer.sh                      # defaults
 #   ./document-explorer/document-explorer.sh --model gpt-5-mini   # pass args
@@ -12,12 +12,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-APP_NAME="Shesha Document Explorer"
-APP_SLUG="shesha-document-explorer"
+APP_NAME="Ananta Document Explorer"
+APP_SLUG="ananta-document-explorer"
 PIP_EXTRA="document-explorer"
-ENTRY_POINT="shesha-document-explorer"
-FRONTEND_DIR="$PROJECT_ROOT/src/shesha/experimental/document_explorer/frontend"
-SHARED_FRONTEND_DIR="$PROJECT_ROOT/src/shesha/experimental/shared/frontend"
+ENTRY_POINT="ananta-document-explorer"
+FRONTEND_DIR="$PROJECT_ROOT/src/ananta/experimental/document_explorer/frontend"
+SHARED_FRONTEND_DIR="$PROJECT_ROOT/src/ananta/experimental/shared/frontend"
 
 source "$PROJECT_ROOT/scripts/common.sh"
 launch "$@"

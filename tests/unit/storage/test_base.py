@@ -1,6 +1,6 @@
 """Tests for storage base classes."""
 
-from shesha.storage.base import ParsedDocument, StorageBackend
+from ananta.storage.base import ParsedDocument, StorageBackend
 
 
 def test_parsed_document_creation():

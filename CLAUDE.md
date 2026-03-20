@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Shesha: Python library for Recursive Language Models (RLMs) per arXiv:2512.24601v1. Documents load as variables in a sandboxed Python REPL; LLM generates code to explore them, sees output, repeats until `FINAL("answer")`.
+Ananta: Python library for Recursive Language Models (RLMs) per arXiv:2512.24601v1. Documents load as variables in a sandboxed Python REPL; LLM generates code to explore them, sees output, repeats until `FINAL("answer")`.
 
 ## Architecture
 
@@ -14,7 +14,7 @@ User Query → RLM Core Loop → Docker Sandbox
            Trace Recorder
 ```
 
-**Components:** `src/shesha/{rlm,sandbox,storage,parser,llm}/`
+**Components:** `src/ananta/{rlm,sandbox,storage,parser,llm}/`
 
 **Security:** Two untrusted content tag patterns:
 - `llm_query(instruction, content)` - instruction trusted, content wrapped in `<untrusted_document_content>` tags
@@ -30,7 +30,7 @@ source .venv/bin/activate        # Activate venv (use .venv first!)
 pip install -e ".[dev]"          # Install
 make all                         # All tests
 pytest tests/path::test_name -v  # Single test
-mypy src/shesha                  # Type check
+mypy src/ananta                  # Type check
 ruff check src tests             # Lint
 ruff format src tests            # Format
 make all                         # Format + lint + typecheck + test
@@ -58,7 +58,7 @@ make all                         # Format + lint + typecheck + test
 
 ## API Boundaries
 
-- **No private API access across module boundaries.** Never access `_`-prefixed attributes from outside the owning class. Use or create public properties/methods instead. Private attributes are internal implementation details — accessing them from another module creates tight coupling that breaks when internals change. The experimental layer uses `Shesha.storage`, `Project.rlm_engine`, and `StorageBackend.get_project_dir()` — not `_storage`, `_rlm_engine`, or `_project_path()`.
+- **No private API access across module boundaries.** Never access `_`-prefixed attributes from outside the owning class. Use or create public properties/methods instead. Private attributes are internal implementation details — accessing them from another module creates tight coupling that breaks when internals change. The experimental layer uses `Ananta.storage`, `Project.rlm_engine`, and `StorageBackend.get_project_dir()` — not `_storage`, `_rlm_engine`, or `_project_path()`.
 
 ## Code Style
 
@@ -126,8 +126,8 @@ Version numbers are derived from git tags via `hatch-vcs`. The `/release` skill 
 
 Comparison links at the bottom of CHANGELOG.md are mandatory. Format:
 ```
-[unreleased]: https://github.com/Ovid/shesha/compare/vLATEST...HEAD
-[X.Y.Z]: https://github.com/Ovid/shesha/compare/vPREVIOUS...vX.Y.Z
+[unreleased]: https://github.com/Ovid/ananta/compare/vLATEST...HEAD
+[X.Y.Z]: https://github.com/Ovid/ananta/compare/vPREVIOUS...vX.Y.Z
 ```
 
 ### git

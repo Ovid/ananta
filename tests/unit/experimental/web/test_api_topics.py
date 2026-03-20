@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from shesha.experimental.web.api import create_api
+from ananta.experimental.web.api import create_api
 
 
 @pytest.fixture
@@ -32,7 +32,7 @@ def test_list_topics_empty(client: TestClient, mock_state: MagicMock) -> None:
 def test_list_topics(client: TestClient, mock_state: MagicMock) -> None:
     from datetime import datetime
 
-    from shesha.experimental.arxiv.models import TopicInfo
+    from ananta.experimental.arxiv.models import TopicInfo
 
     mock_state.topic_mgr.list_topics.return_value = [
         TopicInfo(

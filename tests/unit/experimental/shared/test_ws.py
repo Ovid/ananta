@@ -11,11 +11,11 @@ import pytest
 from fastapi import FastAPI, WebSocket
 from fastapi.testclient import TestClient
 
-from shesha.experimental.shared.websockets import build_complete_response, websocket_handler
-from shesha.models import ParsedDocument
-from shesha.rlm.trace import TokenUsage, Trace
+from ananta.experimental.shared.websockets import build_complete_response, websocket_handler
+from ananta.models import ParsedDocument
+from ananta.rlm.trace import TokenUsage, Trace
 
-_SESSION_PATCH = "shesha.experimental.shared.websockets.WebConversationSession"
+_SESSION_PATCH = "ananta.experimental.shared.websockets.WebConversationSession"
 
 
 def _make_doc(name: str) -> ParsedDocument:
@@ -93,10 +93,10 @@ def test_ws_query_returns_complete(client: TestClient, mock_state: MagicMock) ->
     mock_project.rlm_engine.query.return_value = mock_result
 
     mock_state.topic_mgr.resolve.return_value = "proj-id"
-    mock_state.shesha.get_project.return_value = mock_project
-    mock_state.shesha.storage.list_documents.return_value = ["doc1"]
-    mock_state.shesha.storage.get_document.side_effect = lambda pid, name: _make_doc(name)
-    mock_state.shesha.storage.list_traces.return_value = []
+    mock_state.ananta.get_project.return_value = mock_project
+    mock_state.ananta.storage.list_documents.return_value = ["doc1"]
+    mock_state.ananta.storage.get_document.side_effect = lambda pid, name: _make_doc(name)
+    mock_state.ananta.storage.list_traces.return_value = []
 
     with patch(_SESSION_PATCH) as mock_sess_cls:
         mock_sess_cls.return_value = _mock_session()
@@ -148,9 +148,9 @@ def test_ws_query_engine_exception_sends_error(client: TestClient, mock_state: M
     mock_project.rlm_engine.query.side_effect = RuntimeError("engine exploded")
 
     mock_state.topic_mgr.resolve.return_value = "proj-id"
-    mock_state.shesha.get_project.return_value = mock_project
-    mock_state.shesha.storage.list_documents.return_value = ["doc1"]
-    mock_state.shesha.storage.get_document.side_effect = lambda pid, name: _make_doc(name)
+    mock_state.ananta.get_project.return_value = mock_project
+    mock_state.ananta.storage.list_documents.return_value = ["doc1"]
+    mock_state.ananta.storage.get_document.side_effect = lambda pid, name: _make_doc(name)
 
     with patch(_SESSION_PATCH) as mock_sess_cls:
         mock_sess_cls.return_value = _mock_session()
@@ -188,7 +188,7 @@ def test_ws_unknown_message_type(client: TestClient, mock_state: MagicMock) -> N
 def test_ws_query_no_document_ids(client: TestClient, mock_state: MagicMock) -> None:
     """Query without document_ids returns error."""
     mock_state.topic_mgr.resolve.return_value = "proj-id"
-    mock_state.shesha.storage.list_documents.return_value = ["doc1"]
+    mock_state.ananta.storage.list_documents.return_value = ["doc1"]
     with client.websocket_connect("/ws") as ws:
         ws.send_json({"type": "query", "topic": "test", "question": "What?"})
         msg = ws.receive_json()
@@ -230,10 +230,10 @@ def test_ws_build_context_called(mock_state: MagicMock) -> None:
     mock_project.rlm_engine.query.return_value = mock_result
 
     mock_state.topic_mgr.resolve.return_value = "proj-id"
-    mock_state.shesha.get_project.return_value = mock_project
-    mock_state.shesha.storage.list_documents.return_value = ["doc1"]
-    mock_state.shesha.storage.get_document.side_effect = lambda pid, name: _make_doc(name)
-    mock_state.shesha.storage.list_traces.return_value = []
+    mock_state.ananta.get_project.return_value = mock_project
+    mock_state.ananta.storage.list_documents.return_value = ["doc1"]
+    mock_state.ananta.storage.get_document.side_effect = lambda pid, name: _make_doc(name)
+    mock_state.ananta.storage.list_traces.return_value = []
 
     def my_build_context(
         document_ids: list[str], state: object, loaded_docs: list[ParsedDocument]
@@ -277,9 +277,9 @@ def test_ws_query_no_engine_sends_error(client: TestClient, mock_state: MagicMoc
     mock_project.rlm_engine = None
 
     mock_state.topic_mgr.resolve.return_value = "proj-id"
-    mock_state.shesha.get_project.return_value = mock_project
-    mock_state.shesha.storage.list_documents.return_value = ["doc1"]
-    mock_state.shesha.storage.get_document.side_effect = lambda pid, name: _make_doc(name)
+    mock_state.ananta.get_project.return_value = mock_project
+    mock_state.ananta.storage.list_documents.return_value = ["doc1"]
+    mock_state.ananta.storage.get_document.side_effect = lambda pid, name: _make_doc(name)
 
     with patch(_SESSION_PATCH) as mock_sess_cls:
         mock_sess_cls.return_value = _mock_session()
@@ -318,10 +318,10 @@ def test_ws_session_factory_is_used(mock_state: MagicMock) -> None:
     mock_project.rlm_engine.query.return_value = mock_result
 
     mock_state.topic_mgr.resolve.return_value = "proj-id"
-    mock_state.shesha.get_project.return_value = mock_project
-    mock_state.shesha.storage.list_documents.return_value = ["doc1"]
-    mock_state.shesha.storage.get_document.side_effect = lambda pid, name: _make_doc(name)
-    mock_state.shesha.storage.list_traces.return_value = []
+    mock_state.ananta.get_project.return_value = mock_project
+    mock_state.ananta.storage.list_documents.return_value = ["doc1"]
+    mock_state.ananta.storage.get_document.side_effect = lambda pid, name: _make_doc(name)
+    mock_state.ananta.storage.list_traces.return_value = []
 
     custom_session = _mock_session()
     custom_factory = MagicMock(return_value=custom_session)
@@ -392,10 +392,10 @@ def test_ws_query_passes_allow_background_knowledge(
     mock_project.rlm_engine.query.return_value = mock_result
 
     mock_state.topic_mgr.resolve.return_value = "proj-id"
-    mock_state.shesha.get_project.return_value = mock_project
-    mock_state.shesha.storage.list_documents.return_value = ["doc1"]
-    mock_state.shesha.storage.get_document.side_effect = lambda pid, name: _make_doc(name)
-    mock_state.shesha.storage.list_traces.return_value = []
+    mock_state.ananta.get_project.return_value = mock_project
+    mock_state.ananta.storage.list_documents.return_value = ["doc1"]
+    mock_state.ananta.storage.get_document.side_effect = lambda pid, name: _make_doc(name)
+    mock_state.ananta.storage.list_traces.return_value = []
 
     with patch(_SESSION_PATCH) as mock_sess_cls:
         mock_sess_cls.return_value = _mock_session()
@@ -441,10 +441,10 @@ def test_ws_complete_includes_allow_background_knowledge_false(
     mock_project.rlm_engine.query.return_value = mock_result
 
     mock_state.topic_mgr.resolve.return_value = "proj-id"
-    mock_state.shesha.get_project.return_value = mock_project
-    mock_state.shesha.storage.list_documents.return_value = ["doc1"]
-    mock_state.shesha.storage.get_document.side_effect = lambda pid, name: _make_doc(name)
-    mock_state.shesha.storage.list_traces.return_value = []
+    mock_state.ananta.get_project.return_value = mock_project
+    mock_state.ananta.storage.list_documents.return_value = ["doc1"]
+    mock_state.ananta.storage.get_document.side_effect = lambda pid, name: _make_doc(name)
+    mock_state.ananta.storage.list_traces.return_value = []
 
     with patch(_SESSION_PATCH) as mock_sess_cls:
         mock_sess_cls.return_value = _mock_session()

@@ -1,7 +1,7 @@
 """Tests for RLM prompts."""
 
-from shesha.prompts import PromptLoader
-from shesha.rlm.prompts import truncate_code_output
+from ananta.prompts import PromptLoader
+from ananta.rlm.prompts import truncate_code_output
 
 
 def test_system_prompt_no_longer_contains_metadata():
@@ -203,7 +203,7 @@ def test_iteration_continue_prompt_mentions_sub_llms():
 
 def test_format_code_echo_message():
     """Code echo message contains both the code and output."""
-    from shesha.rlm.prompts import format_code_echo
+    from ananta.rlm.prompts import format_code_echo
 
     code = 'print("hello")'
     output = "hello"
@@ -218,7 +218,7 @@ def test_format_code_echo_message():
 
 def test_format_code_echo_with_vars():
     """Code echo includes REPL variables list when vars provided."""
-    from shesha.rlm.prompts import format_code_echo
+    from ananta.rlm.prompts import format_code_echo
 
     code = "x = 42"
     output = ""
@@ -232,7 +232,7 @@ def test_format_code_echo_with_vars():
 
 def test_format_code_echo_without_vars():
     """Code echo omits REPL variables when vars is None."""
-    from shesha.rlm.prompts import format_code_echo
+    from ananta.rlm.prompts import format_code_echo
 
     code = 'print("hello")'
     output = "hello"
@@ -245,7 +245,7 @@ def test_format_code_echo_without_vars():
 
 def test_format_code_echo_no_repl_output_tags():
     """Code echo uses plain 'REPL output:' not XML tags."""
-    from shesha.rlm.prompts import format_code_echo
+    from ananta.rlm.prompts import format_code_echo
 
     result = format_code_echo("code", "output")
     assert "<repl_output" not in result
@@ -276,7 +276,7 @@ def test_iteration_zero_prompt_includes_step_by_step():
 
 def test_format_code_echo_wraps_output_with_boundary():
     """Code echo wraps REPL output when boundary is provided."""
-    from shesha.rlm.prompts import format_code_echo
+    from ananta.rlm.prompts import format_code_echo
 
     result = format_code_echo("x = 1", "1", boundary="UNTRUSTED_CONTENT_abc123")
     assert "UNTRUSTED_CONTENT_abc123_BEGIN" in result
@@ -286,7 +286,7 @@ def test_format_code_echo_wraps_output_with_boundary():
 
 def test_format_code_echo_no_wrapping_without_boundary():
     """Code echo does not wrap when boundary is None."""
-    from shesha.rlm.prompts import format_code_echo
+    from ananta.rlm.prompts import format_code_echo
 
     result = format_code_echo("x = 1", "1")
     assert "_BEGIN" not in result

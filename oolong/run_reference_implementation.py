@@ -2,13 +2,13 @@
 """OOLONG & OOLONG-Pairs benchmark using the paper's reference RLM.
 
 Runs the same benchmarks as run_oolong_and_pairs.py but against the reference
-RLM implementation in rlm/ instead of Shesha.  Outputs results in the same CSV
+RLM implementation in rlm/ instead of Ananta.  Outputs results in the same CSV
 format for side-by-side comparison.
 
 Environment variables:
 
-  SHESHA_API_KEY        API key for the LLM provider (required).
-  SHESHA_MODEL          LLM model (default: gpt-5.2, overridden by --model).
+  ANANTA_API_KEY        API key for the LLM provider (required).
+  ANANTA_MODEL          LLM model (default: gpt-5.2, overridden by --model).
   MAX_WINDOWS_PER_LEN   Context windows per length (default: 1).
   REF_MAX_ITER          Max RLM iterations (default: 30).
   PLOT_ONLY             Set to 1 to regenerate plot from existing CSV.
@@ -128,7 +128,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--model",
         default=None,
-        help="LLM model to use (overrides SHESHA_MODEL, default: gpt-5.2)",
+        help="LLM model to use (overrides ANANTA_MODEL, default: gpt-5.2)",
     )
     parser.add_argument(
         "--fast",
@@ -216,7 +216,7 @@ def main() -> None:
         return
 
     t_start = time.monotonic()
-    model = args.model or os.getenv("SHESHA_MODEL", "gpt-5.2")
+    model = args.model or os.getenv("ANANTA_MODEL", "gpt-5.2")
     max_win = int(os.getenv("MAX_WINDOWS_PER_LEN", "1"))
     max_iter = int(os.getenv("REF_MAX_ITER", "30"))
 
@@ -233,9 +233,9 @@ def main() -> None:
     status(f"max_windows={max_win}  max_iter={max_iter}")
 
     # --- Reference RLM setup ---
-    api_key = os.getenv("SHESHA_API_KEY")
+    api_key = os.getenv("ANANTA_API_KEY")
     if not api_key:
-        print("Error: SHESHA_API_KEY environment variable not set.")
+        print("Error: ANANTA_API_KEY environment variable not set.")
         sys.exit(1)
     ref = RLM(
         backend=backend,

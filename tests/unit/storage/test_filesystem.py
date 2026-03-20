@@ -7,19 +7,19 @@ from unittest.mock import patch
 
 import pytest
 
-from shesha.exceptions import (
+from ananta.exceptions import (
     DocumentNotFoundError,
     ProjectExistsError,
     ProjectNotFoundError,
 )
-from shesha.models import (
+from ananta.models import (
     AnalysisComponent,
     AnalysisExternalDep,
     ParsedDocument,
     RepoAnalysis,
 )
-from shesha.security.paths import PathTraversalError
-from shesha.storage.filesystem import FilesystemStorage
+from ananta.security.paths import PathTraversalError
+from ananta.storage.filesystem import FilesystemStorage
 
 
 @pytest.fixture
@@ -421,7 +421,7 @@ class TestSwapDocs:
         def failing_rmtree(path, *args, **kwargs):
             raise OSError("Permission denied")
 
-        with patch("shesha.storage.filesystem.shutil.rmtree", side_effect=failing_rmtree):
+        with patch("ananta.storage.filesystem.shutil.rmtree", side_effect=failing_rmtree):
             # Should NOT raise despite rmtree failure
             storage.swap_docs("source", "target")
 

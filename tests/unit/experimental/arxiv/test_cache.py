@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 # Late import: test helper uses deferred import pattern matching other test files
-from shesha.experimental.arxiv.models import PaperMeta
+from ananta.experimental.arxiv.models import PaperMeta
 
 
 def _make_meta() -> PaperMeta:
@@ -29,13 +29,13 @@ class TestPaperCache:
     """Tests for PaperCache."""
 
     def test_empty_cache_has_no_paper(self, tmp_path: Path) -> None:
-        from shesha.experimental.arxiv.cache import PaperCache
+        from ananta.experimental.arxiv.cache import PaperCache
 
         cache = PaperCache(tmp_path / "cache")
         assert not cache.has("2501.12345")
 
     def test_store_and_retrieve_meta(self, tmp_path: Path) -> None:
-        from shesha.experimental.arxiv.cache import PaperCache
+        from ananta.experimental.arxiv.cache import PaperCache
 
         cache = PaperCache(tmp_path / "cache")
         meta = _make_meta()
@@ -47,7 +47,7 @@ class TestPaperCache:
         assert restored.source_type == "latex"
 
     def test_store_and_retrieve_source_files(self, tmp_path: Path) -> None:
-        from shesha.experimental.arxiv.cache import PaperCache
+        from ananta.experimental.arxiv.cache import PaperCache
 
         cache = PaperCache(tmp_path / "cache")
         meta = _make_meta()
@@ -60,7 +60,7 @@ class TestPaperCache:
         assert retrieved["refs.bib"] == "@article{a}"
 
     def test_get_source_files_returns_none_when_missing(self, tmp_path: Path) -> None:
-        from shesha.experimental.arxiv.cache import PaperCache
+        from ananta.experimental.arxiv.cache import PaperCache
 
         cache = PaperCache(tmp_path / "cache")
         meta = _make_meta()
@@ -68,7 +68,7 @@ class TestPaperCache:
         assert cache.get_source_files("2501.12345") is None
 
     def test_store_and_retrieve_pdf(self, tmp_path: Path) -> None:
-        from shesha.experimental.arxiv.cache import PaperCache
+        from ananta.experimental.arxiv.cache import PaperCache
 
         cache = PaperCache(tmp_path / "cache")
         meta = _make_meta()
@@ -81,13 +81,13 @@ class TestPaperCache:
         assert pdf_path.read_bytes() == pdf_content
 
     def test_get_pdf_path_returns_none_when_missing(self, tmp_path: Path) -> None:
-        from shesha.experimental.arxiv.cache import PaperCache
+        from ananta.experimental.arxiv.cache import PaperCache
 
         cache = PaperCache(tmp_path / "cache")
         assert cache.get_pdf_path("2501.12345") is None
 
     def test_list_papers(self, tmp_path: Path) -> None:
-        from shesha.experimental.arxiv.cache import PaperCache
+        from ananta.experimental.arxiv.cache import PaperCache
 
         cache = PaperCache(tmp_path / "cache")
         assert cache.list_papers() == []
@@ -96,13 +96,13 @@ class TestPaperCache:
         assert papers == ["2501.12345"]
 
     def test_get_meta_returns_none_for_missing(self, tmp_path: Path) -> None:
-        from shesha.experimental.arxiv.cache import PaperCache
+        from ananta.experimental.arxiv.cache import PaperCache
 
         cache = PaperCache(tmp_path / "cache")
         assert cache.get_meta("nonexistent") is None
 
     def test_cache_dir_created_on_first_store(self, tmp_path: Path) -> None:
-        from shesha.experimental.arxiv.cache import PaperCache
+        from ananta.experimental.arxiv.cache import PaperCache
 
         cache_dir = tmp_path / "cache"
         cache = PaperCache(cache_dir)
@@ -111,7 +111,7 @@ class TestPaperCache:
         assert cache_dir.exists()
 
     def test_store_source_files_rejects_dotdot_traversal(self, tmp_path: Path) -> None:
-        from shesha.experimental.arxiv.cache import PaperCache
+        from ananta.experimental.arxiv.cache import PaperCache
 
         cache = PaperCache(tmp_path / "cache")
         cache.store_meta(_make_meta())
@@ -127,7 +127,7 @@ class TestPaperCache:
         assert not (tmp_path / "escape.tex").exists()
 
     def test_store_source_files_rejects_absolute_path(self, tmp_path: Path) -> None:
-        from shesha.experimental.arxiv.cache import PaperCache
+        from ananta.experimental.arxiv.cache import PaperCache
 
         cache = PaperCache(tmp_path / "cache")
         cache.store_meta(_make_meta())
@@ -139,7 +139,7 @@ class TestPaperCache:
         assert "/etc/evil.tex" not in retrieved
 
     def test_store_source_files_rejects_nested_traversal(self, tmp_path: Path) -> None:
-        from shesha.experimental.arxiv.cache import PaperCache
+        from ananta.experimental.arxiv.cache import PaperCache
 
         cache = PaperCache(tmp_path / "cache")
         cache.store_meta(_make_meta())

@@ -2,7 +2,9 @@
 
 import atexit
 import logging
+import os
 import re
+import subprocess
 import threading
 import weakref
 from pathlib import Path
@@ -138,24 +140,109 @@ class Ananta:
 
     @staticmethod
     def _check_docker_available() -> None:
-        """Verify Docker daemon is running. Raises RuntimeError if not."""
+        """Discover Docker socket and verify daemon is running.
+
+        Strategy:
+        1. If DOCKER_HOST is set, use it directly.
+        2. Try ``docker context inspect`` to get the active socket.
+        3. Probe known socket paths on disk.
+        4. Give up with a diagnostic error message.
+
+        Raises RuntimeError with a clean message if Docker is unreachable.
+        """
+        diagnostics: list[str] = []
+
+        # Strategy 1: DOCKER_HOST already set — use it directly.
+        if os.environ.get("DOCKER_HOST"):
+            diagnostics.append(f"DOCKER_HOST={os.environ['DOCKER_HOST']}")
+            try:
+                client = docker.from_env()
+                client.close()
+                return
+            except DockerException as e:
+                diagnostics[-1] += " — not responding"
+                logger.debug("DOCKER_HOST set but failed: %s", e)
+        else:
+            diagnostics.append("DOCKER_HOST not set")
+
+        # Strategy 2: docker context inspect
         try:
-            client = docker.from_env()
-            client.close()
-        except DockerException as e:
-            error_str = str(e)
-            if "Connection refused" in error_str:
-                raise RuntimeError(
-                    "Docker is not running. Please start Docker Desktop and try again."
-                ) from e
-            if "No such file or directory" in error_str:
-                raise RuntimeError(
-                    "No Docker-compatible socket found. "
-                    "If you're using Podman, set DOCKER_HOST to Podman's socket:\n"
-                    '  export DOCKER_HOST="unix://$(podman machine inspect '
-                    "--format '{{.ConnectionInfo.PodmanSocket.Path}}')\""
-                ) from e
-            raise
+            result = subprocess.run(
+                [
+                    "docker",
+                    "context",
+                    "inspect",
+                    "--format",
+                    "{{.Endpoints.docker.Host}}",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                socket_url = result.stdout.strip()
+                diagnostics.append(f"docker context: {socket_url}")
+                os.environ["DOCKER_HOST"] = socket_url
+                try:
+                    client = docker.from_env()
+                    client.close()
+                    return
+                except DockerException as e:
+                    diagnostics[-1] += " — not responding"
+                    logger.debug("docker context socket failed: %s", e)
+                    del os.environ["DOCKER_HOST"]
+            else:
+                stderr = result.stderr.strip()
+                diagnostics.append(
+                    f"docker context: failed ({stderr})"
+                    if stderr
+                    else "docker context: no socket returned"
+                )
+        except FileNotFoundError:
+            diagnostics.append("docker context: docker CLI not found")
+        except subprocess.TimeoutExpired:
+            diagnostics.append("docker context: timed out")
+        except Exception as e:
+            diagnostics.append(f"docker context: {e}")
+            logger.debug("docker context inspect failed: %s", e)
+
+        # Strategy 3: probe known socket paths
+        known_paths = [
+            Path("/var/run/docker.sock"),
+            Path.home() / ".docker" / "run" / "docker.sock",
+            Path.home() / ".colima" / "default" / "docker.sock",
+        ]
+        for sock_path in known_paths:
+            if not sock_path.exists():
+                diagnostics.append(f"{sock_path} — not found")
+                continue
+            if not sock_path.is_socket():
+                diagnostics.append(f"{sock_path} — exists but not a socket")
+                continue
+            socket_url = f"unix://{sock_path}"
+            diagnostics.append(f"{sock_path} — found")
+            os.environ["DOCKER_HOST"] = socket_url
+            try:
+                client = docker.from_env()
+                client.close()
+                return
+            except DockerException as e:
+                diagnostics[-1] += " — not responding"
+                logger.debug("Socket %s found but failed: %s", sock_path, e)
+                del os.environ["DOCKER_HOST"]
+
+        # Strategy 4: give up
+        tried = "\n    ".join(f"x {d}" for d in diagnostics)
+        raise RuntimeError(
+            "Could not connect to Docker.\n\n"
+            f"  Tried:\n    {tried}\n\n"
+            "  To fix, either:\n"
+            "    - Start Docker Desktop\n"
+            "    - Set DOCKER_HOST to your Docker socket path\n"
+            "    - If using Podman: export DOCKER_HOST=\"unix://$("
+            "podman machine inspect "
+            "--format '{{.ConnectionInfo.PodmanSocket.Path}}')\""
+        )
 
     def create_project(self, project_id: str) -> Project:
         """Create a new project."""

@@ -8,7 +8,6 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 import docker
-from docker.errors import DockerException
 from docker.models.containers import Container
 
 from ananta.sandbox.base import ExecutionResult, LLMQueryHandler
@@ -72,14 +71,7 @@ class ContainerExecutor:
         logger.debug("Starting container (image=%s, memory=%s)", self.image, self.memory_limit)
         self._raw_buffer = b""  # Clear raw stream buffer
         self._content_buffer = b""  # Clear content buffer
-        try:
-            self._client = docker.from_env()
-        except DockerException as e:
-            if "Connection refused" in str(e):
-                raise RuntimeError(
-                    "Docker is not running. Please start Docker Desktop and try again."
-                ) from e
-            raise
+        self._client = docker.from_env()
         self._container = self._client.containers.run(
             self.image,
             detach=True,

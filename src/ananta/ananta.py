@@ -8,7 +8,7 @@ import subprocess
 import threading
 import weakref
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, ClassVar, Literal
 
 import docker
 from docker.errors import DockerException
@@ -40,6 +40,12 @@ logger = logging.getLogger(__name__)
 
 class Ananta:
     """Main entry point for Ananta - Recursive Language Models."""
+
+    _KNOWN_SOCKET_PATHS: ClassVar[list[Path]] = [
+        Path("/var/run/docker.sock"),
+        Path.home() / ".docker" / "run" / "docker.sock",
+        Path.home() / ".colima" / "default" / "docker.sock",
+    ]
 
     def __init__(
         self,
@@ -138,8 +144,8 @@ class Ananta:
         """The repo ingester used by this instance."""
         return self._repo_ingester
 
-    @staticmethod
-    def _check_docker_available() -> None:
+    @classmethod
+    def _check_docker_available(cls) -> None:
         """Discover Docker socket and verify daemon is running.
 
         Strategy:
@@ -207,12 +213,7 @@ class Ananta:
             logger.debug("docker context inspect failed: %s", e)
 
         # Strategy 3: probe known socket paths
-        known_paths = [
-            Path("/var/run/docker.sock"),
-            Path.home() / ".docker" / "run" / "docker.sock",
-            Path.home() / ".colima" / "default" / "docker.sock",
-        ]
-        for sock_path in known_paths:
+        for sock_path in cls._KNOWN_SOCKET_PATHS:
             if not sock_path.exists():
                 diagnostics.append(f"{sock_path} — not found")
                 continue

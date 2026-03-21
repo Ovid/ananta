@@ -276,6 +276,74 @@ class TestDockerAvailability:
             mock_docker.from_env.assert_called_once()
             mock_client.close.assert_called_once()
 
+    def test_check_docker_falls_through_when_docker_cli_not_installed(self, tmp_path: Path):
+        """When docker CLI is not installed, discovery silently falls through to path probing."""
+        mock_client = MagicMock()
+        sock_path = tmp_path / "docker.sock"
+        sock_path.touch()  # Will mock is_socket
+
+        with (
+            patch("ananta.ananta.docker") as mock_docker,
+            patch("ananta.ananta.ContainerPool", return_value=MagicMock(spec=ContainerPool)),
+            patch.dict(os.environ, {}, clear=True),
+            patch("ananta.ananta.subprocess.run", side_effect=FileNotFoundError),
+            patch("ananta.ananta.Ananta._KNOWN_SOCKET_PATHS", [sock_path]),
+            patch.object(Path, "is_socket", return_value=True),
+        ):
+            mock_docker.from_env.return_value = mock_client
+            ananta = Ananta(model="test-model", storage_path=tmp_path)
+            ananta.start()
+
+            mock_docker.from_env.assert_called_once()
+            mock_client.close.assert_called_once()
+
+    def test_check_docker_falls_through_when_context_returns_nonzero(self, tmp_path: Path):
+        """When docker context inspect returns non-zero, discovery falls through."""
+        mock_client = MagicMock()
+        sock_path = tmp_path / "docker.sock"
+        sock_path.touch()
+
+        with (
+            patch("ananta.ananta.docker") as mock_docker,
+            patch("ananta.ananta.ContainerPool", return_value=MagicMock(spec=ContainerPool)),
+            patch.dict(os.environ, {}, clear=True),
+            patch("ananta.ananta.subprocess.run") as mock_run,
+            patch("ananta.ananta.Ananta._KNOWN_SOCKET_PATHS", [sock_path]),
+            patch.object(Path, "is_socket", return_value=True),
+        ):
+            mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="error")
+            mock_docker.from_env.return_value = mock_client
+            ananta = Ananta(model="test-model", storage_path=tmp_path)
+            ananta.start()
+
+            mock_docker.from_env.assert_called_once()
+
+    def test_check_docker_falls_through_when_context_returns_garbage(self, tmp_path: Path):
+        """When docker context inspect returns success but unparseable output, falls through."""
+        mock_client = MagicMock()
+        sock_path = tmp_path / "docker.sock"
+        sock_path.touch()
+
+        with (
+            patch("ananta.ananta.docker") as mock_docker,
+            patch("ananta.ananta.ContainerPool", return_value=MagicMock(spec=ContainerPool)),
+            patch.dict(os.environ, {}, clear=True),
+            patch("ananta.ananta.subprocess.run") as mock_run,
+            patch("ananta.ananta.Ananta._KNOWN_SOCKET_PATHS", [sock_path]),
+            patch.object(Path, "is_socket", return_value=True),
+        ):
+            # returncode=0 but garbage output — from_env will fail with this as DOCKER_HOST
+            mock_run.return_value = MagicMock(returncode=0, stdout="not a valid url\n")
+            mock_docker.from_env.side_effect = [
+                DockerException("Invalid URL"),  # first call with garbage URL fails
+                mock_client,  # second call after path probing succeeds
+            ]
+            ananta = Ananta(model="test-model", storage_path=tmp_path)
+            ananta.start()
+
+            assert mock_docker.from_env.call_count == 2
+            mock_client.close.assert_called_once()
+
 
 class TestAnanta:
     """Tests for Ananta class."""

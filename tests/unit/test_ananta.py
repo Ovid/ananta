@@ -48,31 +48,31 @@ class TestDockerAvailability:
 
     def test_start_checks_docker_and_creates_pool(self, tmp_path: Path):
         """start() checks Docker and creates the container pool."""
-
         mock_pool = MagicMock(spec=ContainerPool)
         with (
             patch("ananta.ananta.docker") as mock_docker,
             patch("ananta.ananta.ContainerPool", return_value=mock_pool) as mock_pool_cls,
+            patch.dict(os.environ, {"DOCKER_HOST": "unix:///var/run/docker.sock"}),
         ):
+            mock_docker.from_env.return_value = MagicMock()
             ananta = Ananta(model="test-model", storage_path=tmp_path)
 
-            # Before start: no Docker check, no pool
             mock_docker.from_env.assert_not_called()
             mock_pool_cls.assert_not_called()
 
             ananta.start()
 
-            # After start: Docker checked, pool created and started
             mock_docker.from_env.assert_called_once()
             mock_pool_cls.assert_called_once()
             mock_pool.start.assert_called_once()
 
     def test_start_raises_clear_error_when_docker_not_running(self, tmp_path: Path):
         """start() raises clear error when Docker is not running."""
-
-        with patch("ananta.ananta.docker") as mock_docker:
+        with (
+            patch("ananta.ananta.docker") as mock_docker,
+            patch.dict(os.environ, {"DOCKER_HOST": "unix:///var/run/docker.sock"}),
+        ):
             ananta = Ananta(model="test-model", storage_path=tmp_path)
-
             mock_docker.from_env.side_effect = DockerException(
                 "Error while fetching server API version: "
                 "('Connection aborted.', ConnectionRefusedError(61, 'Connection refused'))"
@@ -82,19 +82,17 @@ class TestDockerAvailability:
                 ananta.start()
 
             error_msg = str(exc_info.value)
-            assert "Docker" in error_msg
-            assert "not running" in error_msg or "start" in error_msg.lower()
+            assert "not responding" in error_msg
 
     def test_start_raises_helpful_error_when_socket_not_found(self, tmp_path: Path):
-        """start() raises helpful error mentioning Podman when socket not found."""
-
-        with patch("ananta.ananta.docker") as mock_docker:
+        """start() raises helpful error mentioning Podman when no socket found."""
+        with (
+            patch("ananta.ananta.docker"),
+            patch.dict(os.environ, {}, clear=True),
+            patch("ananta.ananta.subprocess.run", side_effect=FileNotFoundError),
+            patch("ananta.ananta.Ananta._KNOWN_SOCKET_PATHS", []),
+        ):
             ananta = Ananta(model="test-model", storage_path=tmp_path)
-
-            mock_docker.from_env.side_effect = DockerException(
-                "Error while fetching server API version: "
-                "('Connection aborted.', FileNotFoundError(2, 'No such file or directory'))"
-            )
 
             with pytest.raises(RuntimeError) as exc_info:
                 ananta.start()

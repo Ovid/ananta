@@ -38,6 +38,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+_VALID_DOCKER_HOST_SCHEMES = ("unix://", "tcp://", "npipe://", "fd://", "ssh://")
+
+
 class Ananta:
     """Main entry point for Ananta - Recursive Language Models."""
 
@@ -195,16 +198,21 @@ class Ananta:
             )
             if result.returncode == 0 and result.stdout.strip():
                 socket_url = result.stdout.strip()
-                diagnostics.append(f"docker context: {socket_url}")
-                os.environ["DOCKER_HOST"] = socket_url
-                try:
-                    client = docker.from_env()
-                    client.close()
-                    return
-                except Exception as e:
-                    diagnostics[-1] += " — not responding"
-                    logger.debug("docker context socket failed: %s", e)
-                    os.environ.pop("DOCKER_HOST", None)
+                if not socket_url.startswith(_VALID_DOCKER_HOST_SCHEMES):
+                    diagnostics.append(
+                        f"docker context: invalid output ({socket_url!r})"
+                    )
+                else:
+                    diagnostics.append(f"docker context: {socket_url}")
+                    os.environ["DOCKER_HOST"] = socket_url
+                    try:
+                        client = docker.from_env()
+                        client.close()
+                        return
+                    except Exception as e:
+                        diagnostics[-1] += " — not responding"
+                        logger.debug("docker context socket failed: %s", e)
+                        os.environ.pop("DOCKER_HOST", None)
             else:
                 stderr = result.stderr.strip()
                 diagnostics.append(

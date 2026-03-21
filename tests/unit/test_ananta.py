@@ -334,7 +334,7 @@ class TestDockerAvailability:
             mock_docker.from_env.assert_called_once()
 
     def test_check_docker_falls_through_when_context_returns_garbage(self, tmp_path: Path):
-        """When docker context inspect returns success but unparseable output, falls through."""
+        """When docker context inspect returns success but invalid scheme, falls through."""
         mock_client = MagicMock()
         sock_path = tmp_path / "docker.sock"
         sock_path.touch()
@@ -347,16 +347,14 @@ class TestDockerAvailability:
             patch("ananta.ananta.Ananta._KNOWN_SOCKET_PATHS", [sock_path]),
             patch.object(Path, "is_socket", return_value=True),
         ):
-            # returncode=0 but garbage output — from_env will fail with this as DOCKER_HOST
+            # returncode=0 but invalid scheme — rejected before from_env
             mock_run.return_value = MagicMock(returncode=0, stdout="not a valid url\n")
-            mock_docker.from_env.side_effect = [
-                DockerException("Invalid URL"),  # first call with garbage URL fails
-                mock_client,  # second call after path probing succeeds
-            ]
+            mock_docker.from_env.return_value = mock_client
             ananta = Ananta(model="test-model", storage_path=tmp_path)
             ananta.start()
 
-            assert mock_docker.from_env.call_count == 2
+            # from_env called only once (Strategy 3 path probing), not for garbage
+            assert mock_docker.from_env.call_count == 1
             mock_client.close.assert_called_once()
 
     def test_check_docker_skips_path_that_exists_but_not_socket(self, tmp_path: Path):
@@ -462,6 +460,47 @@ class TestDockerAvailability:
                 ananta.start()
 
             assert os.environ.get("DOCKER_HOST") == "unix:///user/custom.sock"
+
+    def test_check_docker_rejects_invalid_context_output(self, tmp_path: Path):
+        """docker context inspect output without a known scheme is rejected."""
+        with (
+            patch("ananta.ananta.docker") as mock_docker,
+            patch.dict(os.environ, {}, clear=True),
+            patch("ananta.ananta.subprocess.run") as mock_run,
+            patch("ananta.ananta.Ananta._KNOWN_SOCKET_PATHS", []),
+        ):
+            mock_run.return_value = MagicMock(
+                returncode=0,
+                stdout="WARNING: some garbage output\n",
+            )
+            mock_docker.from_env.side_effect = DockerException("fail")
+            ananta = Ananta(model="test-model", storage_path=tmp_path)
+
+            with pytest.raises(RuntimeError, match="Could not connect"):
+                ananta.start()
+
+            # from_env should NOT have been called — the output was rejected
+            mock_docker.from_env.assert_not_called()
+
+    def test_check_docker_accepts_valid_schemes(self, tmp_path: Path):
+        """docker context inspect output with unix://, tcp://, npipe:// is accepted."""
+        for scheme in ["unix:///var/run/docker.sock", "tcp://127.0.0.1:2375", "npipe:////./pipe/docker"]:
+            mock_client = MagicMock()
+            with (
+                patch("ananta.ananta.docker") as mock_docker,
+                patch("ananta.ananta.ContainerPool", return_value=MagicMock(spec=ContainerPool)),
+                patch.dict(os.environ, {}, clear=True),
+                patch("ananta.ananta.subprocess.run") as mock_run,
+            ):
+                mock_run.return_value = MagicMock(
+                    returncode=0,
+                    stdout=f"{scheme}\n",
+                )
+                mock_docker.from_env.return_value = mock_client
+                ananta = Ananta(model="test-model", storage_path=tmp_path)
+                ananta.start()
+
+                mock_docker.from_env.assert_called_once()
 
     def test_docker_discovery_uses_class_level_lock(self, tmp_path: Path):
         """_check_docker_available uses a class-level lock to protect os.environ."""

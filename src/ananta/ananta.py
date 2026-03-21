@@ -157,10 +157,11 @@ class Ananta:
         Raises RuntimeError with a clean message if Docker is unreachable.
         """
         diagnostics: list[str] = []
+        original_docker_host = os.environ.get("DOCKER_HOST")
 
         # Strategy 1: DOCKER_HOST already set — use it directly.
-        if os.environ.get("DOCKER_HOST"):
-            diagnostics.append(f"DOCKER_HOST={os.environ['DOCKER_HOST']}")
+        if original_docker_host:
+            diagnostics.append(f"DOCKER_HOST={original_docker_host}")
             try:
                 client = docker.from_env()
                 client.close()
@@ -193,10 +194,10 @@ class Ananta:
                     client = docker.from_env()
                     client.close()
                     return
-                except DockerException as e:
+                except Exception as e:
                     diagnostics[-1] += " — not responding"
                     logger.debug("docker context socket failed: %s", e)
-                    del os.environ["DOCKER_HOST"]
+                    os.environ.pop("DOCKER_HOST", None)
             else:
                 stderr = result.stderr.strip()
                 diagnostics.append(
@@ -227,12 +228,17 @@ class Ananta:
                 client = docker.from_env()
                 client.close()
                 return
-            except DockerException as e:
+            except Exception as e:
                 diagnostics[-1] += " — not responding"
                 logger.debug("Socket %s found but failed: %s", sock_path, e)
-                del os.environ["DOCKER_HOST"]
+                os.environ.pop("DOCKER_HOST", None)
 
-        # Strategy 4: give up
+        # Strategy 4: give up — restore original DOCKER_HOST
+        if original_docker_host:
+            os.environ["DOCKER_HOST"] = original_docker_host
+        else:
+            os.environ.pop("DOCKER_HOST", None)
+
         tried = "\n    ".join(f"x {d}" for d in diagnostics)
         raise RuntimeError(
             "Could not connect to Docker.\n\n"

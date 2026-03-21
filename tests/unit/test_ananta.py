@@ -406,6 +406,62 @@ class TestDockerAvailability:
             assert "Podman" in error_msg or "podman" in error_msg
             assert "Tried:" in error_msg
 
+    def test_docker_host_cleaned_up_on_non_docker_exception_strategy2(self, tmp_path: Path):
+        """DOCKER_HOST is cleaned up even if from_env() raises a non-DockerException."""
+        with (
+            patch("ananta.ananta.docker") as mock_docker,
+            patch.dict(os.environ, {}, clear=True),
+            patch("ananta.ananta.subprocess.run") as mock_run,
+            patch("ananta.ananta.Ananta._KNOWN_SOCKET_PATHS", []),
+        ):
+            mock_run.return_value = MagicMock(
+                returncode=0,
+                stdout="unix:///test/docker.sock\n",
+            )
+            mock_docker.from_env.side_effect = ValueError("unexpected SDK error")
+            ananta = Ananta(model="test-model", storage_path=tmp_path)
+
+            with pytest.raises(RuntimeError, match="Could not connect"):
+                ananta.start()
+
+            assert "DOCKER_HOST" not in os.environ
+
+    def test_docker_host_cleaned_up_on_non_docker_exception_strategy3(self, tmp_path: Path):
+        """DOCKER_HOST is cleaned up from Strategy 3 on non-DockerException."""
+        sock_path = tmp_path / "docker.sock"
+        sock_path.touch()
+
+        with (
+            patch("ananta.ananta.docker") as mock_docker,
+            patch.dict(os.environ, {}, clear=True),
+            patch("ananta.ananta.subprocess.run", side_effect=FileNotFoundError),
+            patch("ananta.ananta.Ananta._KNOWN_SOCKET_PATHS", [sock_path]),
+            patch.object(Path, "is_socket", return_value=True),
+        ):
+            mock_docker.from_env.side_effect = ValueError("unexpected SDK error")
+            ananta = Ananta(model="test-model", storage_path=tmp_path)
+
+            with pytest.raises(RuntimeError, match="Could not connect"):
+                ananta.start()
+
+            assert "DOCKER_HOST" not in os.environ
+
+    def test_original_docker_host_restored_on_total_failure(self, tmp_path: Path):
+        """User's original DOCKER_HOST is restored when all strategies fail."""
+        with (
+            patch("ananta.ananta.docker") as mock_docker,
+            patch.dict(os.environ, {"DOCKER_HOST": "unix:///user/custom.sock"}),
+            patch("ananta.ananta.subprocess.run", side_effect=FileNotFoundError),
+            patch("ananta.ananta.Ananta._KNOWN_SOCKET_PATHS", []),
+        ):
+            mock_docker.from_env.side_effect = DockerException("Connection refused")
+            ananta = Ananta(model="test-model", storage_path=tmp_path)
+
+            with pytest.raises(RuntimeError, match="Could not connect"):
+                ananta.start()
+
+            assert os.environ.get("DOCKER_HOST") == "unix:///user/custom.sock"
+
     def test_check_docker_error_when_socket_found_but_not_responding(self, tmp_path: Path):
         """When socket exists but Docker doesn't respond, distinct error."""
         sock_path = tmp_path / "docker.sock"

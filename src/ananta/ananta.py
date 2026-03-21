@@ -240,7 +240,7 @@ class Ananta:
             "  To fix, either:\n"
             "    - Start Docker Desktop\n"
             "    - Set DOCKER_HOST to your Docker socket path\n"
-            "    - If using Podman: export DOCKER_HOST=\"unix://$("
+            '    - If using Podman: export DOCKER_HOST="unix://$('
             "podman machine inspect "
             "--format '{{.ConnectionInfo.PodmanSocket.Path}}')\""
         )

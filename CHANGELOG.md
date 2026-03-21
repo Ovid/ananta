@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Docker socket auto-discovery — finds Docker Desktop, Colima, and Podman sockets automatically instead of failing with a stacktrace when `/var/run/docker.sock` is missing ([#8](https://github.com/Ovid/ananta/issues/8))
+
 ## [0.23.0] - 2026-03-20
 
 ### Added

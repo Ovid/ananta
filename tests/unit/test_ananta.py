@@ -344,6 +344,36 @@ class TestDockerAvailability:
             assert mock_docker.from_env.call_count == 2
             mock_client.close.assert_called_once()
 
+    def test_check_docker_skips_path_that_exists_but_not_socket(self, tmp_path: Path):
+        """Paths that exist but aren't sockets are skipped with diagnostic."""
+        regular_file = tmp_path / "docker.sock"
+        regular_file.touch()  # regular file, not a socket
+
+        with (
+            patch("ananta.ananta.docker"),
+            patch.dict(os.environ, {}, clear=True),
+            patch("ananta.ananta.subprocess.run", side_effect=FileNotFoundError),
+            patch("ananta.ananta.Ananta._KNOWN_SOCKET_PATHS", [regular_file]),
+            patch.object(Path, "is_socket", return_value=False),
+        ):
+            ananta = Ananta(model="test-model", storage_path=tmp_path)
+            with pytest.raises(RuntimeError, match="exists but not a socket"):
+                ananta.start()
+
+    def test_check_docker_skips_nonexistent_path(self, tmp_path: Path):
+        """Paths that don't exist are skipped with 'not found' diagnostic."""
+        missing = tmp_path / "nonexistent.sock"
+
+        with (
+            patch("ananta.ananta.docker"),
+            patch.dict(os.environ, {}, clear=True),
+            patch("ananta.ananta.subprocess.run", side_effect=FileNotFoundError),
+            patch("ananta.ananta.Ananta._KNOWN_SOCKET_PATHS", [missing]),
+        ):
+            ananta = Ananta(model="test-model", storage_path=tmp_path)
+            with pytest.raises(RuntimeError, match="not found"):
+                ananta.start()
+
 
 class TestAnanta:
     """Tests for Ananta class."""

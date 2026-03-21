@@ -46,6 +46,7 @@ class Ananta:
         Path.home() / ".docker" / "run" / "docker.sock",
         Path.home() / ".colima" / "default" / "docker.sock",
     ]
+    _docker_discovery_lock: ClassVar[threading.Lock] = threading.Lock()
 
     def __init__(
         self,
@@ -156,6 +157,12 @@ class Ananta:
 
         Raises RuntimeError with a clean message if Docker is unreachable.
         """
+        with cls._docker_discovery_lock:
+            cls._check_docker_available_locked()
+
+    @classmethod
+    def _check_docker_available_locked(cls) -> None:
+        """Inner discovery logic — must be called under ``_docker_discovery_lock``."""
         diagnostics: list[str] = []
         original_docker_host = os.environ.get("DOCKER_HOST")
 

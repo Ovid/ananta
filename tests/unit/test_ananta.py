@@ -3,6 +3,7 @@
 import logging
 import os
 import re
+import threading
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -461,6 +462,11 @@ class TestDockerAvailability:
                 ananta.start()
 
             assert os.environ.get("DOCKER_HOST") == "unix:///user/custom.sock"
+
+    def test_docker_discovery_uses_class_level_lock(self, tmp_path: Path):
+        """_check_docker_available uses a class-level lock to protect os.environ."""
+        assert hasattr(Ananta, "_docker_discovery_lock")
+        assert isinstance(Ananta._docker_discovery_lock, type(threading.Lock()))
 
     def test_check_docker_error_when_socket_found_but_not_responding(self, tmp_path: Path):
         """When socket exists but Docker doesn't respond, distinct error."""

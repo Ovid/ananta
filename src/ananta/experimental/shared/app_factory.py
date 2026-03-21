@@ -8,6 +8,7 @@ endpoint, and a lifespan hook that starts/stops the Ananta container pool.
 
 from __future__ import annotations
 
+import sys
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -54,7 +55,11 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        state.ananta.start()
+        try:
+            state.ananta.start()
+        except RuntimeError as e:
+            print(f"\n[ananta] Error: {e}\n", file=sys.stderr)
+            raise SystemExit(1) from e
         try:
             yield
         finally:

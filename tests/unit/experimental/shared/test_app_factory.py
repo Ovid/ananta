@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import APIRouter, FastAPI
@@ -250,3 +251,29 @@ def test_images_dir_serves_file(tmp_path: Path) -> None:
     response = client.get("/static/logo.txt")
     assert response.status_code == 200
     assert response.text == "logo-content"
+
+
+# -- Startup error handling --
+
+
+def test_lifespan_prints_clean_error_on_startup_failure(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """When start() raises RuntimeError, lifespan prints message and exits cleanly."""
+    state = MagicMock()
+    state.ananta.start.side_effect = RuntimeError(
+        "Could not connect to Docker.\n\n  Tried:\n    x ..."
+    )
+
+    app = create_app(state, title="Test App")
+
+    # The SystemExit(1) raised in lifespan gets wrapped by anyio's TaskGroup
+    # into a BaseExceptionGroup, which TestClient converts to CancelledError.
+    # What matters is: (a) the clean error was printed, and (b) the app did
+    # not start successfully.
+    with pytest.raises(BaseException):
+        with TestClient(app):
+            pass
+
+    captured = capsys.readouterr()
+    assert "Could not connect to Docker" in captured.err

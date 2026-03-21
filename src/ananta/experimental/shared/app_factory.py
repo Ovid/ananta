@@ -14,6 +14,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
+from docker.errors import ImageNotFound
 from fastapi import APIRouter, FastAPI, WebSocket
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.cors import CORSMiddleware
@@ -59,6 +60,15 @@ def create_app(
             state.ananta.start()
         except RuntimeError as e:
             print(f"\n[ananta] Error: {e}\n", file=sys.stderr)
+            raise SystemExit(1) from e
+        except ImageNotFound as e:
+            explanation = getattr(e, "explanation", str(e))
+            print(
+                f"\n[ananta] Error: Docker image not found: {explanation}\n"
+                "\n  Build it with:"
+                "\n    docker build -t ananta-sandbox src/ananta/sandbox/\n",
+                file=sys.stderr,
+            )
             raise SystemExit(1) from e
         try:
             yield

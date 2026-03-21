@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from docker.errors import ImageNotFound
 from fastapi import APIRouter, FastAPI
 from fastapi.testclient import TestClient
 from starlette.middleware.cors import CORSMiddleware
@@ -276,3 +277,30 @@ def test_lifespan_prints_clean_error_on_startup_failure(
 
     captured = capsys.readouterr()
     assert "Could not connect to Docker" in captured.err
+
+
+def test_lifespan_prints_clean_error_on_missing_image(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """When start() raises ImageNotFound, lifespan prints build hint and exits."""
+    state = MagicMock()
+    # ImageNotFound expects (message, response=..., explanation=...)
+    # but we can simulate it with a plain Exception wrapping
+    response = MagicMock()
+    response.status_code = 404
+    response.reason = "Not Found"
+    state.ananta.start.side_effect = ImageNotFound(
+        "404 Client Error: Not Found",
+        response=response,
+        explanation='No such image: ananta-sandbox:latest',
+    )
+
+    app = create_app(state, title="Test App")
+
+    with pytest.raises(BaseException):
+        with TestClient(app):
+            pass
+
+    captured = capsys.readouterr()
+    assert "ananta-sandbox" in captured.err
+    assert "docker build" in captured.err

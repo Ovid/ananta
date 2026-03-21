@@ -374,6 +374,44 @@ class TestDockerAvailability:
             with pytest.raises(RuntimeError, match="not found"):
                 ananta.start()
 
+    def test_check_docker_error_includes_podman_guidance(self, tmp_path: Path):
+        """When all discovery fails, error message includes Podman guidance."""
+        with (
+            patch("ananta.ananta.docker"),
+            patch.dict(os.environ, {}, clear=True),
+            patch("ananta.ananta.subprocess.run", side_effect=FileNotFoundError),
+            patch("ananta.ananta.Ananta._KNOWN_SOCKET_PATHS", []),
+        ):
+            ananta = Ananta(model="test-model", storage_path=tmp_path)
+            with pytest.raises(RuntimeError) as exc_info:
+                ananta.start()
+
+            error_msg = str(exc_info.value)
+            assert "Could not connect to Docker" in error_msg
+            assert "DOCKER_HOST" in error_msg
+            assert "Podman" in error_msg or "podman" in error_msg
+            assert "Tried:" in error_msg
+
+    def test_check_docker_error_when_socket_found_but_not_responding(self, tmp_path: Path):
+        """When socket exists but Docker doesn't respond, distinct error."""
+        sock_path = tmp_path / "docker.sock"
+        sock_path.touch()
+
+        with (
+            patch("ananta.ananta.docker") as mock_docker,
+            patch.dict(os.environ, {}, clear=True),
+            patch("ananta.ananta.subprocess.run", side_effect=FileNotFoundError),
+            patch("ananta.ananta.Ananta._KNOWN_SOCKET_PATHS", [sock_path]),
+            patch.object(Path, "is_socket", return_value=True),
+        ):
+            mock_docker.from_env.side_effect = DockerException("Connection refused")
+            ananta = Ananta(model="test-model", storage_path=tmp_path)
+            with pytest.raises(RuntimeError) as exc_info:
+                ananta.start()
+
+            error_msg = str(exc_info.value)
+            assert "not responding" in error_msg
+
 
 class TestAnanta:
     """Tests for Ananta class."""

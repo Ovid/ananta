@@ -92,8 +92,8 @@ run_preflight() {
     require_env ANANTA_API_KEY "export ANANTA_API_KEY=<your-key>"
     require_env ANANTA_MODEL   "export ANANTA_MODEL=<model-name>"
     check_docker_running
-    report_and_exit
     ensure_sandbox_image
+    report_and_exit
 }
 
 # --- Lifecycle ---

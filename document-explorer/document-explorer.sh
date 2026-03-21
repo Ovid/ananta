@@ -4,7 +4,7 @@
 #   ./document-explorer/document-explorer.sh                      # defaults
 #   ./document-explorer/document-explorer.sh --model gpt-5-mini   # pass args
 #   ./document-explorer/document-explorer.sh --port 9000           # custom port
-#   ./document-explorer/document-explorer.sh --no-browser          # don't open browser
+#   ./document-explorer/document-explorer.sh --open                 # open browser on startup
 #   ./document-explorer/document-explorer.sh --rebuild             # force frontend rebuild
 
 set -euo pipefail

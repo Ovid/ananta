@@ -7,9 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Explorers no longer auto-open the browser on startup — pass `--open` to open it (replaces `--no-browser`)
+- Explorers print their URL on startup so users know where to connect
+
 ### Fixed
 
 - Docker socket auto-discovery — finds Docker Desktop, Colima, and Podman sockets automatically instead of failing with a stacktrace when `/var/run/docker.sock` is missing ([#8](https://github.com/Ovid/ananta/issues/8))
+- Clean error message when `ananta-sandbox` Docker image is missing, with build command hint
 
 ## [0.23.0] - 2026-03-20
 

@@ -6,7 +6,7 @@
 #   ./examples/arxiv-explorer.sh                      # defaults
 #   ./examples/arxiv-explorer.sh --model gpt-5-mini   # pass args to ananta-web
 #   ./examples/arxiv-explorer.sh --port 8080          # custom port
-#   ./examples/arxiv-explorer.sh --no-browser         # don't open browser
+#   ./examples/arxiv-explorer.sh --open                # open browser on startup
 #   ./examples/arxiv-explorer.sh --rebuild            # force frontend rebuild
 
 set -euo pipefail

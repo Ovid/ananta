@@ -1,3 +1,14 @@
+- s/experiments/explorers/
+  Also, need to write the shell scripts in Python.
+- Node.js is v23.3.0 (EOL odd-number release). Homebrew has 25.8.1.
+  Run `brew upgrade node` and update `.nvmrc` to match.
+- If I launch an explorer, perhaps if the ENV keys aren't set, I can have them
+  set in the app?
+- Does this work on Windows? If not, we should add a warning in the README and
+  ideally add Windows support.
+- Allow a local .env file? It's already .gitignored, but that seems like a
+  security concern.
+- Topics should allow subtopics?
 - I see this in arXiv, but needs to be everywhere:
   "Ask a question about the documents in this topic."
   it needs to name the topic because it's hard to know which topic you have.

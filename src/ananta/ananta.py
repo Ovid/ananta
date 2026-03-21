@@ -463,7 +463,11 @@ class Ananta:
                 image=self._config.sandbox_image,
                 memory_limit=f"{self._config.container_memory_mb}m",
             )
-            pool.start()
+            try:
+                pool.start()
+            except BaseException:
+                pool.stop()
+                raise
             self._pool = pool
             self._rlm_engine.set_pool(pool)
 

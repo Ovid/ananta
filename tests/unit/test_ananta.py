@@ -161,6 +161,22 @@ class TestDockerAvailability:
             ananta.start()
             assert call_count == 2
 
+    def test_start_cleans_up_pool_on_partial_failure(self, tmp_path: Path):
+        """If pool.start() raises, pool.stop() must be called to avoid orphaned containers."""
+        mock_pool = MagicMock(spec=ContainerPool)
+        mock_pool.start.side_effect = RuntimeError("third container failed")
+
+        with (
+            patch("ananta.ananta.docker"),
+            patch("ananta.ananta.ContainerPool", return_value=mock_pool),
+        ):
+            ananta = Ananta(model="test-model", storage_path=tmp_path)
+
+            with pytest.raises(RuntimeError, match="third container failed"):
+                ananta.start()
+
+            mock_pool.stop.assert_called_once()
+
     def test_start_is_idempotent(self, tmp_path: Path):
         """Calling start() twice creates only one pool."""
 

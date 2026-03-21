@@ -241,6 +241,21 @@ class TestDockerAvailability:
 
         assert call_order == ["set_pool(None)", "pool.stop"]
 
+    def test_check_docker_respects_existing_docker_host(self, tmp_path: Path):
+        """When DOCKER_HOST is set, discovery is skipped and from_env() is used directly."""
+        mock_client = MagicMock()
+        with (
+            patch("ananta.ananta.docker") as mock_docker,
+            patch("ananta.ananta.ContainerPool", return_value=MagicMock(spec=ContainerPool)),
+            patch.dict(os.environ, {"DOCKER_HOST": "unix:///custom/docker.sock"}),
+        ):
+            mock_docker.from_env.return_value = mock_client
+            ananta = Ananta(model="test-model", storage_path=tmp_path)
+            ananta.start()
+
+            mock_docker.from_env.assert_called_once()
+            mock_client.close.assert_called_once()
+
 
 class TestAnanta:
     """Tests for Ananta class."""

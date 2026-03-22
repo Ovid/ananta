@@ -1,5 +1,8 @@
-- s/experiments/explorers/
-  Also, need to write the shell scripts in Python.
+# Explorers
+
+    - rename "experiments" directory to "explorers"
+    - Also, need to write the shell scripts in Python.
+    - put all explorers in a single directory (scripts)
 - Node.js is v23.3.0 (EOL odd-number release). Homebrew has 25.8.1.
   Run `brew upgrade node` and update `.nvmrc` to match.
 - If I launch an explorer, perhaps if the ENV keys aren't set, I can have them

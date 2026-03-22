@@ -162,6 +162,41 @@ class TestDockerAvailability:
             ananta.start()
             assert call_count == 2
 
+    def test_start_retries_after_stop_then_failed_restart(self, tmp_path: Path):
+        """After stop() + failed start() + start(), the third start() must not return early."""
+        call_count = 0
+
+        def fail_on_second():
+            nonlocal call_count
+            call_count += 1
+            if call_count == 2:
+                raise RuntimeError("Docker error on restart")
+
+        mock_pool = MagicMock(spec=ContainerPool)
+        mock_pool.start.side_effect = fail_on_second
+
+        with (
+            patch("ananta.ananta.docker"),
+            patch("ananta.ananta.ContainerPool", return_value=mock_pool),
+        ):
+            ananta = Ananta(model="test-model", storage_path=tmp_path)
+
+            # 1. Successful start
+            ananta.start()
+            assert call_count == 1
+
+            # 2. Stop
+            ananta.stop()
+
+            # 3. Failed restart
+            with pytest.raises(RuntimeError, match="Docker error on restart"):
+                ananta.start()
+            assert call_count == 2
+
+            # 4. Third start() must retry, not return early
+            ananta.start()
+            assert call_count == 3
+
     def test_start_cleans_up_pool_on_partial_failure(self, tmp_path: Path):
         """If pool.start() raises, pool.stop() must be called to avoid orphaned containers."""
         mock_pool = MagicMock(spec=ContainerPool)

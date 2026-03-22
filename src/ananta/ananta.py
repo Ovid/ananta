@@ -501,6 +501,7 @@ class Ananta:
             if self._pool is not None:
                 self._rlm_engine.set_pool(None)
                 self._pool.stop()
+                self._pool = None
 
     def __enter__(self) -> "Ananta":
         """Context manager entry."""

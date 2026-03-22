@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Explorer launcher scripts rewritten: bash logic moved to testable Python (`src/ananta/explorers/launcher.py`), shell scripts reduced to venv-bootstrap shims
+
+### Removed
+
+- `scripts/common.sh` — replaced by Python launcher module
+- `examples/arxiv-explorer.sh` — stale launcher pointing at old paths
+
 ## [0.24.0] - 2026-03-22
 
 ### Changed

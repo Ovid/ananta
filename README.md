@@ -319,11 +319,11 @@ _The screenshot above shows Ananta searching through nearly 25 MB of research pa
 A web-based interface for uploading documents, organizing them into topics, and querying them with Ananta. Upload PDFs, Word documents, PowerPoint, Excel, RTF, or plain text files, group them by topic, then ask questions across your collection.
 
 ```bash
-# Launch the Document Explorer (opens browser automatically)
+# Launch the Document Explorer
 python -m ananta.experimental.document_explorer
 
 # Options
-python -m ananta.experimental.document_explorer --port 8003 --no-browser --model gpt-4o
+python -m ananta.experimental.document_explorer --port 8003 --open --model gpt-4o
 ```
 
 The explorer provides:

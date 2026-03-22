@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, Literal
 
 import docker
-from docker.errors import DockerException
 
 from ananta.analysis import AnalysisGenerator
 from ananta.config import AnantaConfig
@@ -176,7 +175,7 @@ class Ananta:
                 client = docker.from_env()
                 client.close()
                 return
-            except DockerException as e:
+            except Exception as e:
                 diagnostics[-1] += " — not responding"
                 logger.debug("DOCKER_HOST set but failed: %s", e)
         else:
@@ -485,7 +484,10 @@ class Ananta:
             try:
                 pool.start()
             except BaseException:
-                pool.stop()
+                try:
+                    pool.stop()
+                except Exception:
+                    logger.debug("pool.stop() failed during cleanup", exc_info=True)
                 raise
             self._pool = pool
             self._rlm_engine.set_pool(pool)

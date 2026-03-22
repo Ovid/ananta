@@ -1,6 +1,13 @@
 """Tests for the shared explorer launcher."""
 
-from ananta.explorers.launcher import LauncherConfig, parse_launcher_args
+from unittest.mock import patch
+
+from ananta.explorers.launcher import (
+    LauncherConfig,
+    check_command,
+    check_python_version,
+    parse_launcher_args,
+)
 
 
 class TestLauncherConfig:
@@ -39,3 +46,32 @@ class TestParseLauncherArgs:
         rebuild, passthrough = parse_launcher_args(["--rebuild"])
         assert rebuild is True
         assert passthrough == []
+
+
+class TestCheckCommand:
+    def test_command_found(self) -> None:
+        with patch("ananta.explorers.launcher.shutil.which", return_value="/usr/bin/python3"):
+            assert check_command("python3", "https://python.org") is None
+
+    def test_command_missing(self) -> None:
+        with patch("ananta.explorers.launcher.shutil.which", return_value=None):
+            error = check_command("python3", "https://python.org")
+            assert error is not None
+            assert "python3" in error
+            assert "https://python.org" in error
+
+
+class TestCheckPythonVersion:
+    def test_version_ok(self) -> None:
+        with patch("ananta.explorers.launcher.sys.version_info", (3, 12, 0)):
+            assert check_python_version() is None
+
+    def test_version_exactly_3_11(self) -> None:
+        with patch("ananta.explorers.launcher.sys.version_info", (3, 11, 0)):
+            assert check_python_version() is None
+
+    def test_version_too_old(self) -> None:
+        with patch("ananta.explorers.launcher.sys.version_info", (3, 10, 5)):
+            error = check_python_version()
+            assert error is not None
+            assert "3.11" in error

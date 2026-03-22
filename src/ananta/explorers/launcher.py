@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import shutil
+import sys
 from dataclasses import dataclass
 
 
@@ -26,3 +28,18 @@ def parse_launcher_args(argv: list[str]) -> tuple[bool, list[str]]:
         else:
             passthrough.append(arg)
     return rebuild, passthrough
+
+
+def check_command(cmd: str, install_hint: str) -> str | None:
+    """Return an error string if cmd is not on PATH, else None."""
+    if shutil.which(cmd) is None:
+        return f"  - Install {cmd}: {install_hint}"
+    return None
+
+
+def check_python_version() -> str | None:
+    """Return an error string if Python < 3.11, else None."""
+    major, minor = sys.version_info[:2]
+    if (major, minor) < (3, 11):
+        return f"  - Upgrade Python: 3.11+ required, found {major}.{minor}"
+    return None

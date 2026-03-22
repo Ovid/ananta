@@ -4,8 +4,11 @@ import os
 import subprocess
 from unittest.mock import patch
 
+from pathlib import Path
+
 from ananta.explorers.launcher import (
     LauncherConfig,
+    build_frontend,
     check_command,
     check_docker_running,
     check_env_var,
@@ -210,3 +213,58 @@ class TestRunPreflight:
         run_preflight(config, "/project")
         cmd_names = [call.args[0] for call in mock_cmd.call_args_list]  # type: ignore[attr-defined]
         assert "git" not in cmd_names
+
+
+class TestBuildFrontend:
+    def _make_config(
+        self,
+        frontend_dir: str = "src/test/frontend",
+        shared_frontend_dir: str | None = None,
+    ) -> LauncherConfig:
+        return LauncherConfig(
+            app_name="Test App",
+            entry_point="test-app",
+            frontend_dir=frontend_dir,
+            shared_frontend_dir=shared_frontend_dir,
+        )
+
+    @patch("ananta.explorers.launcher.subprocess.run")
+    def test_build_when_dist_missing(self, mock_run: object, tmp_path: Path) -> None:
+        frontend = tmp_path / "frontend"
+        frontend.mkdir()
+        config = self._make_config(frontend_dir=str(frontend))
+        build_frontend(config, str(tmp_path), rebuild=False)
+        # Should have called npm install + npm run build
+        assert mock_run.call_count == 2  # type: ignore[attr-defined]
+
+    @patch("ananta.explorers.launcher.subprocess.run")
+    def test_skip_when_dist_exists(self, mock_run: object, tmp_path: Path) -> None:
+        frontend = tmp_path / "frontend"
+        frontend.mkdir()
+        (frontend / "dist").mkdir()
+        config = self._make_config(frontend_dir=str(frontend))
+        build_frontend(config, str(tmp_path), rebuild=False)
+        mock_run.assert_not_called()  # type: ignore[attr-defined]
+
+    @patch("ananta.explorers.launcher.subprocess.run")
+    def test_rebuild_forces_build(self, mock_run: object, tmp_path: Path) -> None:
+        frontend = tmp_path / "frontend"
+        frontend.mkdir()
+        (frontend / "dist").mkdir()
+        config = self._make_config(frontend_dir=str(frontend))
+        build_frontend(config, str(tmp_path), rebuild=True)
+        assert mock_run.call_count == 2  # type: ignore[attr-defined]
+
+    @patch("ananta.explorers.launcher.subprocess.run")
+    def test_shared_frontend_installed(self, mock_run: object, tmp_path: Path) -> None:
+        frontend = tmp_path / "frontend"
+        frontend.mkdir()
+        shared = tmp_path / "shared"
+        shared.mkdir()
+        config = self._make_config(
+            frontend_dir=str(frontend),
+            shared_frontend_dir=str(shared),
+        )
+        build_frontend(config, str(tmp_path), rebuild=False)
+        # shared npm install + frontend npm install + npm run build = 3
+        assert mock_run.call_count == 3  # type: ignore[attr-defined]

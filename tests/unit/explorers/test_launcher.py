@@ -12,6 +12,7 @@ from ananta.explorers.launcher import (
     check_python_version,
     ensure_sandbox_image,
     parse_launcher_args,
+    run_preflight,
 )
 
 
@@ -152,3 +153,60 @@ class TestEnsureSandboxImage:
     def test_docker_not_installed(self) -> None:
         with patch("ananta.explorers.launcher.shutil.which", return_value=None):
             assert ensure_sandbox_image("/project/root") is None
+
+
+class TestRunPreflight:
+    def _make_config(self, requires_git: bool = False) -> LauncherConfig:
+        return LauncherConfig(
+            app_name="Test App",
+            entry_point="test-app",
+            frontend_dir="src/test/frontend",
+            requires_git=requires_git,
+        )
+
+    @patch("ananta.explorers.launcher.check_command", return_value=None)
+    @patch("ananta.explorers.launcher.check_python_version", return_value=None)
+    @patch("ananta.explorers.launcher.check_env_var", return_value=None)
+    @patch("ananta.explorers.launcher.check_docker_running", return_value=None)
+    @patch("ananta.explorers.launcher.ensure_sandbox_image", return_value=None)
+    def test_all_pass(self, *mocks: object) -> None:
+        errors = run_preflight(self._make_config(), "/project")
+        assert errors == []
+
+    @patch("ananta.explorers.launcher.ensure_sandbox_image", return_value=None)
+    @patch("ananta.explorers.launcher.check_docker_running", return_value=None)
+    @patch("ananta.explorers.launcher.check_env_var", return_value=None)
+    @patch("ananta.explorers.launcher.check_python_version", return_value=None)
+    @patch("ananta.explorers.launcher.check_command")
+    def test_collects_multiple_errors(self, mock_cmd: object, *mocks: object) -> None:
+        mock_cmd.side_effect = lambda cmd, hint: f"  - missing {cmd}" if cmd == "node" else None
+        errors = run_preflight(self._make_config(), "/project")
+        assert len(errors) == 1
+        assert "node" in errors[0]
+
+    @patch("ananta.explorers.launcher.ensure_sandbox_image", return_value=None)
+    @patch("ananta.explorers.launcher.check_docker_running", return_value=None)
+    @patch("ananta.explorers.launcher.check_env_var", return_value=None)
+    @patch("ananta.explorers.launcher.check_python_version", return_value=None)
+    @patch("ananta.explorers.launcher.check_command", return_value=None)
+    def test_git_checked_when_required(
+        self, mock_cmd: object, *mocks: object
+    ) -> None:
+        """When requires_git=True, git is in the check_command call list."""
+        config = self._make_config(requires_git=True)
+        run_preflight(config, "/project")
+        cmd_names = [call.args[0] for call in mock_cmd.call_args_list]  # type: ignore[attr-defined]
+        assert "git" in cmd_names
+
+    @patch("ananta.explorers.launcher.ensure_sandbox_image", return_value=None)
+    @patch("ananta.explorers.launcher.check_docker_running", return_value=None)
+    @patch("ananta.explorers.launcher.check_env_var", return_value=None)
+    @patch("ananta.explorers.launcher.check_python_version", return_value=None)
+    @patch("ananta.explorers.launcher.check_command", return_value=None)
+    def test_git_not_checked_when_not_required(
+        self, mock_cmd: object, *mocks: object
+    ) -> None:
+        config = self._make_config(requires_git=False)
+        run_preflight(config, "/project")
+        cmd_names = [call.args[0] for call in mock_cmd.call_args_list]  # type: ignore[attr-defined]
+        assert "git" not in cmd_names

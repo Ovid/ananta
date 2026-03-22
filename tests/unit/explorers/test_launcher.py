@@ -328,3 +328,15 @@ class TestLaunch:
         call_args = mock_run.call_args  # type: ignore[attr-defined]
         assert "--rebuild" not in call_args[0][0]
         assert "--open" in call_args[0][0]
+
+    @patch("ananta.explorers.launcher.build_frontend")
+    @patch("ananta.explorers.launcher.run_preflight", return_value=[])
+    def test_launch_build_failure_returns_exit_code_1(
+        self,
+        mock_preflight: object,
+        mock_build: object,
+    ) -> None:
+        mock_build.side_effect = subprocess.CalledProcessError(1, "npm")  # type: ignore[attr-defined]
+        config = self._make_config()
+        exit_code = launch(config, argv=[], project_root="/project")
+        assert exit_code == 1

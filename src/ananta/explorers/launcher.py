@@ -151,7 +151,14 @@ def launch(
         return 1
 
     # Build frontend
-    build_frontend(config, project_root, rebuild=rebuild)
+    try:
+        build_frontend(config, project_root, rebuild=rebuild)
+    except subprocess.CalledProcessError:
+        print(
+            f"\033[0;31m[ananta]\033[0m Frontend build failed for {config.app_name}.",
+            file=sys.stderr,
+        )
+        return 1
 
     # Launch
     print(f"[ananta] Starting {config.app_name}...")

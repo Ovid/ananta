@@ -62,14 +62,11 @@ export default function DownloadProgress({ taskIds, onComplete }: DownloadProgre
     return () => clearInterval(interval)
   }, [taskIds, poll])
 
-  // Clean up completed refs when taskIds change
+  // Clean up completed refs only when all tasks are gone (fresh batch)
   useEffect(() => {
-    const current = new Set(taskIds)
-    for (const id of completedRef.current) {
-      if (!current.has(id)) {
-        completedRef.current.delete(id)
-        completedPapersRef.current.delete(id)
-      }
+    if (taskIds.length === 0) {
+      completedRef.current.clear()
+      completedPapersRef.current.clear()
     }
   }, [taskIds])
 

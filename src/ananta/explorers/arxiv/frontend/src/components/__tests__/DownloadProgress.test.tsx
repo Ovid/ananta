@@ -178,6 +178,43 @@ describe('DownloadProgress', () => {
     })
   })
 
+  it('keeps correct total when parent removes completed taskIds', async () => {
+    vi.useFakeTimers()
+    const onComplete = vi.fn()
+
+    // 3 tasks, each with 1 paper
+    vi.mocked(api.papers.taskStatus).mockImplementation(async (taskId: string) => ({
+      task_id: taskId,
+      papers: [{
+        arxiv_id: `paper-${taskId}`,
+        status: taskId === 'task-1' ? 'complete' : 'downloading',
+      }],
+    }))
+
+    const { rerender } = render(
+      <DownloadProgress taskIds={['task-1', 'task-2', 'task-3']} onComplete={onComplete} />
+    )
+
+    // First poll: task-1 completes, shows 1/3
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0)
+    })
+    expect(screen.getByText(/1\/3/)).toBeInTheDocument()
+
+    // Parent removes completed task-1 from taskIds (simulating handleDownloadComplete)
+    rerender(
+      <DownloadProgress taskIds={['task-2', 'task-3']} onComplete={onComplete} />
+    )
+
+    // Next poll: should still show 1/3, not 0/2
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000)
+    })
+    expect(screen.getByText(/1\/3/)).toBeInTheDocument()
+
+    vi.useRealTimers()
+  })
+
   it('shows green bar when all downloads complete', async () => {
     vi.mocked(api.papers.taskStatus).mockResolvedValue({
       task_id: 'task-1',

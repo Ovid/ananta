@@ -93,3 +93,25 @@ def ensure_sandbox_image(project_root: str) -> str | None:
     except subprocess.CalledProcessError:
         return f"  - Failed to build Docker image '{image}'"
     return None
+
+
+def run_preflight(config: LauncherConfig, project_root: str) -> list[str]:
+    """Run all preflight checks. Return list of error strings (empty = all OK)."""
+    errors: list[str] = []
+
+    def collect(result: str | None) -> None:
+        if result is not None:
+            errors.append(result)
+
+    collect(check_python_version())
+    collect(check_command("node", "https://nodejs.org/"))
+    collect(check_command("npm", "https://nodejs.org/"))
+    collect(check_command("docker", "https://www.docker.com/get-started/"))
+    if config.requires_git:
+        collect(check_command("git", "https://git-scm.com/"))
+    collect(check_env_var("ANANTA_API_KEY", "export ANANTA_API_KEY=<your-key>"))
+    collect(check_env_var("ANANTA_MODEL", "export ANANTA_MODEL=<model-name>"))
+    collect(check_docker_running())
+    collect(ensure_sandbox_image(project_root))
+
+    return errors

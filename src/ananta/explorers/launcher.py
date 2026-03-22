@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -93,6 +94,31 @@ def ensure_sandbox_image(project_root: str) -> str | None:
     except subprocess.CalledProcessError:
         return f"  - Failed to build Docker image '{image}'"
     return None
+
+
+def build_frontend(config: LauncherConfig, project_root: str, *, rebuild: bool) -> None:
+    """Build the explorer frontend (and shared UI if configured)."""
+    frontend_path = Path(config.frontend_dir)
+    if not frontend_path.is_absolute():
+        frontend_path = Path(project_root) / frontend_path
+    dist_path = frontend_path / "dist"
+
+    needs_build = rebuild or not dist_path.is_dir()
+
+    if not needs_build:
+        print("[ananta] Frontend already built. Use --rebuild to force.")
+        return
+
+    if config.shared_frontend_dir:
+        shared_path = Path(config.shared_frontend_dir)
+        if not shared_path.is_absolute():
+            shared_path = Path(project_root) / shared_path
+        print("[ananta] Installing shared UI dependencies...")
+        subprocess.run(["npm", "install", "--silent"], cwd=shared_path, check=True)
+
+    print("[ananta] Building frontend...")
+    subprocess.run(["npm", "install", "--silent"], cwd=frontend_path, check=True)
+    subprocess.run(["npm", "run", "build"], cwd=frontend_path, check=True)
 
 
 def run_preflight(config: LauncherConfig, project_root: str) -> list[str]:

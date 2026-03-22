@@ -450,7 +450,8 @@ class Ananta:
             project_id: ID of an existing project created from a repository.
 
         Returns:
-            RepoProjectResult with status 'unchanged' or 'updates_available'.
+            RepoProjectResult with status 'unchanged', 'updates_available',
+            or 'check_failed'.
 
         Raises:
             ProjectNotFoundError: If project doesn't exist.

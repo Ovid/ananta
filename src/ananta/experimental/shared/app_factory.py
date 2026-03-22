@@ -8,6 +8,7 @@ endpoint, and a lifespan hook that starts/stops the Ananta container pool.
 
 from __future__ import annotations
 
+import os
 import sys
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
@@ -63,10 +64,11 @@ def create_app(
             raise SystemExit(1) from e
         except ImageNotFound as e:
             explanation = getattr(e, "explanation", str(e))
+            image = os.environ.get("ANANTA_SANDBOX_IMAGE", "ananta-sandbox")
             print(
                 f"\n[ananta] Error: Docker image not found: {explanation}\n"
                 "\n  Build it with:"
-                "\n    docker build -t ananta-sandbox src/ananta/sandbox/\n",
+                f"\n    docker build -t {image} src/ananta/sandbox/\n",
                 file=sys.stderr,
             )
             raise SystemExit(1) from e

@@ -121,6 +121,42 @@ def build_frontend(config: LauncherConfig, project_root: str, *, rebuild: bool) 
     subprocess.run(["npm", "run", "build"], cwd=frontend_path, check=True)
 
 
+def launch(
+    config: LauncherConfig,
+    *,
+    argv: list[str] | None = None,
+    project_root: str | None = None,
+) -> int:
+    """Run preflight checks, build frontend, and launch the explorer.
+
+    Returns the process exit code (0 = success).
+    """
+    if argv is None:
+        argv = sys.argv[1:]
+    if project_root is None:
+        # Resolve from this file: src/ananta/explorers/launcher.py -> project root
+        project_root = str(Path(__file__).resolve().parents[3])
+
+    rebuild, passthrough = parse_launcher_args(argv)
+
+    # Preflight
+    errors = run_preflight(config, project_root)
+    if errors:
+        print(f"\033[0;31m[ananta]\033[0m Cannot start {config.app_name}. Fix the following:",
+              file=sys.stderr)
+        for e in errors:
+            print(e, file=sys.stderr)
+        return 1
+
+    # Build frontend
+    build_frontend(config, project_root, rebuild=rebuild)
+
+    # Launch
+    print(f"[ananta] Starting {config.app_name}...")
+    result = subprocess.run([config.entry_point, *passthrough])
+    return result.returncode
+
+
 def run_preflight(config: LauncherConfig, project_root: str) -> list[str]:
     """Run all preflight checks. Return list of error strings (empty = all OK)."""
     errors: list[str] = []

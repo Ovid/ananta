@@ -14,6 +14,7 @@ from ananta.explorers.launcher import (
     check_env_var,
     check_python_version,
     ensure_sandbox_image,
+    launch,
     parse_launcher_args,
     run_preflight,
 )
@@ -268,3 +269,61 @@ class TestBuildFrontend:
         build_frontend(config, str(tmp_path), rebuild=False)
         # shared npm install + frontend npm install + npm run build = 3
         assert mock_run.call_count == 3  # type: ignore[attr-defined]
+
+
+class TestLaunch:
+    def _make_config(self) -> LauncherConfig:
+        return LauncherConfig(
+            app_name="Test App",
+            entry_point="test-app",
+            frontend_dir="src/test/frontend",
+        )
+
+    @patch("ananta.explorers.launcher.subprocess.run")
+    @patch("ananta.explorers.launcher.build_frontend")
+    @patch("ananta.explorers.launcher.run_preflight", return_value=[])
+    def test_launch_success(
+        self,
+        mock_preflight: object,
+        mock_build: object,
+        mock_run: object,
+    ) -> None:
+        mock_run.return_value = subprocess.CompletedProcess([], 0)
+        config = self._make_config()
+        exit_code = launch(config, argv=["--port", "9000"], project_root="/project")
+        assert exit_code == 0
+        mock_run.assert_called_once()  # type: ignore[attr-defined]
+        call_args = mock_run.call_args  # type: ignore[attr-defined]
+        assert call_args[0][0] == ["test-app", "--port", "9000"]
+
+    @patch("ananta.explorers.launcher.build_frontend")
+    @patch("ananta.explorers.launcher.run_preflight", return_value=["  - missing node"])
+    def test_launch_preflight_failure(
+        self,
+        mock_preflight: object,
+        mock_build: object,
+    ) -> None:
+        config = self._make_config()
+        exit_code = launch(config, argv=[], project_root="/project")
+        assert exit_code == 1
+        mock_build.assert_not_called()  # type: ignore[attr-defined]
+
+    @patch("ananta.explorers.launcher.subprocess.run")
+    @patch("ananta.explorers.launcher.build_frontend")
+    @patch("ananta.explorers.launcher.run_preflight", return_value=[])
+    def test_rebuild_passed_to_build(
+        self,
+        mock_preflight: object,
+        mock_build: object,
+        mock_run: object,
+    ) -> None:
+        mock_run.return_value = subprocess.CompletedProcess([], 0)
+        config = self._make_config()
+        launch(config, argv=["--rebuild", "--open"], project_root="/project")
+        mock_build.assert_called_once()  # type: ignore[attr-defined]
+        _, kwargs = mock_build.call_args  # type: ignore[attr-defined]
+        assert kwargs["rebuild"] is True
+        # --rebuild should NOT be passed to the entry point
+        call_args = mock_run.call_args  # type: ignore[attr-defined]
+        assert "--rebuild" not in call_args[0][0]
+        assert "--open" in call_args[0][0]

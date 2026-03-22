@@ -71,9 +71,9 @@ document-explorer = [
 ]
 
 [project.scripts]
-ananta-web = "ananta.experimental.web.__main__:main"
-ananta-code = "ananta.experimental.code_explorer.__main__:main"
-ananta-document-explorer = "ananta.experimental.document_explorer.__main__:main"
+ananta-web = "ananta.explorers.arxiv.__main__:main"
+ananta-code = "ananta.explorers.code.__main__:main"
+ananta-document-explorer = "ananta.explorers.document.__main__:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ananta"]

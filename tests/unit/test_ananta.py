@@ -69,15 +69,18 @@ class TestDockerAvailability:
 
     def test_start_raises_clear_error_when_docker_not_running(self, tmp_path: Path):
         """start() raises clear error when Docker is not running."""
+        docker_error = DockerException(
+            "Error while fetching server API version: "
+            "('Connection aborted.', ConnectionRefusedError(61, 'Connection refused'))"
+        )
         with (
             patch("ananta.ananta.docker") as mock_docker,
             patch.dict(os.environ, {"DOCKER_HOST": "unix:///var/run/docker.sock"}),
+            patch("ananta.ananta.subprocess.run", side_effect=FileNotFoundError),
+            patch("ananta.ananta.Ananta._KNOWN_SOCKET_PATHS", []),
         ):
             ananta = Ananta(model="test-model", storage_path=tmp_path)
-            mock_docker.from_env.side_effect = DockerException(
-                "Error while fetching server API version: "
-                "('Connection aborted.', ConnectionRefusedError(61, 'Connection refused'))"
-            )
+            mock_docker.from_env.side_effect = docker_error
 
             with pytest.raises(RuntimeError) as exc_info:
                 ananta.start()
@@ -299,17 +302,18 @@ class TestDockerAvailability:
             patch("ananta.ananta.ContainerPool", return_value=MagicMock(spec=ContainerPool)),
             patch.dict(os.environ, {}, clear=True),
             patch("ananta.ananta.subprocess.run") as mock_run,
-            patch("ananta.ananta.Path.is_socket", return_value=False),
         ):
             mock_run.return_value = MagicMock(
                 returncode=0,
                 stdout="unix:///Users/test/.docker/run/docker.sock\n",
             )
-            mock_docker.from_env.return_value = mock_client
+            mock_docker.DockerClient.return_value = mock_client
             ananta = Ananta(model="test-model", storage_path=tmp_path)
             ananta.start()
 
-            mock_docker.from_env.assert_called_once()
+            mock_docker.DockerClient.assert_called_once_with(
+                base_url="unix:///Users/test/.docker/run/docker.sock"
+            )
 
     def test_check_docker_respects_existing_docker_host(self, tmp_path: Path):
         """When DOCKER_HOST is set, discovery is skipped and from_env() is used directly."""
@@ -340,11 +344,11 @@ class TestDockerAvailability:
             patch("ananta.ananta.Ananta._KNOWN_SOCKET_PATHS", [sock_path]),
             patch.object(Path, "is_socket", return_value=True),
         ):
-            mock_docker.from_env.return_value = mock_client
+            mock_docker.DockerClient.return_value = mock_client
             ananta = Ananta(model="test-model", storage_path=tmp_path)
             ananta.start()
 
-            mock_docker.from_env.assert_called_once()
+            mock_docker.DockerClient.assert_called_once()
             mock_client.close.assert_called_once()
 
     def test_check_docker_falls_through_when_context_returns_nonzero(self, tmp_path: Path):
@@ -362,11 +366,11 @@ class TestDockerAvailability:
             patch.object(Path, "is_socket", return_value=True),
         ):
             mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="error")
-            mock_docker.from_env.return_value = mock_client
+            mock_docker.DockerClient.return_value = mock_client
             ananta = Ananta(model="test-model", storage_path=tmp_path)
             ananta.start()
 
-            mock_docker.from_env.assert_called_once()
+            mock_docker.DockerClient.assert_called_once()
 
     def test_check_docker_falls_through_when_context_returns_garbage(self, tmp_path: Path):
         """When docker context inspect returns success but invalid scheme, falls through."""
@@ -382,15 +386,70 @@ class TestDockerAvailability:
             patch("ananta.ananta.Ananta._KNOWN_SOCKET_PATHS", [sock_path]),
             patch.object(Path, "is_socket", return_value=True),
         ):
-            # returncode=0 but invalid scheme — rejected before from_env
+            # returncode=0 but invalid scheme — rejected, DockerClient used for path probe
             mock_run.return_value = MagicMock(returncode=0, stdout="not a valid url\n")
-            mock_docker.from_env.return_value = mock_client
+            mock_docker.DockerClient.return_value = mock_client
             ananta = Ananta(model="test-model", storage_path=tmp_path)
             ananta.start()
 
-            # from_env called only once (Strategy 3 path probing), not for garbage
-            assert mock_docker.from_env.call_count == 1
+            # DockerClient called once (Strategy 3 path probing), not for garbage
+            assert mock_docker.DockerClient.call_count == 1
             mock_client.close.assert_called_once()
+
+    def test_check_docker_rejects_multiline_context_output(self, tmp_path: Path):
+        """Multi-line docker context inspect output is rejected."""
+        with (
+            patch("ananta.ananta.docker") as mock_docker,
+            patch.dict(os.environ, {}, clear=True),
+            patch("ananta.ananta.subprocess.run") as mock_run,
+            patch("ananta.ananta.Ananta._KNOWN_SOCKET_PATHS", []),
+        ):
+            mock_run.return_value = MagicMock(
+                returncode=0,
+                stdout="unix:///var/run/docker.sock\nWARNING: extra line\n",
+            )
+            mock_docker.from_env.side_effect = DockerException("fail")
+            ananta = Ananta(model="test-model", storage_path=tmp_path)
+            with pytest.raises(RuntimeError) as exc_info:
+                ananta.start()
+
+            assert "multi-line" in str(exc_info.value).lower() or "Could not connect" in str(
+                exc_info.value
+            )
+
+    def test_strategy2_does_not_mutate_env_during_failed_probing(self, tmp_path: Path):
+        """When Strategy 2 probe fails, DOCKER_HOST must never have been set in os.environ."""
+        env_mutations: list[str] = []
+        original_setitem = os.environ.__class__.__setitem__
+
+        def tracking_setitem(self_env, key, value):
+            if key == "DOCKER_HOST":
+                env_mutations.append(value)
+            original_setitem(self_env, key, value)
+
+        with (
+            patch("ananta.ananta.docker") as mock_docker,
+            patch.dict(os.environ, {}, clear=True),
+            patch("ananta.ananta.subprocess.run") as mock_run,
+            patch("ananta.ananta.Ananta._KNOWN_SOCKET_PATHS", []),
+        ):
+            mock_run.return_value = MagicMock(
+                returncode=0,
+                stdout="unix:///discovered/docker.sock\n",
+            )
+            # Strategy 2 probe fails
+            mock_docker.from_env.side_effect = DockerException("Connection refused")
+            mock_docker.DockerClient.side_effect = DockerException("Connection refused")
+
+            with patch.object(os.environ.__class__, "__setitem__", tracking_setitem):
+                ananta = Ananta(model="test-model", storage_path=tmp_path)
+                with pytest.raises(RuntimeError, match="Could not connect"):
+                    ananta.start()
+
+            # DOCKER_HOST should NEVER have been set during probing
+            assert len(env_mutations) == 0, (
+                f"DOCKER_HOST was temporarily set during probing: {env_mutations}"
+            )
 
     def test_check_docker_skips_path_that_exists_but_not_socket(self, tmp_path: Path):
         """Paths that exist but aren't sockets are skipped with diagnostic."""
@@ -440,8 +499,8 @@ class TestDockerAvailability:
             assert "Podman" in error_msg or "podman" in error_msg
             assert "Tried:" in error_msg
 
-    def test_docker_host_cleaned_up_on_non_docker_exception_strategy2(self, tmp_path: Path):
-        """DOCKER_HOST is cleaned up even if from_env() raises a non-DockerException."""
+    def test_docker_host_not_set_on_failed_strategy2_probe(self, tmp_path: Path):
+        """DOCKER_HOST is never set when Strategy 2 probe fails."""
         with (
             patch("ananta.ananta.docker") as mock_docker,
             patch.dict(os.environ, {}, clear=True),
@@ -452,7 +511,7 @@ class TestDockerAvailability:
                 returncode=0,
                 stdout="unix:///test/docker.sock\n",
             )
-            mock_docker.from_env.side_effect = ValueError("unexpected SDK error")
+            mock_docker.DockerClient.side_effect = ValueError("unexpected SDK error")
             ananta = Ananta(model="test-model", storage_path=tmp_path)
 
             with pytest.raises(RuntimeError, match="Could not connect"):
@@ -460,8 +519,8 @@ class TestDockerAvailability:
 
             assert "DOCKER_HOST" not in os.environ
 
-    def test_docker_host_cleaned_up_on_non_docker_exception_strategy3(self, tmp_path: Path):
-        """DOCKER_HOST is cleaned up from Strategy 3 on non-DockerException."""
+    def test_docker_host_not_set_on_failed_strategy3_probe(self, tmp_path: Path):
+        """DOCKER_HOST is never set when Strategy 3 probe fails."""
         sock_path = tmp_path / "docker.sock"
         sock_path.touch()
 
@@ -472,7 +531,7 @@ class TestDockerAvailability:
             patch("ananta.ananta.Ananta._KNOWN_SOCKET_PATHS", [sock_path]),
             patch.object(Path, "is_socket", return_value=True),
         ):
-            mock_docker.from_env.side_effect = ValueError("unexpected SDK error")
+            mock_docker.DockerClient.side_effect = ValueError("unexpected SDK error")
             ananta = Ananta(model="test-model", storage_path=tmp_path)
 
             with pytest.raises(RuntimeError, match="Could not connect"):
@@ -508,14 +567,13 @@ class TestDockerAvailability:
                 returncode=0,
                 stdout="WARNING: some garbage output\n",
             )
-            mock_docker.from_env.side_effect = DockerException("fail")
             ananta = Ananta(model="test-model", storage_path=tmp_path)
 
             with pytest.raises(RuntimeError, match="Could not connect"):
                 ananta.start()
 
-            # from_env should NOT have been called — the output was rejected
-            mock_docker.from_env.assert_not_called()
+            # DockerClient should NOT have been called — the output was rejected
+            mock_docker.DockerClient.assert_not_called()
 
     def test_check_docker_accepts_valid_schemes(self, tmp_path: Path):
         """docker context inspect output with unix://, tcp://, npipe:// is accepted."""
@@ -535,11 +593,11 @@ class TestDockerAvailability:
                     returncode=0,
                     stdout=f"{scheme}\n",
                 )
-                mock_docker.from_env.return_value = mock_client
+                mock_docker.DockerClient.return_value = mock_client
                 ananta = Ananta(model="test-model", storage_path=tmp_path)
                 ananta.start()
 
-                mock_docker.from_env.assert_called_once()
+                mock_docker.DockerClient.assert_called_once_with(base_url=scheme)
 
     def test_docker_discovery_uses_class_level_lock(self, tmp_path: Path):
         """_check_docker_available uses a class-level lock to protect os.environ."""
@@ -558,7 +616,7 @@ class TestDockerAvailability:
             patch("ananta.ananta.Ananta._KNOWN_SOCKET_PATHS", [sock_path]),
             patch.object(Path, "is_socket", return_value=True),
         ):
-            mock_docker.from_env.side_effect = DockerException("Connection refused")
+            mock_docker.DockerClient.side_effect = DockerException("Connection refused")
             ananta = Ananta(model="test-model", storage_path=tmp_path)
             with pytest.raises(RuntimeError) as exc_info:
                 ananta.start()

@@ -58,7 +58,7 @@ make all                         # Format + lint + typecheck + test
 
 ## API Boundaries
 
-- **No private API access across module boundaries.** Never access `_`-prefixed attributes from outside the owning class. Use or create public properties/methods instead. Private attributes are internal implementation details — accessing them from another module creates tight coupling that breaks when internals change. The experimental layer uses `Ananta.storage`, `Project.rlm_engine`, and `StorageBackend.get_project_dir()` — not `_storage`, `_rlm_engine`, or `_project_path()`.
+- **No private API access across module boundaries.** Never access `_`-prefixed attributes from outside the owning class. Use or create public properties/methods instead. Private attributes are internal implementation details — accessing them from another module creates tight coupling that breaks when internals change. The explorer layer uses `Ananta.storage`, `Project.rlm_engine`, and `StorageBackend.get_project_dir()` — not `_storage`, `_rlm_engine`, or `_project_path()`.
 
 ## Code Style
 
@@ -86,7 +86,7 @@ make all                         # Format + lint + typecheck + test
 - Max iterations = 20 (configurable)
 - Container pool with 3 warm containers
 - Documents organized into projects
-- **Beyond PoC mindset:** The experimental web explorers are moving beyond proof-of-concept. When making design choices in the experimental layer, prefer resilient patterns (graceful degradation, self-healing on restart) over shortcuts that assume single-use or ephemeral state. This is not a mandate to gold-plate everything, but "it's just a PoC" should not be the default justification for fragile design.
+- **Beyond PoC mindset:** The web explorers are moving beyond proof-of-concept. When making design choices in the explorer layer, prefer resilient patterns (graceful degradation, self-healing on restart) over shortcuts that assume single-use or ephemeral state. This is not a mandate to gold-plate everything, but "it's just a PoC" should not be the default justification for fragile design.
 
 ## Changelog & Versioning
 

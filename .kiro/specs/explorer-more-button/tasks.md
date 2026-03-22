@@ -11,7 +11,7 @@ The feature uses TypeScript/React and integrates with the existing WebSocket-bas
 ### Cycle 0: Test Infrastructure Setup
 
 - [x] 0.1 RED: Set up test infrastructure
-  - Create test file at `src/shesha/experimental/shared/frontend/src/components/__tests__/ChatArea.test.tsx`
+  - Create test file at `src/ananta/explorers/shared_ui/frontend/src/components/__tests__/ChatArea.test.tsx`
   - Import React Testing Library, Vitest, and fast-check
   - Define DEEPER_ANALYSIS_PROMPT constant matching requirements
   - Set up mock WebSocket send function and component props

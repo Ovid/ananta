@@ -142,8 +142,10 @@ def launch(
     # Preflight
     errors = run_preflight(config, project_root)
     if errors:
-        print(f"\033[0;31m[ananta]\033[0m Cannot start {config.app_name}. Fix the following:",
-              file=sys.stderr)
+        print(
+            f"\033[0;31m[ananta]\033[0m Cannot start {config.app_name}. Fix the following:",
+            file=sys.stderr,
+        )
         for e in errors:
             print(e, file=sys.stderr)
         return 1

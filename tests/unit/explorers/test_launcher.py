@@ -2,9 +2,8 @@
 
 import os
 import subprocess
-from unittest.mock import patch
-
 from pathlib import Path
+from unittest.mock import patch
 
 from ananta.explorers.launcher import (
     LauncherConfig,
@@ -113,7 +112,8 @@ class TestCheckDockerRunning:
             assert check_docker_running() is None
 
     def test_docker_not_running(self) -> None:
-        with patch("ananta.explorers.launcher.subprocess.run", side_effect=subprocess.CalledProcessError(1, "docker")):
+        side_effect = subprocess.CalledProcessError(1, "docker")
+        with patch("ananta.explorers.launcher.subprocess.run", side_effect=side_effect):
             error = check_docker_running()
             assert error is not None
             assert "Docker" in error
@@ -193,9 +193,7 @@ class TestRunPreflight:
     @patch("ananta.explorers.launcher.check_env_var", return_value=None)
     @patch("ananta.explorers.launcher.check_python_version", return_value=None)
     @patch("ananta.explorers.launcher.check_command", return_value=None)
-    def test_git_checked_when_required(
-        self, mock_cmd: object, *mocks: object
-    ) -> None:
+    def test_git_checked_when_required(self, mock_cmd: object, *mocks: object) -> None:
         """When requires_git=True, git is in the check_command call list."""
         config = self._make_config(requires_git=True)
         run_preflight(config, "/project")
@@ -207,9 +205,7 @@ class TestRunPreflight:
     @patch("ananta.explorers.launcher.check_env_var", return_value=None)
     @patch("ananta.explorers.launcher.check_python_version", return_value=None)
     @patch("ananta.explorers.launcher.check_command", return_value=None)
-    def test_git_not_checked_when_not_required(
-        self, mock_cmd: object, *mocks: object
-    ) -> None:
+    def test_git_not_checked_when_not_required(self, mock_cmd: object, *mocks: object) -> None:
         config = self._make_config(requires_git=False)
         run_preflight(config, "/project")
         cmd_names = [call.args[0] for call in mock_cmd.call_args_list]  # type: ignore[attr-defined]

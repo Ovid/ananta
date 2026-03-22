@@ -9,17 +9,17 @@ FROM node:20-slim AS frontend
 WORKDIR /build
 
 # Copy shared UI library first (local dependency)
-COPY src/ananta/experimental/shared/frontend/ /shared-ui/
+COPY src/ananta/explorers/shared_ui/frontend/ /shared-ui/
 
 # Copy code explorer frontend (lockfile excluded — npm install regenerates it
 # because the local file: dependency path is rewritten for Docker context)
-COPY src/ananta/experimental/code_explorer/frontend/package.json ./
+COPY src/ananta/explorers/code/frontend/package.json ./
 
 # Rewrite the local dependency path for the Docker build context
-RUN sed -i 's|file:../../shared/frontend|file:/shared-ui|' package.json
+RUN sed -i 's|file:../../shared_ui/frontend|file:/shared-ui|' package.json
 
 RUN npm install --install-links
-COPY src/ananta/experimental/code_explorer/frontend/ ./
+COPY src/ananta/explorers/code/frontend/ ./
 RUN npm run build
 
 # --- Stage 2: Runtime ---
@@ -32,7 +32,7 @@ WORKDIR /app
 COPY . .
 
 # Copy built frontend into the source tree
-COPY --from=frontend /build/dist src/ananta/experimental/code_explorer/frontend/dist
+COPY --from=frontend /build/dist src/ananta/explorers/code/frontend/dist
 
 # .git is excluded by .dockerignore, so provide version via env var
 ENV SETUPTOOLS_SCM_PRETEND_VERSION=0.0.0

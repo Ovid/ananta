@@ -304,3 +304,21 @@ def test_lifespan_prints_clean_error_on_missing_image(
     captured = capsys.readouterr()
     assert "ananta-sandbox" in captured.err
     assert "docker build" in captured.err
+
+
+def test_lifespan_prints_clean_error_on_unexpected_exception(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """When start() raises an unexpected exception, lifespan prints it cleanly."""
+    state = MagicMock()
+    state.ananta.start.side_effect = PermissionError("Permission denied: /var/run/docker.sock")
+
+    app = create_app(state, title="Test App")
+
+    with pytest.raises(BaseException):
+        with TestClient(app):
+            pass
+
+    captured = capsys.readouterr()
+    assert "Permission denied" in captured.err
+    assert "[ananta]" in captured.err

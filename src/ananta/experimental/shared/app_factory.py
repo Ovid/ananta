@@ -70,6 +70,9 @@ def create_app(
                 file=sys.stderr,
             )
             raise SystemExit(1) from e
+        except Exception as e:
+            print(f"\n[ananta] Error: {e}\n", file=sys.stderr)
+            raise SystemExit(1) from e
         try:
             yield
         finally:

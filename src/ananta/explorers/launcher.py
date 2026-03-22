@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import os
 import shutil
+import subprocess
 import sys
 from dataclasses import dataclass
 
@@ -42,4 +44,52 @@ def check_python_version() -> str | None:
     major, minor = sys.version_info[:2]
     if (major, minor) < (3, 11):
         return f"  - Upgrade Python: 3.11+ required, found {major}.{minor}"
+    return None
+
+
+def check_env_var(var: str, hint: str) -> str | None:
+    """Return an error string if the env var is unset or empty, else None."""
+    if not os.environ.get(var):
+        return f"  - Set {var}: {hint}"
+    return None
+
+
+def check_docker_running() -> str | None:
+    """Return an error string if Docker daemon is not running, else None."""
+    if shutil.which("docker") is None:
+        return None  # check_command will catch this
+    try:
+        subprocess.run(
+            ["docker", "info"],
+            capture_output=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError:
+        return "  - Start Docker daemon (e.g. open Docker Desktop)"
+    return None
+
+
+def ensure_sandbox_image(project_root: str) -> str | None:
+    """Build the sandbox image if missing. Return error string on failure, else None."""
+    image = os.environ.get("ANANTA_SANDBOX_IMAGE", "ananta-sandbox")
+    if shutil.which("docker") is None:
+        return None  # check_command will catch this
+    try:
+        subprocess.run(
+            ["docker", "image", "inspect", image],
+            capture_output=True,
+            check=True,
+        )
+        return None  # Image exists
+    except subprocess.CalledProcessError:
+        pass  # Image missing, try to build
+
+    print(f"[ananta] Building sandbox image ({image})...")
+    try:
+        subprocess.run(
+            ["docker", "build", "-t", image, f"{project_root}/src/ananta/sandbox/"],
+            check=True,
+        )
+    except subprocess.CalledProcessError:
+        return f"  - Failed to build Docker image '{image}'"
     return None

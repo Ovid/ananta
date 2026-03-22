@@ -59,6 +59,19 @@ check_docker_running() {
     fi
 }
 
+ensure_sandbox_image() {
+    local image="${ANANTA_SANDBOX_IMAGE:-ananta-sandbox}"
+    if ! command -v docker &>/dev/null; then return; fi
+    if ! docker info &>/dev/null; then return; fi
+    if ! docker image inspect "$image" &>/dev/null; then
+        info "Building sandbox image ($image)..."
+        docker build -t "$image" "$PROJECT_ROOT/src/ananta/sandbox/" || {
+            ERRORS+=("  - Failed to build Docker image '$image'")
+            return
+        }
+    fi
+}
+
 report_and_exit() {
     if [ ${#ERRORS[@]} -gt 0 ]; then
         error "Cannot start $APP_NAME. Fix the following:"
@@ -79,6 +92,7 @@ run_preflight() {
     require_env ANANTA_API_KEY "export ANANTA_API_KEY=<your-key>"
     require_env ANANTA_MODEL   "export ANANTA_MODEL=<model-name>"
     check_docker_running
+    ensure_sandbox_image
     report_and_exit
 }
 
@@ -123,7 +137,7 @@ stderr_filter() {
     # during shutdown (harmless but scary-looking to users).
     awk '
         /^Exception ignored/ { skip=1; next }
-        skip && /^[A-Za-z_][A-Za-z0-9_.]*:/ { skip=0; next }
+        skip && /^[A-Za-z_][A-Za-z0-9_.]*:/ { skip=0; print; next }
         skip && /^Traceback / { next }
         skip && /^[^ ]/ { skip=0 }
         skip { next }

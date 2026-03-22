@@ -21,9 +21,13 @@ class TestParseArgs:
         args = parse_args([])
         assert args.data_dir is None
 
-    def test_no_browser_flag(self) -> None:
-        args = parse_args(["--no-browser"])
-        assert args.no_browser is True
+    def test_open_flag(self) -> None:
+        args = parse_args(["--open"])
+        assert args.open is True
+
+    def test_open_default(self) -> None:
+        args = parse_args([])
+        assert args.open is False
 
     def test_default_model_is_none(self) -> None:
         args = parse_args([])
@@ -50,9 +54,7 @@ class TestMain:
         mock_uvicorn: MagicMock,
         mock_parse: MagicMock,
     ) -> None:
-        mock_parse.return_value = parse_args(
-            ["--data-dir", "/tmp/d", "--model", "gpt-5", "--no-browser"]
-        )
+        mock_parse.return_value = parse_args(["--data-dir", "/tmp/d", "--model", "gpt-5"])
         mock_state.return_value = MagicMock()
         mock_api.return_value = MagicMock()
         main()
@@ -69,7 +71,7 @@ class TestMain:
         mock_uvicorn: MagicMock,
         mock_parse: MagicMock,
     ) -> None:
-        mock_parse.return_value = parse_args(["--port", "9999", "--no-browser"])
+        mock_parse.return_value = parse_args(["--port", "9999"])
         mock_state.return_value = MagicMock()
         sentinel = MagicMock(name="app")
         mock_api.return_value = sentinel

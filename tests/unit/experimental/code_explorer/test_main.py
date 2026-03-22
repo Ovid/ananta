@@ -31,15 +31,15 @@ class TestParseArgs:
         args = parse_args(["--data-dir", "/tmp/test"])
         assert args.data_dir == "/tmp/test"
 
-    def test_no_browser_flag(self) -> None:
-        """--no-browser sets the flag to True."""
-        args = parse_args(["--no-browser"])
-        assert args.no_browser is True
+    def test_open_flag(self) -> None:
+        """--open sets the flag to True."""
+        args = parse_args(["--open"])
+        assert args.open is True
 
-    def test_no_browser_default(self) -> None:
-        """Default no-browser is False."""
+    def test_open_default(self) -> None:
+        """Default --open is False (browser not opened)."""
         args = parse_args([])
-        assert args.no_browser is False
+        assert args.open is False
 
     def test_default_model_is_none(self) -> None:
         """Default model is None."""
@@ -77,9 +77,7 @@ class TestMain:
         mock_parse_args: MagicMock,
     ) -> None:
         """main() passes data_dir and model to create_app_state."""
-        mock_parse_args.return_value = parse_args(
-            ["--data-dir", "/tmp/data", "--model", "gpt-4o", "--no-browser"]
-        )
+        mock_parse_args.return_value = parse_args(["--data-dir", "/tmp/data", "--model", "gpt-4o"])
         mock_create_state.return_value = MagicMock()
         mock_create_api.return_value = MagicMock()
 
@@ -99,7 +97,7 @@ class TestMain:
         mock_parse_args: MagicMock,
     ) -> None:
         """main() passes None data_dir when --data-dir not specified."""
-        mock_parse_args.return_value = parse_args(["--no-browser"])
+        mock_parse_args.return_value = parse_args([])
         mock_create_state.return_value = MagicMock()
         mock_create_api.return_value = MagicMock()
 
@@ -119,7 +117,7 @@ class TestMain:
         mock_parse_args: MagicMock,
     ) -> None:
         """main() passes the state to create_api."""
-        mock_parse_args.return_value = parse_args(["--no-browser"])
+        mock_parse_args.return_value = parse_args([])
         sentinel_state = MagicMock(name="state")
         mock_create_state.return_value = sentinel_state
         mock_create_api.return_value = MagicMock()
@@ -140,7 +138,7 @@ class TestMain:
         mock_parse_args: MagicMock,
     ) -> None:
         """main() calls uvicorn.run with the app, host, and port."""
-        mock_parse_args.return_value = parse_args(["--port", "9999", "--no-browser"])
+        mock_parse_args.return_value = parse_args(["--port", "9999"])
         mock_create_state.return_value = MagicMock()
         sentinel_app = MagicMock(name="app")
         mock_create_api.return_value = sentinel_app
@@ -155,7 +153,7 @@ class TestMain:
     @patch("ananta.experimental.code_explorer.__main__.create_app_state")
     @patch("ananta.experimental.code_explorer.__main__.threading")
     @patch("ananta.experimental.code_explorer.__main__.webbrowser")
-    def test_opens_browser_when_no_browser_not_set(
+    def test_opens_browser_when_open_flag_set(
         self,
         mock_webbrowser: MagicMock,
         mock_threading: MagicMock,
@@ -164,8 +162,8 @@ class TestMain:
         mock_uvicorn: MagicMock,
         mock_parse_args: MagicMock,
     ) -> None:
-        """main() starts a timer to open the browser when --no-browser is not set."""
-        mock_parse_args.return_value = parse_args(["--port", "8001"])
+        """main() starts a timer to open the browser when --open is set."""
+        mock_parse_args.return_value = parse_args(["--port", "8001", "--open"])
         mock_create_state.return_value = MagicMock()
         mock_create_api.return_value = MagicMock()
         mock_timer = MagicMock()
@@ -181,7 +179,7 @@ class TestMain:
     @patch("ananta.experimental.code_explorer.__main__.create_api")
     @patch("ananta.experimental.code_explorer.__main__.create_app_state")
     @patch("ananta.experimental.code_explorer.__main__.threading")
-    def test_no_browser_when_flag_set(
+    def test_no_browser_by_default(
         self,
         mock_threading: MagicMock,
         mock_create_state: MagicMock,
@@ -189,8 +187,8 @@ class TestMain:
         mock_uvicorn: MagicMock,
         mock_parse_args: MagicMock,
     ) -> None:
-        """main() does NOT open browser when --no-browser is set."""
-        mock_parse_args.return_value = parse_args(["--no-browser"])
+        """main() does NOT open browser by default."""
+        mock_parse_args.return_value = parse_args([])
         mock_create_state.return_value = MagicMock()
         mock_create_api.return_value = MagicMock()
 

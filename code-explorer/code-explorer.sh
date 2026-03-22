@@ -4,7 +4,7 @@
 #   ./code-explorer/code-explorer.sh                      # defaults
 #   ./code-explorer/code-explorer.sh --model gpt-5-mini   # pass args to ananta-code
 #   ./code-explorer/code-explorer.sh --port 9000           # custom port
-#   ./code-explorer/code-explorer.sh --no-browser          # don't open browser
+#   ./code-explorer/code-explorer.sh --open                 # open browser on startup
 #   ./code-explorer/code-explorer.sh --rebuild             # force frontend rebuild
 
 set -euo pipefail

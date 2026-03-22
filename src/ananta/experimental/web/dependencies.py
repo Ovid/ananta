@@ -11,6 +11,7 @@ from ananta.experimental.arxiv.cache import PaperCache
 from ananta.experimental.arxiv.search import ArxivSearcher
 from ananta.experimental.arxiv.topics import TopicManager
 from ananta.migration import check_legacy_directory
+from ananta.repo.ingester import RepoIngester
 from ananta.storage.filesystem import FilesystemStorage
 
 
@@ -45,7 +46,11 @@ def create_app_state(
     if model:
         config.model = model
     storage = FilesystemStorage(ananta_data)
-    ananta = Ananta(config=config, storage=storage)
+    repo_ingester = RepoIngester(
+        storage_path=str(ananta_data),
+        allow_local_paths=False,
+    )
+    ananta = Ananta(config=config, storage=storage, repo_ingester=repo_ingester)
     cache = PaperCache(cache_dir)
     searcher = ArxivSearcher()
     topic_mgr = TopicManager(ananta=ananta, storage=storage)

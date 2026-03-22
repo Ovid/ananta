@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from docker.errors import ImageNotFound
 from fastapi import APIRouter, FastAPI
 from fastapi.testclient import TestClient
 from starlette.middleware.cors import CORSMiddleware
@@ -250,3 +251,74 @@ def test_images_dir_serves_file(tmp_path: Path) -> None:
     response = client.get("/static/logo.txt")
     assert response.status_code == 200
     assert response.text == "logo-content"
+
+
+# -- Startup error handling --
+
+
+def test_lifespan_prints_clean_error_on_startup_failure(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """When start() raises RuntimeError, lifespan prints message and exits cleanly."""
+    state = MagicMock()
+    state.ananta.start.side_effect = RuntimeError(
+        "Could not connect to Docker.\n\n  Tried:\n    x ..."
+    )
+
+    app = create_app(state, title="Test App")
+
+    # The SystemExit(1) raised in lifespan gets wrapped by anyio's TaskGroup
+    # into a BaseExceptionGroup, which TestClient converts to CancelledError.
+    # What matters is: (a) the clean error was printed, and (b) the app did
+    # not start successfully.
+    with pytest.raises(BaseException):
+        with TestClient(app):
+            pass
+
+    captured = capsys.readouterr()
+    assert "Could not connect to Docker" in captured.err
+
+
+def test_lifespan_prints_clean_error_on_missing_image(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """When start() raises ImageNotFound, lifespan prints build hint and exits."""
+    state = MagicMock()
+    # ImageNotFound expects (message, response=..., explanation=...)
+    # but we can simulate it with a plain Exception wrapping
+    response = MagicMock()
+    response.status_code = 404
+    response.reason = "Not Found"
+    state.ananta.start.side_effect = ImageNotFound(
+        "404 Client Error: Not Found",
+        response=response,
+        explanation="No such image: ananta-sandbox:latest",
+    )
+
+    app = create_app(state, title="Test App")
+
+    with pytest.raises(BaseException):
+        with TestClient(app):
+            pass
+
+    captured = capsys.readouterr()
+    assert "ananta-sandbox" in captured.err
+    assert "docker build" in captured.err
+
+
+def test_lifespan_prints_clean_error_on_unexpected_exception(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """When start() raises an unexpected exception, lifespan prints it cleanly."""
+    state = MagicMock()
+    state.ananta.start.side_effect = PermissionError("Permission denied: /var/run/docker.sock")
+
+    app = create_app(state, title="Test App")
+
+    with pytest.raises(BaseException):
+        with TestClient(app):
+            pass
+
+    captured = capsys.readouterr()
+    assert "Permission denied" in captured.err
+    assert "[ananta]" in captured.err

@@ -3,11 +3,13 @@
 install:
 	pip install -e ".[dev]"
 
+# -W filter suppresses RequestsDependencyWarning from urllib3/chardet version skew in transitive deps;
+# must be on the interpreter to catch import-time warnings before pytest resets filters.
 test:
-	pytest
+	python -W "ignore:urllib3:Warning" -m pytest
 
 test-frontend:
-	cd src/ananta/experimental/web/frontend && npx vitest run
+	cd src/ananta/experimental/web/frontend && NODE_OPTIONS="--disable-warning=ExperimentalWarning" npx vitest run
 
 lint:
 	ruff check src tests

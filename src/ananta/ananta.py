@@ -2,14 +2,15 @@
 
 import atexit
 import logging
+import os
 import re
+import subprocess
 import threading
 import weakref
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, ClassVar, Literal
 
 import docker
-from docker.errors import DockerException
 
 from ananta.analysis import AnalysisGenerator
 from ananta.config import AnantaConfig
@@ -36,8 +37,18 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+_VALID_DOCKER_HOST_SCHEMES = ("unix://", "tcp://", "npipe://", "fd://", "ssh://")
+
+
 class Ananta:
     """Main entry point for Ananta - Recursive Language Models."""
+
+    _KNOWN_SOCKET_PATHS: ClassVar[list[Path]] = [
+        Path("/var/run/docker.sock"),
+        Path.home() / ".docker" / "run" / "docker.sock",
+        Path.home() / ".colima" / "default" / "docker.sock",
+    ]
+    _docker_discovery_lock: ClassVar[threading.Lock] = threading.Lock()
 
     def __init__(
         self,
@@ -136,26 +147,133 @@ class Ananta:
         """The repo ingester used by this instance."""
         return self._repo_ingester
 
-    @staticmethod
-    def _check_docker_available() -> None:
-        """Verify Docker daemon is running. Raises RuntimeError if not."""
+    @classmethod
+    def _check_docker_available(cls) -> None:
+        """Discover Docker socket and verify daemon is running.
+
+        Strategy:
+        1. If DOCKER_HOST is set, use it directly.
+        2. Try ``docker context inspect`` to get the active socket.
+        3. Probe known socket paths on disk.
+        4. Give up with a diagnostic error message.
+
+        Raises RuntimeError with a clean message if Docker is unreachable.
+        """
+        with cls._docker_discovery_lock:
+            cls._check_docker_available_locked()
+
+    @classmethod
+    def _check_docker_available_locked(cls) -> None:
+        """Inner discovery logic — must be called under ``_docker_discovery_lock``."""
+        diagnostics: list[str] = []
+
+        # Strategy 1: DOCKER_HOST already set — use it directly.
+        existing_host = os.environ.get("DOCKER_HOST")
+        if existing_host:
+            diagnostics.append(f"DOCKER_HOST={existing_host}")
+            try:
+                client = docker.from_env()
+                client.close()
+                return
+            except Exception as e:
+                diagnostics[-1] += " — not responding"
+                logger.debug("DOCKER_HOST set but failed: %s", e)
+        else:
+            diagnostics.append("DOCKER_HOST not set")
+
+        # Strategy 2: docker context inspect
+        socket_url = cls._try_docker_context(diagnostics)
+        if socket_url:
+            os.environ["DOCKER_HOST"] = socket_url
+            return
+
+        # Strategy 3: probe known socket paths
+        for sock_path in cls._KNOWN_SOCKET_PATHS:
+            if not sock_path.exists():
+                diagnostics.append(f"{sock_path} — not found")
+                continue
+            if not sock_path.is_socket():
+                diagnostics.append(f"{sock_path} — exists but not a socket")
+                continue
+            candidate = f"unix://{sock_path}"
+            diagnostics.append(f"{sock_path} — found")
+            try:
+                client = docker.DockerClient(base_url=candidate)
+                client.close()
+                os.environ["DOCKER_HOST"] = candidate
+                return
+            except Exception as e:
+                diagnostics[-1] += " — not responding"
+                logger.debug("Socket %s found but failed: %s", sock_path, e)
+
+        # Strategy 4: give up — os.environ is untouched
+        tried = "\n    ".join(f"x {d}" for d in diagnostics)
+        raise RuntimeError(
+            "Could not connect to Docker.\n\n"
+            f"  Tried:\n    {tried}\n\n"
+            "  To fix, either:\n"
+            "    - Start Docker Desktop\n"
+            "    - Set DOCKER_HOST to your Docker socket path\n"
+            '    - If using Podman: export DOCKER_HOST="unix://$('
+            "podman machine inspect "
+            "--format '{{.ConnectionInfo.PodmanSocket.Path}}')\""
+        )
+
+    @classmethod
+    def _try_docker_context(cls, diagnostics: list[str]) -> str | None:
+        """Try ``docker context inspect`` and return a working socket URL, or None."""
         try:
-            client = docker.from_env()
+            result = subprocess.run(
+                [
+                    "docker",
+                    "context",
+                    "inspect",
+                    "--format",
+                    "{{.Endpoints.docker.Host}}",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+        except FileNotFoundError:
+            diagnostics.append("docker context: docker CLI not found")
+            return None
+        except subprocess.TimeoutExpired:
+            diagnostics.append("docker context: timed out")
+            return None
+        except Exception as e:
+            diagnostics.append(f"docker context: {e}")
+            logger.debug("docker context inspect failed: %s", e)
+            return None
+
+        if result.returncode != 0 or not result.stdout.strip():
+            stderr = result.stderr.strip()
+            diagnostics.append(
+                f"docker context: failed ({stderr})"
+                if stderr
+                else "docker context: no socket returned"
+            )
+            return None
+
+        socket_url = result.stdout.strip()
+
+        if "\n" in socket_url:
+            diagnostics.append(f"docker context: multi-line output rejected ({socket_url!r})")
+            return None
+
+        if not socket_url.startswith(_VALID_DOCKER_HOST_SCHEMES):
+            diagnostics.append(f"docker context: invalid output ({socket_url!r})")
+            return None
+
+        diagnostics.append(f"docker context: {socket_url}")
+        try:
+            client = docker.DockerClient(base_url=socket_url)
             client.close()
-        except DockerException as e:
-            error_str = str(e)
-            if "Connection refused" in error_str:
-                raise RuntimeError(
-                    "Docker is not running. Please start Docker Desktop and try again."
-                ) from e
-            if "No such file or directory" in error_str:
-                raise RuntimeError(
-                    "No Docker-compatible socket found. "
-                    "If you're using Podman, set DOCKER_HOST to Podman's socket:\n"
-                    '  export DOCKER_HOST="unix://$(podman machine inspect '
-                    "--format '{{.ConnectionInfo.PodmanSocket.Path}}')\""
-                ) from e
-            raise
+            return socket_url
+        except Exception as e:
+            diagnostics[-1] += " — not responding"
+            logger.debug("docker context socket failed: %s", e)
+            return None
 
     def create_project(self, project_id: str) -> Project:
         """Create a new project."""
@@ -332,7 +450,8 @@ class Ananta:
             project_id: ID of an existing project created from a repository.
 
         Returns:
-            RepoProjectResult with status 'unchanged' or 'updates_available'.
+            RepoProjectResult with status 'unchanged', 'updates_available',
+            or 'check_failed'.
 
         Raises:
             ProjectNotFoundError: If project doesn't exist.
@@ -375,7 +494,14 @@ class Ananta:
                 image=self._config.sandbox_image,
                 memory_limit=f"{self._config.container_memory_mb}m",
             )
-            pool.start()
+            try:
+                pool.start()
+            except BaseException:
+                try:
+                    pool.stop()
+                except Exception:
+                    logger.debug("pool.stop() failed during cleanup", exc_info=True)
+                raise
             self._pool = pool
             self._rlm_engine.set_pool(pool)
 
@@ -388,6 +514,7 @@ class Ananta:
             if self._pool is not None:
                 self._rlm_engine.set_pool(None)
                 self._pool.stop()
+                self._pool = None
 
     def __enter__(self) -> "Ananta":
         """Context manager entry."""

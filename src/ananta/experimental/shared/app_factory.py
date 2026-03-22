@@ -8,11 +8,14 @@ endpoint, and a lifespan hook that starts/stops the Ananta container pool.
 
 from __future__ import annotations
 
+import os
+import sys
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
+from docker.errors import ImageNotFound
 from fastapi import APIRouter, FastAPI, WebSocket
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.cors import CORSMiddleware
@@ -54,7 +57,24 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        state.ananta.start()
+        try:
+            state.ananta.start()
+        except RuntimeError as e:
+            print(f"\n[ananta] Error: {e}\n", file=sys.stderr)
+            raise SystemExit(1) from e
+        except ImageNotFound as e:
+            explanation = getattr(e, "explanation", str(e))
+            image = os.environ.get("ANANTA_SANDBOX_IMAGE", "ananta-sandbox")
+            print(
+                f"\n[ananta] Error: Docker image not found: {explanation}\n"
+                "\n  Build it with:"
+                f"\n    docker build -t {image} src/ananta/sandbox/\n",
+                file=sys.stderr,
+            )
+            raise SystemExit(1) from e
+        except Exception as e:
+            print(f"\n[ananta] Error: {e}\n", file=sys.stderr)
+            raise SystemExit(1) from e
         try:
             yield
         finally:

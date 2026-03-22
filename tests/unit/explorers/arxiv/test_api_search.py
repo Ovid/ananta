@@ -6,8 +6,8 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from ananta.explorers.arxiv.papers.models import PaperMeta
 from ananta.explorers.arxiv.api import create_api
+from ananta.explorers.arxiv.papers.models import PaperMeta
 
 
 @pytest.fixture

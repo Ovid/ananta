@@ -5,11 +5,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
+from ananta.explorers.arxiv.api import create_api
 from ananta.explorers.arxiv.papers.models import (
     VerificationResult,
     VerificationStatus,
 )
-from ananta.explorers.arxiv.api import create_api
 
 
 @pytest.fixture

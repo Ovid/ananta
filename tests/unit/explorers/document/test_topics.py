@@ -1,6 +1,6 @@
 """Smoke tests for DocumentTopicManager subclass.
 
-Full coverage lives in tests/unit/experimental/shared/test_topics.py.
+Full coverage lives in tests/unit/explorers/shared_ui/test_topics.py.
 """
 
 from pathlib import Path

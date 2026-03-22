@@ -1,4 +1,4 @@
-"""Generic API routes shared across Ananta experimental tools.
+"""Generic API routes shared across Ananta explorers.
 
 Provides ``create_shared_router()`` which returns a FastAPI ``APIRouter``
 containing topic CRUD, trace listing/retrieval, model management, and

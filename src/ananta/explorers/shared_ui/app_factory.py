@@ -1,4 +1,4 @@
-"""Generic FastAPI app factory for Ananta experimental tools.
+"""Generic FastAPI app factory for Ananta explorers.
 
 Provides ``create_app()`` which builds a FastAPI instance with common
 infrastructure: CORS middleware, a ``.well-known`` catch-all (suppresses

@@ -9,7 +9,7 @@ test:
 	python -W "ignore:urllib3:Warning" -m pytest
 
 test-frontend:
-	cd src/ananta/experimental/web/frontend && NODE_OPTIONS="--disable-warning=ExperimentalWarning" npx vitest run
+	cd src/ananta/explorers/arxiv/frontend && NODE_OPTIONS="--disable-warning=ExperimentalWarning" npx vitest run
 
 lint:
 	ruff check src tests
@@ -18,7 +18,7 @@ typecheck:
 	mypy src/ananta
 
 typecheck-frontend:
-	cd src/ananta/experimental/shared/frontend && npx tsc --noEmit
+	cd src/ananta/explorers/shared_ui/frontend && npx tsc --noEmit
 
 format:
 	ruff format src tests

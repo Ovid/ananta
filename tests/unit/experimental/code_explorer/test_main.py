@@ -77,9 +77,7 @@ class TestMain:
         mock_parse_args: MagicMock,
     ) -> None:
         """main() passes data_dir and model to create_app_state."""
-        mock_parse_args.return_value = parse_args(
-            ["--data-dir", "/tmp/data", "--model", "gpt-4o"]
-        )
+        mock_parse_args.return_value = parse_args(["--data-dir", "/tmp/data", "--model", "gpt-4o"])
         mock_create_state.return_value = MagicMock()
         mock_create_api.return_value = MagicMock()
 

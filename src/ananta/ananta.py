@@ -199,9 +199,7 @@ class Ananta:
             if result.returncode == 0 and result.stdout.strip():
                 socket_url = result.stdout.strip()
                 if not socket_url.startswith(_VALID_DOCKER_HOST_SCHEMES):
-                    diagnostics.append(
-                        f"docker context: invalid output ({socket_url!r})"
-                    )
+                    diagnostics.append(f"docker context: invalid output ({socket_url!r})")
                 else:
                     diagnostics.append(f"docker context: {socket_url}")
                     os.environ["DOCKER_HOST"] = socket_url

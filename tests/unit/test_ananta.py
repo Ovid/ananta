@@ -484,7 +484,11 @@ class TestDockerAvailability:
 
     def test_check_docker_accepts_valid_schemes(self, tmp_path: Path):
         """docker context inspect output with unix://, tcp://, npipe:// is accepted."""
-        for scheme in ["unix:///var/run/docker.sock", "tcp://127.0.0.1:2375", "npipe:////./pipe/docker"]:
+        for scheme in [
+            "unix:///var/run/docker.sock",
+            "tcp://127.0.0.1:2375",
+            "npipe:////./pipe/docker",
+        ]:
             mock_client = MagicMock()
             with (
                 patch("ananta.ananta.docker") as mock_docker,

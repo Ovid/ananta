@@ -54,9 +54,7 @@ class TestMain:
         mock_uvicorn: MagicMock,
         mock_parse: MagicMock,
     ) -> None:
-        mock_parse.return_value = parse_args(
-            ["--data-dir", "/tmp/d", "--model", "gpt-5"]
-        )
+        mock_parse.return_value = parse_args(["--data-dir", "/tmp/d", "--model", "gpt-5"])
         mock_state.return_value = MagicMock()
         mock_api.return_value = MagicMock()
         main()

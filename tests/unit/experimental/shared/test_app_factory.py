@@ -292,7 +292,7 @@ def test_lifespan_prints_clean_error_on_missing_image(
     state.ananta.start.side_effect = ImageNotFound(
         "404 Client Error: Not Found",
         response=response,
-        explanation='No such image: ananta-sandbox:latest',
+        explanation="No such image: ananta-sandbox:latest",
     )
 
     app = create_app(state, title="Test App")

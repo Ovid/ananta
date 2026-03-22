@@ -17,8 +17,8 @@ APP_SLUG="ananta-code"
 PIP_EXTRA="web"
 ENTRY_POINT="ananta-code"
 REQUIRES_GIT=true
-FRONTEND_DIR="$PROJECT_ROOT/src/ananta/experimental/code_explorer/frontend"
-SHARED_FRONTEND_DIR="$PROJECT_ROOT/src/ananta/experimental/shared/frontend"
+FRONTEND_DIR="$PROJECT_ROOT/src/ananta/explorers/code/frontend"
+SHARED_FRONTEND_DIR="$PROJECT_ROOT/src/ananta/explorers/shared_ui/frontend"
 
 source "$PROJECT_ROOT/scripts/common.sh"
 launch "$@"

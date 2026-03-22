@@ -106,12 +106,14 @@ class TestCheckEnvVar:
 
 
 class TestCheckDockerRunning:
-    def test_docker_running(self) -> None:
+    @patch("ananta.explorers.launcher.shutil.which", return_value="/usr/bin/docker")
+    def test_docker_running(self, _mock_which: object) -> None:
         with patch("ananta.explorers.launcher.subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess([], 0)
             assert check_docker_running() is None
 
-    def test_docker_not_running(self) -> None:
+    @patch("ananta.explorers.launcher.shutil.which", return_value="/usr/bin/docker")
+    def test_docker_not_running(self, _mock_which: object) -> None:
         side_effect = subprocess.CalledProcessError(1, "docker")
         with patch("ananta.explorers.launcher.subprocess.run", side_effect=side_effect):
             error = check_docker_running()
@@ -125,12 +127,14 @@ class TestCheckDockerRunning:
 
 
 class TestEnsureSandboxImage:
-    def test_image_exists(self) -> None:
+    @patch("ananta.explorers.launcher.shutil.which", return_value="/usr/bin/docker")
+    def test_image_exists(self, _mock_which: object) -> None:
         with patch("ananta.explorers.launcher.subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess([], 0)
             assert ensure_sandbox_image("/project/root") is None
 
-    def test_image_missing_build_succeeds(self, capsys: object) -> None:
+    @patch("ananta.explorers.launcher.shutil.which", return_value="/usr/bin/docker")
+    def test_image_missing_build_succeeds(self, _mock_which: object, capsys: object) -> None:
         call_count = 0
 
         def side_effect(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
@@ -145,7 +149,8 @@ class TestEnsureSandboxImage:
         with patch("ananta.explorers.launcher.subprocess.run", side_effect=side_effect):
             assert ensure_sandbox_image("/project/root") is None
 
-    def test_image_missing_build_fails(self) -> None:
+    @patch("ananta.explorers.launcher.shutil.which", return_value="/usr/bin/docker")
+    def test_image_missing_build_fails(self, _mock_which: object) -> None:
         with patch(
             "ananta.explorers.launcher.subprocess.run",
             side_effect=subprocess.CalledProcessError(1, "docker"),

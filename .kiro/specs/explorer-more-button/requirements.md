@@ -2,12 +2,12 @@
 
 ## Introduction
 
-This feature adds a "More" button to the chat interface of all three Shesha explorers (arXiv explorer, code explorer, and document explorer). The button enables users to request a deeper analysis with a single click, automatically sending a predefined prompt that asks the system to verify and enhance its previous response.
+This feature adds a "More" button to the chat interface of all three Ananta explorers (arXiv explorer, code explorer, and document explorer). The button enables users to request a deeper analysis with a single click, automatically sending a predefined prompt that asks the system to verify and enhance its previous response.
 
 ## Glossary
 
 - **ChatArea**: The shared React component that handles the prompt input and message sending functionality across all three explorers
-- **Explorer**: One of the three Shesha web interfaces (arXiv explorer, code explorer, or document explorer)
+- **Explorer**: One of the three Ananta web interfaces (arXiv explorer, code explorer, or document explorer)
 - **More_Button**: The new UI button that triggers the deeper analysis prompt
 - **Deeper_Analysis_Prompt**: The predefined text "Do a deeper dive to verify if your report is complete, accurate, and relevant. Explain any changes or additions in bullet points and then present the full report with those changes and/or additions. You must also walk through the entire report, point by point, and ensure its aligned with the previous report and the changes or additions."
 - **Send_Flow**: The existing message sending mechanism that transmits user queries via WebSocket
@@ -55,7 +55,7 @@ This feature adds a "More" button to the chat interface of all three Shesha expl
 
 #### Acceptance Criteria
 
-1. THE More_Button SHALL be implemented in the shared ChatArea component located at src/shesha/experimental/shared/frontend/src/components/ChatArea.tsx
+1. THE More_Button SHALL be implemented in the shared ChatArea component located at src/ananta/explorers/shared_ui/frontend/src/components/ChatArea.tsx
 2. WHEN any explorer uses the ChatArea component, THE More_Button SHALL be available without additional configuration
 3. THE More_Button SHALL use the same WebSocket send mechanism (wsSend) as the existing Send button
 4. THE More_Button SHALL respect the same document selection constraints (selectedDocuments) as the existing Send button

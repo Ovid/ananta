@@ -1,18 +1,18 @@
 # Extending the Web Tool Ecosystem
 
-This guide walks through creating a new experimental web tool using the shared
-infrastructure in `src/ananta/experimental/shared/`.
+This guide walks through creating a new explorer using the shared
+infrastructure in `src/ananta/explorers/shared_ui/`.
 
 Existing tools built on this infrastructure:
 
-- **arXiv Explorer** (`ananta.experimental.web`) -- search, download, and query arXiv papers
-- **Code Explorer** (`ananta.experimental.code_explorer`) -- ingest and query git repositories
+- **arXiv Explorer** (`ananta.explorers.arxiv`) -- search, download, and query arXiv papers
+- **Code Explorer** (`ananta.explorers.code`) -- ingest and query git repositories
 
 ## 1. Overview
 
 The shared module provides two layers of reusable infrastructure:
 
-**Backend** (`src/ananta/experimental/shared/`):
+**Backend** (`src/ananta/explorers/shared_ui/`):
 
 | Module            | Purpose                                                       |
 |-------------------|---------------------------------------------------------------|
@@ -22,7 +22,7 @@ The shared module provides two layers of reusable infrastructure:
 | `session.py`      | `WebConversationSession` -- JSON-persisted conversation history |
 | `websockets.py`   | `websocket_handler()` -- query dispatch loop with cancellation |
 
-**Frontend** (`src/ananta/experimental/shared/frontend/`, published as `@ananta/shared-ui`):
+**Frontend** (`src/ananta/explorers/shared_ui/frontend/`, published as `@ananta/shared-ui`):
 
 | Export             | Purpose                                         |
 |--------------------|-------------------------------------------------|
@@ -45,7 +45,7 @@ The shared module provides two layers of reusable infrastructure:
 ### Step 1: Create the backend module
 
 ```
-src/ananta/experimental/your_tool/
+src/ananta/explorers/your_tool/
     __init__.py
     __main__.py      # CLI entry point
     dependencies.py  # AppState dataclass + create_app_state()
@@ -63,7 +63,7 @@ function. See Section 3 for details.
 ### Step 3: Create the frontend
 
 ```
-src/ananta/experimental/your_tool/frontend/
+src/ananta/explorers/your_tool/frontend/
     package.json     # depends on @ananta/shared-ui
     vite.config.ts
     src/
@@ -86,7 +86,7 @@ Add to `pyproject.toml`:
 
 ```toml
 [project.scripts]
-ananta-yourtool = "ananta.experimental.your_tool.__main__:main"
+ananta-yourtool = "ananta.explorers.your_tool.__main__:main"
 ```
 
 ## 3. Backend
@@ -99,7 +99,7 @@ WebSocket handler access fields by attribute name, so these fields are required:
 ```python
 from dataclasses import dataclass
 from ananta import Ananta
-from ananta.experimental.shared.session import WebConversationSession
+from ananta.explorers.shared_ui.session import WebConversationSession
 
 @dataclass
 class YourToolState:
@@ -142,7 +142,7 @@ def create_app_state(
 `create_app()` builds a FastAPI instance with common middleware:
 
 ```python
-from ananta.experimental.shared.app_factory import create_app
+from ananta.explorers.shared_ui.app_factory import create_app
 
 app = create_app(
     state,
@@ -169,7 +169,7 @@ context budget routes. Both the arXiv and code explorer use it via callbacks
 to adapt the shared routes to their domain models:
 
 ```python
-from ananta.experimental.shared.routes import create_shared_router
+from ananta.explorers.shared_ui.routes import create_shared_router
 
 shared_router = create_shared_router(
     state,
@@ -238,7 +238,7 @@ The shared `websocket_handler()` handles the dispatch loop (query, cancel) and
 accepts two extension points:
 
 ```python
-from ananta.experimental.shared.websockets import websocket_handler
+from ananta.explorers.shared_ui.websockets import websocket_handler
 
 await websocket_handler(
     websocket, state,
@@ -444,17 +444,17 @@ FROM node:20-slim AS frontend
 WORKDIR /build
 
 # Copy shared UI library first (local dependency)
-COPY src/ananta/experimental/shared/frontend/ /shared-ui/
+COPY src/ananta/explorers/shared_ui/frontend/ /shared-ui/
 
 # Copy tool frontend
-COPY src/ananta/experimental/your_tool/frontend/package.json \
-     src/ananta/experimental/your_tool/frontend/package-lock.json ./
+COPY src/ananta/explorers/your_tool/frontend/package.json \
+     src/ananta/explorers/your_tool/frontend/package-lock.json ./
 
 # Rewrite the local dependency path for the Docker build context
 RUN sed -i 's|file:../../shared/frontend|file:/shared-ui|' package.json
 
 RUN npm ci --silent
-COPY src/ananta/experimental/your_tool/frontend/ ./
+COPY src/ananta/explorers/your_tool/frontend/ ./
 RUN npm run build
 
 # --- Stage 2: Runtime ---
@@ -463,7 +463,7 @@ WORKDIR /app
 COPY . .
 
 # Copy built frontend into the source tree
-COPY --from=frontend /build/dist src/ananta/experimental/your_tool/frontend/dist
+COPY --from=frontend /build/dist src/ananta/explorers/your_tool/frontend/dist
 
 ENV SETUPTOOLS_SCM_PRETEND_VERSION=0.0.0
 RUN pip install --no-cache-dir -e ".[web]"
@@ -502,7 +502,7 @@ volumes:
 ```
 
 The build context must be the project root (not the tool directory) because the
-Dockerfile copies from `src/ananta/experimental/`.
+Dockerfile copies from `src/ananta/explorers/`.
 
 ## 7. Testing
 
@@ -518,7 +518,7 @@ backed by `tmp_path`:
 
 ```python
 from unittest.mock import MagicMock
-from ananta.experimental.your_tool.dependencies import YourToolState
+from ananta.explorers.your_tool.dependencies import YourToolState
 
 def test_list_repos(tmp_path):
     ananta = MagicMock()
@@ -551,6 +551,6 @@ vi.mock('../api', () => ({
 Run frontend tests:
 
 ```bash
-cd src/ananta/experimental/your_tool/frontend
+cd src/ananta/explorers/your_tool/frontend
 npm test
 ```

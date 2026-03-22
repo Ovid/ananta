@@ -16,7 +16,7 @@ APP_NAME="Ananta arXiv Web Explorer"
 APP_SLUG="ananta-web"
 PIP_EXTRA="web"
 ENTRY_POINT="ananta-web"
-FRONTEND_DIR="$PROJECT_ROOT/src/ananta/experimental/web/frontend"
+FRONTEND_DIR="$PROJECT_ROOT/src/ananta/explorers/arxiv/frontend"
 
 source "$PROJECT_ROOT/scripts/common.sh"
 launch "$@"

@@ -60,7 +60,7 @@ ChatArea displays updated conversation
 
 ### Modified Component: ChatArea
 
-**Location**: `src/shesha/experimental/shared/frontend/src/components/ChatArea.tsx`
+**Location**: `src/ananta/explorers/shared_ui/frontend/src/components/ChatArea.tsx`
 
 **New State**: None (reuses existing state variables)
 
@@ -375,7 +375,7 @@ Property-based tests will verify universal behaviors across many generated input
 ### Test File Organization
 
 ```
-tests/experimental/shared/frontend/
+tests/explorers/shared_ui/frontend/
 └── ChatArea.test.tsx
     ├── Unit Tests
     │   ├── Rendering

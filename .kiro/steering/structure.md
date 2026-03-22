@@ -5,10 +5,10 @@ inclusion: always
 # Project Structure
 
 ```
-src/shesha/                      # Main package
-├── shesha.py                    # Main Shesha class (entry point)
+src/ananta/                      # Main package
+├── ananta.py                    # Main Ananta class (entry point)
 ├── project.py                   # Project class (document collections)
-├── config.py                    # SheshaConfig
+├── config.py                    # AnantaConfig
 ├── models.py                    # ParsedDocument and data models
 ├── exceptions.py                # Exception hierarchy
 ├── __init__.py                  # Public API exports
@@ -62,8 +62,8 @@ src/shesha/                      # Main package
 │       ├── info_bar.py          # Status/info bar
 │       ├── input_area.py        # Query input
 │       └── output_area.py       # Response display
-└── experimental/                # Experimental features
-    ├── shared/                  # Common explorer framework
+└── explorers/                   # Web explorer applications
+    ├── shared_ui/               # Common explorer framework
     │   ├── app_factory.py       # FastAPI app builder
     │   ├── dependencies.py      # Shared DI
     │   ├── routes.py            # Shared API routes
@@ -79,7 +79,7 @@ src/shesha/                      # Main package
     │   ├── relevance.py         # Relevance scoring
     │   ├── topics.py            # Topic management
     │   └── verifiers.py         # Result verification
-    ├── web/                     # arXiv web UI (FastAPI backend)
+    ├── arxiv_web/               # arXiv web UI (FastAPI backend)
     │   ├── api.py, dependencies.py, schemas.py
     │   ├── session.py, websockets.py
     │   └── frontend/            # React frontend
@@ -87,20 +87,17 @@ src/shesha/                      # Main package
     │   ├── api.py, dependencies.py, schemas.py
     │   ├── topics.py, websockets.py
     │   └── frontend/            # React frontend
-    ├── document_explorer/       # Document exploration tool
-    │   ├── api.py, dependencies.py, schemas.py
-    │   ├── extractors.py        # Document content extraction
-    │   ├── topics.py, websockets.py
-    │   └── frontend/            # React frontend
-    └── multi_repo/              # Multi-repo analysis
-        ├── analyzer.py          # Cross-repo analysis
-        └── models.py            # Data models
+    └── document_explorer/       # Document exploration tool
+        ├── api.py, dependencies.py, schemas.py
+        ├── extractors.py        # Document content extraction
+        ├── topics.py, websockets.py
+        └── frontend/            # React frontend
 
 tests/                           # Test suite
-├── unit/                        # Unit tests (mirrors src/shesha/ structure)
+├── unit/                        # Unit tests (mirrors src/ananta/ structure)
 ├── integration/                 # Integration tests
 ├── examples/                    # Example script tests
-├── experimental/                # Experimental feature tests
+├── explorers/                   # Explorer feature tests
 ├── scripts/                     # Script tests
 └── fixtures/                    # Test data files
 
@@ -111,8 +108,8 @@ docs/                            # Documentation
 
 ## Conventions
 
-- Source code lives in `src/shesha/` (src layout)
+- Source code lives in `src/ananta/` (src layout)
 - Unit tests mirror the source structure under `tests/unit/`
-- Experimental features go in `src/shesha/experimental/` — they have their own optional dependency groups
+- Explorer applications go in `src/ananta/explorers/` — they have their own optional dependency groups
 - All imports at top of file (comment if exception needed)
-- Public API is exported from `src/shesha/__init__.py`
+- Public API is exported from `src/ananta/__init__.py`

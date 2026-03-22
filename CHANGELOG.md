@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-03-22
+
 ### Changed
 
 - Explorers no longer auto-open the browser on startup — pass `--open` to open it (replaces `--no-browser`)
@@ -639,7 +641,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Security hardening with untrusted content tagging
 - Network isolation with egress whitelist for LLM APIs
 
-[unreleased]: https://github.com/Ovid/ananta/compare/v0.23.0...HEAD
+[unreleased]: https://github.com/Ovid/ananta/compare/v0.24.0...HEAD
+[0.24.0]: https://github.com/Ovid/ananta/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/Ovid/ananta/compare/v0.22.0...v0.23.0
 [0.21.1]: https://github.com/Ovid/ananta/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/Ovid/ananta/compare/v0.20.0...v0.21.0

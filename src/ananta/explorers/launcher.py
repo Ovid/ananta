@@ -72,6 +72,7 @@ def check_docker_running() -> str | None:
 
 def ensure_sandbox_image(project_root: str) -> str | None:
     """Build the sandbox image if missing. Return error string on failure, else None."""
+    # Default must match AnantaConfig.sandbox_image in config.py
     image = os.environ.get("ANANTA_SANDBOX_IMAGE", "ananta-sandbox")
     if shutil.which("docker") is None:
         return None  # check_command will catch this

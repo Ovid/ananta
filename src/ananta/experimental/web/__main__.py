@@ -36,7 +36,9 @@ def main() -> None:
     print(f"\n  Ananta arXiv Explorer → {url}\n")
 
     if args.open:
-        threading.Timer(1.5, lambda: webbrowser.open(url)).start()
+        timer = threading.Timer(1.5, lambda: webbrowser.open(url))
+        timer.daemon = True
+        timer.start()
 
     uvicorn.run(app, host=args.bind, port=args.port)
 

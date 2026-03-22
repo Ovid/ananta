@@ -137,7 +137,7 @@ stderr_filter() {
     # during shutdown (harmless but scary-looking to users).
     awk '
         /^Exception ignored/ { skip=1; next }
-        skip && /^[A-Za-z_][A-Za-z0-9_.]*:/ { skip=0; next }
+        skip && /^[A-Za-z_][A-Za-z0-9_.]*:/ { skip=0; print; next }
         skip && /^Traceback / { next }
         skip && /^[^ ]/ { skip=0 }
         skip { next }

@@ -2,9 +2,9 @@
 
 Provides repo management routes (list, add, get, delete, check/apply updates)
 and analysis routes for the code explorer web interface.  Uses the shared
-``create_app()`` factory from ``ananta.experimental.shared.app_factory`` for
+``create_app()`` factory from ``ananta.explorers.shared_ui.app_factory`` for
 FastAPI boilerplate and the shared router from
-``ananta.experimental.shared.routes`` for traces, model, history, and
+``ananta.explorers.shared_ui.routes`` for traces, model, history, and
 context-budget routes.  Code-explorer-specific repo and topic CRUD routes
 live on a local router.
 """
@@ -20,20 +20,20 @@ from pathlib import Path
 from fastapi import APIRouter, FastAPI, HTTPException
 
 from ananta.exceptions import ProjectNotFoundError, RepoIngestError
-from ananta.experimental.code_explorer.dependencies import (
+from ananta.explorers.code.dependencies import (
     CodeExplorerState,
     get_topic_session,
 )
-from ananta.experimental.code_explorer.schemas import (
+from ananta.explorers.code.schemas import (
     AnalysisResponse,
     RepoAdd,
     RepoInfo,
     RepoRename,
     UpdateStatus,
 )
-from ananta.experimental.code_explorer.websockets import websocket_handler
-from ananta.experimental.shared.app_factory import create_app
-from ananta.experimental.shared.routes import create_item_router, create_shared_router
+from ananta.explorers.code.websockets import websocket_handler
+from ananta.explorers.shared_ui.app_factory import create_app
+from ananta.explorers.shared_ui.routes import create_item_router, create_shared_router
 from ananta.models import RepoProjectResult
 
 # Allow / for old-style arXiv IDs (e.g. cs/9808001v1), but block .. traversal.

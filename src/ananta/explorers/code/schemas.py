@@ -1,6 +1,6 @@
 """Pydantic schemas for the code explorer API.
 
-Generic schemas are imported from ananta.experimental.shared.schemas and
+Generic schemas are imported from ananta.explorers.shared_ui.schemas and
 re-exported here so that ``from code_explorer.schemas import X`` works for
 all schema types.  Unlike the arxiv explorer, the code explorer uses the
 shared TopicInfo (with ``document_count``) and ExchangeSchema (with
@@ -14,7 +14,7 @@ from typing import Any
 from pydantic import BaseModel
 
 # Re-export shared schemas used by the code explorer API.
-from ananta.experimental.shared.schemas import (
+from ananta.explorers.shared_ui.schemas import (
     ContextBudget,
     ExchangeSchema,
     ModelInfo,

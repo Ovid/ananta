@@ -9,9 +9,9 @@ import urllib.request
 from pathlib import Path
 from urllib.error import URLError
 
-from ananta.experimental.arxiv.cache import PaperCache
-from ananta.experimental.arxiv.models import PaperMeta
-from ananta.experimental.arxiv.rate_limit import RateLimiter
+from ananta.explorers.arxiv.papers.cache import PaperCache
+from ananta.explorers.arxiv.papers.models import PaperMeta
+from ananta.explorers.arxiv.papers.rate_limit import RateLimiter
 from ananta.models import ParsedDocument
 
 # File extensions to extract from LaTeX source archives

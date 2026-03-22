@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from ananta.experimental.arxiv.models import PaperMeta
+from ananta.explorers.arxiv.papers.models import PaperMeta
 
 
 class PaperCache:

@@ -14,8 +14,9 @@ from typing import Any
 
 from fastapi import WebSocket
 
-from ananta.experimental.arxiv.cache import PaperCache
-from ananta.experimental.arxiv.citations import (
+from ananta.explorers.arxiv.dependencies import AppState
+from ananta.explorers.arxiv.papers.cache import PaperCache
+from ananta.explorers.arxiv.papers.citations import (
     ArxivVerifier,
     detect_llm_phrases,
     extract_citations_from_bbl,
@@ -23,22 +24,21 @@ from ananta.experimental.arxiv.citations import (
     extract_citations_from_text,
     format_check_report_json,
 )
-from ananta.experimental.arxiv.models import (
+from ananta.explorers.arxiv.papers.models import (
     CheckReport,
     ExtractedCitation,
     VerificationResult,
     VerificationStatus,
 )
-from ananta.experimental.arxiv.relevance import check_topical_relevance
-from ananta.experimental.arxiv.verifiers import (
+from ananta.explorers.arxiv.papers.relevance import check_topical_relevance
+from ananta.explorers.arxiv.papers.verifiers import (
     CascadingVerifier,
     CrossRefVerifier,
     OpenAlexVerifier,
     SemanticScholarVerifier,
 )
-from ananta.experimental.shared.websockets import websocket_handler as shared_ws_handler
-from ananta.experimental.web.dependencies import AppState
-from ananta.experimental.web.session import WebConversationSession
+from ananta.explorers.arxiv.session import WebConversationSession
+from ananta.explorers.shared_ui.websockets import websocket_handler as shared_ws_handler
 from ananta.models import ParsedDocument
 
 logger = logging.getLogger(__name__)

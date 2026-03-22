@@ -7,7 +7,7 @@ import logging
 
 import litellm
 
-from ananta.experimental.arxiv.models import (
+from ananta.explorers.arxiv.papers.models import (
     ExtractedCitation,
     VerificationResult,
     VerificationStatus,

@@ -7,9 +7,9 @@ from pathlib import Path
 
 from ananta import Ananta
 from ananta.config import AnantaConfig
-from ananta.experimental.arxiv.cache import PaperCache
-from ananta.experimental.arxiv.search import ArxivSearcher
-from ananta.experimental.arxiv.topics import TopicManager
+from ananta.explorers.arxiv.papers.cache import PaperCache
+from ananta.explorers.arxiv.papers.search import ArxivSearcher
+from ananta.explorers.arxiv.papers.topics import TopicManager
 from ananta.migration import check_legacy_directory
 from ananta.repo.ingester import RepoIngester
 from ananta.storage.filesystem import FilesystemStorage

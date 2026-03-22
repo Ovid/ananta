@@ -13,14 +13,14 @@ from typing import Any
 from fastapi import WebSocket
 
 from ananta.exceptions import ProjectNotFoundError
-from ananta.experimental.code_explorer.dependencies import (
+from ananta.explorers.code.dependencies import (
     CodeExplorerState,
     get_topic_session,
 )
-from ananta.experimental.shared.websockets import (
+from ananta.explorers.shared_ui.websockets import (
     handle_multi_project_query,
 )
-from ananta.experimental.shared.websockets import (
+from ananta.explorers.shared_ui.websockets import (
     websocket_handler as shared_ws_handler,
 )
 

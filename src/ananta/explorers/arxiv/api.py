@@ -21,23 +21,23 @@ import arxiv
 from fastapi import APIRouter, FastAPI, HTTPException, WebSocket
 from fastapi.responses import JSONResponse
 
-from ananta.experimental.arxiv.download import to_parsed_document
-from ananta.experimental.shared.app_factory import create_app
-from ananta.experimental.shared.routes import (
-    create_shared_router,
-    resolve_topic_or_404,
-)
-from ananta.experimental.shared.schemas import TopicInfo
-from ananta.experimental.web.dependencies import AppState
-from ananta.experimental.web.schemas import (
+from ananta.explorers.arxiv.dependencies import AppState
+from ananta.explorers.arxiv.papers.download import to_parsed_document
+from ananta.explorers.arxiv.schemas import (
     PaperAdd,
     PaperInfo,
     PaperRename,
     PaperReorder,
     SearchResult,
 )
-from ananta.experimental.web.session import WebConversationSession
-from ananta.experimental.web.websockets import websocket_handler
+from ananta.explorers.arxiv.session import WebConversationSession
+from ananta.explorers.arxiv.websockets import websocket_handler
+from ananta.explorers.shared_ui.app_factory import create_app
+from ananta.explorers.shared_ui.routes import (
+    create_shared_router,
+    resolve_topic_or_404,
+)
+from ananta.explorers.shared_ui.schemas import TopicInfo
 
 
 def _build_arxiv_topic_info(state: AppState) -> list[TopicInfo]:
@@ -128,7 +128,7 @@ def _create_arxiv_router(state: AppState) -> APIRouter:
             # Import here to avoid circular import at module level — the
             # download module imports from the cache module which may
             # trigger lazy initialization.
-            from ananta.experimental.arxiv.download import download_paper
+            from ananta.explorers.arxiv.papers.download import download_paper
 
             task = state.download_tasks[task_id]
             papers_list = task["papers"]

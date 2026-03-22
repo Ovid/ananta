@@ -16,7 +16,7 @@ import litellm
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, PlainTextResponse
 
-from ananta.experimental.shared.schemas import (
+from ananta.explorers.shared_ui.schemas import (
     ContextBudget,
     ConversationHistory,
     ItemReorder,
@@ -29,8 +29,8 @@ from ananta.experimental.shared.schemas import (
     TraceListItem,
     TraceStepSchema,
 )
-from ananta.experimental.shared.session import WebConversationSession
-from ananta.experimental.shared.topics import BaseTopicManager
+from ananta.explorers.shared_ui.session import WebConversationSession
+from ananta.explorers.shared_ui.topics import BaseTopicManager
 
 # Context budget estimation constants
 BASE_PROMPT_TOKENS = 2000  # system prompt + context metadata overhead

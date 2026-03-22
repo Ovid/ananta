@@ -16,24 +16,24 @@ from typing import Any
 from fastapi import APIRouter, FastAPI, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
-from ananta.experimental.document_explorer.dependencies import (
+from ananta.explorers.document.dependencies import (
     DocumentExplorerState,
     get_topic_session,
 )
-from ananta.experimental.document_explorer.extractors import (
+from ananta.explorers.document.extractors import (
     extract_text,
     get_page_count,
     is_supported_extension,
 )
-from ananta.experimental.document_explorer.schemas import (
+from ananta.explorers.document.schemas import (
     DocumentInfo,
     DocumentRename,
     DocumentUploadResponse,
 )
-from ananta.experimental.document_explorer.topics import _slugify
-from ananta.experimental.document_explorer.websockets import websocket_handler
-from ananta.experimental.shared.app_factory import create_app
-from ananta.experimental.shared.routes import create_item_router, create_shared_router
+from ananta.explorers.document.topics import _slugify
+from ananta.explorers.document.websockets import websocket_handler
+from ananta.explorers.shared_ui.app_factory import create_app
+from ananta.explorers.shared_ui.routes import create_item_router, create_shared_router
 from ananta.models import ParsedDocument
 
 # Maximum upload size per file (50 MB).

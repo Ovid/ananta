@@ -7,7 +7,7 @@ remain specific to this explorer.
 
 from __future__ import annotations
 
-from ananta.experimental.shared.topics import BaseTopicManager, _slugify
+from ananta.explorers.shared_ui.topics import BaseTopicManager, _slugify
 
 __all__ = ["DocumentTopicManager", "_slugify"]
 

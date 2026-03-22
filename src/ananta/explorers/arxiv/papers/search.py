@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 
 import arxiv
 
-from ananta.experimental.arxiv.models import PaperMeta
+from ananta.explorers.arxiv.papers.models import PaperMeta
 
 
 def extract_arxiv_id(entry_id: str) -> str:

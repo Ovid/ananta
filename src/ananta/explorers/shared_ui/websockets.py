@@ -22,7 +22,7 @@ from typing import Any
 from fastapi import WebSocket, WebSocketDisconnect
 
 from ananta.exceptions import DocumentNotFoundError
-from ananta.experimental.shared.session import WebConversationSession
+from ananta.explorers.shared_ui.session import WebConversationSession
 from ananta.models import ParsedDocument
 from ananta.rlm.trace import StepType, TokenUsage
 

@@ -7,8 +7,8 @@ from pathlib import Path
 
 from ananta import Ananta
 from ananta.config import AnantaConfig
-from ananta.experimental.shared.session import WebConversationSession
-from ananta.experimental.shared.topics import BaseTopicManager
+from ananta.explorers.shared_ui.session import WebConversationSession
+from ananta.explorers.shared_ui.topics import BaseTopicManager
 from ananta.migration import check_legacy_directory
 from ananta.repo.ingester import RepoIngester
 from ananta.storage.filesystem import FilesystemStorage

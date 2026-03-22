@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ananta.experimental.shared.session import WebConversationSession as _SharedSession
+from ananta.explorers.shared_ui.session import WebConversationSession as _SharedSession
 
 CONVERSATION_FILE = "_conversation.json"
 

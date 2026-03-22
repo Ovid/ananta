@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from ananta.exceptions import ProjectExistsError, ProjectNotFoundError
-from ananta.experimental.arxiv.models import TopicInfo
+from ananta.explorers.arxiv.papers.models import TopicInfo
 
 if TYPE_CHECKING:
     from pathlib import Path

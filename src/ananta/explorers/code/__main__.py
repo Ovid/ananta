@@ -9,8 +9,8 @@ from pathlib import Path
 
 import uvicorn
 
-from ananta.experimental.code_explorer.api import create_api
-from ananta.experimental.code_explorer.dependencies import create_app_state
+from ananta.explorers.code.api import create_api
+from ananta.explorers.code.dependencies import create_app_state
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

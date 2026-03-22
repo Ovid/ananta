@@ -1,6 +1,6 @@
 """Pydantic schemas for the arxiv web API.
 
-Generic schemas are imported from ananta.experimental.shared.schemas and
+Generic schemas are imported from ananta.explorers.shared_ui.schemas and
 re-exported here.  Arxiv-specific schemas (PaperAdd, PaperInfo, SearchResult,
 DownloadTaskStatus) are defined locally.
 """
@@ -10,7 +10,7 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 # Re-export all shared schemas.
-from ananta.experimental.shared.schemas import (
+from ananta.explorers.shared_ui.schemas import (
     ContextBudget,
     ConversationHistory,
     ExchangeSchema,

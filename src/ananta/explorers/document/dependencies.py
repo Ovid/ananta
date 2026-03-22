@@ -5,12 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from ananta.experimental.document_explorer.topics import DocumentTopicManager
-from ananta.experimental.shared.dependencies import (
+from ananta.explorers.document.topics import DocumentTopicManager
+from ananta.explorers.shared_ui.dependencies import (
     BaseExplorerState,
     get_topic_session,
 )
-from ananta.experimental.shared.dependencies import (
+from ananta.explorers.shared_ui.dependencies import (
     create_app_state as _create_app_state,
 )
 

@@ -7,13 +7,13 @@ import logging
 import httpx
 import litellm
 
-from ananta.experimental.arxiv.citations import ArxivVerifier, title_similarity
-from ananta.experimental.arxiv.models import (
+from ananta.explorers.arxiv.papers.citations import ArxivVerifier, title_similarity
+from ananta.explorers.arxiv.papers.models import (
     ExtractedCitation,
     VerificationResult,
     VerificationStatus,
 )
-from ananta.experimental.arxiv.rate_limit import RateLimiter
+from ananta.explorers.arxiv.papers.rate_limit import RateLimiter
 
 # Thresholds for fuzzy title matching
 MATCH_THRESHOLD = 0.85  # Above this = confident match

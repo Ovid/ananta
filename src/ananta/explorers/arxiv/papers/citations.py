@@ -6,7 +6,7 @@ import logging
 import re
 from typing import TYPE_CHECKING
 
-from ananta.experimental.arxiv.models import (
+from ananta.explorers.arxiv.papers.models import (
     CheckReport,
     ExtractedCitation,
     VerificationResult,
@@ -14,7 +14,7 @@ from ananta.experimental.arxiv.models import (
 )
 
 if TYPE_CHECKING:
-    from ananta.experimental.arxiv.search import ArxivSearcher
+    from ananta.explorers.arxiv.papers.search import ArxivSearcher
 
 # Patterns that suggest LLM-generated text
 LLM_TELL_PATTERNS = [
@@ -167,7 +167,7 @@ class ArxivVerifier:
     def __init__(self, searcher: ArxivSearcher | None = None) -> None:
         if searcher is None:
             # Late import: arxiv is an optional dependency (ananta[arxiv])
-            from ananta.experimental.arxiv.search import ArxivSearcher
+            from ananta.explorers.arxiv.papers.search import ArxivSearcher
 
             searcher = ArxivSearcher()
         self._searcher = searcher

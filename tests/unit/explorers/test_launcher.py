@@ -242,11 +242,14 @@ class TestRunPreflight:
     @patch("ananta.explorers.launcher.check_env_var", return_value=None)
     @patch("ananta.explorers.launcher.check_python_version", return_value=None)
     @patch("ananta.explorers.launcher.check_command")
-    def test_collects_multiple_errors(self, mock_cmd: object, *mocks: object) -> None:
-        mock_cmd.side_effect = lambda cmd, hint: f"  - missing {cmd}" if cmd == "node" else None
+    def test_collects_errors(self, mock_cmd: object, *mocks: object) -> None:
+        mock_cmd.side_effect = lambda cmd, hint: (
+            f"  - missing {cmd}" if cmd in ("node", "npm") else None
+        )
         errors = run_preflight(self._make_config(), "/project")
-        assert len(errors) == 1
+        assert len(errors) == 2
         assert "node" in errors[0]
+        assert "npm" in errors[1]
 
     @patch("ananta.explorers.launcher.ensure_sandbox_image", return_value=None)
     @patch("ananta.explorers.launcher.check_docker_running", return_value=None)

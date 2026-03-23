@@ -66,9 +66,9 @@ class TestExplorerConfigs:
             kwargs = {kw.arg: kw.value for kw in config_call.keywords}
             assert "frontend_dir" in kwargs, f"{explorer_name}: missing frontend_dir"
             frontend_dir = ast.literal_eval(kwargs["frontend_dir"])
-            has_shared = "shared_frontend_dir" in kwargs and kwargs[
-                "shared_frontend_dir"
-            ] is not None
+            has_shared = (
+                "shared_frontend_dir" in kwargs and kwargs["shared_frontend_dir"] is not None
+            )
 
             # Check if package.json has @ananta/shared-ui dependency
             pkg_json = project_root / frontend_dir / "package.json"
@@ -283,7 +283,12 @@ class TestRunPreflight:
     @patch("ananta.explorers.launcher.check_python_version", return_value=None)
     @patch("ananta.explorers.launcher.check_command", return_value=None)
     def test_sandbox_image_skipped_when_docker_not_running(
-        self, mock_cmd: object, mock_py: object, mock_env: object, mock_docker: object, mock_image: object
+        self,
+        mock_cmd: object,
+        mock_py: object,
+        mock_env: object,
+        mock_docker: object,
+        mock_image: object,
     ) -> None:
         """When Docker daemon is not running, ensure_sandbox_image should not be called."""
         run_preflight(self._make_config(), "/project")

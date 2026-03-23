@@ -33,6 +33,56 @@ class TestLauncherConfig:
         assert config.shared_frontend_dir is None
 
 
+class TestExplorerConfigs:
+    """Verify per-explorer launch.py configs are consistent with their frontends."""
+
+    def test_shared_ui_dependency_requires_shared_frontend_dir(self) -> None:
+        """If a frontend's package.json depends on @ananta/shared-ui,
+        the launch.py config must set shared_frontend_dir."""
+        import ast
+        import json
+
+        project_root = Path(__file__).resolve().parents[3]
+        launch_files = sorted(project_root.glob("*-explorer/launch.py"))
+        assert launch_files, "Expected at least one explorer launch.py"
+
+        for launch_file in launch_files:
+            explorer_name = launch_file.parent.name
+            tree = ast.parse(launch_file.read_text())
+
+            # Find the LauncherConfig(...) call
+            config_call = None
+            for node in ast.walk(tree):
+                if (
+                    isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Name)
+                    and node.func.id == "LauncherConfig"
+                ):
+                    config_call = node
+                    break
+            assert config_call is not None, f"{explorer_name}: no LauncherConfig call found"
+
+            # Extract frontend_dir and shared_frontend_dir from the config
+            kwargs = {kw.arg: kw.value for kw in config_call.keywords}
+            assert "frontend_dir" in kwargs, f"{explorer_name}: missing frontend_dir"
+            frontend_dir = ast.literal_eval(kwargs["frontend_dir"])
+            has_shared = "shared_frontend_dir" in kwargs and kwargs[
+                "shared_frontend_dir"
+            ] is not None
+
+            # Check if package.json has @ananta/shared-ui dependency
+            pkg_json = project_root / frontend_dir / "package.json"
+            if pkg_json.exists():
+                pkg_data = json.loads(pkg_json.read_text())
+                deps = pkg_data.get("dependencies", {})
+                needs_shared = "@ananta/shared-ui" in deps
+                assert has_shared == needs_shared, (
+                    f"{explorer_name}: package.json "
+                    f"{'has' if needs_shared else 'lacks'} @ananta/shared-ui dep "
+                    f"but config {'sets' if has_shared else 'omits'} shared_frontend_dir"
+                )
+
+
 class TestParseLauncherArgs:
     def test_no_args(self) -> None:
         rebuild, passthrough = parse_launcher_args([])

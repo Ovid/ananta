@@ -9,6 +9,7 @@ config = LauncherConfig(
     app_name="Ananta arXiv Web Explorer",
     entry_point="ananta-web",
     frontend_dir="src/ananta/explorers/arxiv/frontend",
+    shared_frontend_dir="src/ananta/explorers/shared_ui/frontend",
 )
 
 if __name__ == "__main__":

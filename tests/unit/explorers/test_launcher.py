@@ -56,6 +56,11 @@ class TestParseLauncherArgs:
         assert rebuild is True
         assert passthrough == []
 
+    def test_rebuild_equals_true(self) -> None:
+        rebuild, passthrough = parse_launcher_args(["--rebuild=true", "--port", "9000"])
+        assert rebuild is True
+        assert passthrough == ["--port", "9000"]
+
 
 class TestCheckCommand:
     def test_command_found(self) -> None:

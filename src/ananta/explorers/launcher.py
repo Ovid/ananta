@@ -26,7 +26,7 @@ def parse_launcher_args(argv: list[str]) -> tuple[bool, list[str]]:
     rebuild = False
     passthrough: list[str] = []
     for arg in argv:
-        if arg == "--rebuild":
+        if arg in ("--rebuild", "--rebuild=true"):
             rebuild = True
         else:
             passthrough.append(arg)

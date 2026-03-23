@@ -340,3 +340,17 @@ class TestLaunch:
         config = self._make_config()
         exit_code = launch(config, argv=[], project_root="/project")
         assert exit_code == 1
+
+    @patch("ananta.explorers.launcher.subprocess.run")
+    @patch("ananta.explorers.launcher.build_frontend")
+    @patch("ananta.explorers.launcher.run_preflight", return_value=[])
+    def test_launch_missing_entry_point_returns_exit_code_1(
+        self,
+        mock_preflight: object,
+        mock_build: object,
+        mock_run: object,
+    ) -> None:
+        mock_run.side_effect = FileNotFoundError("No such file: 'test-app'")  # type: ignore[attr-defined]
+        config = self._make_config()
+        exit_code = launch(config, argv=[], project_root="/project")
+        assert exit_code == 1

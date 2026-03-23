@@ -163,7 +163,15 @@ def launch(
 
     # Launch
     print(f"[ananta] Starting {config.app_name}...")
-    result = subprocess.run([config.entry_point, *passthrough])
+    try:
+        result = subprocess.run([config.entry_point, *passthrough])
+    except FileNotFoundError:
+        print(
+            f"\033[0;31m[ananta]\033[0m Command '{config.entry_point}' not found. "
+            f"Is the package installed?",
+            file=sys.stderr,
+        )
+        return 1
     return result.returncode
 
 

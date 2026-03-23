@@ -216,6 +216,21 @@ class TestRunPreflight:
         cmd_names = [call.args[0] for call in mock_cmd.call_args_list]  # type: ignore[attr-defined]
         assert "git" not in cmd_names
 
+    @patch("ananta.explorers.launcher.ensure_sandbox_image")
+    @patch(
+        "ananta.explorers.launcher.check_docker_running",
+        return_value="  - Start Docker daemon (e.g. open Docker Desktop)",
+    )
+    @patch("ananta.explorers.launcher.check_env_var", return_value=None)
+    @patch("ananta.explorers.launcher.check_python_version", return_value=None)
+    @patch("ananta.explorers.launcher.check_command", return_value=None)
+    def test_sandbox_image_skipped_when_docker_not_running(
+        self, mock_cmd: object, mock_py: object, mock_env: object, mock_docker: object, mock_image: object
+    ) -> None:
+        """When Docker daemon is not running, ensure_sandbox_image should not be called."""
+        run_preflight(self._make_config(), "/project")
+        mock_image.assert_not_called()  # type: ignore[attr-defined]
+
 
 class TestBuildFrontend:
     def _make_config(

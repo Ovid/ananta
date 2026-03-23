@@ -191,7 +191,9 @@ def run_preflight(config: LauncherConfig, project_root: str) -> list[str]:
         collect(check_command("git", "https://git-scm.com/"))
     collect(check_env_var("ANANTA_API_KEY", "export ANANTA_API_KEY=<your-key>"))
     collect(check_env_var("ANANTA_MODEL", "export ANANTA_MODEL=<model-name>"))
-    collect(check_docker_running())
-    collect(ensure_sandbox_image(project_root))
+    docker_err = check_docker_running()
+    collect(docker_err)
+    if docker_err is None:
+        collect(ensure_sandbox_image(project_root))
 
     return errors

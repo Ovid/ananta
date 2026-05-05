@@ -8,6 +8,8 @@ DocumentUploadResponse) are defined locally.
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel
 
 # Re-export shared schemas used by the document explorer API.
@@ -65,4 +67,5 @@ class DocumentRename(BaseModel):
 class DocumentUploadResponse(BaseModel):
     project_id: str
     filename: str
-    status: str
+    status: Literal["created", "failed"]
+    reason: str | None = None

@@ -87,6 +87,24 @@ class TestDocumentUploadResponse:
         assert r.status == "created"
 
 
+def test_document_upload_response_status_and_reason():
+    ok = DocumentUploadResponse(
+        project_id="x-12345678",
+        filename="a.md",
+        status="created",
+    )
+    assert ok.reason is None
+
+    failed = DocumentUploadResponse(
+        project_id="",
+        filename="bad.pdf",
+        status="failed",
+        reason="text extraction failed: corrupt PDF",
+    )
+    assert failed.status == "failed"
+    assert failed.reason == "text extraction failed: corrupt PDF"
+
+
 class TestReexportedSharedSchemas:
     def test_topic_create(self) -> None:
         t = TopicCreate(name="Research")

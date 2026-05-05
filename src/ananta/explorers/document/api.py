@@ -16,6 +16,10 @@ from typing import Any
 from fastapi import APIRouter, FastAPI, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
+from ananta.explorers.document.config import (
+    MAX_AGGREGATE_UPLOAD_BYTES,
+    MAX_UPLOAD_BYTES,
+)
 from ananta.explorers.document.dependencies import (
     DocumentExplorerState,
     get_topic_session,
@@ -35,10 +39,6 @@ from ananta.explorers.document.websockets import websocket_handler
 from ananta.explorers.shared_ui.app_factory import create_app
 from ananta.explorers.shared_ui.routes import create_item_router, create_shared_router
 from ananta.models import ParsedDocument
-
-# Maximum upload size per file (50 MB).
-MAX_UPLOAD_BYTES = 50 * 1024 * 1024
-MAX_AGGREGATE_UPLOAD_BYTES = 200 * 1024 * 1024
 
 # Allow / for old-style arXiv IDs (e.g. cs/9808001v1), but block .. traversal.
 # safe_path() provides the real path-traversal defence; this is belt-and-suspenders.

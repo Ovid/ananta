@@ -26,6 +26,8 @@ ENV/
 htmlcov/
 .mypy_cache/
 uv.lock
+vitest_*.json
+vitest_*.txt
 
 # OS
 .DS_Store

@@ -61,6 +61,16 @@ def _make_project_id(filename: str) -> str:
     return f"{slug}-{short_hash}"
 
 
+def _failed_row(filename: str, reason: str) -> DocumentUploadResponse:
+    """Build a `failed` upload-row response for partial-success uploads."""
+    return DocumentUploadResponse(
+        project_id="",
+        filename=filename,
+        status="failed",
+        reason=reason,
+    )
+
+
 def _read_upload_meta(uploads_dir: Path, project_id: str) -> dict[str, Any] | None:
     """Read upload metadata for a document, or None if missing/corrupt."""
     meta_path = uploads_dir / project_id / "meta.json"
@@ -161,6 +171,8 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
     ) -> list[DocumentUploadResponse]:
         # Validate topic name up-front so we fail before creating any
         # files or projects — avoids orphaned data on invalid topics.
+        # Topic-validation is still all-or-nothing; only per-file work is
+        # partial-success.
         if topic:
             try:
                 state.topic_mgr.create(topic)
@@ -168,50 +180,52 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                 raise HTTPException(422, str(exc)) from exc
 
         results: list[DocumentUploadResponse] = []
-        created_projects: list[str] = []
-        created_upload_dirs: list[Path] = []
         total_bytes = 0
-        try:
-            for idx, file in enumerate(files):
-                if not file.filename:
-                    continue
 
-                rel_path = (
-                    relative_path[idx]
-                    if relative_path is not None and idx < len(relative_path)
-                    else None
-                )
+        for idx, file in enumerate(files):
+            if not file.filename:
+                continue
 
-                project_id = _make_project_id(file.filename)
+            rel_path = (
+                relative_path[idx]
+                if relative_path is not None and idx < len(relative_path)
+                else None
+            )
 
+            upload_dir: Path | None = None
+            project_id: str | None = None
+            try:
                 # Validate extension before reading body — only needs filename,
                 # avoids allocating memory for files we'll reject anyway.
                 ext = Path(file.filename).suffix.lower()
                 if not is_supported_extension(file.filename):
-                    raise HTTPException(422, f"Unsupported file type: {ext}")
+                    results.append(_failed_row(file.filename, f"unsupported file type: {ext}"))
+                    continue
 
                 # Cap read to avoid memory exhaustion from oversized uploads.
                 content = await file.read(MAX_UPLOAD_BYTES + 1)
                 if len(content) > MAX_UPLOAD_BYTES:
-                    raise HTTPException(
-                        413,
-                        f"File '{file.filename}' exceeds the "
-                        f"{MAX_UPLOAD_BYTES // (1024 * 1024)} MB upload limit",
+                    results.append(
+                        _failed_row(
+                            file.filename,
+                            f"file exceeds the {MAX_UPLOAD_BYTES // (1024 * 1024)} MB upload limit",
+                        )
                     )
+                    continue
 
                 total_bytes += len(content)
                 if total_bytes > MAX_AGGREGATE_UPLOAD_BYTES:
+                    # Aggregate cap remains a hard 413 — frontend chunking
+                    # should ensure this is never reached in practice.
                     raise HTTPException(
                         413,
                         f"Total upload size exceeds the "
                         f"{MAX_AGGREGATE_UPLOAD_BYTES // (1024 * 1024)} MB aggregate limit",
                     )
 
-                # Save original file
+                project_id = _make_project_id(file.filename)
                 upload_dir = state.uploads_dir / project_id
                 upload_dir.mkdir(parents=True, exist_ok=True)
-                created_upload_dirs.append(upload_dir)
-
                 original_path = upload_dir / f"original{ext}"
                 original_path.write_bytes(content)
 
@@ -219,7 +233,9 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                 try:
                     text = extract_text(original_path)
                 except ValueError as exc:
-                    raise HTTPException(422, str(exc)) from exc
+                    shutil.rmtree(upload_dir, ignore_errors=True)
+                    results.append(_failed_row(file.filename, f"text extraction failed: {exc}"))
+                    continue
 
                 # Compute page/sheet/slide count where applicable
                 page_count = get_page_count(original_path)
@@ -237,7 +253,6 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                 (upload_dir / "meta.json").write_text(json.dumps(meta, indent=2))
 
                 state.ananta.create_project(project_id)
-                created_projects.append(project_id)
                 doc = ParsedDocument(
                     name=file.filename,
                     content=text,
@@ -257,20 +272,22 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                         status="created",
                     )
                 )
-        except Exception:
-            # Roll back all projects and upload dirs created so far
-            for pid in created_projects:
-                try:
-                    state.topic_mgr.remove_item_from_all(pid)
-                except Exception:
-                    pass  # Best-effort cleanup — original error takes priority
-                try:
-                    state.ananta.delete_project(pid)
-                except Exception:
-                    pass  # Best-effort cleanup — original error takes priority
-            for udir in created_upload_dirs:
-                shutil.rmtree(udir, ignore_errors=True)
-            raise
+            except HTTPException:
+                raise  # 413 aggregate cap propagates as before
+            except Exception as exc:
+                # Per-file rollback: clean up only this file's state.
+                if upload_dir is not None:
+                    shutil.rmtree(upload_dir, ignore_errors=True)
+                if project_id is not None:
+                    try:
+                        state.topic_mgr.remove_item_from_all(project_id)
+                    except Exception:
+                        pass  # Best-effort cleanup — original error takes priority
+                    try:
+                        state.ananta.delete_project(project_id)
+                    except Exception:
+                        pass  # Best-effort cleanup — original error takes priority
+                results.append(_failed_row(file.filename, f"unexpected error: {exc}"))
 
         return results
 

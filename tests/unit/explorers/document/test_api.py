@@ -197,16 +197,71 @@ class TestUploadDocument:
         # No upload directories should have been created
         assert list(uploads_dir.iterdir()) == []
 
-    def test_upload_unsupported_type_returns_422_with_detail(
+    def test_upload_unsupported_type_returns_failed_row(
         self,
         client: TestClient,
+        uploads_dir: Path,
     ) -> None:
         resp = client.post(
             "/api/documents/upload",
-            files=[("files", ("photo.png", b"\x89PNG", "image/png"))],
+            files=[("files", ("foo.xyz", b"junk", "application/octet-stream"))],
         )
-        assert resp.status_code == 422
-        assert ".png" in resp.json()["detail"]
+        assert resp.status_code == 200
+        rows = resp.json()
+        assert len(rows) == 1
+        row = rows[0]
+        assert row["status"] == "failed"
+        assert ".xyz" in row["reason"] or "unsupported" in row["reason"].lower()
+
+    def test_upload_partial_success_unsupported_extension(
+        self,
+        client: TestClient,
+        mock_ananta: MagicMock,
+        uploads_dir: Path,
+    ) -> None:
+        """One unsupported file should NOT fail the whole batch."""
+        mock_ananta.create_project.return_value = MagicMock()
+        response = client.post(
+            "/api/documents/upload",
+            files=[
+                ("files", ("good.md", b"hello", "text/markdown")),
+                ("files", ("bad.xyz", b"junk", "application/octet-stream")),
+                ("files", ("also-good.txt", b"world", "text/plain")),
+            ],
+        )
+        assert response.status_code == 200
+        rows = response.json()
+        assert len(rows) == 3
+        by_filename = {r["filename"]: r for r in rows}
+        assert by_filename["good.md"]["status"] == "created"
+        assert by_filename["also-good.txt"]["status"] == "created"
+        assert by_filename["bad.xyz"]["status"] == "failed"
+        assert "unsupported" in by_filename["bad.xyz"]["reason"].lower()
+
+        good_id = by_filename["good.md"]["project_id"]
+        assert (uploads_dir / good_id / "meta.json").exists()
+
+    def test_upload_partial_success_oversized(
+        self,
+        client: TestClient,
+        mock_ananta: MagicMock,
+        uploads_dir: Path,
+    ) -> None:
+        mock_ananta.create_project.return_value = MagicMock()
+        big = b"x" * (51 * 1024 * 1024)
+        response = client.post(
+            "/api/documents/upload",
+            files=[
+                ("files", ("good.md", b"hello", "text/markdown")),
+                ("files", ("big.md", big, "text/markdown")),
+            ],
+        )
+        assert response.status_code == 200
+        rows = response.json()
+        by_filename = {r["filename"]: r for r in rows}
+        assert by_filename["good.md"]["status"] == "created"
+        assert by_filename["big.md"]["status"] == "failed"
+        assert "limit" in by_filename["big.md"]["reason"].lower()
 
     def test_upload_persists_relative_path_and_session_id(
         self,
@@ -235,7 +290,13 @@ class TestUploadDocument:
 
 
 class TestUploadAtomicity:
-    """Upload failures at each step should clean up and not leave orphaned state."""
+    """Per-file upload failures should clean up the failing file's state.
+
+    After A4 (per-file partial success): a single-file failure no longer
+    rolls back the whole batch. Each failure is a `failed` row in a 200
+    response, with the failing file's own upload dir/project/topic-entries
+    cleaned up. Successful files are kept.
+    """
 
     def test_create_project_failure_cleans_up_upload_dir(
         self,
@@ -243,7 +304,7 @@ class TestUploadAtomicity:
         mock_ananta: MagicMock,
         uploads_dir: Path,
     ) -> None:
-        """If create_project fails, upload dir is cleaned up."""
+        """If create_project fails, that file's upload dir is cleaned up."""
         mock_ananta.create_project.side_effect = RuntimeError("storage full")
         app = create_api(state)
         client = TestClient(app, raise_server_exceptions=False)
@@ -252,7 +313,9 @@ class TestUploadAtomicity:
             "/api/documents/upload",
             files=[("files", ("notes.txt", b"Hello", "text/plain"))],
         )
-        assert resp.status_code == 500
+        assert resp.status_code == 200
+        [row] = resp.json()
+        assert row["status"] == "failed"
         mock_ananta.storage.store_document.assert_not_called()
         # Upload dir should be cleaned up
         assert list(uploads_dir.iterdir()) == []
@@ -263,7 +326,7 @@ class TestUploadAtomicity:
         mock_ananta: MagicMock,
         uploads_dir: Path,
     ) -> None:
-        """If store_document fails, both project and upload dir are cleaned up."""
+        """If store_document fails, that file's project and upload dir are cleaned up."""
         mock_ananta.create_project.return_value = MagicMock()
         mock_ananta.storage.store_document.side_effect = RuntimeError("disk error")
         app = create_api(state)
@@ -273,7 +336,9 @@ class TestUploadAtomicity:
             "/api/documents/upload",
             files=[("files", ("notes.txt", b"Hello", "text/plain"))],
         )
-        assert resp.status_code == 500
+        assert resp.status_code == 200
+        [row] = resp.json()
+        assert row["status"] == "failed"
         # Project should be deleted (cleanup)
         mock_ananta.delete_project.assert_called_once()
         # Upload dir should be cleaned up
@@ -284,12 +349,20 @@ class TestUploadAtomicity:
         client: TestClient,
         uploads_dir: Path,
     ) -> None:
-        """Existing behavior: extraction failure removes the upload directory."""
+        """Extraction failure removes the failing file's upload dir.
+
+        After A4: an unsupported extension is caught up-front as a `failed`
+        row before any upload dir is created — extraction never runs for
+        unsupported types, so this test asserts the same end-state from a
+        different angle (no orphaned upload dir).
+        """
         resp = client.post(
             "/api/documents/upload",
             files=[("files", ("photo.png", b"\x89PNG", "image/png"))],
         )
-        assert resp.status_code == 422
+        assert resp.status_code == 200
+        [row] = resp.json()
+        assert row["status"] == "failed"
         # Upload dir should be cleaned up
         assert list(uploads_dir.iterdir()) == []
 
@@ -299,7 +372,7 @@ class TestUploadAtomicity:
         mock_ananta: MagicMock,
         uploads_dir: Path,
     ) -> None:
-        """If add_to_topic fails, project, document, and upload dir are cleaned up."""
+        """If add_to_topic fails, that file's project, document, and upload dir are cleaned up."""
         mock_ananta.create_project.return_value = MagicMock()
         # Create the topic so the pre-flight validation passes
         state.topic_mgr.create("Research")
@@ -320,7 +393,9 @@ class TestUploadAtomicity:
             files=[("files", ("notes.txt", b"Hello", "text/plain"))],
             data={"topic": "Research"},
         )
-        assert resp.status_code == 500
+        assert resp.status_code == 200
+        [row] = resp.json()
+        assert row["status"] == "failed"
         # Project should be deleted (cleanup)
         mock_ananta.delete_project.assert_called_once()
         # Upload dir should be cleaned up
@@ -328,13 +403,16 @@ class TestUploadAtomicity:
 
         state.topic_mgr.add_item = original_add  # type: ignore[assignment]
 
-    def test_batch_upload_cleans_up_earlier_files_on_later_failure(
+    def test_batch_upload_keeps_earlier_successes_on_later_failure(
         self,
         state: DocumentExplorerState,
         mock_ananta: MagicMock,
         uploads_dir: Path,
     ) -> None:
-        """If file 2 of 2 fails at store_document, file 1's project is also cleaned up."""
+        """If file 2 of 2 fails, file 1 is kept (per-file partial success).
+
+        Only the failing file's project is cleaned up.
+        """
         call_count = [0]
 
         def store_side_effect(project_id, doc, **kwargs):
@@ -354,27 +432,31 @@ class TestUploadAtomicity:
                 ("files", ("second.txt", b"World", "text/plain")),
             ],
         )
-        assert resp.status_code == 500
-        # Both projects should be cleaned up — not just the second one
-        assert mock_ananta.delete_project.call_count == 2
-        # All upload dirs should be cleaned up
-        assert list(uploads_dir.iterdir()) == []
+        assert resp.status_code == 200
+        rows = resp.json()
+        by_filename = {r["filename"]: r for r in rows}
+        assert by_filename["first.txt"]["status"] == "created"
+        assert by_filename["second.txt"]["status"] == "failed"
+        # Only the second project is cleaned up — first remains
+        assert mock_ananta.delete_project.call_count == 1
+        # Only the failing file's upload dir was removed
+        assert (uploads_dir / by_filename["first.txt"]["project_id"]).exists()
 
-    def test_batch_upload_rollback_removes_topic_associations(
+    def test_batch_upload_failed_file_does_not_leave_topic_association(
         self,
         state: DocumentExplorerState,
         mock_ananta: MagicMock,
         topic_mgr: DocumentTopicManager,
         uploads_dir: Path,
     ) -> None:
-        """Batch upload rollback removes topic associations for cleaned-up projects."""
+        """A failed file has no topic association; successful files do."""
         topic_mgr.create("MyTopic")
         call_count = [0]
-        created_pids: list[str] = []
+        seen_pids: list[str] = []
 
         def store_side_effect(project_id, doc, **kwargs):
             call_count[0] += 1
-            created_pids.append(project_id)
+            seen_pids.append(project_id)
             if call_count[0] == 2:
                 raise RuntimeError("disk full on second file")
 
@@ -391,19 +473,23 @@ class TestUploadAtomicity:
                 ("files", ("second.txt", b"World", "text/plain")),
             ],
         )
-        assert resp.status_code == 500
-        # Topic associations should be cleaned up — no orphaned references
-        for pid in created_pids:
-            items = topic_mgr.list_items("MyTopic")
-            assert pid not in items, f"Orphaned topic entry for {pid}"
+        assert resp.status_code == 200
+        rows = resp.json()
+        by_filename = {r["filename"]: r for r in rows}
+        # First file is in the topic; second (failed) is not
+        topic_items = topic_mgr.list_items("MyTopic")
+        assert by_filename["first.txt"]["project_id"] in topic_items
+        # The failed file's project_id is "" (not stored), so the seen pid
+        # for the second file must not appear in the topic.
+        assert seen_pids[1] not in topic_items
 
 
 class TestUploadSizeLimit:
-    def test_upload_exceeding_size_limit_returns_413(
+    def test_upload_exceeding_per_file_limit_returns_failed_row(
         self,
         client: TestClient,
     ) -> None:
-        """Uploads exceeding MAX_UPLOAD_BYTES are rejected with 413."""
+        """Uploads exceeding MAX_UPLOAD_BYTES become per-file failed rows (status 200)."""
         from ananta.explorers.document.api import MAX_UPLOAD_BYTES
 
         oversized = b"x" * (MAX_UPLOAD_BYTES + 1)
@@ -411,7 +497,10 @@ class TestUploadSizeLimit:
             "/api/documents/upload",
             files=[("files", ("big.txt", oversized, "text/plain"))],
         )
-        assert resp.status_code == 413
+        assert resp.status_code == 200
+        [row] = resp.json()
+        assert row["status"] == "failed"
+        assert "limit" in row["reason"].lower()
 
     def test_upload_at_size_limit_succeeds(
         self,
@@ -439,13 +528,18 @@ class TestUploadSizeLimit:
         Regression: the old code read the entire file into memory before
         checking the extension, so a large .png upload would allocate RAM
         before being rejected.
+
+        After A4 (per-file partial success): unsupported extensions appear as
+        per-file `failed` rows with status 200 — no upload dir is created.
         """
         # A small payload is enough — the extension check must come first.
         resp = client.post(
             "/api/documents/upload",
             files=[("files", ("photo.png", b"\x89PNG", "image/png"))],
         )
-        assert resp.status_code == 422
+        assert resp.status_code == 200
+        [row] = resp.json()
+        assert row["status"] == "failed"
         # No upload directory should have been created for the rejected file.
         assert list(uploads_dir.iterdir()) == []
 
@@ -457,6 +551,8 @@ class TestUploadSizeLimit:
 
         Verifies the capped-read approach: the endpoint reads at most
         MAX_UPLOAD_BYTES+1 bytes, then checks length.
+
+        After A4: per-file oversize is a `failed` row with status 200.
         """
         from ananta.explorers.document.api import MAX_UPLOAD_BYTES
 
@@ -466,7 +562,10 @@ class TestUploadSizeLimit:
             "/api/documents/upload",
             files=[("files", ("huge.txt", oversized, "text/plain"))],
         )
-        assert resp.status_code == 413
+        assert resp.status_code == 200
+        [row] = resp.json()
+        assert row["status"] == "failed"
+        assert "limit" in row["reason"].lower()
 
     def test_extension_lowercased_in_stored_format(
         self,

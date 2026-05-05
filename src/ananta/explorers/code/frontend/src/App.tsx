@@ -62,6 +62,7 @@ export default function App() {
   const [reposVersion, setReposVersion] = useState(0)
   const [helpOpen, setHelpOpen] = useState(false)
   const [allowBgKnowledge, setAllowBgKnowledge] = useState(false)
+  const [analyzingRepos, setAnalyzingRepos] = useState<Set<string>>(new Set())
 
   const allReposRef = useRef<RepoInfo[]>([])
   allReposRef.current = allRepos
@@ -127,14 +128,37 @@ export default function App() {
   }, [])
 
   const handleAnalyze = useCallback(async (projectId: string) => {
+    if (analyzingRepos.has(projectId)) return
+    setAnalyzingRepos(prev => {
+      const next = new Set(prev)
+      next.add(projectId)
+      return next
+    })
     try {
       const analysis = await api.repos.analyze(projectId)
-      setViewingAnalysis(analysis)
+      setViewingAnalysis(prev =>
+        viewingRepo?.project_id === projectId ? analysis : prev,
+      )
+      // Refresh repo info so the analysis_status badge reflects the new state.
+      try {
+        const refreshed = await api.repos.get(projectId)
+        setAllRepos(prev => prev.map(r => (r.project_id === projectId ? refreshed : r)))
+        setViewingRepo(prev => (prev?.project_id === projectId ? refreshed : prev))
+      } catch {
+        // If refresh fails, the analysis still succeeded — just leave stale info.
+      }
+      setReposVersion(v => v + 1)
       showToast('Analysis complete', 'success')
     } catch {
       showToast('Failed to analyze repository', 'error')
+    } finally {
+      setAnalyzingRepos(prev => {
+        const next = new Set(prev)
+        next.delete(projectId)
+        return next
+      })
     }
-  }, [])
+  }, [analyzingRepos, viewingRepo])
 
   const handleCheckUpdates = useCallback(async (projectId: string) => {
     try {
@@ -322,6 +346,7 @@ export default function App() {
             <RepoDetail
               repo={viewingRepo}
               analysis={viewingAnalysis}
+              analyzing={analyzingRepos.has(viewingRepo.project_id)}
               onClose={() => { setViewingRepo(null); setViewingAnalysis(null) }}
               onAnalyze={handleAnalyze}
               onCheckUpdates={handleCheckUpdates}

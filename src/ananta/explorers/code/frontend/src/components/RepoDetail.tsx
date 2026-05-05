@@ -4,6 +4,7 @@ import type { RepoInfo, RepoAnalysis } from '../types'
 interface RepoDetailProps {
   repo: RepoInfo
   analysis: RepoAnalysis | null
+  analyzing?: boolean
   onClose: () => void
   onAnalyze: (projectId: string) => Promise<void> | void
   onCheckUpdates: (projectId: string) => Promise<void> | void
@@ -29,24 +30,19 @@ function statusLabel(status: string | null): string {
 export default function RepoDetail({
   repo,
   analysis,
+  analyzing = false,
   onClose,
   onAnalyze,
   onCheckUpdates,
   onRemove,
 }: RepoDetailProps) {
-  const [analyzing, setAnalyzing] = useState(false)
   const [checking, setChecking] = useState(false)
   const status = repo.analysis_status
   const showGenerate = !status || status === 'missing'
   const showRegenerate = status === 'stale'
 
-  const handleAnalyze = async () => {
-    setAnalyzing(true)
-    try {
-      await onAnalyze(repo.project_id)
-    } finally {
-      setAnalyzing(false)
-    }
+  const handleAnalyze = () => {
+    void onAnalyze(repo.project_id)
   }
 
   const handleCheckUpdates = async () => {
@@ -94,47 +90,44 @@ export default function RepoDetail({
           </span>
         </div>
 
-        {/* Action buttons */}
-        <div className="flex items-center gap-3 mt-4">
-          {(showGenerate || showRegenerate || analyzing) && (
+        {/* Action buttons \u2014 hidden while analyzing so the in-progress state is unambiguous. */}
+        {!analyzing && (
+          <div className="flex items-center gap-3 mt-4">
+            {(showGenerate || showRegenerate) && (
+              <button
+                onClick={handleAnalyze}
+                className="px-3 py-1.5 text-xs rounded font-medium transition-colors bg-accent text-surface-0 hover:bg-accent/90"
+              >
+                {showRegenerate ? 'Regenerate Analysis' : 'Generate Analysis'}
+              </button>
+            )}
             <button
-              onClick={handleAnalyze}
-              disabled={analyzing}
-              className={`px-3 py-1.5 text-xs rounded font-medium transition-colors ${
-                analyzing
-                  ? 'bg-accent/50 text-surface-0 cursor-wait'
-                  : 'bg-accent text-surface-0 hover:bg-accent/90'
+              onClick={handleCheckUpdates}
+              disabled={checking}
+              className={`px-3 py-1.5 text-xs border rounded transition-colors ${
+                checking
+                  ? 'text-text-dim border-border cursor-wait'
+                  : 'text-text-secondary border-border hover:text-text-primary hover:border-text-dim'
               }`}
             >
-              {analyzing
-                ? 'Analyzing\u2026'
-                : showRegenerate
-                  ? 'Regenerate Analysis'
-                  : 'Generate Analysis'}
+              {checking ? 'Checking\u2026' : 'Check for Updates'}
             </button>
-          )}
-          <button
-            onClick={handleCheckUpdates}
-            disabled={checking}
-            className={`px-3 py-1.5 text-xs border rounded transition-colors ${
-              checking
-                ? 'text-text-dim border-border cursor-wait'
-                : 'text-text-secondary border-border hover:text-text-primary hover:border-text-dim'
-            }`}
-          >
-            {checking ? 'Checking\u2026' : 'Check for Updates'}
-          </button>
-          <div className="flex-1" />
-          <button
-            onClick={() => onRemove(repo.project_id)}
-            className="px-3 py-1.5 text-xs text-red border border-red/30 rounded hover:bg-red/10 transition-colors"
-          >
-            Remove
-          </button>
-        </div>
+            <div className="flex-1" />
+            <button
+              onClick={() => onRemove(repo.project_id)}
+              className="px-3 py-1.5 text-xs text-red border border-red/30 rounded hover:bg-red/10 transition-colors"
+            >
+              Remove
+            </button>
+          </div>
+        )}
 
         {/* Analysis content or empty state */}
-        {analysis ? (
+        {analyzing ? (
+          <p className="mt-6 text-sm text-text-secondary">
+            Analysis in progress&hellip; this may take a minute.
+          </p>
+        ) : analysis ? (
           <div className="mt-6 space-y-6">
             {/* Overview */}
             <section>

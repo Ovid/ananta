@@ -42,6 +42,7 @@ const sampleAnalysis: RepoAnalysis = {
 function renderDetail(overrides: {
   repo?: RepoInfo
   analysis?: RepoAnalysis | null
+  analyzing?: boolean
   onClose?: () => void
   onAnalyze?: (id: string) => void
   onCheckUpdates?: (id: string) => void
@@ -50,6 +51,7 @@ function renderDetail(overrides: {
   const props = {
     repo: baseRepo,
     analysis: sampleAnalysis as RepoAnalysis | null,
+    analyzing: false,
     onClose: vi.fn(),
     onAnalyze: vi.fn(),
     onCheckUpdates: vi.fn(),
@@ -142,19 +144,35 @@ describe('RepoDetail', () => {
     expect(onAnalyze).toHaveBeenCalledWith('owner-myrepo')
   })
 
-  it('disables button and shows "Analyzing..." while analysis runs', async () => {
-    let resolveAnalyze!: () => void
-    const onAnalyze = vi.fn(() => new Promise<void>(r => { resolveAnalyze = r }))
+  it('shows "Analysis in progress…" message when analyzing prop is true', () => {
     renderDetail({
       repo: { ...baseRepo, analysis_status: 'missing' },
-      onAnalyze,
+      analysis: null,
+      analyzing: true,
     })
-    await userEvent.click(screen.getByRole('button', { name: 'Generate Analysis' }))
-    // While the promise is pending, button should show loading state
-    const btn = screen.getByRole('button', { name: /analyzing/i })
-    expect(btn).toBeDisabled()
-    // Resolve the promise and verify button restores
-    await act(async () => { resolveAnalyze() })
+    expect(screen.getByText(/analysis in progress/i)).toBeInTheDocument()
+    expect(screen.queryByText(/no analysis available/i)).not.toBeInTheDocument()
+  })
+
+  it('hides Generate Analysis, Check for Updates, and Remove buttons while analyzing', () => {
+    renderDetail({
+      repo: { ...baseRepo, analysis_status: 'missing' },
+      analysis: null,
+      analyzing: true,
+    })
+    expect(screen.queryByRole('button', { name: 'Generate Analysis' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /analyzing/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Check for Updates' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument()
+  })
+
+  it('still shows the close button while analyzing (so user can navigate away)', () => {
+    renderDetail({
+      repo: { ...baseRepo, analysis_status: 'missing' },
+      analysis: null,
+      analyzing: true,
+    })
+    expect(screen.getByRole('button', { name: /close/i })).toBeInTheDocument()
   })
 
   it('calls onCheckUpdates when "Check for Updates" is clicked', async () => {

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Codebase analysis no longer crashes with `AttributeError` when the LLM returns a bare string in the `components` or `external_dependencies` arrays — strings are now promoted to `{"name": <string>}` to match the expected element shape
+- Code Explorer now shows an "Analysis in progress…" status on the repo detail page while an analysis is running — the action buttons are hidden so the in-progress state is unambiguous, and the state is preserved when the user navigates away and returns (previously the page reverted to "Generate Analysis", letting users start a duplicate run)
+- Code Explorer repo "analysis status" badge now refreshes from "not analyzed" to "current" as soon as analysis completes (previously the badge stayed stale until the page was reloaded)
+
 ## [0.24.0] - 2026-03-22
 
 ### Changed

@@ -309,6 +309,74 @@ class TestAnalysisGeneration:
         assert isinstance(dep.description, str)
         assert all(isinstance(u, str) for u in dep.used_by)
 
+    def test_generate_handles_string_element_in_external_dependencies(self):
+        """generate() handles a bare string element in external_dependencies.
+
+        The LLM sometimes emits shorthand strings (e.g. "Docker") instead of
+        the full {"name": ..., "type": ..., ...} object. Promote each such
+        string to a minimal dict using the string as the name.
+        """
+        mock_ananta = MagicMock()
+        mock_project = MagicMock()
+        mock_ananta.get_project.return_value = mock_project
+
+        mock_result = MagicMock()
+        mock_result.answer = """
+        ```json
+        {
+          "overview": "Test",
+          "components": [],
+          "external_dependencies": [
+            "Docker",
+            {"name": "OpenAI", "type": "ai_service", "description": "LLM", "used_by": []}
+          ]
+        }
+        ```
+        """
+        mock_project.query.return_value = mock_result
+        mock_ananta.get_project_sha.return_value = "sha222"
+
+        generator = AnalysisGenerator(
+            get_project=mock_ananta.get_project, get_project_sha=mock_ananta.get_project_sha
+        )
+        result = generator.generate("test-project")
+
+        assert len(result.external_dependencies) == 2
+        assert result.external_dependencies[0].name == "Docker"
+        assert result.external_dependencies[1].name == "OpenAI"
+
+    def test_generate_handles_string_element_in_components(self):
+        """generate() handles a bare string element in components."""
+        mock_ananta = MagicMock()
+        mock_project = MagicMock()
+        mock_ananta.get_project.return_value = mock_project
+
+        mock_result = MagicMock()
+        mock_result.answer = """
+        ```json
+        {
+          "overview": "Test",
+          "components": [
+            "API",
+            {"name": "Worker", "path": "w/", "description": "", "apis": [],
+             "models": [], "entry_points": [], "internal_dependencies": []}
+          ],
+          "external_dependencies": []
+        }
+        ```
+        """
+        mock_project.query.return_value = mock_result
+        mock_ananta.get_project_sha.return_value = "sha333"
+
+        generator = AnalysisGenerator(
+            get_project=mock_ananta.get_project, get_project_sha=mock_ananta.get_project_sha
+        )
+        result = generator.generate("test-project")
+
+        assert len(result.components) == 2
+        assert result.components[0].name == "API"
+        assert result.components[1].name == "Worker"
+
     def test_generate_handles_invalid_json(self):
         """generate() falls back to raw answer when JSON extraction fails."""
         mock_ananta = MagicMock()

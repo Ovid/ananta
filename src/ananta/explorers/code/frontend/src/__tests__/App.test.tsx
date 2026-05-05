@@ -53,7 +53,7 @@ vi.mock('@ananta/shared-ui', async () => {
 vi.mock('../api/client', () => ({
   api: {
     model: { get: vi.fn().mockResolvedValue({ model: 'test-model' }) },
-    repos: { list: vi.fn().mockResolvedValue([]), listUncategorized: vi.fn().mockResolvedValue([]), analyze: vi.fn(), getAnalysis: vi.fn(), checkUpdates: vi.fn(), applyUpdates: vi.fn(), delete: vi.fn() },
+    repos: { list: vi.fn().mockResolvedValue([]), listUncategorized: vi.fn().mockResolvedValue([]), get: vi.fn(), analyze: vi.fn(), getAnalysis: vi.fn(), checkUpdates: vi.fn(), applyUpdates: vi.fn(), delete: vi.fn() },
     topics: {
       list: vi.fn().mockResolvedValue([]),
       create: vi.fn(),
@@ -196,6 +196,122 @@ describe('App', () => {
       await flush()
 
       expect(api.repos.applyUpdates).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('handleAnalyze', () => {
+    const mockRepo = {
+      project_id: 'test-repo',
+      source_url: 'https://github.com/test/repo',
+      file_count: 10,
+      analysis_status: 'missing' as const,
+      display_name: null,
+    }
+
+    const sampleAnalysis = {
+      version: '1',
+      generated_at: '2026-05-05T10:00:00Z',
+      head_sha: 'abc123',
+      overview: 'Sample overview text.',
+      components: [],
+      external_dependencies: [],
+      caveats: '',
+    }
+
+    async function renderWithRepoSelected() {
+      const { api } = await import('../api/client')
+      vi.mocked(api.repos.list).mockResolvedValue([mockRepo])
+      vi.mocked(api.repos.listUncategorized).mockResolvedValue([mockRepo])
+      vi.mocked(api.repos.getAnalysis).mockRejectedValue(new Error('none'))
+
+      render(<App />)
+      await flush()
+
+      const label = screen.getByText('test-repo')
+      await userEvent.click(label)
+      await flush()
+
+      return api
+    }
+
+    it('keeps "Analyzing…" state visible after closing and reopening the detail panel', async () => {
+      const api = await renderWithRepoSelected()
+      // Make analyze hang so we can verify state is preserved across navigation
+      let resolveAnalyze!: (v: typeof sampleAnalysis) => void
+      vi.mocked(api.repos.analyze).mockImplementation(
+        () => new Promise(r => { resolveAnalyze = r }),
+      )
+
+      await userEvent.click(screen.getByRole('button', { name: 'Generate Analysis' }))
+      await flush()
+      // Buttons are hidden, "Analysis in progress" is shown
+      expect(screen.getByText(/analysis in progress/i)).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Generate Analysis' })).not.toBeInTheDocument()
+
+      // Close detail
+      await userEvent.click(screen.getByRole('button', { name: /close/i }))
+      await flush()
+      expect(screen.queryByText(/analysis in progress/i)).not.toBeInTheDocument()
+
+      // Reopen detail by clicking the repo again
+      await userEvent.click(screen.getByText('test-repo'))
+      await flush()
+
+      // Should still show "Analysis in progress" — and no Generate button
+      expect(screen.getByText(/analysis in progress/i)).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Generate Analysis' })).not.toBeInTheDocument()
+
+      // Resolve the analyze promise to clean up
+      await act(async () => {
+        resolveAnalyze(sampleAnalysis)
+      })
+    })
+
+    it('refreshes repo info after analyze completes so the badge reflects new status', async () => {
+      const api = await renderWithRepoSelected()
+      vi.mocked(api.repos.analyze).mockResolvedValue(sampleAnalysis)
+      // After analyze completes, the refreshed RepoInfo should report "current"
+      vi.mocked(api.repos.get).mockResolvedValue({
+        ...mockRepo,
+        analysis_status: 'current',
+      })
+
+      // Sanity: badge starts as "not analyzed"
+      expect(screen.getByText('not analyzed')).toBeInTheDocument()
+
+      await userEvent.click(screen.getByRole('button', { name: 'Generate Analysis' }))
+      await flush()
+
+      // Badge should now reflect "current" (not "not analyzed")
+      expect(screen.queryByText('not analyzed')).not.toBeInTheDocument()
+      expect(screen.getByText('current')).toBeInTheDocument()
+    })
+
+    it('does not start a second analyze when the user clicks Generate Analysis twice', async () => {
+      const api = await renderWithRepoSelected()
+      let resolveAnalyze!: (v: typeof sampleAnalysis) => void
+      vi.mocked(api.repos.analyze).mockImplementation(
+        () => new Promise(r => { resolveAnalyze = r }),
+      )
+
+      await userEvent.click(screen.getByRole('button', { name: 'Generate Analysis' }))
+      await flush()
+      expect(api.repos.analyze).toHaveBeenCalledTimes(1)
+
+      // Close and reopen
+      await userEvent.click(screen.getByRole('button', { name: /close/i }))
+      await flush()
+      await userEvent.click(screen.getByText('test-repo'))
+      await flush()
+
+      // The Generate button is hidden during analysis; only "Analysis in progress" is visible.
+      expect(screen.queryByRole('button', { name: 'Generate Analysis' })).not.toBeInTheDocument()
+      expect(screen.getByText(/analysis in progress/i)).toBeInTheDocument()
+
+      // Clean up
+      await act(async () => {
+        resolveAnalyze(sampleAnalysis)
+      })
     })
   })
 })

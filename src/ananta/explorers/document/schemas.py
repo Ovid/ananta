@@ -54,6 +54,8 @@ class DocumentInfo(BaseModel):
     size: int
     upload_date: str
     page_count: int | None
+    relative_path: str | None = None
+    upload_session_id: str | None = None
 
 
 class DocumentRename(BaseModel):

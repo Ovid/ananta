@@ -84,6 +84,8 @@ def _build_doc_info(uploads_dir: Path, project_id: str) -> DocumentInfo | None:
         size=meta.get("size", 0),
         upload_date=meta.get("upload_date", ""),
         page_count=meta.get("page_count"),
+        relative_path=meta.get("relative_path"),
+        upload_session_id=meta.get("upload_session_id"),
     )
 
 
@@ -306,6 +308,8 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
             size=meta.get("size", 0),
             upload_date=meta.get("upload_date", ""),
             page_count=meta.get("page_count"),
+            relative_path=meta.get("relative_path"),
+            upload_session_id=meta.get("upload_session_id"),
         )
 
     @router.get("/documents/{doc_id}/download")

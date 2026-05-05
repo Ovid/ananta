@@ -11,6 +11,7 @@ from ananta.models import (
     AnalysisComponent,
     AnalysisExternalDep,
     RepoAnalysis,
+    coerce_to_dict_list,
     coerce_to_str,
     coerce_to_str_list,
 )
@@ -116,7 +117,7 @@ class AnalysisGenerator:
 
         # Parse components
         components = []
-        for c in data.get("components", []):
+        for c in coerce_to_dict_list(data.get("components", [])):
             components.append(
                 AnalysisComponent(
                     name=coerce_to_str(c.get("name", "Unknown")),
@@ -133,7 +134,7 @@ class AnalysisGenerator:
 
         # Parse external dependencies
         external_deps = []
-        for d in data.get("external_dependencies", []):
+        for d in coerce_to_dict_list(data.get("external_dependencies", [])):
             external_deps.append(
                 AnalysisExternalDep(
                     name=coerce_to_str(d.get("name", "Unknown")),

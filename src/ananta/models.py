@@ -84,6 +84,19 @@ def coerce_to_str_list(items: list[Any]) -> list[str]:
     return result
 
 
+def coerce_to_dict_list(items: list[Any]) -> list[dict[str, Any]]:
+    """Coerce list items to dicts. Bare strings are promoted to {"name": str}."""
+    result: list[dict[str, Any]] = []
+    for item in items:
+        if isinstance(item, dict):
+            result.append(item)
+        elif isinstance(item, str):
+            result.append({"name": item})
+        else:
+            result.append({"name": json.dumps(item)})
+    return result
+
+
 def _validate_str(value: Any, field_name: str) -> None:
     """Raise TypeError if value is not a str."""
     if not isinstance(value, str):

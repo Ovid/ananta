@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Codebase analysis no longer crashes with `AttributeError` when the LLM returns a bare string in the `components` or `external_dependencies` arrays — strings are now promoted to `{"name": <string>}` to match the expected element shape
+
 ## [0.24.0] - 2026-03-22
 
 ### Changed

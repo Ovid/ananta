@@ -348,22 +348,33 @@ class TestUploadAtomicity:
         self,
         client: TestClient,
         uploads_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """Extraction failure removes the failing file's upload dir.
+        """If extract_text raises ValueError, the upload dir is removed.
 
-        After A4: an unsupported extension is caught up-front as a `failed`
-        row before any upload dir is created — extraction never runs for
-        unsupported types, so this test asserts the same end-state from a
-        different angle (no orphaned upload dir).
+        Covers the cleanup branch at api.py:233-238 (rmtree of upload_dir
+        before any project_id is created). Uses a supported extension so the
+        unsupported-extension gate doesn't intercept, and stubs extract_text
+        to raise ValueError to drive the failure path deterministically.
         """
+
+        def _raise_value_error(_path: Path) -> str:
+            raise ValueError("simulated extraction failure")
+
+        monkeypatch.setattr(
+            "ananta.explorers.document.api.extract_text",
+            _raise_value_error,
+        )
+
         resp = client.post(
             "/api/documents/upload",
-            files=[("files", ("photo.png", b"\x89PNG", "image/png"))],
+            files=[("files", ("notes.pdf", b"%PDF-1.4 fake", "application/pdf"))],
         )
         assert resp.status_code == 200
         [row] = resp.json()
         assert row["status"] == "failed"
-        # Upload dir should be cleaned up
+        assert "text extraction failed" in row["reason"].lower()
+        # Upload dir should be cleaned up — no leftover project directory.
         assert list(uploads_dir.iterdir()) == []
 
     def test_topic_add_failure_cleans_up_everything(

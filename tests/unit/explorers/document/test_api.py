@@ -208,6 +208,31 @@ class TestUploadDocument:
         assert resp.status_code == 422
         assert ".png" in resp.json()["detail"]
 
+    def test_upload_persists_relative_path_and_session_id(
+        self,
+        client: TestClient,
+        mock_ananta: MagicMock,
+        uploads_dir: Path,
+    ) -> None:
+        mock_ananta.create_project.return_value = MagicMock()
+
+        response = client.post(
+            "/api/documents/upload",
+            files=[("files", ("README.md", b"hello", "text/markdown"))],
+            data={
+                "relative_path": "docs/api/README.md",
+                "upload_session_id": "11111111-1111-1111-1111-111111111111",
+            },
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        project_id = data[0]["project_id"]
+
+        meta = json.loads((uploads_dir / project_id / "meta.json").read_text())
+        assert meta["relative_path"] == "docs/api/README.md"
+        assert meta["upload_session_id"] == "11111111-1111-1111-1111-111111111111"
+
 
 class TestUploadAtomicity:
     """Upload failures at each step should clean up and not leave orphaned state."""

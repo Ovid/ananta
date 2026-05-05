@@ -156,6 +156,8 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
     async def upload_documents(
         files: list[UploadFile],
         topic: str | None = Form(default=None),
+        relative_path: list[str] | None = Form(default=None),
+        upload_session_id: str | None = Form(default=None),
     ) -> list[DocumentUploadResponse]:
         # Validate topic name up-front so we fail before creating any
         # files or projects — avoids orphaned data on invalid topics.
@@ -170,9 +172,15 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
         created_upload_dirs: list[Path] = []
         total_bytes = 0
         try:
-            for file in files:
+            for idx, file in enumerate(files):
                 if not file.filename:
                     continue
+
+                rel_path = (
+                    relative_path[idx]
+                    if relative_path is not None and idx < len(relative_path)
+                    else None
+                )
 
                 project_id = _make_project_id(file.filename)
 
@@ -223,6 +231,8 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                     "size": len(content),
                     "upload_date": datetime.now(UTC).isoformat(),
                     "page_count": page_count,
+                    "relative_path": rel_path,
+                    "upload_session_id": upload_session_id,
                 }
                 (upload_dir / "meta.json").write_text(json.dumps(meta, indent=2))
 

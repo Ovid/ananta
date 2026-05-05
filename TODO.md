@@ -60,6 +60,19 @@
 - Audit: all endpoints should return correct status codes. We had one return a
   404 on duplicate topic id when it should have returned a 409:
 - bottom bar for code/arxiv explorer needs size of data retrieved
+- Folder upload: all-or-nothing rollback is deferred. Today, a batch failure
+  mid-upload leaves already-uploaded batches in place (best-effort). Each
+  document records an `upload_session_id` in `meta.json`, so a future
+  `DELETE /api/documents/upload-session/{id}` endpoint could clean up a
+  partial folder upload. See
+  docs/plans/2026-05-05-folder-upload-design.md.
+- Folder upload: sensitive-info filtering is deferred. v1 walks every
+  directory and applies only the supported-extension allowlist. Dot-dirs
+  (`.git`), cruft dirs (`node_modules`, `__pycache__`, `.venv`), dotfiles
+  (`.env`, `.DS_Store`), and `.py`/`.env` files are NOT pre-filtered. A
+  folder containing `.env` will upload it to the active topic. Auto-create
+  topic from folder name is also deferred. See
+  docs/plans/2026-05-05-folder-upload-design.md.
 
 oolong, choose scale:
 

@@ -3,6 +3,7 @@ import {
   filterFiles,
   SUPPORTED_EXTENSIONS,
   MAX_UPLOAD_BYTES,
+  MAX_FOLDER_FILES,
   walkEntries,
   type WalkedFile,
 } from '../../lib/folder-walk'
@@ -99,5 +100,16 @@ describe('walkEntries', () => {
     ])
     const result = await walkEntries([root as any], 'papers')
     expect(result.map(r => r.relativePath).sort()).toEqual(['sub/x.md', 'top.md'])
+  })
+})
+
+describe('walkEntries with cap', () => {
+  it('throws when the file count exceeds MAX_FOLDER_FILES', async () => {
+    const children = Array.from({ length: MAX_FOLDER_FILES + 100 }, (_, i) =>
+      makeFile(`f${i}.md`, `/big/f${i}.md`)
+    )
+    const root = makeDir('big', '/big', children)
+    await expect(walkEntries([root as any], 'big'))
+      .rejects.toThrow(/folder.*limit/i)
   })
 })

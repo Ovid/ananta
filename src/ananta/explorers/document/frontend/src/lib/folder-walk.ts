@@ -95,6 +95,9 @@ export async function walkEntries(
   }
 
   const visit = async (entry: FileSystemEntry): Promise<void> => {
+    if (result.length > MAX_FOLDER_FILES) {
+      throw new Error(`folder exceeds the ${MAX_FOLDER_FILES}-file limit`)
+    }
     if (entry.isFile) {
       const file = await getFile(entry as FileSystemFileEntry)
       result.push({ file, relativePath: stripPrefix(entry.fullPath) })

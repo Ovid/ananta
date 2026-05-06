@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { filterFiles, SUPPORTED_EXTENSIONS, MAX_UPLOAD_BYTES } from '../../lib/folder-walk'
+import {
+  filterFiles,
+  SUPPORTED_EXTENSIONS,
+  MAX_UPLOAD_BYTES,
+  walkEntries,
+  type WalkedFile,
+} from '../../lib/folder-walk'
 
 describe('filterFiles', () => {
   it('accepts files with supported extensions under the size limit', () => {
@@ -40,5 +46,58 @@ describe('filterFiles', () => {
     expect(SUPPORTED_EXTENSIONS).toContain('.md')
     expect(SUPPORTED_EXTENSIONS).toContain('.docx')
     expect(SUPPORTED_EXTENSIONS).not.toContain('.png')
+  })
+})
+
+type FakeEntry =
+  | { isFile: true; isDirectory: false; name: string; fullPath: string; file: (cb: (f: File) => void) => void }
+  | { isFile: false; isDirectory: true; name: string; fullPath: string; createReader: () => { readEntries: (cb: (e: FakeEntry[]) => void) => void } }
+
+function makeFile(name: string, fullPath: string, content = ''): FakeEntry {
+  return {
+    isFile: true,
+    isDirectory: false,
+    name,
+    fullPath,
+    file: (cb) => cb(new File([content], name)),
+  }
+}
+function makeDir(name: string, fullPath: string, children: FakeEntry[]): FakeEntry {
+  return {
+    isFile: false,
+    isDirectory: true,
+    name,
+    fullPath,
+    createReader: () => {
+      let returned = false
+      return {
+        readEntries: (cb) => {
+          cb(returned ? [] : children)
+          returned = true
+        },
+      }
+    },
+  }
+}
+
+describe('walkEntries', () => {
+  it('walks a flat directory and produces relative paths', async () => {
+    const root = makeDir('papers', '/papers', [
+      makeFile('a.md', '/papers/a.md'),
+      makeFile('b.pdf', '/papers/b.pdf'),
+    ])
+    const result: WalkedFile[] = await walkEntries([root as any], 'papers')
+    expect(result.map(r => r.relativePath).sort()).toEqual(['a.md', 'b.pdf'])
+  })
+
+  it('walks nested directories and produces relative paths', async () => {
+    const root = makeDir('papers', '/papers', [
+      makeFile('top.md', '/papers/top.md'),
+      makeDir('sub', '/papers/sub', [
+        makeFile('x.md', '/papers/sub/x.md'),
+      ]),
+    ])
+    const result = await walkEntries([root as any], 'papers')
+    expect(result.map(r => r.relativePath).sort()).toEqual(['sub/x.md', 'top.md'])
   })
 })

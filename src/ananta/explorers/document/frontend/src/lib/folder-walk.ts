@@ -45,3 +45,70 @@ export function filterFiles(files: File[]): FilterResult {
   }
   return { accepted, skipped }
 }
+
+export interface WalkedFile {
+  file: File
+  relativePath: string
+}
+
+// FileSystemEntry / FileSystemDirectoryEntry / FileSystemFileEntry /
+// FileSystemDirectoryReader are declared globally in lib.dom.d.ts; we use
+// those types directly rather than redeclare them.
+
+function readAllEntries(reader: FileSystemDirectoryReader): Promise<FileSystemEntry[]> {
+  return new Promise((resolve, reject) => {
+    const all: FileSystemEntry[] = []
+    const readBatch = (): void => {
+      reader.readEntries(
+        (batch) => {
+          if (batch.length === 0) {
+            resolve(all)
+          } else {
+            all.push(...batch)
+            // Defer recursion so the reader's bookkeeping (e.g., the
+            // post-callback "returned" flip in tests, and Safari's internal
+            // cursor advance) completes before we ask for the next batch.
+            queueMicrotask(readBatch)
+          }
+        },
+        reject,
+      )
+    }
+    readBatch()
+  })
+}
+
+function getFile(entry: FileSystemFileEntry): Promise<File> {
+  return new Promise((resolve, reject) => entry.file(resolve, reject))
+}
+
+export async function walkEntries(
+  entries: FileSystemEntry[],
+  rootName: string,
+): Promise<WalkedFile[]> {
+  const result: WalkedFile[] = []
+  const stripPrefix = (fullPath: string): string => {
+    const prefix = `/${rootName}/`
+    return fullPath.startsWith(prefix)
+      ? fullPath.slice(prefix.length)
+      : fullPath.replace(/^\//, '')
+  }
+
+  const visit = async (entry: FileSystemEntry): Promise<void> => {
+    if (entry.isFile) {
+      const file = await getFile(entry as FileSystemFileEntry)
+      result.push({ file, relativePath: stripPrefix(entry.fullPath) })
+    } else if (entry.isDirectory) {
+      const reader = (entry as FileSystemDirectoryEntry).createReader()
+      const children = await readAllEntries(reader)
+      for (const child of children) {
+        await visit(child)
+      }
+    }
+  }
+
+  for (const entry of entries) {
+    await visit(entry)
+  }
+  return result
+}

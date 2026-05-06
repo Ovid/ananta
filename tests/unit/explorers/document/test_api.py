@@ -165,6 +165,43 @@ class TestUploadDocument:
         pid = resp.json()[0]["project_id"]
         assert pid in topic_mgr.list_items("Research")
 
+    def test_upload_to_existing_topic_succeeds(
+        self,
+        client: TestClient,
+        mock_ananta: MagicMock,
+        topic_mgr: DocumentTopicManager,
+        uploads_dir: Path,
+    ) -> None:
+        """Regression guard (Task A5): two uploads to the same topic both succeed.
+
+        The upload route always calls ``topic_mgr.create(topic)`` for every
+        request, so the second upload exercises the idempotent-create path on
+        an already-existing topic. If ``create()`` ever stops being idempotent,
+        this test fails before any user does.
+        """
+        mock_ananta.create_project.return_value = MagicMock()
+
+        resp1 = client.post(
+            "/api/documents/upload",
+            files=[("files", ("a.md", b"x", "text/markdown"))],
+            data={"topic": "Barsoom"},
+        )
+        assert resp1.status_code == 200
+        assert resp1.json()[0]["status"] == "created"
+
+        resp2 = client.post(
+            "/api/documents/upload",
+            files=[("files", ("b.md", b"y", "text/markdown"))],
+            data={"topic": "Barsoom"},
+        )
+        assert resp2.status_code == 200
+        assert resp2.json()[0]["status"] == "created"
+
+        # Both project IDs ended up referenced by the same topic.
+        items = topic_mgr.list_items("Barsoom")
+        assert resp1.json()[0]["project_id"] in items
+        assert resp2.json()[0]["project_id"] in items
+
     def test_upload_with_invalid_topic_name_returns_422(
         self,
         client: TestClient,

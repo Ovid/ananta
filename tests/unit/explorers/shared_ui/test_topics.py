@@ -120,6 +120,21 @@ class TestCreateAndListTopics:
         mgr.create("Reports")
         assert mgr.list_topics().count("Reports") == 1
 
+    def test_create_existing_topic_is_idempotent(self, tmp_path: Path) -> None:
+        """Regression guard (Task A5): re-creating an existing topic must not raise.
+
+        The folder-upload flow relies on this — every uploaded file calls
+        ``topic_mgr.create(topic)`` regardless of whether the topic already
+        exists. If this contract regresses, single-file and folder uploads to
+        an existing topic both break.
+        """
+        mgr = BaseTopicManager(tmp_path)
+        mgr.create("Barsoom")
+        mgr.create("Barsoom")  # must not raise
+        assert "Barsoom" in mgr.list_topics()
+        # No duplicates either: idempotent means at most one entry.
+        assert mgr.list_topics().count("Barsoom") == 1
+
     @pytest.mark.parametrize("name", ["!!!", "   ", "---", ""])
     def test_create_rejects_empty_slug(self, tmp_path: Path, name: str) -> None:
         mgr = BaseTopicManager(tmp_path)

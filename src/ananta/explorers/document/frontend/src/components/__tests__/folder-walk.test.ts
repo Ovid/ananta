@@ -5,6 +5,8 @@ import {
   MAX_UPLOAD_BYTES,
   MAX_FOLDER_FILES,
   walkEntries,
+  partitionIntoBatches,
+  TARGET_BATCH_BYTES,
   type WalkedFile,
 } from '../../lib/folder-walk'
 
@@ -111,5 +113,32 @@ describe('walkEntries with cap', () => {
     const root = makeDir('big', '/big', children)
     await expect(walkEntries([root as any], 'big'))
       .rejects.toThrow(/folder.*limit/i)
+  })
+})
+
+describe('partitionIntoBatches', () => {
+  it('groups files under the target byte size', () => {
+    const files = [
+      { file: new File([new Uint8Array(20 * 1024 * 1024)], 'a.pdf'), relativePath: 'a.pdf' },
+      { file: new File([new Uint8Array(20 * 1024 * 1024)], 'b.pdf'), relativePath: 'b.pdf' },
+      { file: new File([new Uint8Array(20 * 1024 * 1024)], 'c.pdf'), relativePath: 'c.pdf' },
+    ]
+    const batches = partitionIntoBatches(files, TARGET_BATCH_BYTES)
+    expect(batches.length).toBe(2)
+    expect(batches[0].length).toBe(2)
+    expect(batches[1].length).toBe(1)
+  })
+
+  it('places a single file in its own batch when adding the next would exceed target', () => {
+    const files = [
+      { file: new File([new Uint8Array(40 * 1024 * 1024)], 'big.pdf'), relativePath: 'big.pdf' },
+      { file: new File([new Uint8Array(20 * 1024 * 1024)], 'small.pdf'), relativePath: 'small.pdf' },
+    ]
+    const batches = partitionIntoBatches(files, 50 * 1024 * 1024)
+    expect(batches.length).toBe(2)
+  })
+
+  it('returns an empty array for empty input', () => {
+    expect(partitionIntoBatches([], TARGET_BATCH_BYTES)).toEqual([])
   })
 })

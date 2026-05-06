@@ -115,3 +115,23 @@ export async function walkEntries(
   }
   return result
 }
+
+export function partitionIntoBatches(
+  files: WalkedFile[],
+  targetBytes: number,
+): WalkedFile[][] {
+  const batches: WalkedFile[][] = []
+  let current: WalkedFile[] = []
+  let currentBytes = 0
+  for (const wf of files) {
+    if (current.length > 0 && currentBytes + wf.file.size > targetBytes) {
+      batches.push(current)
+      current = []
+      currentBytes = 0
+    }
+    current.push(wf)
+    currentBytes += wf.file.size
+  }
+  if (current.length > 0) batches.push(current)
+  return batches
+}

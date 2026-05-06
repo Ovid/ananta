@@ -253,11 +253,17 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                 (upload_dir / "meta.json").write_text(json.dumps(meta, indent=2))
 
                 state.ananta.create_project(project_id)
+                doc_metadata: dict[str, str | int | float | bool] = {
+                    "filename": file.filename,
+                    "size": len(content),
+                }
+                if rel_path is not None:
+                    doc_metadata["relative_path"] = rel_path
                 doc = ParsedDocument(
                     name=file.filename,
                     content=text,
                     format=ext.lstrip(".") or "txt",
-                    metadata={"filename": file.filename, "size": len(content)},
+                    metadata=doc_metadata,
                     char_count=len(text),
                 )
                 state.ananta.storage.store_document(project_id, doc)

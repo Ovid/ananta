@@ -325,6 +325,55 @@ class TestUploadDocument:
         assert meta["relative_path"] == "docs/api/README.md"
         assert meta["upload_session_id"] == "11111111-1111-1111-1111-111111111111"
 
+    def test_upload_exposes_relative_path_to_rlm_metadata(
+        self,
+        client: TestClient,
+        mock_ananta: MagicMock,
+        uploads_dir: Path,
+    ) -> None:
+        """The ParsedDocument stored to Ananta storage should expose
+        relative_path in its metadata so the RLM-side document object can
+        read it.
+        """
+        mock_ananta.create_project.return_value = MagicMock()
+
+        response = client.post(
+            "/api/documents/upload",
+            files=[("files", ("README.md", b"hello world", "text/markdown"))],
+            data={"relative_path": "docs/api/README.md"},
+        )
+        assert response.status_code == 200
+        [row] = response.json()
+        assert row["status"] == "created"
+
+        # store_document was called with (project_id, ParsedDocument)
+        mock_ananta.storage.store_document.assert_called_once()
+        call_args = mock_ananta.storage.store_document.call_args
+        stored_doc = call_args[0][1]
+        assert stored_doc.metadata.get("relative_path") == "docs/api/README.md"
+
+    def test_upload_without_relative_path_omits_key_in_rlm_metadata(
+        self,
+        client: TestClient,
+        mock_ananta: MagicMock,
+        uploads_dir: Path,
+    ) -> None:
+        """A single-file upload without a relative_path form field omits
+        the key from ParsedDocument.metadata (the typed model does not
+        permit None values; downstream code uses .get() so both are fine).
+        """
+        mock_ananta.create_project.return_value = MagicMock()
+
+        response = client.post(
+            "/api/documents/upload",
+            files=[("files", ("notes.txt", b"hi", "text/plain"))],
+        )
+        assert response.status_code == 200
+
+        mock_ananta.storage.store_document.assert_called_once()
+        stored_doc = mock_ananta.storage.store_document.call_args[0][1]
+        assert "relative_path" not in stored_doc.metadata
+
 
 class TestUploadAtomicity:
     """Per-file upload failures should clean up the failing file's state.

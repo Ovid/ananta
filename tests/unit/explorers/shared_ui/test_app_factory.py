@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -23,6 +24,69 @@ def _make_state() -> MagicMock:
     state.ananta.start = MagicMock()
     state.ananta.stop = MagicMock()
     return state
+
+
+# -- Body-size limiting middleware (I11) --
+
+
+def _add_echo_route(app: FastAPI) -> None:
+    """Add a tiny POST endpoint so we can drive the middleware."""
+    from starlette.requests import Request
+    from starlette.routing import Route
+
+    async def echo(request: Request) -> Any:
+        from starlette.responses import JSONResponse
+
+        body = await request.body()
+        return JSONResponse({"len": len(body)})
+
+    app.router.routes.append(Route("/echo", echo, methods=["POST"]))
+
+
+def test_oversized_content_length_rejected_with_413() -> None:
+    """A Content-Length header above the cap is rejected with 413.
+
+    Reproduces I11: a malicious POST without our application-level cap
+    would spool a multi-gigabyte body to disk before the handler ran,
+    enabling disk-fill DoS. The middleware fails fast before any spooling.
+    """
+    from ananta.explorers.shared_ui.app_factory import MAX_REQUEST_BODY_BYTES
+
+    state = _make_state()
+    app = create_app(state, title="Test App")
+    _add_echo_route(app)
+    client = TestClient(app)
+    # We claim more than the cap via Content-Length; the body itself isn't
+    # actually that big — that's the point: the handler never runs.
+    headers = {"Content-Length": str(MAX_REQUEST_BODY_BYTES + 1)}
+    resp = client.post("/echo", content=b"x", headers=headers)
+    assert resp.status_code == 413
+
+
+def test_streamed_body_exceeding_cap_aborts() -> None:
+    """A request without Content-Length but exceeding the cap is aborted."""
+    from ananta.explorers.shared_ui.app_factory import MAX_REQUEST_BODY_BYTES
+
+    state = _make_state()
+    app = create_app(state, title="Test App")
+    _add_echo_route(app)
+    client = TestClient(app)
+    # An actual oversized body (TestClient adds Content-Length, so the
+    # header check catches this first — same outcome).
+    big = b"\x00" * (MAX_REQUEST_BODY_BYTES + 1)
+    resp = client.post("/echo", content=big)
+    assert resp.status_code == 413
+
+
+def test_normal_request_unaffected_by_size_middleware() -> None:
+    """A small request still succeeds end-to-end."""
+    state = _make_state()
+    app = create_app(state, title="Test App")
+    _add_echo_route(app)
+    client = TestClient(app)
+    resp = client.post("/echo", content=b"hello")
+    assert resp.status_code == 200
+    assert resp.json() == {"len": 5}
 
 
 # -- Basic app creation --

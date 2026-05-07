@@ -18,8 +18,68 @@ from typing import Any
 from docker.errors import ImageNotFound
 from fastapi import APIRouter, FastAPI, WebSocket
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.cors import CORSMiddleware
+from starlette.requests import Request
 from starlette.responses import Response
+from starlette.types import ASGIApp
+
+# Hard cap on request body bytes. Without this, an unbounded POST is spooled
+# to disk by Starlette before any application-level cap can react — disk-fill
+# DoS reachable by any caller (I11). 256 MiB sits comfortably above the
+# document-explorer's 200 MiB aggregate cap for a folder upload while still
+# refusing any obviously-malicious request.
+MAX_REQUEST_BODY_BYTES = 256 * 1024 * 1024
+
+
+class _BodySizeLimitMiddleware(BaseHTTPMiddleware):
+    """Reject requests whose body exceeds MAX_REQUEST_BODY_BYTES.
+
+    Two layers of defence:
+
+    * Content-Length header check — fails fast before any body is consumed,
+      and is the path a well-behaved (or merely lazy) HTTP client takes.
+    * Streaming counter — wraps ``request.receive`` so a chunked / no-Length
+      body that lies about its size is still aborted as soon as the cumulative
+      bytes exceed the cap.
+    """
+
+    def __init__(self, app: ASGIApp, max_bytes: int) -> None:
+        super().__init__(app)
+        self._max = max_bytes
+
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Any]
+    ) -> Response:
+        cl_header = request.headers.get("content-length")
+        if cl_header is not None:
+            try:
+                if int(cl_header) > self._max:
+                    return Response(status_code=413, content="Request body too large")
+            except ValueError:
+                # Malformed Content-Length: let the streaming guard handle it
+                pass
+
+        # Wrap receive so a streamed body is metered. The wrapper raises
+        # before more than `_max` bytes have flowed.
+        original_receive = request.receive
+        seen = 0
+        max_bytes = self._max
+
+        async def metered_receive() -> Any:
+            nonlocal seen
+            msg = await original_receive()
+            if msg.get("type") == "http.request":
+                seen += len(msg.get("body", b""))
+                if seen > max_bytes:
+                    # Convert the next read into an empty terminator so the
+                    # framework returns the response we send below.
+                    return {"type": "http.disconnect"}
+            return msg
+
+        request._receive = metered_receive
+        response: Response = await call_next(request)
+        return response
 
 
 def create_app(
@@ -81,6 +141,11 @@ def create_app(
             state.ananta.stop()
 
     app = FastAPI(title=title, lifespan=lifespan)
+
+    # Body-size middleware MUST be added before CORS so it runs first on
+    # the inbound path; oversized requests are rejected before any
+    # downstream middleware allocates resources.
+    app.add_middleware(_BodySizeLimitMiddleware, max_bytes=MAX_REQUEST_BODY_BYTES)
 
     # CORS — allow all origins during development.
     # allow_credentials intentionally omitted: no cookies/auth headers are

@@ -423,6 +423,44 @@ class TestUploadAtomicity:
         # existing project would silently destroy the existing project's data.
         mock_ananta.delete_project.assert_not_called()
 
+    def test_unexpected_exception_text_is_not_leaked_to_response(
+        self,
+        state: DocumentExplorerState,
+        mock_ananta: MagicMock,
+        uploads_dir: Path,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """The reason returned to the client must not include raw exception text.
+
+        Reproduces Inline 3: the previous code returned
+        `f"unexpected error: {exc}"` to the client, which leaked internal
+        details (filesystem paths, dependency error messages, stack-trace
+        fragments). The fix logs the original exception server-side and
+        returns a generic reason in the API response.
+        """
+        import logging
+
+        sensitive = "/var/lib/secrets/db_password.txt: permission denied"
+        mock_ananta.create_project.return_value = MagicMock()
+        mock_ananta.storage.store_document.side_effect = RuntimeError(sensitive)
+        app = create_api(state)
+        client = TestClient(app, raise_server_exceptions=False)
+
+        with caplog.at_level(logging.ERROR, logger="ananta.explorers.document.api"):
+            resp = client.post(
+                "/api/documents/upload",
+                files=[("files", ("notes.txt", b"Hello", "text/plain"))],
+            )
+        assert resp.status_code == 200
+        [row] = resp.json()
+        assert row["status"] == "failed"
+        # The sensitive message must NOT appear in the response reason.
+        assert sensitive not in row["reason"]
+        # The reason should still be informative ("upload failed", "internal error", etc).
+        assert row["reason"]
+        # The original exception SHOULD be logged server-side for diagnosis.
+        assert any(sensitive in record.message or sensitive in str(record) for record in caplog.records)
+
     def test_project_id_collision_does_not_destroy_existing_project(
         self,
         state: DocumentExplorerState,

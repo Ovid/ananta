@@ -6,12 +6,15 @@ Provides document upload, CRUD, and topic-document reference routes.
 from __future__ import annotations
 
 import json
+import logging
 import re
 import secrets
 import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+_logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, FastAPI, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
@@ -315,7 +318,14 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                         state.ananta.delete_project(project_id)
                     except Exception:
                         pass  # Best-effort cleanup — original error takes priority
-                results.append(_failed_row(file.filename, f"unexpected error: {exc}"))
+                # Log the original exception server-side for diagnosis but
+                # return a generic reason to the client — raw exception text
+                # can leak internal details (filesystem paths, dependency
+                # errors, stack-trace fragments).
+                _logger.exception(
+                    "Unexpected error processing upload %r: %s", file.filename, exc
+                )
+                results.append(_failed_row(file.filename, "unexpected upload error"))
 
         return results
 

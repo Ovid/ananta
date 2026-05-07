@@ -22,13 +22,26 @@ class TestMakeProjectId:
         assert re.fullmatch(r"[a-z0-9]+-[a-f0-9]{8}", pid), f"unexpected format: {pid}"
 
     def test_same_filename_produces_different_ids(self) -> None:
-        """Same filename yields different IDs due to timestamp in hash.
+        """Same filename yields different IDs (cryptographically random suffix).
 
-        Known limitation (F-18): fix deferred — requires content-based hashing.
+        After I6: the suffix is `secrets.token_hex(4)` instead of a hash of the
+        timestamp, so colliding IDs require a 32-bit random collision (~2^16
+        files via the birthday bound) rather than two requests landing in the
+        same microsecond with the same filename.
         """
         id1 = _make_project_id("report.pdf")
         id2 = _make_project_id("report.pdf")
         assert id1 != id2
+
+    def test_many_ids_are_unique(self) -> None:
+        """Generate many IDs at once; the random suffix must not collide.
+
+        With the previous timestamp-based scheme this test was flaky on fast
+        machines (two calls in the same microsecond produced identical IDs).
+        With token_hex(4) the chance of collision in 1000 calls is ~10^-7.
+        """
+        ids = {_make_project_id("report.pdf") for _ in range(1000)}
+        assert len(ids) == 1000
 
 
 @pytest.fixture
@@ -405,6 +418,41 @@ class TestUploadAtomicity:
         mock_ananta.storage.store_document.assert_not_called()
         # Upload dir should be cleaned up
         assert list(uploads_dir.iterdir()) == []
+        # Critical (I6): rollback must NOT call delete_project when we never
+        # successfully created one. Otherwise an id-collision against an
+        # existing project would silently destroy the existing project's data.
+        mock_ananta.delete_project.assert_not_called()
+
+    def test_project_id_collision_does_not_destroy_existing_project(
+        self,
+        state: DocumentExplorerState,
+        mock_ananta: MagicMock,
+        uploads_dir: Path,
+    ) -> None:
+        """A ProjectExistsError on create_project must not trigger delete_project.
+
+        Reproduces the I6 attack: if `_make_project_id` happens to return an
+        id that collides with an existing project, the existing rollback
+        path called shutil.rmtree(upload_dir) AND state.ananta.delete_project
+        on that id — wiping the colliding project's data. After the fix, the
+        rollback skips the destructive cleanup unless the upload created the
+        project itself.
+        """
+        from ananta.exceptions import ProjectExistsError
+
+        mock_ananta.create_project.side_effect = ProjectExistsError("colliding-id")
+        app = create_api(state)
+        client = TestClient(app, raise_server_exceptions=False)
+
+        resp = client.post(
+            "/api/documents/upload",
+            files=[("files", ("README.md", b"hello", "text/markdown"))],
+        )
+        assert resp.status_code == 200
+        [row] = resp.json()
+        assert row["status"] == "failed"
+        # The collision must NOT result in the existing project being deleted.
+        mock_ananta.delete_project.assert_not_called()
 
     def test_store_document_failure_cleans_up_project_and_upload(
         self,

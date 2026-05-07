@@ -5,9 +5,9 @@ Provides document upload, CRUD, and topic-document reference routes.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import re
+import secrets
 import shutil
 from datetime import UTC, datetime
 from pathlib import Path
@@ -53,13 +53,18 @@ def _validate_doc_id(doc_id: str) -> None:
 
 
 def _make_project_id(filename: str) -> str:
-    """Generate project_id from filename: slugified-name-xxxxxxxx."""
+    """Generate project_id from filename: slugified-name-xxxxxxxx.
+
+    The 8-hex suffix is cryptographically random (`secrets.token_hex(4)`) so
+    two uploads with the same filename in fast succession are vanishingly
+    unlikely to collide. A previous implementation hashed the filename plus
+    a microsecond timestamp, which was deterministic enough that two calls
+    in the same microsecond produced identical IDs — and the rollback path
+    would then destroy the colliding pre-existing project's data.
+    """
     stem = Path(filename).stem
     slug = _slugify(stem) or "document"
-    short_hash = hashlib.sha256(f"{filename}-{datetime.now(UTC).isoformat()}".encode()).hexdigest()[
-        :8
-    ]
-    return f"{slug}-{short_hash}"
+    return f"{slug}-{secrets.token_hex(4)}"
 
 
 def _failed_row(filename: str, reason: str) -> DocumentUploadResponse:
@@ -205,6 +210,7 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
 
             upload_dir: Path | None = None
             project_id: str | None = None
+            created_project = False
             try:
                 # Validate extension before reading body — only needs filename,
                 # avoids allocating memory for files we'll reject anyway.
@@ -264,6 +270,7 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                 (upload_dir / "meta.json").write_text(json.dumps(meta, indent=2))
 
                 state.ananta.create_project(project_id)
+                created_project = True
                 doc_metadata: dict[str, str | int | float | bool] = {
                     "filename": file.filename,
                     "size": len(content),
@@ -295,7 +302,11 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                 # Per-file rollback: clean up only this file's state.
                 if upload_dir is not None:
                     shutil.rmtree(upload_dir, ignore_errors=True)
-                if project_id is not None:
+                # Critical (I6): only delete the project if THIS upload created
+                # it. If create_project raised (e.g., ProjectExistsError on an
+                # id collision), the project belongs to someone else — deleting
+                # it would destroy unrelated data.
+                if project_id is not None and created_project:
                     try:
                         state.topic_mgr.remove_item_from_all(project_id)
                     except Exception:

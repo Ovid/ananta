@@ -129,6 +129,38 @@ describe('UploadArea', () => {
     expect(screen.queryByRole('button', { name: /upload folder/i })).toBeNull()
   })
 
+  it('resets the folder input value after a selection so re-picking the same folder fires change (Inline 6)', async () => {
+    const onFolderUpload = vi.fn(async () => {})
+    render(<UploadArea onUpload={vi.fn()} onFolderUpload={onFolderUpload} activeTopic="Barsoom" />)
+
+    const file = new File(['x'], 'a.md')
+    Object.defineProperty(file, 'webkitRelativePath', { value: 'papers/a.md' })
+
+    const folderInput = screen.getByLabelText(/folder picker/i) as HTMLInputElement
+    // Spy on the value-setter so we can detect the post-change reset. Browsers
+    // forbid setting non-empty strings on input[type=file] from JS, so the
+    // only assignment we expect is `''`.
+    const valueAssignments: string[] = []
+    const proto = Object.getPrototypeOf(folderInput)
+    const originalDescriptor = Object.getOwnPropertyDescriptor(proto, 'value')!
+    Object.defineProperty(folderInput, 'value', {
+      configurable: true,
+      get: () => originalDescriptor.get!.call(folderInput),
+      set: (v: string) => {
+        valueAssignments.push(v)
+        originalDescriptor.set!.call(folderInput, v)
+      },
+    })
+
+    Object.defineProperty(folderInput, 'files', { value: [file], writable: true })
+    fireEvent.change(folderInput)
+
+    await waitFor(() => expect(onFolderUpload).toHaveBeenCalled())
+    // The handler must clear .value so re-picking the same folder fires
+    // change again — browsers won't fire change for the same value twice.
+    expect(valueAssignments).toContain('')
+  })
+
   it('routes click-selected folder files to onFolderUpload as WalkedFile[]', async () => {
     const onFolderUpload = vi.fn(async () => {})
     render(<UploadArea onUpload={vi.fn()} onFolderUpload={onFolderUpload} activeTopic="Barsoom" />)

@@ -61,7 +61,12 @@ export default function UploadArea({ onUpload, onFolderUpload, activeTopic }: Up
   }, [disabled, handleFiles, onFolderUpload])
 
   const handleFolderInputChange = useCallback(async (e: ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []) as FileWithPath[]
+    const input = e.target
+    const files = Array.from(input.files ?? []) as FileWithPath[]
+    // Reset the input value so re-picking the same folder fires change again.
+    // Browsers won't fire change when the value is unchanged. Reset before
+    // dispatching the upload so failure paths still leave the input usable.
+    input.value = ''
     if (files.length === 0 || !onFolderUpload) return
     const firstPath = files[0].webkitRelativePath
     const rootName = firstPath.split('/')[0] ?? ''

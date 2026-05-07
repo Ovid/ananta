@@ -494,6 +494,79 @@ class TestUploadAtomicity:
         # The collision must NOT result in the existing project being deleted.
         mock_ananta.delete_project.assert_not_called()
 
+    def test_upload_dir_collision_does_not_destroy_existing_files(
+        self,
+        state: DocumentExplorerState,
+        mock_ananta: MagicMock,
+        uploads_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """A pre-existing upload_dir at the new project_id must not be wiped.
+
+        Reproduces C4: previously the upload code did
+        `mkdir(parents=True, exist_ok=True)` and on any failure ran
+        `shutil.rmtree(upload_dir, ignore_errors=True)`. If
+        `_make_project_id` happened to return an id that already had a
+        directory on disk (existing project), the new request would (a)
+        overwrite `original.{ext}` if extensions matched, (b) overwrite
+        meta.json, then (c) on the inevitable ProjectExistsError from
+        `state.ananta.create_project`, rmtree the existing project's entire
+        directory — silent data loss. The fix uses `mkdir(exist_ok=False)`
+        and only rmtrees a directory THIS request created.
+        """
+        from ananta.exceptions import ProjectExistsError
+
+        # Pre-create a directory at the colliding id with a precious file.
+        colliding_id = "shared-id"
+        existing_dir = uploads_dir / colliding_id
+        existing_dir.mkdir()
+        precious = existing_dir / "original.md"
+        precious.write_bytes(b"DO NOT DELETE")
+        existing_meta = existing_dir / "meta.json"
+        existing_meta.write_text(json.dumps({"filename": "important.md", "size": 14}))
+
+        # Force _make_project_id to return the colliding id on the first call,
+        # then a fresh id on retries (so the upload can proceed if the fix
+        # implements retry-on-collision).
+        call_count = [0]
+
+        def fake_make_id(_filename: str) -> str:
+            call_count[0] += 1
+            return colliding_id if call_count[0] == 1 else f"fresh-{call_count[0]}"
+
+        monkeypatch.setattr(
+            "ananta.explorers.document.api._make_project_id",
+            fake_make_id,
+        )
+        # If retry succeeds, create_project should NOT raise on the second id.
+        # If retry doesn't happen, we still need create_project to raise on
+        # the colliding id (otherwise the test path is meaningless).
+        def fake_create(pid: str) -> MagicMock:
+            if pid == colliding_id:
+                raise ProjectExistsError(pid)
+            return MagicMock()
+
+        mock_ananta.create_project.side_effect = fake_create
+
+        app = create_api(state)
+        client = TestClient(app, raise_server_exceptions=False)
+
+        resp = client.post(
+            "/api/documents/upload",
+            files=[("files", ("README.md", b"new content", "text/markdown"))],
+        )
+        assert resp.status_code == 200
+
+        # The pre-existing directory and its files MUST still exist.
+        assert existing_dir.exists(), "existing project directory was destroyed"
+        assert precious.exists(), "existing project's original file was wiped"
+        assert precious.read_bytes() == b"DO NOT DELETE", (
+            "existing project's original file was overwritten"
+        )
+        # delete_project must NOT have been called for the colliding id.
+        for call in mock_ananta.delete_project.call_args_list:
+            assert call.args[0] != colliding_id
+
     def test_store_document_failure_cleans_up_project_and_upload(
         self,
         state: DocumentExplorerState,

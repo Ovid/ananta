@@ -214,6 +214,7 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
             upload_dir: Path | None = None
             project_id: str | None = None
             created_project = False
+            created_upload_dir = False
             try:
                 # Validate extension before reading body — only needs filename,
                 # avoids allocating memory for files we'll reject anyway.
@@ -243,9 +244,28 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                         f"{MAX_AGGREGATE_UPLOAD_BYTES // (1024 * 1024)} MB aggregate limit",
                     )
 
-                project_id = _make_project_id(file.filename)
-                upload_dir = state.uploads_dir / project_id
-                upload_dir.mkdir(parents=True, exist_ok=True)
+                # Allocate an upload dir we know is fresh. Retrying on
+                # FileExistsError protects against `_make_project_id` collisions
+                # — the random 32-bit suffix makes them rare, but a collision
+                # with mkdir(exist_ok=True) would silently overwrite an existing
+                # project's files (C4). Three attempts is plenty given the
+                # birthday-paradox threshold of ~65k uploads.
+                for _attempt in range(3):
+                    project_id = _make_project_id(file.filename)
+                    upload_dir = state.uploads_dir / project_id
+                    try:
+                        upload_dir.mkdir(parents=True, exist_ok=False)
+                        created_upload_dir = True
+                        break
+                    except FileExistsError:
+                        upload_dir = None
+                        project_id = None
+                        continue
+                if not created_upload_dir or upload_dir is None:
+                    results.append(
+                        _failed_row(file.filename, "could not allocate a unique upload directory")
+                    )
+                    continue
                 original_path = upload_dir / f"original{ext}"
                 original_path.write_bytes(content)
 
@@ -302,8 +322,12 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
             except HTTPException:
                 raise  # 413 aggregate cap propagates as before
             except Exception as exc:
-                # Per-file rollback: clean up only this file's state.
-                if upload_dir is not None:
+                # Per-file rollback: clean up only this file's state. Critical
+                # (C4): only rmtree the upload_dir if THIS request created it.
+                # With mkdir(exist_ok=False) above, created_upload_dir is true
+                # only on a successful fresh creation; legacy callers reading
+                # an unrelated colliding directory must NOT have it deleted.
+                if upload_dir is not None and created_upload_dir:
                     shutil.rmtree(upload_dir, ignore_errors=True)
                 # Critical (I6): only delete the project if THIS upload created
                 # it. If create_project raised (e.g., ProjectExistsError on an

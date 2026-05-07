@@ -29,11 +29,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Document Explorer: Continue button on the folder-upload preflight modal disables on click, preventing double-click double-uploads
 - Document Explorer: a folder containing many unsupported files but few accepted ones no longer trips the 500-file cap (the cap now counts accepted files only)
 - Document Explorer: re-picking the same folder via the folder-input button now works (the input value is reset after each selection)
+- Document Explorer: a folder upload that trips the 200 MB aggregate cap now returns 200 with per-file failed rows for the over-the-line files instead of a hard 413 that abandoned earlier files already committed server-side
+- Document Explorer: when a later batch of a folder upload fails, the summary now reflects the rows committed by earlier batches instead of showing "0 ingested" alongside an upload-failure row
+- Document Explorer: cancelling an upload and starting a new one no longer leaves the new upload's Cancel button unresponsive (the previous upload's promise no longer clobbers the new abort controller)
+- Document Explorer: the folder-upload progress modal no longer briefly displays "batch 0 of N" before the first batch completes
+- Document Explorer: corrupt PDFs / DOCX / PPTX / XLSX files now report "text extraction failed: …" instead of a generic "unexpected upload error"
+- Document Explorer: a get_page_count failure no longer rejects the entire upload — page count falls back to None and the file still ingests
+- Document Explorer: dropping multiple folders at once now strips each top-level folder's own name from its files' relative paths (previously only the first folder's prefix was stripped)
+- Document Explorer: a single unreadable file in a dropped folder no longer abandons the whole walk — readable files still reach the summary
+- Document Explorer: dropping a second folder while an upload is in flight is now a no-op (previously it churned the modal); cancel the first upload to start a new one
+- Document Explorer: rename now refreshes all DocumentInfo fields from disk instead of reconstructing them inline (no observable change today, but new metadata fields surface immediately)
 
 ### Security
 
 - Document Explorer: `/api/documents/upload` rejects requests with more than 500 files (denial-of-service guard); previously only the per-file 50 MB and per-batch 200 MB caps were enforced server-side
 - Document Explorer: per-file upload errors no longer include raw exception text in the API response (which could leak filesystem paths or dependency error details); the original exception is logged server-side
+- Document Explorer: `relative_path` form input is now validated against an allowlist regex (max 512 chars, no `..`, no leading `/`, ASCII-friendly character set). Previously the value was persisted verbatim, allowing disk-fill DoS via giant strings and a path-traversal / prompt-injection surface. The array length is also required to match `files` length
+- Shared explorer factory now rejects requests with bodies above 256 MiB at the middleware layer before any data is spooled to disk. Previously the application's per-route caps fired only after Starlette had finished spooling, leaving a disk-fill DoS reachable
 
 ## [0.24.0] - 2026-03-22
 

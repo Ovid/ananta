@@ -78,7 +78,7 @@ describe('UploadArea', () => {
 
   it('enables drop zone when activeTopic is provided', () => {
     render(<UploadArea onUpload={vi.fn()} activeTopic="Barsoom" />)
-    const zone = screen.getByRole('button', { name: /upload/i })
+    const zone = screen.getByRole('button', { name: 'Upload files' })
     expect(zone).not.toHaveAttribute('aria-disabled', 'true')
   })
 
@@ -93,7 +93,7 @@ describe('UploadArea', () => {
       items: [{ webkitGetAsEntry: () => fakeDirEntry }],
     } as unknown as DataTransfer
 
-    const zone = screen.getByRole('button', { name: /upload/i })
+    const zone = screen.getByRole('button', { name: 'Upload files' })
     fireEvent.drop(zone, { dataTransfer })
 
     await waitFor(() => expect(onFolderUpload).toHaveBeenCalled())
@@ -112,10 +112,40 @@ describe('UploadArea', () => {
       items: [{ webkitGetAsEntry: () => fakeFileEntry }],
     } as unknown as DataTransfer
 
-    const zone = screen.getByRole('button', { name: /upload/i })
+    const zone = screen.getByRole('button', { name: 'Upload files' })
     fireEvent.drop(zone, { dataTransfer })
 
     await waitFor(() => expect(onUpload).toHaveBeenCalled())
     expect(onFolderUpload).not.toHaveBeenCalled()
+  })
+
+  it('renders an "Upload folder" button when enabled', () => {
+    render(<UploadArea onUpload={vi.fn()} onFolderUpload={vi.fn()} activeTopic="Barsoom" />)
+    expect(screen.getByRole('button', { name: /upload folder/i })).toBeInTheDocument()
+  })
+
+  it('does not render "Upload folder" when no topic selected', () => {
+    render(<UploadArea onUpload={vi.fn()} onFolderUpload={vi.fn()} activeTopic={null} />)
+    expect(screen.queryByRole('button', { name: /upload folder/i })).toBeNull()
+  })
+
+  it('routes click-selected folder files to onFolderUpload as WalkedFile[]', async () => {
+    const onFolderUpload = vi.fn(async () => {})
+    render(<UploadArea onUpload={vi.fn()} onFolderUpload={onFolderUpload} activeTopic="Barsoom" />)
+
+    const file1 = new File(['x'], 'a.md')
+    Object.defineProperty(file1, 'webkitRelativePath', { value: 'papers/a.md' })
+    const file2 = new File(['y'], 'b.md')
+    Object.defineProperty(file2, 'webkitRelativePath', { value: 'papers/sub/b.md' })
+
+    const folderInput = screen.getByLabelText(/folder picker/i) as HTMLInputElement
+    Object.defineProperty(folderInput, 'files', { value: [file1, file2], writable: false })
+    fireEvent.change(folderInput)
+
+    await waitFor(() => expect(onFolderUpload).toHaveBeenCalled())
+    const [arg] = onFolderUpload.mock.calls[0]
+    expect(arg.kind).toBe('walked')
+    expect(arg.rootName).toBe('papers')
+    expect(arg.files.map((w: { relativePath: string }) => w.relativePath).sort()).toEqual(['a.md', 'sub/b.md'])
   })
 })

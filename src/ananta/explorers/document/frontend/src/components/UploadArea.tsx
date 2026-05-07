@@ -1,8 +1,20 @@
-import { useState, useRef, useCallback, type DragEvent, type KeyboardEvent } from 'react'
+import { useState, useRef, useCallback, type ChangeEvent, type DragEvent, type KeyboardEvent } from 'react'
+import type { WalkedFile } from '../lib/folder-walk'
+
+// Discriminated union: drop path emits FileSystemEntry[] (needs async traversal),
+// click path emits WalkedFile[] directly (browser flattens via webkitRelativePath).
+// The D2 hook is the seam where both paths converge.
+export type FolderUploadInput =
+  | { kind: 'entries'; entries: FileSystemEntry[]; rootName: string }
+  | { kind: 'walked'; files: WalkedFile[]; rootName: string }
+
+interface FileWithPath extends File {
+  webkitRelativePath: string
+}
 
 interface UploadAreaProps {
   onUpload: (files: File[]) => Promise<void>
-  onFolderUpload?: (entries: FileSystemEntry[], rootName: string) => Promise<void>
+  onFolderUpload?: (input: FolderUploadInput) => Promise<void>
   activeTopic: string | null
 }
 
@@ -10,6 +22,7 @@ export default function UploadArea({ onUpload, onFolderUpload, activeTopic }: Up
   const [dragging, setDragging] = useState(false)
   const [uploading, setUploading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const folderInputRef = useRef<HTMLInputElement>(null)
   const disabled = activeTopic === null
 
   const handleFiles = useCallback(async (files: FileList | File[]) => {
@@ -41,11 +54,24 @@ export default function UploadArea({ onUpload, onFolderUpload, activeTopic }: Up
 
     const hasDirectory = entries.some(e => e.isDirectory)
     if (hasDirectory && onFolderUpload) {
-      await onFolderUpload(entries, rootName)
+      await onFolderUpload({ kind: 'entries', entries, rootName })
     } else {
       await handleFiles(e.dataTransfer.files)
     }
   }, [disabled, handleFiles, onFolderUpload])
+
+  const handleFolderInputChange = useCallback(async (e: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []) as FileWithPath[]
+    if (files.length === 0 || !onFolderUpload) return
+    const firstPath = files[0].webkitRelativePath
+    const rootName = firstPath.split('/')[0] ?? ''
+    const walked: WalkedFile[] = files.map((f) => {
+      const wp = f.webkitRelativePath
+      const relativePath = wp.startsWith(`${rootName}/`) ? wp.slice(rootName.length + 1) : wp
+      return { file: f, relativePath }
+    })
+    await onFolderUpload({ kind: 'walked', files: walked, rootName })
+  }, [onFolderUpload])
 
   const handlers = disabled
     ? {}
@@ -63,30 +89,51 @@ export default function UploadArea({ onUpload, onFolderUpload, activeTopic }: Up
       }
 
   return (
-    <div
-      role="button"
-      tabIndex={disabled ? -1 : 0}
-      aria-label="Upload files"
-      aria-disabled={disabled || undefined}
-      {...handlers}
-      className={`mx-2 mb-2 p-3 border border-dashed rounded-lg text-center transition-colors text-xs ${
-        disabled
-          ? 'border-border text-text-dim opacity-50 cursor-not-allowed'
-          : dragging
-            ? 'border-accent bg-accent-dim text-accent cursor-pointer'
-            : 'border-border text-text-dim hover:border-text-dim hover:text-text-secondary cursor-pointer'
-      } ${uploading ? 'opacity-50 pointer-events-none' : ''}`}
-    >
+    <div className="mx-2 mb-2">
+      <div
+        role="button"
+        tabIndex={disabled ? -1 : 0}
+        aria-label="Upload files"
+        aria-disabled={disabled || undefined}
+        {...handlers}
+        className={`p-3 border border-dashed rounded-lg text-center transition-colors text-xs ${
+          disabled
+            ? 'border-border text-text-dim opacity-50 cursor-not-allowed'
+            : dragging
+              ? 'border-accent bg-accent-dim text-accent cursor-pointer'
+              : 'border-border text-text-dim hover:border-text-dim hover:text-text-secondary cursor-pointer'
+        } ${uploading ? 'opacity-50 pointer-events-none' : ''}`}
+      >
+        <input
+          ref={inputRef}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={async e => { if (e.target.files) await handleFiles(e.target.files) }}
+        />
+        {disabled
+          ? 'Select a topic first'
+          : (uploading ? 'Uploading...' : 'Drop files here or click to upload')}
+      </div>
+      {!disabled && onFolderUpload && (
+        <button
+          type="button"
+          onClick={() => folderInputRef.current?.click()}
+          aria-label="Upload folder"
+          className="mt-2 w-full px-3 py-1.5 text-xs border border-border rounded-lg text-text-dim hover:border-text-dim hover:text-text-secondary transition-colors cursor-pointer"
+        >
+          Upload folder
+        </button>
+      )}
       <input
-        ref={inputRef}
+        ref={folderInputRef}
         type="file"
-        multiple
+        // @ts-expect-error - webkitdirectory is not in standard TS DOM types
+        webkitdirectory=""
         className="hidden"
-        onChange={async e => { if (e.target.files) await handleFiles(e.target.files) }}
+        aria-label="folder picker"
+        onChange={handleFolderInputChange}
       />
-      {disabled
-        ? 'Select a topic first'
-        : (uploading ? 'Uploading...' : 'Drop files here or click to upload')}
     </div>
   )
 }

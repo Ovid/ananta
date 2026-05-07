@@ -316,11 +316,14 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                         upload_dir = None
                         project_id = None
                         continue
-                if not created_upload_dir or upload_dir is None:
+                if not created_upload_dir or upload_dir is None or project_id is None:
                     results.append(
                         _failed_row(file.filename, "could not allocate a unique upload directory")
                     )
                     continue
+                # mypy: after the guard above, project_id and upload_dir are non-None
+                assert project_id is not None
+                assert upload_dir is not None
                 original_path = upload_dir / f"original{ext}"
                 original_path.write_bytes(content)
 
@@ -341,16 +344,21 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                     _logger.exception("get_page_count failed for %r", file.filename)
                     page_count = None
 
-                # Save upload metadata
-                meta = {
+                # Save upload metadata. Apply the same conditional rule for
+                # relative_path / upload_session_id to both meta.json and
+                # ParsedDocument.metadata so consumers see a consistent shape
+                # regardless of which store they read (I3).
+                meta: dict[str, Any] = {
                     "filename": file.filename,
                     "content_type": file.content_type or "application/octet-stream",
                     "size": len(content),
                     "upload_date": datetime.now(UTC).isoformat(),
                     "page_count": page_count,
-                    "relative_path": rel_path,
-                    "upload_session_id": upload_session_id,
                 }
+                if rel_path is not None:
+                    meta["relative_path"] = rel_path
+                if upload_session_id is not None:
+                    meta["upload_session_id"] = upload_session_id
                 (upload_dir / "meta.json").write_text(json.dumps(meta, indent=2))
 
                 state.ananta.create_project(project_id)
@@ -361,6 +369,8 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                 }
                 if rel_path is not None:
                     doc_metadata["relative_path"] = rel_path
+                if upload_session_id is not None:
+                    doc_metadata["upload_session_id"] = upload_session_id
                 doc = ParsedDocument(
                     name=file.filename,
                     content=text,

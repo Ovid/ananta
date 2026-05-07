@@ -113,6 +113,34 @@ describe('useFolderUpload', () => {
     }
   })
 
+  it('upload error transitions to summary with the error reason', async () => {
+    // confirm() previously had no catch around uploadFolderInBatches: a
+    // non-OK response (e.g., 413) or fetch failure left the modal stuck on
+    // 'progress' with no error info, no failed-row reporting, and only a
+    // Cancel button (I4).
+    const files = [{ file: new File(['x'], 'a.md'), relativePath: 'a.md' }]
+    vi.spyOn(documentsApi, 'uploadFolderInBatches').mockRejectedValue(
+      new Error('upload failed: 500'),
+    )
+    const { result } = renderHook(() => useFolderUpload())
+    await act(async () => {
+      await result.current.start({ kind: 'walked', files, rootName: 'x' }, 'Barsoom')
+    })
+    await act(async () => {
+      await result.current.confirm()
+    })
+    expect(result.current.state?.kind).toBe('summary')
+    if (result.current.state?.kind === 'summary') {
+      // The error must appear somewhere in the summary so the user sees what
+      // went wrong instead of being stranded on progress.
+      const allReasons = [
+        ...result.current.state.failed.map(f => f.reason),
+        ...result.current.state.skipped.map(s => s.reason),
+      ]
+      expect(allReasons.some(r => r.includes('upload failed'))).toBe(true)
+    }
+  })
+
   it('cancel during upload bails before summary fires', async () => {
     // Reproduces the bug where a late onProgress callback (or the post-upload
     // summary setState) reanimated the modal after the user clicked Cancel.

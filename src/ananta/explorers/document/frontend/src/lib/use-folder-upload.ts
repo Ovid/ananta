@@ -71,6 +71,7 @@ export function useFolderUpload() {
     setAbortCtl(ctl)
     setState({ kind: 'progress', total, completed: 0, currentBatch: 0, totalBatches: batches.length })
     let rows: UploadRow[] = []
+    let uploadError: Error | null = null
     try {
       rows = await uploadFolderInBatches(
         batches,
@@ -86,6 +87,11 @@ export function useFolderUpload() {
         },
         ctl.signal,
       )
+    } catch (err) {
+      // A non-OK response (e.g., 413) or network drop bubbles out of
+      // uploadFolderInBatches. Without this catch the modal would stay stuck
+      // on 'progress' with no error info — only Cancel works (I4).
+      uploadError = err instanceof Error ? err : new Error(String(err))
     } finally {
       setAbortCtl(null)
     }
@@ -99,6 +105,9 @@ export function useFolderUpload() {
     const failed = rows
       .filter(r => r.status === 'failed')
       .map(r => ({ name: r.filename, reason: r.reason ?? 'failed' }))
+    if (uploadError) {
+      failed.push({ name: 'upload', reason: uploadError.message })
+    }
     // Carry pre-flight skipped rows through to the summary so the user sees
     // every file that did not get ingested, not just upload-time failures.
     setState({

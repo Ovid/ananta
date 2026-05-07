@@ -2,12 +2,14 @@ import { useState, useRef, useCallback, type DragEvent, type KeyboardEvent } fro
 
 interface UploadAreaProps {
   onUpload: (files: File[]) => Promise<void>
+  activeTopic: string | null
 }
 
-export default function UploadArea({ onUpload }: UploadAreaProps) {
+export default function UploadArea({ onUpload, activeTopic }: UploadAreaProps) {
   const [dragging, setDragging] = useState(false)
   const [uploading, setUploading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const disabled = activeTopic === null
 
   const handleFiles = useCallback(async (files: FileList | File[]) => {
     const fileArray = Array.from(files)
@@ -26,25 +28,34 @@ export default function UploadArea({ onUpload }: UploadAreaProps) {
     await handleFiles(e.dataTransfer.files)
   }, [handleFiles])
 
+  const handlers = disabled
+    ? {}
+    : {
+        onDragOver: (e: DragEvent<HTMLDivElement>) => { e.preventDefault(); setDragging(true) },
+        onDragLeave: () => setDragging(false),
+        onDrop: handleDrop,
+        onClick: () => inputRef.current?.click(),
+        onKeyDown: (e: KeyboardEvent<HTMLDivElement>) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            inputRef.current?.click()
+          }
+        },
+      }
+
   return (
     <div
       role="button"
-      tabIndex={0}
+      tabIndex={disabled ? -1 : 0}
       aria-label="Upload files"
-      onDragOver={e => { e.preventDefault(); setDragging(true) }}
-      onDragLeave={() => setDragging(false)}
-      onDrop={handleDrop}
-      onClick={() => inputRef.current?.click()}
-      onKeyDown={(e: KeyboardEvent<HTMLDivElement>) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          inputRef.current?.click()
-        }
-      }}
-      className={`mx-2 mb-2 p-3 border border-dashed rounded-lg text-center cursor-pointer transition-colors text-xs ${
-        dragging
-          ? 'border-accent bg-accent-dim text-accent'
-          : 'border-border text-text-dim hover:border-text-dim hover:text-text-secondary'
+      aria-disabled={disabled || undefined}
+      {...handlers}
+      className={`mx-2 mb-2 p-3 border border-dashed rounded-lg text-center transition-colors text-xs ${
+        disabled
+          ? 'border-border text-text-dim opacity-50 cursor-not-allowed'
+          : dragging
+            ? 'border-accent bg-accent-dim text-accent cursor-pointer'
+            : 'border-border text-text-dim hover:border-text-dim hover:text-text-secondary cursor-pointer'
       } ${uploading ? 'opacity-50 pointer-events-none' : ''}`}
     >
       <input
@@ -54,7 +65,9 @@ export default function UploadArea({ onUpload }: UploadAreaProps) {
         className="hidden"
         onChange={async e => { if (e.target.files) await handleFiles(e.target.files) }}
       />
-      {uploading ? 'Uploading...' : 'Drop files here or click to upload'}
+      {disabled
+        ? 'Select a topic first'
+        : (uploading ? 'Uploading...' : 'Drop files here or click to upload')}
     </div>
   )
 }

@@ -239,7 +239,7 @@ export default function App() {
           createTopic={async name => { await api.topics.create(name) }}
           renameTopic={async (o, n) => { await api.topics.rename(o, n) }}
           deleteTopic={async name => { await api.topics.delete(name) }}
-          addButton={<UploadArea onUpload={handleUpload} />}
+          addButton={<UploadArea onUpload={handleUpload} activeTopic={activeTopic} />}
           addDocToTopic={handleAddDocToTopic}
           removeDocFromTopic={handleRemoveDocFromTopic}
           deleteDocument={handleDeleteDocument}

@@ -24,7 +24,15 @@ export const api = {
       request<string[]>(`/documents/${encodeURIComponent(id)}/topics`),
     upload: (files: File[], topic?: string) => {
       const formData = new FormData()
-      for (const file of files) formData.append('files', file)
+      for (const file of files) {
+        formData.append('files', file)
+        // Append a relative_path entry per file so click-folder selections
+        // and multi-select drops in a subdirectory keep their webkit path
+        // (I13). Empty string means "no relative path" and is normalised
+        // to None server-side. The backend requires the array length to
+        // match files.length once any value is supplied.
+        formData.append('relative_path', file.webkitRelativePath ?? '')
+      }
       if (topic) formData.append('topic', topic)
       // Override headers to let the browser set Content-Type with boundary for multipart
       return request<UploadRow[]>(

@@ -241,9 +241,7 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
             if rel_path == "":
                 rel_path = None
             if rel_path is not None and not _RELATIVE_PATH_RE.match(rel_path):
-                results.append(
-                    _failed_row(file.filename or "(unnamed)", "invalid relative_path")
-                )
+                results.append(_failed_row(file.filename or "(unnamed)", "invalid relative_path"))
                 continue
 
             # Once the aggregate cap is breached, every remaining file gets a

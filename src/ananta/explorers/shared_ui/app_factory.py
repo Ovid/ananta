@@ -48,9 +48,7 @@ class _BodySizeLimitMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self._max = max_bytes
 
-    async def dispatch(
-        self, request: Request, call_next: Callable[[Request], Any]
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: Callable[[Request], Any]) -> Response:
         cl_header = request.headers.get("content-length")
         if cl_header is not None:
             try:

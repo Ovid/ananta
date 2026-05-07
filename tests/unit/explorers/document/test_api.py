@@ -538,6 +538,7 @@ class TestUploadAtomicity:
             "ananta.explorers.document.api._make_project_id",
             fake_make_id,
         )
+
         # If retry succeeds, create_project should NOT raise on the second id.
         # If retry doesn't happen, we still need create_project to raise on
         # the colliding id (otherwise the test path is meaningless).
@@ -882,7 +883,7 @@ class TestAggregateLimitPartialSuccess:
         resp = client_for(state).post(
             "/api/documents/upload",
             files=[
-                ("files", ("first.txt", b"AAAAA", "text/plain")),    # 5 bytes
+                ("files", ("first.txt", b"AAAAA", "text/plain")),  # 5 bytes
                 ("files", ("second.txt", b"BBBBBB", "text/plain")),  # 6 bytes — trips cap
             ],
         )

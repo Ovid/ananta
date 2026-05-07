@@ -217,6 +217,37 @@ describe('useFolderUpload', () => {
     expect(result.current.commitVersion).toBe(0)
   })
 
+  it('initial progress state shows batch 1, not batch 0', async () => {
+    // The modal renders "(batch X of N)" using state.currentBatch. If the
+    // initial progress state is currentBatch=0 the user briefly sees
+    // "batch 0 of N" before the first onProgress fires. Initialise to 1 so
+    // the user always sees a 1-based batch count.
+    const files = [{ file: new File(['x'], 'a.md'), relativePath: 'a.md' }]
+    let resolveUpload: (rows: UploadRow[]) => void = () => {}
+    const uploadPromise = new Promise<UploadRow[]>((resolve) => {
+      resolveUpload = resolve
+    })
+    vi.spyOn(documentsApi, 'uploadFolderInBatches').mockImplementation(
+      async () => uploadPromise,
+    )
+    const { result } = renderHook(() => useFolderUpload())
+    await act(async () => {
+      await result.current.start({ kind: 'walked', files, rootName: 'x' }, 'Barsoom')
+    })
+    let confirmPromise: Promise<void> = Promise.resolve()
+    act(() => {
+      confirmPromise = result.current.confirm()
+    })
+    expect(result.current.state?.kind).toBe('progress')
+    if (result.current.state?.kind === 'progress') {
+      expect(result.current.state.currentBatch).toBe(1)
+    }
+    await act(async () => {
+      resolveUpload([{ project_id: 'p1', filename: 'a.md', status: 'created' }])
+      await confirmPromise
+    })
+  })
+
   it('confirm is a no-op when an upload is already in flight (double-click guard)', async () => {
     // Reproduces I7: a second confirm() call from a double-click (touch screen,
     // accessibility tools, queued events) must not start a second upload.

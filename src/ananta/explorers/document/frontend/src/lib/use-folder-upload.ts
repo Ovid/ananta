@@ -83,7 +83,10 @@ export function useFolderUpload() {
     const sessionId = crypto.randomUUID()
     const ctl = new AbortController()
     abortCtlRef.current = ctl
-    setState({ kind: 'progress', total, completed: 0, currentBatch: 0, totalBatches: batches.length })
+    // currentBatch is 1-based: batch 1 is in progress at this point. Without
+    // this, the modal briefly renders "batch 0 of N" until the first
+    // onProgress callback fires after batch 1 commits.
+    setState({ kind: 'progress', total, completed: 0, currentBatch: 1, totalBatches: batches.length })
     let rows: UploadRow[] = []
     let uploadError: Error | null = null
     try {

@@ -33,6 +33,12 @@ export function useFolderUpload() {
   const [commitVersion, setCommitVersion] = useState(0)
 
   const start = useCallback(async (input: FolderInput, topic: string) => {
+    // Refuse a second start while an upload is in flight. Without this guard,
+    // a second drop clobbers state and pending while batch 1 of the first
+    // upload is still committing — the first upload's progress callback
+    // then re-overwrites state, churning the modal (I9). The user must
+    // explicitly cancel before starting a new folder.
+    if (abortCtlRef.current) return
     let walked: WalkedFile[]
     if (input.kind === 'entries') {
       try {
@@ -48,21 +54,23 @@ export function useFolderUpload() {
         return
       }
     } else {
-      // Click-folder picker: the browser hands us a flat file list, bypassing
-      // walkEntries. Apply the same MAX_FOLDER_FILES cap drag-drop enforces
-      // so click and drop paths agree on the limit (I3).
-      if (input.files.length > MAX_FOLDER_FILES) {
-        setState({
-          kind: 'summary',
-          ingested: 0,
-          failed: [],
-          skipped: [{ name: input.rootName, reason: `folder exceeds the ${MAX_FOLDER_FILES}-file limit` }],
-        })
-        return
-      }
       walked = input.files
     }
     const { accepted, skipped } = filterFiles(walked.map(w => w.file))
+    // Count the cap against the *accepted* set only — drag-drop's walkEntries
+    // does the same (Inline 5). Otherwise a folder of mostly unsupported
+    // assets (e.g. a git repo with images) trips the cap on click but
+    // succeeds on drop (I7). Drop path: walkEntries already raised on cap,
+    // so accepted.length <= MAX_FOLDER_FILES here. Click path: enforce now.
+    if (accepted.length > MAX_FOLDER_FILES) {
+      setState({
+        kind: 'summary',
+        ingested: 0,
+        failed: [],
+        skipped: [{ name: input.rootName, reason: `folder exceeds the ${MAX_FOLDER_FILES}-file limit` }],
+      })
+      return
+    }
     // O(n^2) but n <= 500 (MAX_FOLDER_FILES); acceptable.
     const acceptedWalked: WalkedFile[] = walked.filter(w => accepted.includes(w.file))
     const skippedTyped: SkippedFile[] = skipped

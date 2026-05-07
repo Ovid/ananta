@@ -113,6 +113,27 @@ describe('useFolderUpload', () => {
     }
   })
 
+  it('walked path counts the cap on accepted files only (I7)', async () => {
+    // Reproduces I7: click-folder previously checked raw input.files.length
+    // against MAX_FOLDER_FILES, while drag-drop's walkEntries counted only
+    // the *accepted* (allowlisted) files. A folder with 1 supported file
+    // and 600 PNGs succeeded via drop but failed via click. Align: the
+    // walked path also counts the accepted set.
+    const supported = [{ file: new File(['x'], 'note.md'), relativePath: 'note.md' }]
+    const unsupported = Array.from({ length: 600 }, (_, i) => ({
+      file: new File(['x'], `img${i}.png`),
+      relativePath: `img${i}.png`,
+    }))
+    const files = [...supported, ...unsupported]
+    const { result } = renderHook(() => useFolderUpload())
+    await act(async () => {
+      await result.current.start({ kind: 'walked', files, rootName: 'mixed' }, 'Barsoom')
+    })
+    // Should reach preflight (NOT summary), because only 1 supported file
+    // counts against the cap.
+    expect(result.current.state?.kind).toBe('preflight')
+  })
+
   it('summary includes earlier batches\' rows when later batch fails (C2)', async () => {
     // Reproduces C2: when batch K fails, batches 1..K-1 are durably committed
     // server-side. The hook must merge those rows into the summary, not
@@ -273,6 +294,38 @@ describe('useFolderUpload', () => {
     await act(async () => {
       resolveUpload([{ project_id: 'p1', filename: 'a.md', status: 'created' }])
       await confirmPromise
+    })
+  })
+
+  it('start is a no-op while a previous upload is still in flight (I9)', async () => {
+    // Reproduces I9: a second drop while the first upload is in flight
+    // previously clobbered state and pending. The first upload's progress
+    // callback then re-overwrote state to its own progress, churning the
+    // modal. Fix: start() refuses if abortCtlRef.current is non-null.
+    const filesA = [{ file: new File(['x'], 'a.md'), relativePath: 'a.md' }]
+    const filesB = [{ file: new File(['y'], 'b.md'), relativePath: 'b.md' }]
+    let resolveA: (rows: UploadRow[]) => void = () => {}
+    const promiseA = new Promise<UploadRow[]>((r) => { resolveA = r })
+    vi.spyOn(documentsApi, 'uploadFolderInBatches').mockImplementation(async () => promiseA)
+
+    const { result } = renderHook(() => useFolderUpload())
+    await act(async () => {
+      await result.current.start({ kind: 'walked', files: filesA, rootName: 'a' }, 'T')
+    })
+    let confirmA: Promise<void> = Promise.resolve()
+    act(() => { confirmA = result.current.confirm() })
+    expect(result.current.state?.kind).toBe('progress')
+
+    const stateBefore = result.current.state
+    // Second start() while A is in flight — must NOT overwrite state.
+    await act(async () => {
+      await result.current.start({ kind: 'walked', files: filesB, rootName: 'b' }, 'T')
+    })
+    expect(result.current.state).toBe(stateBefore)
+
+    await act(async () => {
+      resolveA([{ project_id: 'p', filename: 'a.md', status: 'created' }])
+      await confirmA
     })
   })
 

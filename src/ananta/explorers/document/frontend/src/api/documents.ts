@@ -7,6 +7,17 @@ export interface UploadRow {
   reason?: string
 }
 
+// Carries the rows accumulated across earlier successful batches when a
+// later batch fails. Without this, throwing a plain Error stranded earlier
+// rows in a closure local — the hook then surfaced "0 ingested" even though
+// batches 1..K-1 were durably committed server-side (C2).
+export class BatchUploadError extends Error {
+  constructor(message: string, public readonly partial: UploadRow[]) {
+    super(message)
+    this.name = 'BatchUploadError'
+  }
+}
+
 export async function uploadFolderInBatches(
   batches: WalkedFile[][],
   topic: string,
@@ -34,7 +45,7 @@ export async function uploadFolderInBatches(
     // honour the abort. Do not "fix" this without revisiting the design.
     const res = await fetch('/api/documents/upload', { method: 'POST', body: form })
     if (!res.ok) {
-      throw new Error(`upload failed: ${res.status}`)
+      throw new BatchUploadError(`upload failed: ${res.status}`, all)
     }
     const rows = (await res.json()) as UploadRow[]
     all.push(...rows)

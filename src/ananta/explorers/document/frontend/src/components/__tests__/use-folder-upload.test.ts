@@ -113,6 +113,34 @@ describe('useFolderUpload', () => {
     }
   })
 
+  it('summary includes earlier batches\' rows when later batch fails (C2)', async () => {
+    // Reproduces C2: when batch K fails, batches 1..K-1 are durably committed
+    // server-side. The hook must merge those rows into the summary, not
+    // present "0 ingested" alongside the failure.
+    const files = [{ file: new File(['x'], 'a.md'), relativePath: 'a.md' }]
+    const partial = [
+      { project_id: 'p1', filename: 'first.md', status: 'created' as const },
+      { project_id: 'p2', filename: 'second.md', status: 'created' as const },
+    ]
+    vi.spyOn(documentsApi, 'uploadFolderInBatches').mockImplementation(async () => {
+      throw new documentsApi.BatchUploadError('upload failed: 500', partial)
+    })
+    const { result } = renderHook(() => useFolderUpload())
+    await act(async () => {
+      await result.current.start({ kind: 'walked', files, rootName: 'x' }, 'T')
+    })
+    await act(async () => {
+      await result.current.confirm()
+    })
+    expect(result.current.state?.kind).toBe('summary')
+    if (result.current.state?.kind === 'summary') {
+      // The two earlier-batch successes must be reflected as "ingested".
+      expect(result.current.state.ingested).toBe(2)
+      // The error reason must still appear in failed rows.
+      expect(result.current.state.failed.some(f => /upload failed/.test(f.reason))).toBe(true)
+    }
+  })
+
   it('upload error transitions to summary with the error reason', async () => {
     // confirm() previously had no catch around uploadFolderInBatches: a
     // non-OK response (e.g., 413) or fetch failure left the modal stuck on

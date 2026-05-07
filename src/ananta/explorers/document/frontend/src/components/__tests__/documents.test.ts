@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { uploadFolderInBatches } from '../../api/documents'
+import { uploadFolderInBatches, BatchUploadError } from '../../api/documents'
 
 describe('uploadFolderInBatches', () => {
   beforeEach(() => {
@@ -35,6 +35,39 @@ describe('uploadFolderInBatches', () => {
     await promise
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((global.fetch as any).mock.calls.length).toBeLessThan(3)
+  })
+
+  it('throws BatchUploadError carrying earlier batches\' rows when a later batch fails', async () => {
+    // Reproduces C2: the previous code threw a plain Error on a non-OK
+    // response, losing all rows accumulated from earlier successful batches.
+    // The hook then surfaced "0 ingested" even though batches 1..K-1 were
+    // durably committed server-side. Fix: throw BatchUploadError carrying
+    // the partial rows so the hook can merge them into the summary.
+    let call = 0
+    global.fetch = vi.fn(async () => {
+      call += 1
+      if (call === 1) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => [
+            { project_id: 'p1', filename: 'a.md', status: 'created' },
+          ],
+        } as Response
+      }
+      return { ok: false, status: 500, json: async () => ({}) } as Response
+    })
+    const batches = [
+      [{ file: new File(['x'], 'a.md'), relativePath: 'a.md' }],
+      [{ file: new File(['y'], 'b.md'), relativePath: 'b.md' }],
+    ]
+    await expect(
+      uploadFolderInBatches(batches, 'T', 'sid', () => {}),
+    ).rejects.toSatisfy((err: unknown) => {
+      if (!(err instanceof BatchUploadError)) return false
+      if (err.partial.length !== 1) return false
+      return err.partial[0].filename === 'a.md' && err.partial[0].status === 'created'
+    })
   })
 
   it('reports progress to the callback', async () => {

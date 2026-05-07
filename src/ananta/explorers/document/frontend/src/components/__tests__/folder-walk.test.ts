@@ -154,6 +154,29 @@ describe('walkEntries with cap', () => {
   })
 })
 
+describe('walkEntries multi-folder drop (I4)', () => {
+  // Reproduces I4: when multiple top-level directories are dropped, the
+  // previous implementation stripped only the first folder's prefix from
+  // every file's relativePath. Files from secondary folders retained
+  // their root in the persisted path.
+  it('strips each top-level folder\'s own prefix', async () => {
+    const folderA = makeDir('folderA', '/folderA', [
+      makeFile('a.md', '/folderA/a.md'),
+    ])
+    const folderB = makeDir('folderB', '/folderB', [
+      makeFile('b.md', '/folderB/b.md'),
+    ])
+    // rootName is kept as the first folder for backward compat (the modal
+    // labels the upload after the first dropped folder); the stripping
+    // logic must derive the per-entry root internally.
+    const result = await walkEntries([folderA as any, folderB as any], 'folderA')
+    const paths = result.map(r => r.relativePath).sort()
+    // Without the fix, b.md ends up as 'folderB/b.md' because folderB's
+    // prefix is never stripped.
+    expect(paths).toEqual(['a.md', 'b.md'])
+  })
+})
+
 describe('walkEntries error resilience (I8)', () => {
   // Reproduces I8: a single getFile failure (permission, OS quirk, race
   // with file deletion) previously rejected the entire walk. The user

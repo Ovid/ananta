@@ -91,16 +91,17 @@ export async function walkEntries(
   // is enforced on the *accepted* count so a folder of many unsupported files
   // (e.g., a git repo with image assets) doesn't trip the cap before reaching
   // its few supported source files (Inline 5).
+  //
+  // *rootName* is kept on the call signature for backward-compat callers, but
+  // when multiple top-level entries are dropped each subtree's prefix is
+  // derived from its own top-level entry (I4) — using a single root for all
+  // entries previously left files from secondary folders with an
+  // unstripped folder/ prefix.
+  void rootName
   const result: WalkedFile[] = []
   let acceptedCount = 0
-  const stripPrefix = (fullPath: string): string => {
-    const prefix = `/${rootName}/`
-    return fullPath.startsWith(prefix)
-      ? fullPath.slice(prefix.length)
-      : fullPath.replace(/^\//, '')
-  }
 
-  const visit = async (entry: FileSystemEntry): Promise<void> => {
+  const visit = async (entry: FileSystemEntry, stripPrefix: (p: string) => string): Promise<void> => {
     if (entry.isFile) {
       // Per-file errors (permission denied, OS quirks, race with deletion)
       // must not abort the whole walk (I8). Drop the unreadable file and
@@ -131,7 +132,7 @@ export async function walkEntries(
         // throw the whole walk away. The cap-exceeded throw must still
         // propagate, since that signals a hard refusal.
         try {
-          await visit(child)
+          await visit(child, stripPrefix)
         } catch (err) {
           if (err instanceof Error && /folder.*limit/i.test(err.message)) throw err
           // else: swallow per-file/per-subtree error and continue
@@ -141,7 +142,19 @@ export async function walkEntries(
   }
 
   for (const entry of entries) {
-    await visit(entry)
+    // Derive a per-entry stripPrefix so each dropped folder loses its OWN
+    // top-level name (I4). For top-level files the strip is just the
+    // leading slash.
+    const ownRoot = entry.isDirectory ? entry.name : ''
+    const stripPrefix = ownRoot
+      ? (fullPath: string): string => {
+          const prefix = `/${ownRoot}/`
+          return fullPath.startsWith(prefix)
+            ? fullPath.slice(prefix.length)
+            : fullPath.replace(/^\//, '')
+        }
+      : (fullPath: string): string => fullPath.replace(/^\//, '')
+    await visit(entry, stripPrefix)
   }
   return result
 }

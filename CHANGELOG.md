@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Document Explorer: folder upload. Drop a folder onto the explorer (or use the new "Upload folder" button) to recursively upload its supported files into the currently selected topic. Pre-flight modal previews counts, byte totals, and skipped reasons; progress modal shows per-batch upload; summary modal reports ingested / failed / skipped per file. Drop is disabled when no topic is selected. (See `docs/plans/2026-05-05-folder-upload-design.md`.)
+- Document Explorer: documents now expose a `relative_path` field (in API responses, UI subtitle, and `ParsedDocument.metadata`) so the LLM can filter or group by folder structure.
+
+### Changed
+
+- Document Explorer: multi-file upload now returns per-file partial-success rows instead of failing the whole request on one bad file. Each `DocumentUploadResponse` row carries `status` (`"created"` or `"failed"`) and an optional `reason`. Single-file uploads are observably unchanged.
+- Document Explorer: upload limits centralized in `src/ananta/explorers/document/config.py`. No behavior change.
+
 ### Fixed
 
 - Codebase analysis no longer crashes with `AttributeError` when the LLM returns a bare string in the `components` or `external_dependencies` arrays — strings are now promoted to `{"name": <string>}` to match the expected element shape

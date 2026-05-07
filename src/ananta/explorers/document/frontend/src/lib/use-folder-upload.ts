@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import {
   walkEntries,
   filterFiles,
@@ -21,7 +21,11 @@ export type FolderInput =
 export function useFolderUpload() {
   const [state, setState] = useState<ModalState | null>(null)
   const [pending, setPending] = useState<{ accepted: WalkedFile[]; topic: string; skipped: SkippedFile[] } | null>(null)
-  const [abortCtl, setAbortCtl] = useState<AbortController | null>(null)
+  // Held in a ref rather than state so cancel() can never read a stale value.
+  // Using setState here meant cancel callbacks captured between renders would
+  // see whichever AbortController was committed at their definition time —
+  // potentially null when an upload was in flight (S6).
+  const abortCtlRef = useRef<AbortController | null>(null)
   // Increments whenever uploaded rows have been committed server-side and the
   // caller should refresh its document list. Bumps on summary AND on cancel-
   // mid-flight (the in-flight batch always commits before cancel is honoured —
@@ -72,13 +76,13 @@ export function useFolderUpload() {
     // accessibility tools, queued events) can fire confirm twice before the
     // state transition to 'progress' commits. The second call must not start
     // a second upload — clear pending atomically by reading-then-clearing.
-    if (state?.kind === 'progress' || abortCtl) return
+    if (state?.kind === 'progress' || abortCtlRef.current) return
     const { accepted, topic, skipped: preflightSkipped } = pending
     const batches = partitionIntoBatches(accepted, TARGET_BATCH_BYTES)
     const total = accepted.length
     const sessionId = crypto.randomUUID()
     const ctl = new AbortController()
-    setAbortCtl(ctl)
+    abortCtlRef.current = ctl
     setState({ kind: 'progress', total, completed: 0, currentBatch: 0, totalBatches: batches.length })
     let rows: UploadRow[] = []
     let uploadError: Error | null = null
@@ -103,7 +107,7 @@ export function useFolderUpload() {
       // on 'progress' with no error info — only Cancel works (I4).
       uploadError = err instanceof Error ? err : new Error(String(err))
     } finally {
-      setAbortCtl(null)
+      abortCtlRef.current = null
     }
     if (ctl.signal.aborted) {
       // User cancelled mid-flight: cancel() already cleared state and bumped
@@ -129,19 +133,23 @@ export function useFolderUpload() {
     })
     setPending(null)
     setCommitVersion(v => v + 1)
-  }, [pending, state, abortCtl])
+  }, [pending, state])
 
   const cancel = useCallback(() => {
     // Cancel from progress means at least one batch completed server-side
     // before we honoured the abort — bump commitVersion so the caller can
-    // refresh. Cancel from preflight has nothing to refresh.
-    if (abortCtl) {
-      abortCtl.abort()
+    // refresh. Cancel from preflight has nothing to refresh. Reading the
+    // ref here (instead of useState) means cancel never closes over a stale
+    // value of the abort controller (S6).
+    const ctl = abortCtlRef.current
+    if (ctl) {
+      ctl.abort()
+      abortCtlRef.current = null
       setCommitVersion(v => v + 1)
     }
     setState(null)
     setPending(null)
-  }, [abortCtl])
+  }, [])
 
   return { state, start, confirm, cancel, commitVersion }
 }

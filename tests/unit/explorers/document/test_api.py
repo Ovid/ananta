@@ -742,6 +742,54 @@ class TestUploadAtomicity:
         assert seen_pids[1] not in topic_items
 
 
+class TestAggregateLimitPartialSuccess:
+    """The aggregate-size cap must respect the partial-success contract.
+
+    Reproduces C1: previously, when total bytes exceeded
+    MAX_AGGREGATE_UPLOAD_BYTES mid-loop, the handler raised HTTPException(413)
+    and propagated it via `except HTTPException: raise`. Earlier files in the
+    same request that had already been written, persisted, and added to
+    topics were durably committed — but discarded from the response.
+    The caller saw only 413 and never learned of those ghost documents.
+    """
+
+    def test_aggregate_cap_keeps_earlier_successes(
+        self,
+        state: DocumentExplorerState,
+        mock_ananta: MagicMock,
+        uploads_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Files committed before the cap is reached must appear in the response."""
+        # Lower the aggregate cap to a value we can trip with two small files.
+        monkeypatch.setattr(
+            "ananta.explorers.document.api.MAX_AGGREGATE_UPLOAD_BYTES",
+            10,
+        )
+        mock_ananta.create_project.return_value = MagicMock()
+
+        resp = client_for(state).post(
+            "/api/documents/upload",
+            files=[
+                ("files", ("first.txt", b"AAAAA", "text/plain")),    # 5 bytes
+                ("files", ("second.txt", b"BBBBBB", "text/plain")),  # 6 bytes — trips cap
+            ],
+        )
+        assert resp.status_code == 200
+        rows = resp.json()
+        by_filename = {r["filename"]: r for r in rows}
+        # First file must be reported as committed.
+        assert by_filename["first.txt"]["status"] == "created"
+        # Second file must be reported as failed with an aggregate-cap reason.
+        assert by_filename["second.txt"]["status"] == "failed"
+        assert "aggregate" in by_filename["second.txt"]["reason"].lower()
+
+
+def client_for(state: DocumentExplorerState) -> TestClient:
+    app = create_api(state)
+    return TestClient(app, raise_server_exceptions=False)
+
+
 class TestUploadFileCountLimit:
     def test_upload_exceeding_file_count_returns_413(
         self,

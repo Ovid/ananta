@@ -200,6 +200,7 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
 
         results: list[DocumentUploadResponse] = []
         total_bytes = 0
+        aggregate_cap_reached = False
 
         for idx, file in enumerate(files):
             if not file.filename:
@@ -210,6 +211,19 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                 if relative_path is not None and idx < len(relative_path)
                 else None
             )
+
+            # Once the aggregate cap is breached, every remaining file gets a
+            # failed row so the caller can reconcile the request count. We
+            # don't break — direct API callers benefit from a row per file.
+            if aggregate_cap_reached:
+                results.append(
+                    _failed_row(
+                        file.filename,
+                        f"aggregate upload size exceeds the "
+                        f"{MAX_AGGREGATE_UPLOAD_BYTES // (1024 * 1024)} MB limit",
+                    )
+                )
+                continue
 
             upload_dir: Path | None = None
             project_id: str | None = None
@@ -236,13 +250,20 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
 
                 total_bytes += len(content)
                 if total_bytes > MAX_AGGREGATE_UPLOAD_BYTES:
-                    # Aggregate cap remains a hard 413 — frontend chunking
-                    # should ensure this is never reached in practice.
-                    raise HTTPException(
-                        413,
-                        f"Total upload size exceeds the "
-                        f"{MAX_AGGREGATE_UPLOAD_BYTES // (1024 * 1024)} MB aggregate limit",
+                    # Aggregate cap reached: respect the partial-success
+                    # contract by emitting a failed row for this file (and
+                    # all remaining files via the loop-top check above)
+                    # instead of raising 413 mid-loop and stranding earlier
+                    # successes (C1).
+                    aggregate_cap_reached = True
+                    results.append(
+                        _failed_row(
+                            file.filename,
+                            f"aggregate upload size exceeds the "
+                            f"{MAX_AGGREGATE_UPLOAD_BYTES // (1024 * 1024)} MB limit",
+                        )
                     )
+                    continue
 
                 # Allocate an upload dir we know is fresh. Retrying on
                 # FileExistsError protects against `_make_project_id` collisions
@@ -320,7 +341,7 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                     )
                 )
             except HTTPException:
-                raise  # 413 aggregate cap propagates as before
+                raise  # MAX_FOLDER_FILES 413 and topic-validation 422 propagate
             except Exception as exc:
                 # Per-file rollback: clean up only this file's state. Critical
                 # (C4): only rmtree the upload_dir if THIS request created it.

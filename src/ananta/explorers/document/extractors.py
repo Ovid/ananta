@@ -5,6 +5,7 @@ Dispatches to format-specific extractors based on file extension.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 import pdfplumber
@@ -64,22 +65,35 @@ def extract_text(path: Path, content_type: str | None = None) -> str:
     """Extract text content from a file.
 
     *content_type* is accepted for forward-compatibility but dispatch
-    is by file extension.  Raises ``ValueError`` for unsupported types.
+    is by file extension. Raises ``ValueError`` for unsupported types
+    or for corrupt/unreadable files (translated from per-library errors
+    like pdfplumber's PDFSyntaxError, zipfile's BadZipFile, openpyxl's
+    InvalidFileException, python-pptx's PackageNotFoundError).
     """
     ext = path.suffix.lower()
 
     if ext in _PLAIN_TEXT_EXTENSIONS:
         return _extract_plain_text(path)
-    if ext == ".pdf":
-        return _extract_pdf(path)
-    if ext == ".docx":
-        return _extract_docx(path)
-    if ext == ".pptx":
-        return _extract_pptx(path)
-    if ext == ".xlsx":
-        return _extract_xlsx(path)
-    if ext == ".rtf":
-        return _extract_rtf(path)
+    fmt_extractors: dict[str, tuple[str, Callable[[Path], str]]] = {
+        ".pdf": ("pdf", _extract_pdf),
+        ".docx": ("docx", _extract_docx),
+        ".pptx": ("pptx", _extract_pptx),
+        ".xlsx": ("xlsx", _extract_xlsx),
+        ".rtf": ("rtf", _extract_rtf),
+    }
+    if ext in fmt_extractors:
+        fmt_name, fn = fmt_extractors[ext]
+        try:
+            return fn(path)
+        except ValueError:
+            raise
+        except Exception as exc:
+            # Per-format libraries raise their own exception types on corrupt
+            # input (e.g. zipfile.BadZipFile). Translate to ValueError so the
+            # API's per-file ValueError handler emits a "text extraction
+            # failed" reason instead of a generic "unexpected upload error".
+            msg = f"could not extract text from {fmt_name}: {exc}"
+            raise ValueError(msg) from exc
 
     msg = f"Unsupported file type: {ext}"
     raise ValueError(msg)

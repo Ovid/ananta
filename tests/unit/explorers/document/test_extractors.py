@@ -70,6 +70,41 @@ class TestUnsupportedExtension:
             extract_text(f)
 
 
+class TestCorruptFileTranslation:
+    """Per-format parser exceptions must be translated to ValueError (I5).
+
+    Reproduces I5: pdfplumber, python-docx, python-pptx, openpyxl etc. raise
+    library-specific exceptions on malformed input (PDFSyntaxError,
+    BadZipFile, InvalidFileException, PackageNotFoundError, ...) — none
+    subclass ValueError. Without translation, the API's `except ValueError`
+    misses them and the user sees the generic "unexpected upload error".
+    """
+
+    def test_corrupt_pdf_raises_value_error(self, tmp_path: Path) -> None:
+        f = tmp_path / "corrupt.pdf"
+        f.write_bytes(b"not a pdf")
+        with pytest.raises(ValueError):
+            extract_text(f)
+
+    def test_corrupt_docx_raises_value_error(self, tmp_path: Path) -> None:
+        f = tmp_path / "corrupt.docx"
+        f.write_bytes(b"not a docx")
+        with pytest.raises(ValueError):
+            extract_text(f)
+
+    def test_corrupt_pptx_raises_value_error(self, tmp_path: Path) -> None:
+        f = tmp_path / "corrupt.pptx"
+        f.write_bytes(b"not a pptx")
+        with pytest.raises(ValueError):
+            extract_text(f)
+
+    def test_corrupt_xlsx_raises_value_error(self, tmp_path: Path) -> None:
+        f = tmp_path / "corrupt.xlsx"
+        f.write_bytes(b"not an xlsx")
+        with pytest.raises(ValueError):
+            extract_text(f)
+
+
 class TestPdfExtraction:
     """Tests for PDF text extraction."""
 

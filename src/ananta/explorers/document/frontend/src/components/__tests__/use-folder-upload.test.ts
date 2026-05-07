@@ -92,6 +92,27 @@ describe('useFolderUpload', () => {
     }
   })
 
+  it('walked path enforces MAX_FOLDER_FILES cap', async () => {
+    // The click-folder picker hands the hook a pre-walked file list, skipping
+    // the entries->walk path. Without this guard, drag-drop enforces the cap
+    // but click-folder does not (I3).
+    const files = Array.from({ length: 501 }, (_, i) => ({
+      file: new File(['x'], `f${i}.md`),
+      relativePath: `f${i}.md`,
+    }))
+    const { result } = renderHook(() => useFolderUpload())
+    await act(async () => {
+      await result.current.start({ kind: 'walked', files, rootName: 'big' }, 'Barsoom')
+    })
+    expect(result.current.state?.kind).toBe('summary')
+    if (result.current.state?.kind === 'summary') {
+      expect(result.current.state.ingested).toBe(0)
+      expect(result.current.state.skipped).toEqual([
+        { name: 'big', reason: expect.stringMatching(/folder.*limit/i) },
+      ])
+    }
+  })
+
   it('cancel during upload bails before summary fires', async () => {
     // Reproduces the bug where a late onProgress callback (or the post-upload
     // summary setState) reanimated the modal after the user clicked Cancel.

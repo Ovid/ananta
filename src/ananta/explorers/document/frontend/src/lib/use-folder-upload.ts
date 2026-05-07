@@ -3,6 +3,7 @@ import {
   walkEntries,
   filterFiles,
   partitionIntoBatches,
+  MAX_FOLDER_FILES,
   TARGET_BATCH_BYTES,
   type WalkedFile,
   type SkippedFile,
@@ -38,6 +39,18 @@ export function useFolderUpload() {
         return
       }
     } else {
+      // Click-folder picker: the browser hands us a flat file list, bypassing
+      // walkEntries. Apply the same MAX_FOLDER_FILES cap drag-drop enforces
+      // so click and drop paths agree on the limit (I3).
+      if (input.files.length > MAX_FOLDER_FILES) {
+        setState({
+          kind: 'summary',
+          ingested: 0,
+          failed: [],
+          skipped: [{ name: input.rootName, reason: `folder exceeds the ${MAX_FOLDER_FILES}-file limit` }],
+        })
+        return
+      }
       walked = input.files
     }
     const { accepted, skipped } = filterFiles(walked.map(w => w.file))

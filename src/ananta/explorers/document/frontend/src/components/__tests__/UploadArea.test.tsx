@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import UploadArea from '../UploadArea'
@@ -80,5 +80,42 @@ describe('UploadArea', () => {
     render(<UploadArea onUpload={vi.fn()} activeTopic="Barsoom" />)
     const zone = screen.getByRole('button', { name: /upload/i })
     expect(zone).not.toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it('routes directory drops to onFolderUpload', async () => {
+    const onFolderUpload = vi.fn(async () => {})
+    const onUpload = vi.fn()
+    render(<UploadArea onUpload={onUpload} onFolderUpload={onFolderUpload} activeTopic="Barsoom" />)
+
+    const fakeDirEntry = { isDirectory: true, isFile: false, name: 'papers', fullPath: '/papers' }
+    const dataTransfer = {
+      files: [],
+      items: [{ webkitGetAsEntry: () => fakeDirEntry }],
+    } as unknown as DataTransfer
+
+    const zone = screen.getByRole('button', { name: /upload/i })
+    fireEvent.drop(zone, { dataTransfer })
+
+    await waitFor(() => expect(onFolderUpload).toHaveBeenCalled())
+    expect(onUpload).not.toHaveBeenCalled()
+  })
+
+  it('routes plain file drops to onUpload', async () => {
+    const onFolderUpload = vi.fn(async () => {})
+    const onUpload = vi.fn(async () => {})
+    render(<UploadArea onUpload={onUpload} onFolderUpload={onFolderUpload} activeTopic="Barsoom" />)
+
+    const file = new File(['x'], 'a.md')
+    const fakeFileEntry = { isFile: true, isDirectory: false, name: 'a.md', fullPath: '/a.md' }
+    const dataTransfer = {
+      files: [file],
+      items: [{ webkitGetAsEntry: () => fakeFileEntry }],
+    } as unknown as DataTransfer
+
+    const zone = screen.getByRole('button', { name: /upload/i })
+    fireEvent.drop(zone, { dataTransfer })
+
+    await waitFor(() => expect(onUpload).toHaveBeenCalled())
+    expect(onFolderUpload).not.toHaveBeenCalled()
   })
 })

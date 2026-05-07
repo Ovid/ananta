@@ -2,10 +2,11 @@ import { useState, useRef, useCallback, type DragEvent, type KeyboardEvent } fro
 
 interface UploadAreaProps {
   onUpload: (files: File[]) => Promise<void>
+  onFolderUpload?: (entries: FileSystemEntry[], rootName: string) => Promise<void>
   activeTopic: string | null
 }
 
-export default function UploadArea({ onUpload, activeTopic }: UploadAreaProps) {
+export default function UploadArea({ onUpload, onFolderUpload, activeTopic }: UploadAreaProps) {
   const [dragging, setDragging] = useState(false)
   const [uploading, setUploading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -25,8 +26,26 @@ export default function UploadArea({ onUpload, activeTopic }: UploadAreaProps) {
   const handleDrop = useCallback(async (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     setDragging(false)
-    await handleFiles(e.dataTransfer.files)
-  }, [handleFiles])
+    if (disabled) return
+
+    const items = Array.from(e.dataTransfer.items ?? [])
+    const entries: FileSystemEntry[] = []
+    let rootName = ''
+    for (const item of items) {
+      const entry = (item as DataTransferItem & { webkitGetAsEntry: () => FileSystemEntry | null }).webkitGetAsEntry()
+      if (entry) {
+        entries.push(entry)
+        if (entry.isDirectory && !rootName) rootName = entry.name
+      }
+    }
+
+    const hasDirectory = entries.some(e => e.isDirectory)
+    if (hasDirectory && onFolderUpload) {
+      await onFolderUpload(entries, rootName)
+    } else {
+      await handleFiles(e.dataTransfer.files)
+    }
+  }, [disabled, handleFiles, onFolderUpload])
 
   const handlers = disabled
     ? {}

@@ -80,3 +80,50 @@ describe('FolderUploadModal pre-flight', () => {
     expect(onContinue).toHaveBeenCalled()
   })
 })
+
+describe('FolderUploadModal progress', () => {
+  it('renders a progress indicator', () => {
+    render(
+      <FolderUploadModal
+        state={{ kind: 'progress', total: 100, completed: 30, currentBatch: 2, totalBatches: 5 }}
+        onContinue={() => {}}
+        onCancel={() => {}}
+      />
+    )
+    expect(screen.getByText(/30 of 100/)).toBeInTheDocument()
+    expect(screen.getByText(/batch 2 of 5/i)).toBeInTheDocument()
+  })
+
+  it('cancel button is enabled', () => {
+    const onCancel = vi.fn()
+    render(
+      <FolderUploadModal
+        state={{ kind: 'progress', total: 100, completed: 30, currentBatch: 2, totalBatches: 5 }}
+        onContinue={() => {}}
+        onCancel={onCancel}
+      />
+    )
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
+    expect(onCancel).toHaveBeenCalled()
+  })
+})
+
+describe('FolderUploadModal summary', () => {
+  it('renders ingested / failed / skipped rows', () => {
+    render(
+      <FolderUploadModal
+        state={{
+          kind: 'summary',
+          ingested: 47,
+          failed: [{ name: 'bad.pdf', reason: 'text extraction failed' }],
+          skipped: [{ name: 'logo.png', reason: 'unsupported extension' }],
+        }}
+        onContinue={() => {}}
+        onCancel={() => {}}
+      />
+    )
+    expect(screen.getByText(/47/)).toBeInTheDocument()
+    expect(screen.getByText('bad.pdf')).toBeInTheDocument()
+    expect(screen.getByText('logo.png')).toBeInTheDocument()
+  })
+})

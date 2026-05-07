@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { WalkedFile, SkippedFile } from '../lib/folder-walk'
 import { SOFT_WARN_FOLDER_FILES } from '../lib/folder-walk'
@@ -58,6 +58,11 @@ function PreflightView({
   onContinue: () => void
   onCancel: () => void
 }) {
+  // Local guard against double-clicks (I7): even though useFolderUpload's
+  // confirm() now no-ops when an upload is in flight, disabling the button
+  // immediately on click prevents a second event from queuing at all and
+  // gives the user clear visual feedback.
+  const [confirming, setConfirming] = useState(false)
   const totalBytes = useMemo(
     () => state.accepted.reduce((sum, f) => sum + f.file.size, 0),
     [state.accepted],
@@ -102,8 +107,13 @@ function PreflightView({
         </button>
         <button
           type="button"
-          onClick={onContinue}
-          className="rounded-lg border border-accent bg-accent-dim px-3 py-1.5 text-xs text-accent hover:bg-accent hover:text-bg-primary cursor-pointer"
+          disabled={confirming}
+          onClick={() => {
+            if (confirming) return
+            setConfirming(true)
+            onContinue()
+          }}
+          className="rounded-lg border border-accent bg-accent-dim px-3 py-1.5 text-xs text-accent hover:bg-accent hover:text-bg-primary cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
         >
           Continue
         </button>

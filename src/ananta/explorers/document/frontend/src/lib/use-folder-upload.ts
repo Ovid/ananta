@@ -68,6 +68,11 @@ export function useFolderUpload() {
 
   const confirm = useCallback(async () => {
     if (!pending) return
+    // Re-entry guard (I7): a double-click on Continue (touch screens,
+    // accessibility tools, queued events) can fire confirm twice before the
+    // state transition to 'progress' commits. The second call must not start
+    // a second upload — clear pending atomically by reading-then-clearing.
+    if (state?.kind === 'progress' || abortCtl) return
     const { accepted, topic, skipped: preflightSkipped } = pending
     const batches = partitionIntoBatches(accepted, TARGET_BATCH_BYTES)
     const total = accepted.length
@@ -124,7 +129,7 @@ export function useFolderUpload() {
     })
     setPending(null)
     setCommitVersion(v => v + 1)
-  }, [pending])
+  }, [pending, state, abortCtl])
 
   const cancel = useCallback(() => {
     // Cancel from progress means at least one batch completed server-side

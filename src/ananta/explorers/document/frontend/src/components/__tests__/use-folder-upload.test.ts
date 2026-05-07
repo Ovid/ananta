@@ -217,6 +217,44 @@ describe('useFolderUpload', () => {
     expect(result.current.commitVersion).toBe(0)
   })
 
+  it('confirm is a no-op when an upload is already in flight (double-click guard)', async () => {
+    // Reproduces I7: a second confirm() call from a double-click (touch screen,
+    // accessibility tools, queued events) must not start a second upload.
+    const files = [{ file: new File(['x'], 'a.md'), relativePath: 'a.md' }]
+    let resolveUpload: (rows: UploadRow[]) => void = () => {}
+    const uploadPromise = new Promise<UploadRow[]>((resolve) => {
+      resolveUpload = resolve
+    })
+    const uploadSpy = vi
+      .spyOn(documentsApi, 'uploadFolderInBatches')
+      .mockImplementation(async () => uploadPromise)
+
+    const { result } = renderHook(() => useFolderUpload())
+    await act(async () => {
+      await result.current.start({ kind: 'walked', files, rootName: 'x' }, 'Barsoom')
+    })
+
+    // First confirm — keep the upload pending.
+    let firstConfirm: Promise<void> = Promise.resolve()
+    act(() => {
+      firstConfirm = result.current.confirm()
+    })
+    expect(result.current.state?.kind).toBe('progress')
+    expect(uploadSpy).toHaveBeenCalledTimes(1)
+
+    // Second confirm — must be a no-op while the first is still in flight.
+    await act(async () => {
+      await result.current.confirm()
+    })
+    expect(uploadSpy).toHaveBeenCalledTimes(1)
+
+    // Resolve the first upload so the test cleans up.
+    await act(async () => {
+      resolveUpload([{ project_id: 'p1', filename: 'a.md', status: 'created' }])
+      await firstConfirm
+    })
+  })
+
   it('cancel during upload bails before summary fires', async () => {
     // Reproduces the bug where a late onProgress callback (or the post-upload
     // summary setState) reanimated the modal after the user clicked Cancel.

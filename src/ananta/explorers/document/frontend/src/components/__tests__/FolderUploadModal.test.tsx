@@ -79,6 +79,23 @@ describe('FolderUploadModal pre-flight', () => {
     fireEvent.click(screen.getByRole('button', { name: /continue/i }))
     expect(onContinue).toHaveBeenCalled()
   })
+
+  it('Continue button disables on click and ignores rapid second clicks (I7)', () => {
+    const onContinue = vi.fn()
+    render(
+      <FolderUploadModal
+        state={{ kind: 'preflight', accepted: baseFiles, skipped: [], targetTopic: 'Barsoom' }}
+        onContinue={onContinue}
+        onCancel={() => {}}
+      />
+    )
+    const button = screen.getByRole('button', { name: /continue/i })
+    fireEvent.click(button)
+    fireEvent.click(button)
+    fireEvent.click(button)
+    expect(onContinue).toHaveBeenCalledTimes(1)
+    expect(button).toBeDisabled()
+  })
 })
 
 describe('FolderUploadModal progress', () => {

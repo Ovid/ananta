@@ -286,6 +286,64 @@ describe('useFolderUpload', () => {
     })
   })
 
+  it('finally clause does not clobber a newer upload\'s abort controller (C3)', async () => {
+    // Reproduces C3: upload A's finally{} runs after A is cancelled and B has
+    // started. A's finally{} previously did `abortCtlRef.current = null`
+    // unconditionally, wiping B's controller. A subsequent cancel() then saw
+    // null and could NOT abort B's in-flight signal. Fix: only null if the
+    // ref still points at our own controller.
+    const files = [{ file: new File(['x'], 'a.md'), relativePath: 'a.md' }]
+    let resolveA: (rows: UploadRow[]) => void = () => {}
+    let resolveB: (rows: UploadRow[]) => void = () => {}
+    const promiseA = new Promise<UploadRow[]>((r) => { resolveA = r })
+    const promiseB = new Promise<UploadRow[]>((r) => { resolveB = r })
+    let signalB: AbortSignal | undefined
+    const uploadSpy = vi.spyOn(documentsApi, 'uploadFolderInBatches')
+    uploadSpy.mockImplementationOnce(async () => promiseA)
+    uploadSpy.mockImplementationOnce(async (_b, _t, _s, _p, signal) => {
+      signalB = signal
+      return promiseB
+    })
+
+    const { result } = renderHook(() => useFolderUpload())
+
+    // Upload A: start, confirm, then cancel.
+    await act(async () => {
+      await result.current.start({ kind: 'walked', files, rootName: 'x' }, 'T')
+    })
+    let confirmA: Promise<void> = Promise.resolve()
+    act(() => { confirmA = result.current.confirm() })
+    expect(result.current.state?.kind).toBe('progress')
+    act(() => { result.current.cancel() })
+
+    // Upload B: start and confirm. A's promise still in flight.
+    await act(async () => {
+      await result.current.start({ kind: 'walked', files, rootName: 'x' }, 'T')
+    })
+    let confirmB: Promise<void> = Promise.resolve()
+    act(() => { confirmB = result.current.confirm() })
+    expect(result.current.state?.kind).toBe('progress')
+    expect(signalB).toBeDefined()
+
+    // A's promise resolves NOW — its finally would clobber B's controller
+    // (set abortCtlRef.current = null) unless guarded.
+    await act(async () => {
+      resolveA([{ project_id: 'pa', filename: 'a.md', status: 'created' }])
+      await confirmA
+    })
+
+    // Now cancel B. cancel() reads abortCtlRef.current; if A clobbered it,
+    // B's signal is never aborted. Verify B's signal was actually aborted.
+    act(() => { result.current.cancel() })
+    expect(signalB?.aborted).toBe(true)
+
+    // Clean up B
+    await act(async () => {
+      resolveB([])
+      await confirmB
+    })
+  })
+
   it('cancel during upload bails before summary fires', async () => {
     // Reproduces the bug where a late onProgress callback (or the post-upload
     // summary setState) reanimated the modal after the user clicked Cancel.

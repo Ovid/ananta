@@ -110,7 +110,11 @@ export function useFolderUpload() {
       // on 'progress' with no error info — only Cancel works (I4).
       uploadError = err instanceof Error ? err : new Error(String(err))
     } finally {
-      abortCtlRef.current = null
+      // Only clear if the ref still points at our controller. If upload A is
+      // cancelled and upload B starts before A's promise settles, A's finally
+      // would otherwise wipe B's controller — leaving cancel() unable to
+      // abort B's in-flight request (C3).
+      if (abortCtlRef.current === ctl) abortCtlRef.current = null
     }
     if (ctl.signal.aborted) {
       // User cancelled mid-flight: cancel() already cleared state and bumped

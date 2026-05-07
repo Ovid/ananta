@@ -45,7 +45,11 @@ from ananta.models import ParsedDocument
 _logger = logging.getLogger(__name__)
 
 # Allow / for old-style arXiv IDs (e.g. cs/9808001v1), but block .. traversal.
-# safe_path() provides the real path-traversal defence; this is belt-and-suspenders.
+# This regex IS the path-traversal defence in this module: handlers below use
+# `state.uploads_dir / doc_id` directly without further sanitisation, so the
+# negative-lookahead `(?!.*\.\.)` is what stops `..` from escaping the dir.
+# Loosen the regex only with a matching defence (e.g. routing every path
+# through a safe_path helper).
 _SAFE_ID_RE = re.compile(r"^(?!.*\.\.)[a-zA-Z0-9][a-zA-Z0-9._/-]*$")
 
 
@@ -204,6 +208,9 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
 
         for idx, file in enumerate(files):
             if not file.filename:
+                # Honour the partial-success contract: emit a row for every
+                # input file rather than silently dropping unnamed ones.
+                results.append(_failed_row("(unnamed)", "missing filename"))
                 continue
 
             rel_path = (
@@ -298,8 +305,14 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                     results.append(_failed_row(file.filename, f"text extraction failed: {exc}"))
                     continue
 
-                # Compute page/sheet/slide count where applicable
-                page_count = get_page_count(original_path)
+                # Compute page/sheet/slide count where applicable. A failure
+                # here must not abort the upload — the file already extracted
+                # cleanly. page_count is purely informational.
+                try:
+                    page_count = get_page_count(original_path)
+                except Exception:
+                    _logger.exception("get_page_count failed for %r", file.filename)
+                    page_count = None
 
                 # Save upload metadata
                 meta = {
@@ -409,16 +422,11 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
         meta["filename"] = new_name
         meta_path = state.uploads_dir / doc_id / "meta.json"
         meta_path.write_text(json.dumps(meta, indent=2))
-        return DocumentInfo(
-            project_id=doc_id,
-            filename=meta.get("filename", ""),
-            content_type=meta.get("content_type", ""),
-            size=meta.get("size", 0),
-            upload_date=meta.get("upload_date", ""),
-            page_count=meta.get("page_count"),
-            relative_path=meta.get("relative_path"),
-            upload_session_id=meta.get("upload_session_id"),
-        )
+        info = _build_doc_info(state.uploads_dir, doc_id)
+        # Just-written meta.json must be readable; if not, treat as 500.
+        if info is None:
+            raise HTTPException(500, f"Failed to read metadata for '{doc_id}' after rename")
+        return info
 
     @router.get("/documents/{doc_id}/download")
     def download_document(doc_id: str) -> FileResponse:

@@ -428,7 +428,7 @@ See [SECURITY.md](SECURITY.md) for details on:
 
 ## Who is Ananta?
 
-In Hindu mythology, **Ananta** (अनन्त, "the infinite one") is an alternate name
+In Hindu beliefs, **Ananta** (अनन्त, "the infinite one") is an alternate name
 for Shesha — the cosmic serpent who coils beneath the god Vishnu. The name was
 chosen because a Recursive Language Model can loop indefinitely, exploring a
 document until it finds the answer. The project was originally called "Shesha"

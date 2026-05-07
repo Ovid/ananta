@@ -14,8 +14,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-_logger = logging.getLogger(__name__)
-
 from fastapi import APIRouter, FastAPI, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
@@ -43,6 +41,8 @@ from ananta.explorers.document.websockets import websocket_handler
 from ananta.explorers.shared_ui.app_factory import create_app
 from ananta.explorers.shared_ui.routes import create_item_router, create_shared_router
 from ananta.models import ParsedDocument
+
+_logger = logging.getLogger(__name__)
 
 # Allow / for old-style arXiv IDs (e.g. cs/9808001v1), but block .. traversal.
 # safe_path() provides the real path-traversal defence; this is belt-and-suspenders.

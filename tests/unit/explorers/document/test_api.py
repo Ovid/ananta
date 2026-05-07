@@ -459,7 +459,10 @@ class TestUploadAtomicity:
         # The reason should still be informative ("upload failed", "internal error", etc).
         assert row["reason"]
         # The original exception SHOULD be logged server-side for diagnosis.
-        assert any(sensitive in record.message or sensitive in str(record) for record in caplog.records)
+        assert any(
+            sensitive in record.message or sensitive in str(record)
+            for record in caplog.records
+        )
 
     def test_project_id_collision_does_not_destroy_existing_project(
         self,

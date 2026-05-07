@@ -22,6 +22,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Codebase analysis no longer crashes with `AttributeError` when the LLM returns a bare string in the `components` or `external_dependencies` arrays — strings are now promoted to `{"name": <string>}` to match the expected element shape
 - Code Explorer now shows an "Analysis in progress…" status on the repo detail page while an analysis is running — the action buttons are hidden so the in-progress state is unambiguous, and the state is preserved when the user navigates away and returns (previously the page reverted to "Generate Analysis", letting users start a duplicate run)
 - Code Explorer repo "analysis status" badge now refreshes from "not analyzed" to "current" as soon as analysis completes (previously the badge stayed stale until the page was reloaded)
+- Document Explorer: single/multi-file upload via the picker now reports per-file failures in the toast — previously it always toasted "uploaded" even when the server flagged unsupported extensions or oversize files
+- Document Explorer: folder upload modal recovers from server errors (e.g., 413) — previously a non-OK response left the modal stuck on "progress" with no error info
+- Document Explorer: folder upload sidebar refreshes after a mid-upload cancel — committed batches no longer remain hidden until manual reload
+- Document Explorer: project-id collisions can no longer destroy unrelated documents (suffix is now cryptographically random; rollback skips destructive cleanup unless this upload created the project)
+- Document Explorer: Continue button on the folder-upload preflight modal disables on click, preventing double-click double-uploads
+- Document Explorer: a folder containing many unsupported files but few accepted ones no longer trips the 500-file cap (the cap now counts accepted files only)
+- Document Explorer: re-picking the same folder via the folder-input button now works (the input value is reset after each selection)
+
+### Security
+
+- Document Explorer: `/api/documents/upload` rejects requests with more than 500 files (denial-of-service guard); previously only the per-file 50 MB and per-batch 200 MB caps were enforced server-side
+- Document Explorer: per-file upload errors no longer include raw exception text in the API response (which could leak filesystem paths or dependency error details); the original exception is logged server-side
 
 ## [0.24.0] - 2026-03-22
 

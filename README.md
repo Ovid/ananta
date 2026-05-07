@@ -78,7 +78,7 @@ The third question searched across all 7 novels, extracted 30 chronological even
 
 ## Alpha Code
 
-So far it seems to work, but it's only been tested with .txt documents and the OpenAI API. It _should_ support PDFs, Word Documents, and other files — feedback welcome.
+So far, it's very stable and plenty of room for new features, including experimentation with advanced planning techniques — feedback and collaboration welcome.
 
 ## Prerequisites
 

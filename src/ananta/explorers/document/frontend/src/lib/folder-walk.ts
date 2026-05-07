@@ -102,7 +102,15 @@ export async function walkEntries(
 
   const visit = async (entry: FileSystemEntry): Promise<void> => {
     if (entry.isFile) {
-      const file = await getFile(entry as FileSystemFileEntry)
+      // Per-file errors (permission denied, OS quirks, race with deletion)
+      // must not abort the whole walk (I8). Drop the unreadable file and
+      // continue so the user still sees the readable ones in the summary.
+      let file: File
+      try {
+        file = await getFile(entry as FileSystemFileEntry)
+      } catch {
+        return
+      }
       const accepted =
         SUPPORTED_EXTENSIONS.includes(getExtension(file.name)) &&
         file.size <= MAX_UPLOAD_BYTES
@@ -119,7 +127,15 @@ export async function walkEntries(
       const reader = (entry as FileSystemDirectoryEntry).createReader()
       const children = await readAllEntries(reader)
       for (const child of children) {
-        await visit(child)
+        // A failure inside a subtree (e.g. unreadable nested dir) shouldn't
+        // throw the whole walk away. The cap-exceeded throw must still
+        // propagate, since that signals a hard refusal.
+        try {
+          await visit(child)
+        } catch (err) {
+          if (err instanceof Error && /folder.*limit/i.test(err.message)) throw err
+          // else: swallow per-file/per-subtree error and continue
+        }
       }
     }
   }

@@ -154,6 +154,35 @@ describe('walkEntries with cap', () => {
   })
 })
 
+describe('walkEntries error resilience (I8)', () => {
+  // Reproduces I8: a single getFile failure (permission, OS quirk, race
+  // with file deletion) previously rejected the entire walk. The user
+  // saw a single "skipped" row with no per-file detail and lost
+  // visibility into which files were readable. Wrap each entry visit so
+  // a failure on one file doesn't abandon the rest.
+  it('continues walking when a single file getFile rejects', async () => {
+    const goodA = makeFile('a.md', '/repo/a.md')
+    const broken: FakeEntry = {
+      isFile: true,
+      isDirectory: false,
+      name: 'broken.md',
+      fullPath: '/repo/broken.md',
+      file: (_cb, errCb?: (err: Error) => void) => {
+        if (errCb) errCb(new Error('permission denied'))
+      },
+    } as FakeEntry
+    const goodB = makeFile('b.md', '/repo/b.md')
+    const root = makeDir('repo', '/repo', [goodA, broken, goodB])
+    const result = await walkEntries([root as any], 'repo')
+    // The two readable files survive; the broken one is dropped silently
+    // (the hook's preflight categorises filtering, but we expect at minimum
+    // not to throw).
+    const names = result.map(r => r.relativePath).sort()
+    expect(names).toContain('a.md')
+    expect(names).toContain('b.md')
+  })
+})
+
 describe('partitionIntoBatches', () => {
   it('groups files under the target byte size', () => {
     const files = [

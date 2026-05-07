@@ -141,6 +141,82 @@ describe('useFolderUpload', () => {
     }
   })
 
+  it('commitVersion bumps after summary so App can refresh docs', async () => {
+    // After a successful upload, commitVersion increments exactly once so a
+    // useEffect can observe it and refresh the document list (I5 motivates
+    // exposing this signal so the cancel-mid-flight path can also bump it).
+    const files = [{ file: new File(['x'], 'a.md'), relativePath: 'a.md' }]
+    vi.spyOn(documentsApi, 'uploadFolderInBatches').mockResolvedValue([
+      { project_id: 'p1', filename: 'a.md', status: 'created' },
+    ])
+    const { result } = renderHook(() => useFolderUpload())
+    expect(result.current.commitVersion).toBe(0)
+
+    await act(async () => {
+      await result.current.start({ kind: 'walked', files, rootName: 'x' }, 'Barsoom')
+    })
+    expect(result.current.commitVersion).toBe(0)
+
+    await act(async () => {
+      await result.current.confirm()
+    })
+    expect(result.current.commitVersion).toBe(1)
+  })
+
+  it('commitVersion bumps when cancel fires after a batch completes', async () => {
+    // The in-flight batch always commits server-side before cancel is honoured
+    // (documented in api/documents.ts). The user-visible bug (I5): the doc
+    // list stayed stale after such a cancel. commitVersion now bumps on
+    // cancel-from-progress so the sidebar can refresh.
+    const files = [{ file: new File(['x'], 'a.md'), relativePath: 'a.md' }]
+    let resolveUpload: (rows: UploadRow[]) => void = () => {}
+    const uploadPromise = new Promise<UploadRow[]>((resolve) => {
+      resolveUpload = resolve
+    })
+    vi.spyOn(documentsApi, 'uploadFolderInBatches').mockImplementation(
+      async () => uploadPromise,
+    )
+    const { result } = renderHook(() => useFolderUpload())
+    await act(async () => {
+      await result.current.start({ kind: 'walked', files, rootName: 'x' }, 'Barsoom')
+    })
+
+    let confirmPromise: Promise<void> = Promise.resolve()
+    act(() => {
+      confirmPromise = result.current.confirm()
+    })
+    expect(result.current.state?.kind).toBe('progress')
+    expect(result.current.commitVersion).toBe(0)
+
+    act(() => {
+      result.current.cancel()
+    })
+    expect(result.current.commitVersion).toBe(1)
+
+    await act(async () => {
+      resolveUpload([{ project_id: 'p1', filename: 'a.md', status: 'created' }])
+      await confirmPromise
+    })
+    // After the in-flight batch resolves, the cancel-already-fired bump
+    // should not double-increment.
+    expect(result.current.commitVersion).toBe(1)
+  })
+
+  it('commitVersion does not bump when cancel fires before any upload', async () => {
+    // Cancel from preflight discards no committed batches, so no refresh is
+    // needed and commitVersion must stay at 0.
+    const files = [{ file: new File(['x'], 'a.md'), relativePath: 'a.md' }]
+    const { result } = renderHook(() => useFolderUpload())
+    await act(async () => {
+      await result.current.start({ kind: 'walked', files, rootName: 'x' }, 'Barsoom')
+    })
+    expect(result.current.state?.kind).toBe('preflight')
+    act(() => {
+      result.current.cancel()
+    })
+    expect(result.current.commitVersion).toBe(0)
+  })
+
   it('cancel during upload bails before summary fires', async () => {
     // Reproduces the bug where a late onProgress callback (or the post-upload
     // summary setState) reanimated the modal after the user clicked Cancel.

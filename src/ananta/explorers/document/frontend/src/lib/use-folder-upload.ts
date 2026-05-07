@@ -22,6 +22,11 @@ export function useFolderUpload() {
   const [state, setState] = useState<ModalState | null>(null)
   const [pending, setPending] = useState<{ accepted: WalkedFile[]; topic: string; skipped: SkippedFile[] } | null>(null)
   const [abortCtl, setAbortCtl] = useState<AbortController | null>(null)
+  // Increments whenever uploaded rows have been committed server-side and the
+  // caller should refresh its document list. Bumps on summary AND on cancel-
+  // mid-flight (the in-flight batch always commits before cancel is honoured —
+  // see api/documents.ts), but not on cancel from preflight (nothing committed).
+  const [commitVersion, setCommitVersion] = useState(0)
 
   const start = useCallback(async (input: FolderInput, topic: string) => {
     let walked: WalkedFile[]
@@ -96,8 +101,9 @@ export function useFolderUpload() {
       setAbortCtl(null)
     }
     if (ctl.signal.aborted) {
-      // User cancelled mid-flight: cancel() already cleared state. Do not
-      // emit a summary — that would re-mount the modal the user just closed.
+      // User cancelled mid-flight: cancel() already cleared state and bumped
+      // commitVersion. Do not emit a summary — that would re-mount the modal
+      // the user just closed.
       setPending(null)
       return
     }
@@ -117,13 +123,20 @@ export function useFolderUpload() {
       skipped: preflightSkipped.map(s => ({ name: s.file.name, reason: s.reason })),
     })
     setPending(null)
+    setCommitVersion(v => v + 1)
   }, [pending])
 
   const cancel = useCallback(() => {
-    abortCtl?.abort()
+    // Cancel from progress means at least one batch completed server-side
+    // before we honoured the abort — bump commitVersion so the caller can
+    // refresh. Cancel from preflight has nothing to refresh.
+    if (abortCtl) {
+      abortCtl.abort()
+      setCommitVersion(v => v + 1)
+    }
     setState(null)
     setPending(null)
   }, [abortCtl])
 
-  return { state, start, confirm, cancel }
+  return { state, start, confirm, cancel, commitVersion }
 }

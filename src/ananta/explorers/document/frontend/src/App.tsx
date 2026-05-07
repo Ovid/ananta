@@ -70,13 +70,15 @@ export default function App() {
     })
   }, [docsVersion])
 
-  // When a folder upload reaches the summary state, refresh the document list
-  // so the newly ingested files appear in the sidebar.
+  // Refresh the sidebar whenever a folder-upload commit happens. The hook
+  // bumps commitVersion both when the upload reaches summary and when the
+  // user cancels mid-flight (the in-flight batch commits server-side before
+  // the abort is honoured, so cancelled uploads can still leave new docs).
   useEffect(() => {
-    if (folderUpload.state?.kind === 'summary') {
+    if (folderUpload.commitVersion > 0) {
       setDocsVersion(v => v + 1)
     }
-  }, [folderUpload.state])
+  }, [folderUpload.commitVersion])
 
   const handleTopicSelect = useCallback((name: string) => {
     if (name !== activeTopic) {

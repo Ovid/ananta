@@ -581,6 +581,51 @@ class TestUploadAtomicity:
         assert seen_pids[1] not in topic_items
 
 
+class TestUploadFileCountLimit:
+    def test_upload_exceeding_file_count_returns_413(
+        self,
+        client: TestClient,
+        mock_ananta: MagicMock,
+    ) -> None:
+        """A request with more than MAX_FOLDER_FILES files is rejected with 413.
+
+        The frontend's MAX_FOLDER_FILES early-bail caps drag-drop uploads, but
+        click-folder selections and direct API callers can still submit any
+        count. This server-side cap is a denial-of-service guard so a hostile
+        or accidental large request can't enqueue tens of thousands of
+        synchronous filesystem ops on the event loop (I2).
+        """
+        from ananta.explorers.document.config import MAX_FOLDER_FILES
+
+        mock_ananta.create_project.return_value = MagicMock()
+        files = [
+            ("files", (f"f{i}.txt", b"x", "text/plain"))
+            for i in range(MAX_FOLDER_FILES + 1)
+        ]
+        resp = client.post("/api/documents/upload", files=files)
+        assert resp.status_code == 413
+        # No project should have been created — the cap fires before the loop.
+        mock_ananta.create_project.assert_not_called()
+
+    def test_upload_at_file_count_limit_succeeds(
+        self,
+        client: TestClient,
+        mock_ananta: MagicMock,
+    ) -> None:
+        """Uploads with exactly MAX_FOLDER_FILES files are not rejected by the cap."""
+        from ananta.explorers.document.config import MAX_FOLDER_FILES
+
+        mock_ananta.create_project.return_value = MagicMock()
+        files = [
+            ("files", (f"f{i}.txt", b"x", "text/plain"))
+            for i in range(MAX_FOLDER_FILES)
+        ]
+        resp = client.post("/api/documents/upload", files=files)
+        assert resp.status_code == 200
+        rows = resp.json()
+        assert len(rows) == MAX_FOLDER_FILES
+
+
 class TestUploadSizeLimit:
     def test_upload_exceeding_per_file_limit_returns_failed_row(
         self,

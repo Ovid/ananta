@@ -18,6 +18,7 @@ from fastapi.responses import FileResponse
 
 from ananta.explorers.document.config import (
     MAX_AGGREGATE_UPLOAD_BYTES,
+    MAX_FOLDER_FILES,
     MAX_UPLOAD_BYTES,
 )
 from ananta.explorers.document.dependencies import (
@@ -169,6 +170,16 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
         relative_path: list[str] | None = Form(default=None),
         upload_session_id: str | None = Form(default=None),
     ) -> list[DocumentUploadResponse]:
+        # DoS guard: cap the number of files per request so a large client
+        # submission can't enqueue tens of thousands of synchronous filesystem
+        # ops on the event loop. Frontend folder-walk enforces the same cap
+        # client-side, but any direct API caller (or click-folder picker) can
+        # otherwise bypass it.
+        if len(files) > MAX_FOLDER_FILES:
+            raise HTTPException(
+                413,
+                f"Upload exceeds the {MAX_FOLDER_FILES}-file per-request limit",
+            )
         # Validate topic name up-front so we fail before creating any
         # files or projects — avoids orphaned data on invalid topics.
         # Topic-validation is still all-or-nothing; only per-file work is

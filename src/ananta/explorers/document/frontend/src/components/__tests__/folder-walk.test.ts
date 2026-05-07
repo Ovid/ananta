@@ -114,6 +114,44 @@ describe('walkEntries with cap', () => {
     await expect(walkEntries([root as any], 'big'))
       .rejects.toThrow(/folder.*limit/i)
   })
+
+  it('accepts exactly MAX_FOLDER_FILES files (off-by-one regression S1)', async () => {
+    const children = Array.from({ length: MAX_FOLDER_FILES }, (_, i) =>
+      makeFile(`f${i}.md`, `/big/f${i}.md`)
+    )
+    const root = makeDir('big', '/big', children)
+    const result = await walkEntries([root as any], 'big')
+    expect(result.length).toBe(MAX_FOLDER_FILES)
+  })
+
+  it('does not throw when the cap is exceeded only by unsupported files (Inline 5)', async () => {
+    // Dropping a folder with many unsupported files (e.g., a git checkout
+    // full of .png/.svg assets) but only a few supported source files must
+    // not trip the cap. The previous implementation counted raw files and
+    // would reject the whole folder.
+    const accepted = Array.from({ length: 10 }, (_, i) =>
+      makeFile(`src${i}.md`, `/repo/src${i}.md`)
+    )
+    const unsupported = Array.from({ length: MAX_FOLDER_FILES + 200 }, (_, i) =>
+      makeFile(`asset${i}.png`, `/repo/asset${i}.png`)
+    )
+    const root = makeDir('repo', '/repo', [...accepted, ...unsupported])
+    const result = await walkEntries([root as any], 'repo')
+    // walkEntries returns every walked file; the hook re-runs filterFiles
+    // to categorise them. The point is that the cap did not throw.
+    expect(result.length).toBe(MAX_FOLDER_FILES + 210)
+  })
+
+  it('throws on the (MAX_FOLDER_FILES + 1)th accepted file (Inline 5)', async () => {
+    // Boundary check: 501 accepted files must exceed the cap. The previous
+    // ">"-comparison would push this through up to 502 before throwing.
+    const children = Array.from({ length: MAX_FOLDER_FILES + 1 }, (_, i) =>
+      makeFile(`f${i}.md`, `/big/f${i}.md`)
+    )
+    const root = makeDir('big', '/big', children)
+    await expect(walkEntries([root as any], 'big'))
+      .rejects.toThrow(/folder.*limit/i)
+  })
 })
 
 describe('partitionIntoBatches', () => {

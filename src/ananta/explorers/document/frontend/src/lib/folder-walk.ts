@@ -86,7 +86,14 @@ export async function walkEntries(
   entries: FileSystemEntry[],
   rootName: string,
 ): Promise<WalkedFile[]> {
+  // Returns the *accepted* WalkedFile[] only — files that fail the allowlist
+  // or oversize check are discarded silently here. The hook's preflight then
+  // re-runs filterFiles to populate the visible "skipped" rows. The cap is
+  // enforced on accepted count so a folder of many unsupported files (e.g.,
+  // a git repo with image assets) doesn't trip the cap before reaching its
+  // few supported source files (Inline 5).
   const result: WalkedFile[] = []
+  let acceptedCount = 0
   const stripPrefix = (fullPath: string): string => {
     const prefix = `/${rootName}/`
     return fullPath.startsWith(prefix)
@@ -95,11 +102,19 @@ export async function walkEntries(
   }
 
   const visit = async (entry: FileSystemEntry): Promise<void> => {
-    if (result.length > MAX_FOLDER_FILES) {
-      throw new Error(`folder exceeds the ${MAX_FOLDER_FILES}-file limit`)
-    }
     if (entry.isFile) {
       const file = await getFile(entry as FileSystemFileEntry)
+      const accepted =
+        SUPPORTED_EXTENSIONS.includes(getExtension(file.name)) &&
+        file.size <= MAX_UPLOAD_BYTES
+      if (accepted) {
+        if (acceptedCount >= MAX_FOLDER_FILES) {
+          throw new Error(`folder exceeds the ${MAX_FOLDER_FILES}-file limit`)
+        }
+        acceptedCount++
+      }
+      // Emit every walked file regardless of allowlist so the hook's
+      // filterFiles call can categorise the skipped ones for the summary.
       result.push({ file, relativePath: stripPrefix(entry.fullPath) })
     } else if (entry.isDirectory) {
       const reader = (entry as FileSystemDirectoryEntry).createReader()

@@ -1,5 +1,8 @@
 import { request, sharedApi } from '@ananta/shared-ui'
 import type { DocumentInfo } from '../types'
+import type { UploadRow } from './documents'
+
+export type { UploadRow }
 
 export const api = {
   ...sharedApi,
@@ -24,7 +27,7 @@ export const api = {
       for (const file of files) formData.append('files', file)
       if (topic) formData.append('topic', topic)
       // Override headers to let the browser set Content-Type with boundary for multipart
-      return request<{ project_id: string; filename: string; status: string }[]>(
+      return request<UploadRow[]>(
         '/documents/upload',
         { method: 'POST', body: formData, headers: {} },
       )

@@ -114,9 +114,16 @@ export default function App() {
 
   const handleUpload = useCallback(async (files: File[]) => {
     try {
-      await api.documents.upload(files, activeTopic || undefined)
-      setDocsVersion(v => v + 1)
-      showToast(`${files.length} file${files.length > 1 ? 's' : ''} uploaded`, 'success')
+      const rows = await api.documents.upload(files, activeTopic || undefined)
+      const created = rows.filter(r => r.status === 'created')
+      const failed = rows.filter(r => r.status === 'failed')
+      if (created.length > 0) {
+        setDocsVersion(v => v + 1)
+        showToast(`${created.length} file${created.length > 1 ? 's' : ''} uploaded`, 'success')
+      }
+      for (const row of failed) {
+        showToast(`${row.filename}: ${row.reason ?? 'upload failed'}`, 'error')
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to upload files'
       showToast(msg, 'error')

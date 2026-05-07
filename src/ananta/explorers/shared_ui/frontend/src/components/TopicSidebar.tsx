@@ -435,8 +435,7 @@ export default function TopicSidebar({
             />
           ) : (
             <div
-              className="min-w-0 cursor-pointer"
-              style={{ display: 'flex', flexDirection: 'column' }}
+              className="min-w-0 cursor-pointer flex flex-col"
               onClick={(e) => {
                 e.stopPropagation()
                 if (activeTopic !== topicName) onSelectTopic(topicName)
@@ -634,8 +633,7 @@ export default function TopicSidebar({
                   />
                 ) : (
                   <div
-                    className="min-w-0 cursor-pointer"
-                    style={{ display: 'flex', flexDirection: 'column' }}
+                    className="min-w-0 cursor-pointer flex flex-col"
                     onClick={(e) => {
                       e.stopPropagation()
                       onDocumentClick(doc)

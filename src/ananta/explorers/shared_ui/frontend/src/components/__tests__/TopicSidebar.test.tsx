@@ -658,7 +658,7 @@ describe('TopicSidebar (shared)', () => {
     render(<TopicSidebar {...props} />)
 
     const docLabel = await screen.findByText('Chess Strategies')
-    const docRow = docLabel.closest('div[class*="flex"]')!
+    const docRow = docLabel.closest('div[class*="group"]')!
     expect(docRow.className).toContain('accent')
   })
 
@@ -715,7 +715,7 @@ describe('TopicSidebar (shared)', () => {
       render(<TopicSidebar {...props} />)
 
       await screen.findByText('Chess Strategies')
-      const docRow = screen.getByText('Chess Strategies').closest('div[class*="flex"]')!
+      const docRow = screen.getByText('Chess Strategies').closest('div[class*="group"]')!
       expect(docRow).toHaveAttribute('draggable', 'true')
     })
 
@@ -727,7 +727,7 @@ describe('TopicSidebar (shared)', () => {
       render(<TopicSidebar {...props} />)
 
       await screen.findByText('Chess Strategies')
-      const docRow = screen.getByText('Chess Strategies').closest('div[class*="flex"]')!
+      const docRow = screen.getByText('Chess Strategies').closest('div[class*="group"]')!
       expect(docRow).not.toHaveAttribute('draggable', 'true')
     })
 
@@ -827,7 +827,7 @@ describe('TopicSidebar (shared)', () => {
       render(<TopicSidebar {...props} />)
 
       await screen.findByText('Orphan Doc')
-      const docRow = screen.getByText('Orphan Doc').closest('div[class*="flex"]')!
+      const docRow = screen.getByText('Orphan Doc').closest('div[class*="group"]')!
       expect(docRow).toHaveAttribute('draggable', 'true')
     })
   })
@@ -888,7 +888,7 @@ describe('TopicSidebar (shared)', () => {
       const renameButtons = screen.queryAllByRole('button', { name: 'Rename' })
       const docMenuRenameButtons = renameButtons.filter(b => {
         const menu = b.closest('.absolute')
-        return menu && menu.closest('div[class*="flex"]')
+        return menu && menu.closest('div[class*="group"]')
       })
       expect(docMenuRenameButtons).toHaveLength(0)
     })

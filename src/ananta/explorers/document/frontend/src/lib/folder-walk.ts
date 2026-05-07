@@ -86,12 +86,11 @@ export async function walkEntries(
   entries: FileSystemEntry[],
   rootName: string,
 ): Promise<WalkedFile[]> {
-  // Returns the *accepted* WalkedFile[] only — files that fail the allowlist
-  // or oversize check are discarded silently here. The hook's preflight then
-  // re-runs filterFiles to populate the visible "skipped" rows. The cap is
-  // enforced on accepted count so a folder of many unsupported files (e.g.,
-  // a git repo with image assets) doesn't trip the cap before reaching its
-  // few supported source files (Inline 5).
+  // Returns every walked file (allowlist filtering is the hook's job — it
+  // re-runs filterFiles to categorise skipped rows for the summary). The cap
+  // is enforced on the *accepted* count so a folder of many unsupported files
+  // (e.g., a git repo with image assets) doesn't trip the cap before reaching
+  // its few supported source files (Inline 5).
   const result: WalkedFile[] = []
   let acceptedCount = 0
   const stripPrefix = (fullPath: string): string => {

@@ -322,9 +322,7 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                 # return a generic reason to the client — raw exception text
                 # can leak internal details (filesystem paths, dependency
                 # errors, stack-trace fragments).
-                _logger.exception(
-                    "Unexpected error processing upload %r: %s", file.filename, exc
-                )
+                _logger.exception("Unexpected error processing upload %r: %s", file.filename, exc)
                 results.append(_failed_row(file.filename, "unexpected upload error"))
 
         return results

@@ -460,8 +460,7 @@ class TestUploadAtomicity:
         assert row["reason"]
         # The original exception SHOULD be logged server-side for diagnosis.
         assert any(
-            sensitive in record.message or sensitive in str(record)
-            for record in caplog.records
+            sensitive in record.message or sensitive in str(record) for record in caplog.records
         )
 
     def test_project_id_collision_does_not_destroy_existing_project(
@@ -687,10 +686,7 @@ class TestUploadFileCountLimit:
         from ananta.explorers.document.config import MAX_FOLDER_FILES
 
         mock_ananta.create_project.return_value = MagicMock()
-        files = [
-            ("files", (f"f{i}.txt", b"x", "text/plain"))
-            for i in range(MAX_FOLDER_FILES + 1)
-        ]
+        files = [("files", (f"f{i}.txt", b"x", "text/plain")) for i in range(MAX_FOLDER_FILES + 1)]
         resp = client.post("/api/documents/upload", files=files)
         assert resp.status_code == 413
         # No project should have been created — the cap fires before the loop.
@@ -705,10 +701,7 @@ class TestUploadFileCountLimit:
         from ananta.explorers.document.config import MAX_FOLDER_FILES
 
         mock_ananta.create_project.return_value = MagicMock()
-        files = [
-            ("files", (f"f{i}.txt", b"x", "text/plain"))
-            for i in range(MAX_FOLDER_FILES)
-        ]
+        files = [("files", (f"f{i}.txt", b"x", "text/plain")) for i in range(MAX_FOLDER_FILES)]
         resp = client.post("/api/documents/upload", files=files)
         assert resp.status_code == 200
         rows = resp.json()

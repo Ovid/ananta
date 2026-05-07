@@ -434,8 +434,9 @@ export default function TopicSidebar({
               className="flex-1 bg-surface-2 border border-border rounded px-1 py-0.5 text-xs text-text-primary focus:outline-none focus:border-accent"
             />
           ) : (
-            <span
-              className="truncate cursor-pointer hover:text-accent"
+            <div
+              className="min-w-0 cursor-pointer"
+              style={{ display: 'flex', flexDirection: 'column' }}
               onClick={(e) => {
                 e.stopPropagation()
                 if (activeTopic !== topicName) onSelectTopic(topicName)
@@ -443,8 +444,13 @@ export default function TopicSidebar({
               }}
               title={doc.sublabel ? `${doc.label}\n${doc.sublabel}` : doc.label}
             >
-              {doc.label}
-            </span>
+              <span className="truncate hover:text-accent">{doc.label}</span>
+              {doc.subtitle && (
+                <span data-testid="doc-subtitle" className="truncate text-xs text-text-dim">
+                  {doc.subtitle}
+                </span>
+              )}
+            </div>
           )}
           {renderDocMenu(doc, topicName)}
         </div>
@@ -627,16 +633,22 @@ export default function TopicSidebar({
                     className="flex-1 bg-surface-2 border border-border rounded px-1 py-0.5 text-xs text-text-primary focus:outline-none focus:border-accent"
                   />
                 ) : (
-                  <span
-                    className="truncate cursor-pointer hover:text-accent"
+                  <div
+                    className="min-w-0 cursor-pointer"
+                    style={{ display: 'flex', flexDirection: 'column' }}
                     onClick={(e) => {
                       e.stopPropagation()
                       onDocumentClick(doc)
                     }}
                     title={doc.sublabel ? `${doc.label}\n${doc.sublabel}` : doc.label}
                   >
-                    {doc.label}
-                  </span>
+                    <span className="truncate hover:text-accent">{doc.label}</span>
+                    {doc.subtitle && (
+                      <span data-testid="doc-subtitle" className="truncate text-xs text-text-dim">
+                        {doc.subtitle}
+                      </span>
+                    )}
+                  </div>
                 )}
                 {renderDocMenu(doc, null)}
               </div>

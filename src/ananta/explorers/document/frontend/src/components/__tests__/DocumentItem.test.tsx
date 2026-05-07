@@ -1,10 +1,9 @@
-import { render, screen } from '@testing-library/react'
 import { describe, it, expect } from 'vitest'
-import { DocumentItem } from '../DocumentItem'
+import { docToDocumentItem } from '../DocumentItem'
 import type { DocumentInfo } from '../../types'
 
-describe('DocumentItem', () => {
-  it('renders relative_path as a subtitle when present', () => {
+describe('docToDocumentItem', () => {
+  it('threads relative_path into the subtitle field for visible rendering', () => {
     const doc: DocumentInfo = {
       project_id: 'p1',
       filename: 'README.md',
@@ -15,11 +14,11 @@ describe('DocumentItem', () => {
       relative_path: 'docs/api/README.md',
       upload_session_id: null,
     }
-    render(<DocumentItem doc={doc} />)
-    expect(screen.getByText('docs/api/README.md')).toBeInTheDocument()
+    const item = docToDocumentItem(doc)
+    expect(item.subtitle).toBe('docs/api/README.md')
   })
 
-  it('does not render a path subtitle when relative_path is null', () => {
+  it('omits subtitle when relative_path is null', () => {
     const doc: DocumentInfo = {
       project_id: 'p1',
       filename: 'README.md',
@@ -30,7 +29,34 @@ describe('DocumentItem', () => {
       relative_path: null,
       upload_session_id: null,
     }
-    const { container } = render(<DocumentItem doc={doc} />)
-    expect(container.querySelector('[data-testid="relative-path"]')).toBeNull()
+    const item = docToDocumentItem(doc)
+    expect(item.subtitle).toBeUndefined()
+  })
+
+  it('omits subtitle when relative_path is missing', () => {
+    const doc: DocumentInfo = {
+      project_id: 'p1',
+      filename: 'README.md',
+      content_type: 'text/markdown',
+      size: 100,
+      upload_date: '2026-05-05T00:00:00Z',
+      page_count: null,
+    }
+    const item = docToDocumentItem(doc)
+    expect(item.subtitle).toBeUndefined()
+  })
+
+  it('still sets sublabel (size+icon) for tooltip', () => {
+    const doc: DocumentInfo = {
+      project_id: 'p1',
+      filename: 'README.md',
+      content_type: 'text/plain',
+      size: 100,
+      upload_date: '2026-05-05T00:00:00Z',
+      page_count: null,
+      relative_path: 'a/b/README.md',
+    }
+    const item = docToDocumentItem(doc)
+    expect(item.sublabel).toMatch(/100 B/)
   })
 })

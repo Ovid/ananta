@@ -605,6 +605,50 @@ describe('TopicSidebar (shared)', () => {
     expect(screen.queryByTestId('bottom-ctrl')).not.toBeInTheDocument()
   })
 
+  describe('subtitle (visible second line under doc label)', () => {
+    it('renders subtitle as a visible second line under doc label in topic docs', async () => {
+      const docsWithSubtitle: DocumentItem[] = [
+        { id: 'doc-1', label: 'README.md', subtitle: 'docs/api/README.md' },
+      ]
+      const props = defaultProps({
+        activeTopic: 'chess',
+        loadDocuments: vi.fn().mockResolvedValue(docsWithSubtitle),
+      })
+      render(<TopicSidebar {...props} />)
+
+      // The subtitle text should appear in the rendered DOM (not just as a tooltip)
+      expect(await screen.findByText('docs/api/README.md')).toBeInTheDocument()
+    })
+
+    it('does not render a visible subtitle node when subtitle is omitted', async () => {
+      const docsNoSubtitle: DocumentItem[] = [
+        { id: 'doc-1', label: 'README.md' },
+      ]
+      const props = defaultProps({
+        activeTopic: 'chess',
+        loadDocuments: vi.fn().mockResolvedValue(docsNoSubtitle),
+      })
+      const { container } = render(<TopicSidebar {...props} />)
+
+      await screen.findByText('README.md')
+      // No element with the doc-subtitle test id should exist
+      expect(container.querySelector('[data-testid="doc-subtitle"]')).toBeNull()
+    })
+
+    it('renders subtitle as visible second line for uncategorized docs', async () => {
+      const uncatDocs: DocumentItem[] = [
+        { id: 'uncat-1', label: 'orphan.md', subtitle: 'inbox/orphan.md' },
+      ]
+      const props = defaultProps({
+        uncategorizedDocs: uncatDocs,
+      })
+      render(<TopicSidebar {...props} />)
+
+      await screen.findByText('chess')
+      expect(screen.getByText('inbox/orphan.md')).toBeInTheDocument()
+    })
+  })
+
   it('shows viewing highlight on the document with viewingDocumentId', async () => {
     const props = defaultProps({
       activeTopic: 'chess',

@@ -2,6 +2,7 @@ import { renderHook, act } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { useFolderUpload } from '../../lib/use-folder-upload'
 import * as documentsApi from '../../api/documents'
+import type { UploadRow } from '../../api/documents'
 
 describe('useFolderUpload', () => {
   beforeEach(() => {
@@ -89,5 +90,50 @@ describe('useFolderUpload', () => {
         { name: 'oops.png', reason: 'unsupported extension' },
       ])
     }
+  })
+
+  it('cancel during upload bails before summary fires', async () => {
+    // Reproduces the bug where a late onProgress callback (or the post-upload
+    // summary setState) reanimated the modal after the user clicked Cancel.
+    const files = [{ file: new File(['x'], 'a.md'), relativePath: 'a.md' }]
+    let resolveUpload: (rows: UploadRow[]) => void = () => {}
+    const uploadPromise = new Promise<UploadRow[]>((resolve) => {
+      resolveUpload = resolve
+    })
+    vi.spyOn(documentsApi, 'uploadFolderInBatches').mockImplementation(
+      async (_batches, _topic, _sid, onProgress) => {
+        // Simulate a progress callback firing after cancel — the in-flight
+        // batch completes between cancel() and signal.aborted being checked.
+        queueMicrotask(() => onProgress(1, 1, 1, 1))
+        return uploadPromise
+      },
+    )
+
+    const { result } = renderHook(() => useFolderUpload())
+    await act(async () => {
+      await result.current.start({ kind: 'walked', files, rootName: 'x' }, 'Barsoom')
+    })
+    expect(result.current.state?.kind).toBe('preflight')
+
+    // Trigger confirm but don't await — keep the upload pending so we can
+    // cancel mid-flight before the mocked uploadFolderInBatches resolves.
+    let confirmPromise: Promise<void> = Promise.resolve()
+    act(() => {
+      confirmPromise = result.current.confirm()
+    })
+    // Cancel while upload is still in flight.
+    act(() => {
+      result.current.cancel()
+    })
+    expect(result.current.state).toBeNull()
+
+    // Now resolve the upload to simulate the in-flight batch completing.
+    await act(async () => {
+      resolveUpload([{ project_id: 'p1', filename: 'a.md', status: 'created' }])
+      await confirmPromise
+    })
+
+    // The summary must NOT appear: cancel was honoured.
+    expect(result.current.state).toBeNull()
   })
 })

@@ -64,12 +64,23 @@ export function useFolderUpload() {
         topic,
         sessionId,
         (completed, totalCnt, currentBatch, totalBatches) => {
+          // A late progress callback can fire after the user clicked Cancel
+          // (the in-flight batch completes before we honour the abort, by
+          // design — see api/documents.ts). Drop it so it doesn't reanimate
+          // the modal that cancel() just closed.
+          if (ctl.signal.aborted) return
           setState({ kind: 'progress', total: totalCnt, completed, currentBatch, totalBatches })
         },
         ctl.signal,
       )
     } finally {
       setAbortCtl(null)
+    }
+    if (ctl.signal.aborted) {
+      // User cancelled mid-flight: cancel() already cleared state. Do not
+      // emit a summary — that would re-mount the modal the user just closed.
+      setPending(null)
+      return
     }
     const ingested = rows.filter(r => r.status === 'created').length
     const failed = rows

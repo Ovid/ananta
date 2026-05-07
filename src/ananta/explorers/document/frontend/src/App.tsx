@@ -15,7 +15,9 @@ import {
 import { api } from './api/client'
 import UploadArea from './components/UploadArea'
 import DocumentDetail from './components/DocumentDetail'
+import FolderUploadModal from './components/FolderUploadModal'
 import { docToDocumentItem } from './components/DocumentItem'
+import { useFolderUpload } from './lib/use-folder-upload'
 import type {
   DocumentInfo,
   DocumentItem,
@@ -50,6 +52,8 @@ export default function App() {
   const [helpOpen, setHelpOpen] = useState(false)
   const [allowBgKnowledge, setAllowBgKnowledge] = useState(false)
 
+  const folderUpload = useFolderUpload()
+
   const allDocsRef = useRef<DocumentInfo[]>([])
   allDocsRef.current = allDocs
 
@@ -65,6 +69,14 @@ export default function App() {
       // Uncategorized API may not be available yet
     })
   }, [docsVersion])
+
+  // When a folder upload reaches the summary state, refresh the document list
+  // so the newly ingested files appear in the sidebar.
+  useEffect(() => {
+    if (folderUpload.state?.kind === 'summary') {
+      setDocsVersion(v => v + 1)
+    }
+  }, [folderUpload.state])
 
   const handleTopicSelect = useCallback((name: string) => {
     if (name !== activeTopic) {
@@ -239,7 +251,13 @@ export default function App() {
           createTopic={async name => { await api.topics.create(name) }}
           renameTopic={async (o, n) => { await api.topics.rename(o, n) }}
           deleteTopic={async name => { await api.topics.delete(name) }}
-          addButton={<UploadArea onUpload={handleUpload} activeTopic={activeTopic} />}
+          addButton={
+            <UploadArea
+              onUpload={handleUpload}
+              onFolderUpload={input => folderUpload.start(input, activeTopic ?? '')}
+              activeTopic={activeTopic}
+            />
+          }
           addDocToTopic={handleAddDocToTopic}
           removeDocFromTopic={handleRemoveDocFromTopic}
           deleteDocument={handleDeleteDocument}
@@ -302,6 +320,14 @@ export default function App() {
           onClose={() => setTraceView(null)}
           fetchTrace={api.traces.get}
           downloadTrace={api.traces.download}
+        />
+      )}
+
+      {folderUpload.state && (
+        <FolderUploadModal
+          state={folderUpload.state}
+          onContinue={folderUpload.state.kind === 'preflight' ? folderUpload.confirm : folderUpload.cancel}
+          onCancel={folderUpload.cancel}
         />
       )}
 

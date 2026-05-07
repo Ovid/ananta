@@ -742,6 +742,117 @@ class TestUploadAtomicity:
         assert seen_pids[1] not in topic_items
 
 
+class TestRelativePathValidation:
+    """relative_path is untrusted input and needs validation.
+
+    Reproduces I2 (length-mismatch) and I10 (no length cap, no character
+    validation, no .. or leading-/ rejection). Persisted verbatim into
+    meta.json and ParsedDocument.metadata, so an unbounded value or a
+    path-traversal sequence is a direct security concern.
+    """
+
+    def test_length_mismatch_rejected(
+        self,
+        client: TestClient,
+        mock_ananta: MagicMock,
+    ) -> None:
+        """If relative_path is provided, its length must match files."""
+        mock_ananta.create_project.return_value = MagicMock()
+        resp = client.post(
+            "/api/documents/upload",
+            data={"relative_path": "wrong"},
+            files=[
+                ("files", ("a.txt", b"a", "text/plain")),
+                ("files", ("b.txt", b"b", "text/plain")),
+            ],
+        )
+        assert resp.status_code == 422
+
+    def test_path_traversal_rejected(
+        self,
+        client: TestClient,
+        mock_ananta: MagicMock,
+    ) -> None:
+        """A relative_path containing .. is rejected per-file."""
+        mock_ananta.create_project.return_value = MagicMock()
+        resp = client.post(
+            "/api/documents/upload",
+            data={"relative_path": "../etc/passwd"},
+            files=[("files", ("a.txt", b"a", "text/plain"))],
+        )
+        # Per-file validation: surfaces as a failed row, not a 4xx.
+        assert resp.status_code == 200
+        [row] = resp.json()
+        assert row["status"] == "failed"
+        assert "relative_path" in row["reason"]
+
+    def test_oversized_relative_path_rejected(
+        self,
+        client: TestClient,
+        mock_ananta: MagicMock,
+    ) -> None:
+        """relative_path with > 512 chars is rejected per-file."""
+        mock_ananta.create_project.return_value = MagicMock()
+        resp = client.post(
+            "/api/documents/upload",
+            data={"relative_path": "a/" * 300 + "b.txt"},
+            files=[("files", ("a.txt", b"a", "text/plain"))],
+        )
+        assert resp.status_code == 200
+        [row] = resp.json()
+        assert row["status"] == "failed"
+        assert "relative_path" in row["reason"]
+
+    def test_control_byte_in_relative_path_rejected(
+        self,
+        client: TestClient,
+        mock_ananta: MagicMock,
+    ) -> None:
+        """A relative_path containing a NUL byte is rejected per-file."""
+        mock_ananta.create_project.return_value = MagicMock()
+        resp = client.post(
+            "/api/documents/upload",
+            data={"relative_path": "ok/\x00bad.txt"},
+            files=[("files", ("a.txt", b"a", "text/plain"))],
+        )
+        assert resp.status_code == 200
+        [row] = resp.json()
+        assert row["status"] == "failed"
+        assert "relative_path" in row["reason"]
+
+    def test_leading_slash_rejected(
+        self,
+        client: TestClient,
+        mock_ananta: MagicMock,
+    ) -> None:
+        """A leading-/ relative_path looks like an absolute path; reject it."""
+        mock_ananta.create_project.return_value = MagicMock()
+        resp = client.post(
+            "/api/documents/upload",
+            data={"relative_path": "/abs/path.txt"},
+            files=[("files", ("a.txt", b"a", "text/plain"))],
+        )
+        assert resp.status_code == 200
+        [row] = resp.json()
+        assert row["status"] == "failed"
+
+    def test_valid_relative_path_accepted(
+        self,
+        client: TestClient,
+        mock_ananta: MagicMock,
+    ) -> None:
+        """Sane relative_path values still succeed."""
+        mock_ananta.create_project.return_value = MagicMock()
+        resp = client.post(
+            "/api/documents/upload",
+            data={"relative_path": "docs/sub/a.txt"},
+            files=[("files", ("a.txt", b"a", "text/plain"))],
+        )
+        assert resp.status_code == 200
+        [row] = resp.json()
+        assert row["status"] == "created"
+
+
 class TestAggregateLimitPartialSuccess:
     """The aggregate-size cap must respect the partial-success contract.
 

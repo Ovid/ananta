@@ -44,6 +44,14 @@ from ananta.models import ParsedDocument
 
 _logger = logging.getLogger(__name__)
 
+# relative_path is untrusted user input that ends up persisted to meta.json,
+# ParsedDocument.metadata, and rendered in the UI. Reject anything outside
+# the allowlist of word chars, dot, slash, hyphen, and space (with bounded
+# length). The negative lookahead blocks `..` traversal sequences, mirroring
+# _SAFE_ID_RE above. Empty string is allowed at the type-system level (Form
+# fields can be empty strings); callers normalise empty -> None separately.
+_RELATIVE_PATH_RE = re.compile(r"^(?!.*\.\.)(?!/)[\w./\- ]{0,512}$")
+
 # Allow / for old-style arXiv IDs (e.g. cs/9808001v1), but block .. traversal.
 # This regex IS the path-traversal defence in this module: handlers below use
 # `state.uploads_dir / doc_id` directly without further sanitisation, so the
@@ -192,6 +200,14 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                 413,
                 f"Upload exceeds the {MAX_FOLDER_FILES}-file per-request limit",
             )
+        # If relative_path is supplied, the client MUST send one entry per
+        # file. A short array silently substituted None per-file before, so
+        # the wrong path was persisted with no error to the caller (I2).
+        if relative_path is not None and len(relative_path) != len(files):
+            raise HTTPException(
+                422,
+                "relative_path length must match files length",
+            )
         # Validate topic name up-front so we fail before creating any
         # files or projects — avoids orphaned data on invalid topics.
         # Topic-validation is still all-or-nothing; only per-file work is
@@ -218,6 +234,17 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                 if relative_path is not None and idx < len(relative_path)
                 else None
             )
+            # Validate per-file (I10): unbounded user input was persisted
+            # verbatim to meta.json — disk-fill DoS via giant strings, plus a
+            # latent prompt-injection / path-traversal surface. Treat the
+            # empty string as "absent" (forms send empty string, not null).
+            if rel_path == "":
+                rel_path = None
+            if rel_path is not None and not _RELATIVE_PATH_RE.match(rel_path):
+                results.append(
+                    _failed_row(file.filename or "(unnamed)", "invalid relative_path")
+                )
+                continue
 
             # Once the aggregate cap is breached, every remaining file gets a
             # failed row so the caller can reconcile the request count. We

@@ -14,7 +14,15 @@ from openpyxl import load_workbook
 from pptx import Presentation as PptxPresentation
 from striprtf.striprtf import rtf_to_text
 
-# Extensions treated as plain text (read with open())
+# Extensions treated as plain text (read with open()).
+#
+# `.env` is intentionally NOT in this list (I8): files named `.env` typically
+# contain API keys, DB credentials, and other secrets. A user who drops a
+# project folder onto the explorer should not silently land their secrets
+# in the RLM document store, where the LLM reads them and the LLM provider
+# sees them. Combined with [C2], this also closes the drive-by-credential-
+# exfiltration vector. If a user genuinely wants to ingest a config file,
+# they can rename it to `.env.txt` or use a different non-secret extension.
 _PLAIN_TEXT_EXTENSIONS = frozenset(
     {
         ".txt",
@@ -30,7 +38,6 @@ _PLAIN_TEXT_EXTENSIONS = frozenset(
         ".ini",
         ".cfg",
         ".toml",
-        ".env",
         ".py",
         ".js",
         ".ts",

@@ -7,9 +7,13 @@ export const SOFT_WARN_FOLDER_FILES = 100
 export const TARGET_BATCH_BYTES = 50 * 1024 * 1024
 
 // Mirror of src/ananta/explorers/document/extractors.py supported list.
+// .env is intentionally absent (I8): such files typically hold secrets;
+// silently ingesting them into the RLM corpus would expose API keys / DB
+// credentials to the LLM and its provider. See extractors.py for the
+// matching note on the BE side.
 export const SUPPORTED_EXTENSIONS: readonly string[] = [
   '.txt', '.md', '.csv', '.log', '.json', '.yaml', '.yml', '.xml', '.html',
-  '.htm', '.ini', '.cfg', '.toml', '.env', '.py', '.js', '.ts', '.java',
+  '.htm', '.ini', '.cfg', '.toml', '.py', '.js', '.ts', '.java',
   '.c', '.cpp', '.h', '.rs', '.go', '.rb', '.sh', '.bat', '.sql', '.r',
   '.tex', '.pdf', '.docx', '.pptx', '.xlsx', '.rtf',
 ] as const

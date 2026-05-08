@@ -53,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Shared explorer factory now rejects requests with bodies above 256 MiB at the middleware layer before any data is spooled to disk. Previously the application's per-route caps fired only after Starlette had finished spooling, leaving a disk-fill DoS reachable
 - Shared explorer factory now refuses mutating HTTP requests (POST/PUT/PATCH/DELETE) whose `Origin` header does not match `Host`. Defends against drive-by uploads from arbitrary webpages: with `allow_origins=["*"]` and no auth on `/api/documents/upload`, any page the user visited could previously inject attacker-chosen documents into the local RLM corpus. Direct API callers (curl, scripts) typically omit `Origin` and remain unaffected
 - All explorers: `BaseTopicManager.create()` now rejects topic names longer than 256 characters or containing control bytes (NUL/tab/CR/LF/etc.). Without this cap, a hostile direct API caller could submit a multi-MB topic name (disk-fill / topic-store bloat) that would also break UI sidebar layout
+- Document Explorer: `.env` files are no longer ingested. Such files typically contain API keys and database credentials; silently landing them in the RLM document store would expose those secrets to the LLM and the LLM provider
 
 ## [0.24.0] - 2026-03-22
 

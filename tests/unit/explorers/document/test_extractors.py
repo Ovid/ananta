@@ -69,6 +69,23 @@ class TestUnsupportedExtension:
         with pytest.raises(ValueError, match="[Uu]nsupported"):
             extract_text(f)
 
+    def test_env_file_is_unsupported(self, tmp_path: Path) -> None:
+        """`.env` files must NOT be accepted (I8).
+
+        `.env` typically holds API keys, DB credentials, and other secrets.
+        A user dropping a project folder onto the explorer should not silently
+        land their secrets into the RLM document store, where the LLM reads
+        them and the LLM provider sees them. Combined with [C2] this also
+        closes the drive-by credential-exfiltration vector.
+        """
+        from ananta.explorers.document.extractors import is_supported_extension
+
+        f = tmp_path / ".env"
+        f.write_text("API_KEY=secret\n")
+        assert is_supported_extension(".env") is False
+        with pytest.raises(ValueError, match="[Uu]nsupported"):
+            extract_text(f)
+
 
 class TestCorruptFileTranslation:
     """Per-format parser exceptions must be translated to ValueError (I5).

@@ -172,6 +172,27 @@ class TestCreateAndListTopics:
         with pytest.raises(ValueError, match="control"):
             mgr.create(name)
 
+    def test_create_strips_surrounding_whitespace(self, tmp_path: Path) -> None:
+        """Whitespace around topic names is stripped on create (I12).
+
+        rename_document strips, but upload_documents previously did not. The
+        same display name with and without trailing whitespace produced two
+        topics that slugified to the same directory but had different stored
+        names — _resolve matched names exactly, so subsequent add_item calls
+        failed to find the topic. Normalize whitespace at every entry point.
+        """
+        mgr = BaseTopicManager(tmp_path)
+        mgr.create("  Reports  ")
+        # "Reports" (no whitespace) must resolve to the same topic.
+        assert "Reports" in mgr.list_topics()
+        assert "Reports" not in [n.strip() for n in mgr.list_topics()] or mgr.list_topics() == ["Reports"]
+        # add_item with the trimmed form must succeed.
+        mgr.add_item("Reports", "project-1")
+        assert mgr.list_items("Reports") == ["project-1"]
+        # Re-creating with whitespace is idempotent (same name after strip).
+        mgr.create("Reports")
+        assert mgr.list_topics() == ["Reports"]
+
     def test_create_slug_collision_different_name_raises(self, tmp_path: Path) -> None:
         mgr = BaseTopicManager(tmp_path)
         mgr.create("Research")

@@ -64,6 +64,17 @@ class BaseTopicManager:
 
     _CONTROL_BYTES_RE = re.compile(r"[\x00-\x1f\x7f]")
 
+    @staticmethod
+    def _normalize_name(name: str) -> str:
+        """Strip surrounding whitespace from a topic name (I12).
+
+        Without this, ``"Reports "`` and ``"Reports"`` produced two topics
+        that slugified to the same directory but stored different display
+        names, so the second call's ``_resolve`` failed to find the first's
+        topic. Normalising at every entry point keeps lookup symmetric.
+        """
+        return name.strip()
+
     @classmethod
     def _validate_name(cls, name: str) -> None:
         """Reject names that contain path separators, control bytes, or
@@ -83,6 +94,7 @@ class BaseTopicManager:
 
     def create(self, name: str) -> None:
         """Create a new topic.  Idempotent -- no error if it already exists."""
+        name = self._normalize_name(name)
         self._validate_name(name)
         slug = _slugify(name)
         if not slug:
@@ -111,6 +123,8 @@ class BaseTopicManager:
 
     def rename(self, old_name: str, new_name: str) -> None:
         """Rename a topic's display name (directory stays the same)."""
+        old_name = self._normalize_name(old_name)
+        new_name = self._normalize_name(new_name)
         self._validate_name(new_name)
         meta, meta_path = self._resolve(old_name)
         if new_name != old_name:
@@ -244,7 +258,13 @@ class BaseTopicManager:
     # ------------------------------------------------------------------
 
     def _resolve(self, name: str) -> tuple[_TopicMeta, Path]:
-        """Find a topic by display name and return (meta_dict, meta_path)."""
+        """Find a topic by display name and return (meta_dict, meta_path).
+
+        Names are matched against the stored display name after both sides
+        are stripped (I12) — so a topic stored as ``"Reports"`` resolves
+        when looked up as ``"  Reports "`` or vice versa.
+        """
+        name = self._normalize_name(name)
         for topic_dir in self._iter_topic_dirs():
             meta_path = topic_dir / TOPIC_META_FILE
             meta = self._read_meta(topic_dir)

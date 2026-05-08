@@ -853,6 +853,93 @@ class TestRelativePathValidation:
         [row] = resp.json()
         assert row["status"] == "created"
 
+    @pytest.mark.parametrize(
+        "rel_path",
+        [
+            "John's docs/notes (final).md",  # apostrophe + parens
+            "hello, world.md",  # comma
+            "C++/file.cpp",  # plus signs
+            "Q&A/answers.md",  # ampersand
+            "v1.0..final.txt",  # dotted version (..-as-segment is what we block)
+            "résumé.pdf",  # unicode
+            "[draft] notes.md",  # brackets
+            "config=prod;db.txt",  # equals + semicolon
+            "@username/file.md",  # at sign
+            "tag #important.md",  # hash
+            "10! shouted.md",  # exclamation
+        ],
+    )
+    def test_realistic_filenames_accepted(
+        self,
+        client: TestClient,
+        mock_ananta: MagicMock,
+        rel_path: str,
+    ) -> None:
+        """Real-world relative_paths with common punctuation are accepted (I1).
+
+        The previous tight allowlist [\\w./\\- ] rejected apostrophes,
+        parens, brackets, commas, ampersands, plus signs, etc. Real folder
+        structures (a project repo with READMEs, a personal docs tree)
+        commonly contain these characters; rejecting them produced silent
+        per-file failures in the upload summary with no actionable feedback.
+        """
+        mock_ananta.create_project.return_value = MagicMock()
+        resp = client.post(
+            "/api/documents/upload",
+            data={"relative_path": rel_path},
+            files=[("files", ("a.txt", b"a", "text/plain"))],
+        )
+        assert resp.status_code == 200
+        [row] = resp.json()
+        assert row["status"] == "created", row.get("reason")
+
+    def test_dotdot_segment_rejected_but_dotdot_within_name_allowed(
+        self,
+        client: TestClient,
+        mock_ananta: MagicMock,
+    ) -> None:
+        """Only `..` as a complete path segment is treated as traversal (I1).
+
+        The previous regex used a global ``..`` lookahead that also rejected
+        legitimate filenames like ``v1.0..final.txt`` where the two dots
+        appear inside a single segment.
+        """
+        mock_ananta.create_project.return_value = MagicMock()
+        # Inside-segment .. is fine.
+        resp = client.post(
+            "/api/documents/upload",
+            data={"relative_path": "releases/v1.0..final.txt"},
+            files=[("files", ("a.txt", b"a", "text/plain"))],
+        )
+        assert resp.status_code == 200
+        assert resp.json()[0]["status"] == "created"
+        # ../ as a segment still rejected.
+        resp = client.post(
+            "/api/documents/upload",
+            data={"relative_path": "ok/../escape.txt"},
+            files=[("files", ("b.txt", b"b", "text/plain"))],
+        )
+        [row] = resp.json()
+        assert row["status"] == "failed"
+        assert "relative_path" in row["reason"]
+
+    def test_backslash_in_relative_path_rejected(
+        self,
+        client: TestClient,
+        mock_ananta: MagicMock,
+    ) -> None:
+        """Windows-style separators are rejected — paths must be POSIX (I1)."""
+        mock_ananta.create_project.return_value = MagicMock()
+        resp = client.post(
+            "/api/documents/upload",
+            data={"relative_path": "docs\\sub\\a.txt"},
+            files=[("files", ("a.txt", b"a", "text/plain"))],
+        )
+        assert resp.status_code == 200
+        [row] = resp.json()
+        assert row["status"] == "failed"
+        assert "relative_path" in row["reason"]
+
 
 class TestAggregateLimitPartialSuccess:
     """The aggregate-size cap must respect the partial-success contract.

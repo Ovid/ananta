@@ -45,12 +45,45 @@ from ananta.models import ParsedDocument
 _logger = logging.getLogger(__name__)
 
 # relative_path is untrusted user input that ends up persisted to meta.json,
-# ParsedDocument.metadata, and rendered in the UI. Reject anything outside
-# the allowlist of word chars, dot, slash, hyphen, and space (with bounded
-# length). The negative lookahead blocks `..` traversal sequences, mirroring
-# _SAFE_ID_RE above. Empty string is allowed at the type-system level (Form
-# fields can be empty strings); callers normalise empty -> None separately.
-_RELATIVE_PATH_RE = re.compile(r"^(?!.*\.\.)(?!/)[\w./\- ]{0,512}$")
+# ParsedDocument.metadata, and rendered in the UI.
+#
+# We use a denylist rather than a tight allowlist (I1): the previous regex
+# blocked common legitimate filename punctuation — apostrophes, parens,
+# brackets, commas, ampersands, plus signs, etc. — so a folder of real-world
+# files (a project repo with READMEs, a personal docs tree) silently
+# produced "invalid relative_path" failed rows for files that were
+# otherwise fine.
+#
+# What we reject (not what we allow):
+#   * empty / None — already normalised by caller, but defensive guard here
+#   * > _MAX_RELATIVE_PATH_LEN chars
+#   * any control byte (0x00-0x1f or 0x7f); blocks NUL injection / log spam
+#   * backslash; paths must be POSIX, never Windows-style
+#   * leading slash; looks like an absolute path
+#   * any segment exactly equal to `..` — that's the path-traversal vector.
+#     Inside-segment `..` (e.g., `v1.0..final.txt`) is fine; only a complete
+#     `..` segment between separators escapes the upload directory.
+_MAX_RELATIVE_PATH_LEN = 512
+_CONTROL_BYTES = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def _is_valid_relative_path(rel_path: str) -> bool:
+    """Return True if *rel_path* is safe to persist as a document path.
+
+    See module-level commentary on the denylist rationale.
+    """
+    if not rel_path or len(rel_path) > _MAX_RELATIVE_PATH_LEN:
+        return False
+    if rel_path.startswith("/"):
+        return False
+    if "\\" in rel_path:
+        return False
+    if _CONTROL_BYTES.search(rel_path):
+        return False
+    # `..` only as a complete segment is traversal.
+    if any(seg == ".." for seg in rel_path.split("/")):
+        return False
+    return True
 
 # Allow / for old-style arXiv IDs (e.g. cs/9808001v1), but block .. traversal.
 # This regex IS the path-traversal defence in this module: handlers below use
@@ -240,7 +273,7 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
             # empty string as "absent" (forms send empty string, not null).
             if rel_path == "":
                 rel_path = None
-            if rel_path is not None and not _RELATIVE_PATH_RE.match(rel_path):
+            if rel_path is not None and not _is_valid_relative_path(rel_path):
                 results.append(_failed_row(file.filename or "(unnamed)", "invalid relative_path"))
                 continue
 

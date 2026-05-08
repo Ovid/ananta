@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Document Explorer: dropping a second folder while an upload is in flight is now a no-op (previously it churned the modal); cancel the first upload to start a new one
 - Document Explorer: rename now refreshes all DocumentInfo fields from disk instead of reconstructing them inline (no observable change today, but new metadata fields surface immediately)
 - Shared explorer factory: chunked / no-Content-Length requests above the 256 MiB body cap now return a real 413 instead of failing with a 5xx ClientDisconnect — the body-size middleware was rewritten as a pure ASGI middleware so it can synthesise the 413 from inside the streaming branch
+- Document Explorer: folder-upload paths with apostrophes, parens, brackets, commas, ampersands, plus signs, hash, and other common filename punctuation no longer fail with "invalid relative_path" — the validator switched from a tight allowlist to a denylist of control bytes, backslash, leading slash, and `..`-as-segment. Filenames like `John's docs/notes (final).md`, `C++/file.cpp`, and `Q&A/answers.md` now ingest cleanly. `..` inside a single segment (e.g., `v1.0..final.txt`) is also accepted; only `..` as a complete segment is treated as path traversal
 
 ### Security
 

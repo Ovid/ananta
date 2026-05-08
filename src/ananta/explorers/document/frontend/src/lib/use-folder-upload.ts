@@ -3,6 +3,7 @@ import {
   walkEntries,
   filterFiles,
   partitionIntoBatches,
+  FolderCapExceededError,
   MAX_FOLDER_FILES,
   TARGET_BATCH_BYTES,
   type WalkedFile,
@@ -44,12 +45,17 @@ export function useFolderUpload() {
       try {
         walked = await walkEntries(input.entries, input.rootName)
       } catch (err) {
-        // Hard cap exceeded — surface as a summary with a single "skipped" row.
+        // Only the hard cap-exceeded refusal short-circuits to summary.
+        // walkEntries swallows per-file / per-subtree errors itself, but
+        // an unrelated readAllEntries rejection at the top level would
+        // otherwise be misreported as "folder exceeds the N-file limit".
+        // Discriminate by class, not by message text (I6).
+        if (!(err instanceof FolderCapExceededError)) throw err
         setState({
           kind: 'summary',
           ingested: 0,
           failed: [],
-          skipped: [{ name: input.rootName, reason: (err as Error).message }],
+          skipped: [{ name: input.rootName, reason: err.message }],
         })
         return
       }

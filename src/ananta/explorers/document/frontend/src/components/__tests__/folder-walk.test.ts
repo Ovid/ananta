@@ -123,6 +123,19 @@ describe('walkEntries with cap', () => {
       .rejects.toThrow(/folder.*limit/i)
   })
 
+  it('cap-exceeded throw is a FolderCapExceededError instance (I6)', async () => {
+    // The hard refusal must be discriminated by class, not by message text.
+    // Copy edits, i18n, or browser-internal error wrapping (AggregateError,
+    // chained causes) would otherwise silently disable the 500-file cap.
+    const { FolderCapExceededError } = await import('../../lib/folder-walk')
+    const children = Array.from({ length: MAX_FOLDER_FILES + 1 }, (_, i) =>
+      makeFile(`f${i}.md`, `/big/f${i}.md`)
+    )
+    const root = makeDir('big', '/big', children)
+    await expect(walkEntries([root as any], 'big'))
+      .rejects.toBeInstanceOf(FolderCapExceededError)
+  })
+
   it('accepts exactly MAX_FOLDER_FILES files (off-by-one regression S1)', async () => {
     const children = Array.from({ length: MAX_FOLDER_FILES }, (_, i) =>
       makeFile(`f${i}.md`, `/big/f${i}.md`)

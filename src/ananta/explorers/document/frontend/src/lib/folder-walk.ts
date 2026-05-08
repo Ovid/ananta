@@ -85,6 +85,18 @@ function getFile(entry: FileSystemFileEntry): Promise<File> {
   return new Promise((resolve, reject) => entry.file(resolve, reject))
 }
 
+// Distinct class so the hard-refusal cap path can be discriminated by
+// instanceof rather than fragile message matching (I6). i18n, copy edits,
+// or browser-internal error wrapping would otherwise silently disable the
+// 500-file DoS guard — the walk would continue past the cap that this
+// throw was supposed to enforce.
+export class FolderCapExceededError extends Error {
+  constructor(maxFiles: number) {
+    super(`folder exceeds the ${maxFiles}-file limit`)
+    this.name = 'FolderCapExceededError'
+  }
+}
+
 export async function walkEntries(
   entries: FileSystemEntry[],
   rootName: string,
@@ -120,7 +132,7 @@ export async function walkEntries(
         file.size <= MAX_UPLOAD_BYTES
       if (accepted) {
         if (acceptedCount >= MAX_FOLDER_FILES) {
-          throw new Error(`folder exceeds the ${MAX_FOLDER_FILES}-file limit`)
+          throw new FolderCapExceededError(MAX_FOLDER_FILES)
         }
         acceptedCount++
       }
@@ -137,7 +149,12 @@ export async function walkEntries(
         try {
           await visit(child, stripPrefix)
         } catch (err) {
-          if (err instanceof Error && /folder.*limit/i.test(err.message)) throw err
+          // Cap-exceeded is a hard refusal — it must propagate. Anything
+          // else (permission denied, OS quirks, race with deletion) is a
+          // per-subtree problem; swallow it so the rest of the walk
+          // continues. Discriminate by type to avoid a fragile dependency
+          // on the error message wording (I6).
+          if (err instanceof FolderCapExceededError) throw err
           // else: swallow per-file/per-subtree error and continue
         }
       }

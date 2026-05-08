@@ -14,13 +14,21 @@ export const SUPPORTED_EXTENSIONS: readonly string[] = [
   '.tex', '.pdf', '.docx', '.pptx', '.xlsx', '.rtf',
 ] as const
 
+export interface WalkedFile {
+  file: File
+  relativePath: string
+}
+
 export interface SkippedFile {
   file: File
+  // Echoes WalkedFile.relativePath so the summary modal can disambiguate
+  // duplicate-named files (multiple READMEs in different subfolders) — I4.
+  relativePath: string
   reason: string
 }
 
 export interface FilterResult {
-  accepted: File[]
+  accepted: WalkedFile[]
   skipped: SkippedFile[]
 }
 
@@ -31,24 +39,19 @@ function getExtension(name: string): string {
 
 const OVERSIZE_REASON = `file exceeds ${MAX_UPLOAD_BYTES / 1024 / 1024} MB limit`
 
-export function filterFiles(files: File[]): FilterResult {
-  const accepted: File[] = []
+export function filterFiles(walked: WalkedFile[]): FilterResult {
+  const accepted: WalkedFile[] = []
   const skipped: SkippedFile[] = []
-  for (const file of files) {
-    if (!SUPPORTED_EXTENSIONS.includes(getExtension(file.name))) {
-      skipped.push({ file, reason: 'unsupported extension' })
-    } else if (file.size > MAX_UPLOAD_BYTES) {
-      skipped.push({ file, reason: OVERSIZE_REASON })
+  for (const wf of walked) {
+    if (!SUPPORTED_EXTENSIONS.includes(getExtension(wf.file.name))) {
+      skipped.push({ file: wf.file, relativePath: wf.relativePath, reason: 'unsupported extension' })
+    } else if (wf.file.size > MAX_UPLOAD_BYTES) {
+      skipped.push({ file: wf.file, relativePath: wf.relativePath, reason: OVERSIZE_REASON })
     } else {
-      accepted.push(file)
+      accepted.push(wf)
     }
   }
   return { accepted, skipped }
-}
-
-export interface WalkedFile {
-  file: File
-  relativePath: string
 }
 
 // FileSystemEntry / FileSystemDirectoryEntry / FileSystemFileEntry /

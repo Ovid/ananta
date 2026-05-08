@@ -115,13 +115,18 @@ def _make_project_id(filename: str) -> str:
     return f"{slug}-{secrets.token_hex(4)}"
 
 
-def _failed_row(filename: str, reason: str) -> DocumentUploadResponse:
+def _failed_row(
+    filename: str,
+    reason: str,
+    relative_path: str | None = None,
+) -> DocumentUploadResponse:
     """Build a `failed` upload-row response for partial-success uploads."""
     return DocumentUploadResponse(
         project_id="",
         filename=filename,
         status="failed",
         reason=reason,
+        relative_path=relative_path,
     )
 
 
@@ -286,6 +291,7 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                         file.filename,
                         f"aggregate upload size exceeds the "
                         f"{MAX_AGGREGATE_UPLOAD_BYTES // (1024 * 1024)} MB limit",
+                        rel_path,
                     )
                 )
                 continue
@@ -299,7 +305,9 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                 # avoids allocating memory for files we'll reject anyway.
                 ext = Path(file.filename).suffix.lower()
                 if not is_supported_extension(file.filename):
-                    results.append(_failed_row(file.filename, f"unsupported file type: {ext}"))
+                    results.append(
+                        _failed_row(file.filename, f"unsupported file type: {ext}", rel_path)
+                    )
                     continue
 
                 # Cap read to avoid memory exhaustion from oversized uploads.
@@ -309,6 +317,7 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                         _failed_row(
                             file.filename,
                             f"file exceeds the {MAX_UPLOAD_BYTES // (1024 * 1024)} MB upload limit",
+                            rel_path,
                         )
                     )
                     continue
@@ -326,6 +335,7 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                             file.filename,
                             f"aggregate upload size exceeds the "
                             f"{MAX_AGGREGATE_UPLOAD_BYTES // (1024 * 1024)} MB limit",
+                            rel_path,
                         )
                     )
                     continue
@@ -349,7 +359,11 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                         continue
                 if not created_upload_dir or upload_dir is None or project_id is None:
                     results.append(
-                        _failed_row(file.filename, "could not allocate a unique upload directory")
+                        _failed_row(
+                            file.filename,
+                            "could not allocate a unique upload directory",
+                            rel_path,
+                        )
                     )
                     continue
                 # mypy: after the guard above, project_id and upload_dir are non-None
@@ -363,7 +377,11 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                     text = extract_text(original_path)
                 except ValueError as exc:
                     shutil.rmtree(upload_dir, ignore_errors=True)
-                    results.append(_failed_row(file.filename, f"text extraction failed: {exc}"))
+                    results.append(
+                        _failed_row(
+                            file.filename, f"text extraction failed: {exc}", rel_path
+                        )
+                    )
                     continue
 
                 # Compute page/sheet/slide count where applicable. A failure
@@ -419,6 +437,7 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                         project_id=project_id,
                         filename=file.filename,
                         status="created",
+                        relative_path=rel_path,
                     )
                 )
             except HTTPException:
@@ -449,7 +468,7 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                 # can leak internal details (filesystem paths, dependency
                 # errors, stack-trace fragments).
                 _logger.exception("Unexpected error processing upload %r: %s", file.filename, exc)
-                results.append(_failed_row(file.filename, "unexpected upload error"))
+                results.append(_failed_row(file.filename, "unexpected upload error", rel_path))
 
         return results
 

@@ -69,3 +69,8 @@ class DocumentUploadResponse(BaseModel):
     filename: str
     status: Literal["created", "failed"]
     reason: str | None = None
+    # Echoed back for the multi-folder summary (I4). When a folder has two
+    # files with the same bare filename in different subfolders, the FE
+    # disambiguates skipped/failed rows by ``relative_path`` so the user
+    # can tell which copy was affected.
+    relative_path: str | None = None

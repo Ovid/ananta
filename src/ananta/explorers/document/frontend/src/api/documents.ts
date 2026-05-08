@@ -5,6 +5,10 @@ export interface UploadRow {
   filename: string
   status: 'created' | 'failed'
   reason?: string
+  // Echoed back from the server so the FE summary can disambiguate
+  // duplicate-named files when the user uploaded a multi-folder structure
+  // (I4). Optional for older server builds that pre-date the field.
+  relative_path?: string
 }
 
 // Carries the rows accumulated across earlier successful batches when a

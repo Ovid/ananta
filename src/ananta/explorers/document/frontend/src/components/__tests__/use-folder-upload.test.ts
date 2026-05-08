@@ -92,6 +92,52 @@ describe('useFolderUpload', () => {
     }
   })
 
+  it('summary disambiguates duplicate-named skipped/failed files by relative path (I4)', async () => {
+    // Two README.md files in different subdirectories must not present
+    // identically in the summary's skipped or failed lists. The summary
+    // takes its display name from relativePath / relative_path when it
+    // differs from the bare filename, so the user can tell which copy
+    // is which.
+    const files = [
+      { file: new File([''], 'README.md'), relativePath: 'pkg-a/README.md' },
+      { file: new File([''], 'README.md'), relativePath: 'pkg-b/README.md' },
+      { file: new File([''], 'logo.png'), relativePath: 'pkg-a/logo.png' },
+      { file: new File([''], 'logo.png'), relativePath: 'pkg-b/logo.png' },
+    ]
+    vi.spyOn(documentsApi, 'uploadFolderInBatches').mockResolvedValue([
+      {
+        project_id: '',
+        filename: 'README.md',
+        status: 'failed',
+        reason: 'unexpected upload error',
+        relative_path: 'pkg-a/README.md',
+      },
+      {
+        project_id: 'p2',
+        filename: 'README.md',
+        status: 'created',
+        relative_path: 'pkg-b/README.md',
+      },
+    ])
+    const { result } = renderHook(() => useFolderUpload())
+    await act(async () => {
+      await result.current.start({ kind: 'walked', files, rootName: 'pkgs' }, 'T')
+    })
+    await act(async () => {
+      await result.current.confirm()
+    })
+    expect(result.current.state?.kind).toBe('summary')
+    if (result.current.state?.kind === 'summary') {
+      // Failed row: the path-disambiguated name, not bare 'README.md'.
+      expect(result.current.state.failed).toEqual([
+        { name: 'pkg-a/README.md', reason: 'unexpected upload error' },
+      ])
+      // Skipped rows: each logo.png keeps its own subfolder prefix.
+      const skippedNames = result.current.state.skipped.map((s) => s.name).sort()
+      expect(skippedNames).toEqual(['pkg-a/logo.png', 'pkg-b/logo.png'])
+    }
+  })
+
   it('walked path enforces MAX_FOLDER_FILES cap', async () => {
     // The click-folder picker hands the hook a pre-walked file list, skipping
     // the entries->walk path. Without this guard, drag-drop enforces the cap

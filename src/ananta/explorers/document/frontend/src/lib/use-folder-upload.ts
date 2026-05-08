@@ -56,7 +56,7 @@ export function useFolderUpload() {
     } else {
       walked = input.files
     }
-    const { accepted, skipped } = filterFiles(walked.map(w => w.file))
+    const { accepted, skipped } = filterFiles(walked)
     // Count the cap against the *accepted* set only — drag-drop's walkEntries
     // does the same (Inline 5). Otherwise a folder of mostly unsupported
     // assets (e.g. a git repo with images) trips the cap on click but
@@ -71,11 +71,8 @@ export function useFolderUpload() {
       })
       return
     }
-    // O(n^2) but n <= 500 (MAX_FOLDER_FILES); acceptable.
-    const acceptedWalked: WalkedFile[] = walked.filter(w => accepted.includes(w.file))
-    const skippedTyped: SkippedFile[] = skipped
-    setState({ kind: 'preflight', accepted: acceptedWalked, skipped: skippedTyped, targetTopic: topic })
-    setPending({ accepted: acceptedWalked, topic, skipped: skippedTyped })
+    setState({ kind: 'preflight', accepted, skipped, targetTopic: topic })
+    setPending({ accepted, topic, skipped })
   }, [])
 
   const confirm = useCallback(async () => {
@@ -137,9 +134,16 @@ export function useFolderUpload() {
       return
     }
     const ingested = rows.filter(r => r.status === 'created').length
+    // Disambiguate duplicate-named files in the summary (I4): when the
+    // server echoes a relative_path that differs from the bare filename,
+    // prefer it so two README.md files from different subfolders don't
+    // present identically. For pre-flight skipped, do the same with the
+    // local relativePath we already have on every WalkedFile.
+    const summaryName = (filename: string, relPath?: string): string =>
+      relPath && relPath !== filename ? relPath : filename
     const failed = rows
       .filter(r => r.status === 'failed')
-      .map(r => ({ name: r.filename, reason: r.reason ?? 'failed' }))
+      .map(r => ({ name: summaryName(r.filename, r.relative_path), reason: r.reason ?? 'failed' }))
     if (uploadError) {
       failed.push({ name: 'upload', reason: uploadError.message })
     }
@@ -149,7 +153,7 @@ export function useFolderUpload() {
       kind: 'summary',
       ingested,
       failed,
-      skipped: preflightSkipped.map(s => ({ name: s.file.name, reason: s.reason })),
+      skipped: preflightSkipped.map(s => ({ name: summaryName(s.file.name, s.relativePath), reason: s.reason })),
     })
     setPending(null)
     setCommitVersion(v => v + 1)

@@ -11,36 +11,44 @@ import {
 } from '../../lib/folder-walk'
 
 describe('filterFiles', () => {
+  const wf = (name: string, content: string | Uint8Array = '', relativePath?: string): WalkedFile => ({
+    file: new File([content], name),
+    relativePath: relativePath ?? name,
+  })
+
   it('accepts files with supported extensions under the size limit', () => {
-    const files = [
-      new File([''], 'a.md'),
-      new File([''], 'b.pdf'),
-      new File([''], 'd.txt'),
-    ]
-    const { accepted, skipped } = filterFiles(files)
-    expect(accepted.map(f => f.name).sort()).toEqual(['a.md', 'b.pdf', 'd.txt'])
+    const walked = [wf('a.md'), wf('b.pdf'), wf('d.txt')]
+    const { accepted, skipped } = filterFiles(walked)
+    expect(accepted.map(w => w.file.name).sort()).toEqual(['a.md', 'b.pdf', 'd.txt'])
     expect(skipped).toEqual([])
   })
 
   it('skips files outside the allowlist with reason "unsupported extension"', () => {
-    const files = [
-      new File([''], 'a.md'),
-      new File([''], 'c.png'),
-    ]
-    const { accepted, skipped } = filterFiles(files)
-    expect(accepted.map(f => f.name)).toEqual(['a.md'])
+    const walked = [wf('a.md'), wf('c.png', '', 'sub/c.png')]
+    const { accepted, skipped } = filterFiles(walked)
+    expect(accepted.map(w => w.file.name)).toEqual(['a.md'])
     expect(skipped).toEqual([
-      { file: expect.objectContaining({ name: 'c.png' }), reason: 'unsupported extension' },
+      {
+        file: expect.objectContaining({ name: 'c.png' }),
+        relativePath: 'sub/c.png',
+        reason: 'unsupported extension',
+      },
     ])
   })
 
   it('skips oversized files with reason "file exceeds 50 MB limit"', () => {
-    const big = new File([new Uint8Array(MAX_UPLOAD_BYTES + 1)], 'big.pdf')
-    const files = [new File([''], 'small.pdf'), big]
-    const { accepted, skipped } = filterFiles(files)
-    expect(accepted.map(f => f.name)).toEqual(['small.pdf'])
+    const walked = [
+      wf('small.pdf'),
+      wf('big.pdf', new Uint8Array(MAX_UPLOAD_BYTES + 1), 'docs/big.pdf'),
+    ]
+    const { accepted, skipped } = filterFiles(walked)
+    expect(accepted.map(w => w.file.name)).toEqual(['small.pdf'])
     expect(skipped).toEqual([
-      { file: expect.objectContaining({ name: 'big.pdf' }), reason: 'file exceeds 50 MB limit' },
+      {
+        file: expect.objectContaining({ name: 'big.pdf' }),
+        relativePath: 'docs/big.pdf',
+        reason: 'file exceeds 50 MB limit',
+      },
     ])
   })
 

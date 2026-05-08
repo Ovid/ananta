@@ -147,6 +147,31 @@ class TestCreateAndListTopics:
         with pytest.raises(ValueError, match="path separator"):
             mgr.create(name)
 
+    def test_create_rejects_overlong_name(self, tmp_path: Path) -> None:
+        """Topic names above the length cap are rejected (I5).
+
+        Without a cap, a hostile direct API caller could submit a multi-MB
+        topic name that gets stored verbatim in topic.json (disk-fill /
+        topic-store bloat) and rendered into the UI sidebar (layout break).
+        The 256 MiB body cap is too coarse for what is meaningfully a
+        human-readable label.
+        """
+        mgr = BaseTopicManager(tmp_path)
+        with pytest.raises(ValueError, match="too long"):
+            mgr.create("x" * 300)
+
+    @pytest.mark.parametrize("name", ["bad\x00name", "tab\there", "newline\nhere", "del\x7fchar"])
+    def test_create_rejects_control_bytes(self, tmp_path: Path, name: str) -> None:
+        """Control bytes in topic names are rejected (I5).
+
+        NUL/CR/LF in stored topic.json values can break consumers that read
+        them as line-oriented files, and rendering them in the UI sidebar
+        can cause unexpected layout effects.
+        """
+        mgr = BaseTopicManager(tmp_path)
+        with pytest.raises(ValueError, match="control"):
+            mgr.create(name)
+
     def test_create_slug_collision_different_name_raises(self, tmp_path: Path) -> None:
         mgr = BaseTopicManager(tmp_path)
         mgr.create("Research")

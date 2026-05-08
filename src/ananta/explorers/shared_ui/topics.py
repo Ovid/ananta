@@ -57,11 +57,28 @@ class BaseTopicManager:
     # Topic CRUD
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _validate_name(name: str) -> None:
-        """Reject names that contain path separators."""
+    # Topic names are human-readable labels stored verbatim in topic.json
+    # and rendered in UI sidebars. The cap is generous for a label but well
+    # below anything that would bloat the topic store or break layout.
+    MAX_TOPIC_NAME_LEN = 256
+
+    _CONTROL_BYTES_RE = re.compile(r"[\x00-\x1f\x7f]")
+
+    @classmethod
+    def _validate_name(cls, name: str) -> None:
+        """Reject names that contain path separators, control bytes, or
+        exceed the length cap (I5)."""
         if "/" in name or "\\" in name:
             msg = f"Topic name must not contain a path separator: {name!r}"
+            raise ValueError(msg)
+        if cls._CONTROL_BYTES_RE.search(name):
+            msg = f"Topic name must not contain control characters: {name!r}"
+            raise ValueError(msg)
+        if len(name) > cls.MAX_TOPIC_NAME_LEN:
+            msg = (
+                f"Topic name is too long ({len(name)} chars; max "
+                f"{cls.MAX_TOPIC_NAME_LEN}): {name[:32]!r}…"
+            )
             raise ValueError(msg)
 
     def create(self, name: str) -> None:

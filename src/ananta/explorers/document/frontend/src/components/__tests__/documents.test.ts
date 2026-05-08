@@ -70,6 +70,74 @@ describe('uploadFolderInBatches', () => {
     })
   })
 
+  it('throws BatchUploadError on a fetch rejection, carrying earlier rows (I2)', async () => {
+    // The C2 fix only handled the !res.ok branch. A network drop, DNS
+    // failure, or mid-body abort makes fetch() reject with a plain
+    // TypeError, which previously bubbled past the hook's
+    // `instanceof BatchUploadError` guard and stranded the rows from any
+    // batches that had already committed server-side. This test pins the
+    // contract: every error path through the function must surface as a
+    // BatchUploadError carrying `partial`.
+    let call = 0
+    global.fetch = vi.fn(async () => {
+      call += 1
+      if (call === 1) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => [
+            { project_id: 'p1', filename: 'a.md', status: 'created' },
+          ],
+        } as Response
+      }
+      throw new TypeError('Failed to fetch')
+    })
+    const batches = [
+      [{ file: new File(['x'], 'a.md'), relativePath: 'a.md' }],
+      [{ file: new File(['y'], 'b.md'), relativePath: 'b.md' }],
+    ]
+    await expect(
+      uploadFolderInBatches(batches, 'T', 'sid', () => {}),
+    ).rejects.toSatisfy((err: unknown) => {
+      if (!(err instanceof BatchUploadError)) return false
+      if (err.partial.length !== 1) return false
+      return err.partial[0].filename === 'a.md' && err.partial[0].status === 'created'
+    })
+  })
+
+  it('throws BatchUploadError on a malformed res.json(), carrying earlier rows (I2)', async () => {
+    // res.json() throwing (e.g., body already consumed, malformed JSON
+    // from a misbehaving proxy) is the same bug class as a fetch rejection
+    // — it must surface as BatchUploadError so partial rows survive.
+    let call = 0
+    global.fetch = vi.fn(async () => {
+      call += 1
+      if (call === 1) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => [
+            { project_id: 'p1', filename: 'a.md', status: 'created' },
+          ],
+        } as Response
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => {
+          throw new SyntaxError('Unexpected end of JSON input')
+        },
+      } as Response
+    })
+    const batches = [
+      [{ file: new File(['x'], 'a.md'), relativePath: 'a.md' }],
+      [{ file: new File(['y'], 'b.md'), relativePath: 'b.md' }],
+    ]
+    await expect(
+      uploadFolderInBatches(batches, 'T', 'sid', () => {}),
+    ).rejects.toSatisfy((err: unknown) => err instanceof BatchUploadError && err.partial.length === 1)
+  })
+
   it('reports progress to the callback', async () => {
     const onProgress = vi.fn()
     const batches = [

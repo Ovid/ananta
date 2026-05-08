@@ -43,11 +43,26 @@ export async function uploadFolderInBatches(
     // Intentionally do not pass `signal` to fetch: cancel is between-batches,
     // not mid-batch. The current batch always completes (or errors) before we
     // honour the abort. Do not "fix" this without revisiting the design.
-    const res = await fetch('/api/documents/upload', { method: 'POST', body: form })
-    if (!res.ok) {
-      throw new BatchUploadError(`upload failed: ${res.status}`, all)
+    //
+    // Every error path through this block must surface as BatchUploadError
+    // carrying `all` (I2). A network drop, DNS failure, or malformed JSON
+    // body that bubbles up as a plain TypeError/SyntaxError otherwise
+    // strands the rows from earlier successful batches: the hook's
+    // `instanceof BatchUploadError` guard goes false and the user sees
+    // "0 ingested" even though batches 1..K-1 have already been durably
+    // committed server-side.
+    let rows: UploadRow[]
+    try {
+      const res = await fetch('/api/documents/upload', { method: 'POST', body: form })
+      if (!res.ok) {
+        throw new BatchUploadError(`upload failed: ${res.status}`, all)
+      }
+      rows = (await res.json()) as UploadRow[]
+    } catch (err) {
+      if (err instanceof BatchUploadError) throw err
+      const message = err instanceof Error ? err.message : String(err)
+      throw new BatchUploadError(`upload failed: ${message}`, all)
     }
-    const rows = (await res.json()) as UploadRow[]
     all.push(...rows)
     completed += batch.length
     onProgress(completed, total, i + 1, batches.length)

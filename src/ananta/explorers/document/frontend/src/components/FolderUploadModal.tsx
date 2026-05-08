@@ -107,9 +107,9 @@ function PreflightView({
         </button>
         <button
           type="button"
-          disabled={confirming}
+          disabled={confirming || state.accepted.length === 0}
           onClick={() => {
-            if (confirming) return
+            if (confirming || state.accepted.length === 0) return
             setConfirming(true)
             onContinue()
           }}

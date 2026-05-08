@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Document Explorer: a folder upload that trips the 200 MB aggregate cap now returns 200 with per-file failed rows for the over-the-line files instead of a hard 413 that abandoned earlier files already committed server-side
 - Document Explorer: when a later batch of a folder upload fails, the summary now reflects the rows committed by earlier batches instead of showing "0 ingested" alongside an upload-failure row
 - Document Explorer: a network drop, DNS failure, or malformed JSON response mid-folder-upload no longer strands the rows from earlier successful batches — every error path through `uploadFolderInBatches` now wraps as `BatchUploadError` so the summary always reflects the durably-committed work (the previous fix only covered HTTP non-OK responses)
+- Document Explorer: dropping a folder with zero supported files no longer enables the Continue button on the preflight modal (which used to flash a nonsensical "batch 1 of 0" progress modal and trigger a needless sidebar refetch)
 - Document Explorer: cancelling an upload and starting a new one no longer leaves the new upload's Cancel button unresponsive (the previous upload's promise no longer clobbers the new abort controller)
 - Document Explorer: the folder-upload progress modal no longer briefly displays "batch 0 of N" before the first batch completes
 - Document Explorer: corrupt PDFs / DOCX / PPTX / XLSX files now report "text extraction failed: …" instead of a generic "unexpected upload error"

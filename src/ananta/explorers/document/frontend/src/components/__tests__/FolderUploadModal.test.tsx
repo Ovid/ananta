@@ -80,6 +80,31 @@ describe('FolderUploadModal pre-flight', () => {
     expect(onContinue).toHaveBeenCalled()
   })
 
+  it('Continue button is disabled when there are no accepted files (I3)', () => {
+    // A folder with only unsupported / oversized files reaches preflight
+    // with accepted=[]. Pressing Continue from that state used to build zero
+    // batches, transition to progress with a nonsensical "batch 1 of 0",
+    // bump commitVersion, and fire a needless refetch. Disable Continue at
+    // the source so the user can only Cancel.
+    const onContinue = vi.fn()
+    render(
+      <FolderUploadModal
+        state={{
+          kind: 'preflight',
+          accepted: [],
+          skipped: [{ file: new File([''], 'logo.png'), reason: 'unsupported extension' }],
+          targetTopic: 'Barsoom',
+        }}
+        onContinue={onContinue}
+        onCancel={() => {}}
+      />
+    )
+    const button = screen.getByRole('button', { name: /continue/i })
+    expect(button).toBeDisabled()
+    fireEvent.click(button)
+    expect(onContinue).not.toHaveBeenCalled()
+  })
+
   it('Continue button disables on click and ignores rapid second clicks (I7)', () => {
     const onContinue = vi.fn()
     render(

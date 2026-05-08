@@ -183,10 +183,9 @@ class TestCreateAndListTopics:
         """
         mgr = BaseTopicManager(tmp_path)
         mgr.create("  Reports  ")
-        # "Reports" (no whitespace) must resolve to the same topic.
-        assert "Reports" in mgr.list_topics()
-        assert "Reports" not in [n.strip() for n in mgr.list_topics()] or mgr.list_topics() == ["Reports"]
-        # add_item with the trimmed form must succeed.
+        # The stored display name has no surrounding whitespace.
+        assert mgr.list_topics() == ["Reports"]
+        # add_item with the trimmed form must resolve to the same topic.
         mgr.add_item("Reports", "project-1")
         assert mgr.list_items("Reports") == ["project-1"]
         # Re-creating with whitespace is idempotent (same name after strip).

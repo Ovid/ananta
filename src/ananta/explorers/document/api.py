@@ -85,6 +85,7 @@ def _is_valid_relative_path(rel_path: str) -> bool:
         return False
     return True
 
+
 # Allow / for old-style arXiv IDs (e.g. cs/9808001v1), but block .. traversal.
 # This regex IS the path-traversal defence in this module: handlers below use
 # `state.uploads_dir / doc_id` directly without further sanitisation, so the
@@ -382,9 +383,7 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                 except ValueError as exc:
                     shutil.rmtree(upload_dir, ignore_errors=True)
                     results.append(
-                        _failed_row(
-                            file.filename, f"text extraction failed: {exc}", rel_path
-                        )
+                        _failed_row(file.filename, f"text extraction failed: {exc}", rel_path)
                     )
                     continue
 

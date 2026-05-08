@@ -16,18 +16,18 @@ from ananta.explorers.document.topics import DocumentTopicManager
 
 
 class TestMakeProjectId:
-    def test_hash_suffix_is_8_hex_chars(self) -> None:
+    def test_hash_suffix_is_12_hex_chars(self) -> None:
+        """Format pinned to slug-<12 hex> (I14 widened from 8 to 12)."""
         pid = _make_project_id("report.pdf")
-        # Format: slug-xxxxxxxx
-        assert re.fullmatch(r"[a-z0-9]+-[a-f0-9]{8}", pid), f"unexpected format: {pid}"
+        assert re.fullmatch(r"[a-z0-9]+-[a-f0-9]{12}", pid), f"unexpected format: {pid}"
 
     def test_same_filename_produces_different_ids(self) -> None:
         """Same filename yields different IDs (cryptographically random suffix).
 
-        After I6: the suffix is `secrets.token_hex(4)` instead of a hash of the
-        timestamp, so colliding IDs require a 32-bit random collision (~2^16
-        files via the birthday bound) rather than two requests landing in the
-        same microsecond with the same filename.
+        Suffix is `secrets.token_hex(6)` (48-bit random space; ~2^24 birthday
+        threshold), widened from 4 bytes / 32-bit to lower the spurious-
+        failure rate from the upload allocator's retry budget under
+        sustained concurrent uploads with stable filenames (I14).
         """
         id1 = _make_project_id("report.pdf")
         id2 = _make_project_id("report.pdf")
@@ -38,7 +38,7 @@ class TestMakeProjectId:
 
         With the previous timestamp-based scheme this test was flaky on fast
         machines (two calls in the same microsecond produced identical IDs).
-        With token_hex(4) the chance of collision in 1000 calls is ~10^-7.
+        With token_hex(6) the chance of collision in 1000 calls is ~10^-12.
         """
         ids = {_make_project_id("report.pdf") for _ in range(1000)}
         assert len(ids) == 1000

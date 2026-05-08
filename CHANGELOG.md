@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Document Explorer: folder upload modal recovers from server errors (e.g., 413) — previously a non-OK response left the modal stuck on "progress" with no error info
 - Document Explorer: folder upload sidebar refreshes after a mid-upload cancel — committed batches no longer remain hidden until manual reload
 - Document Explorer: project-id collisions can no longer destroy unrelated documents (suffix is now cryptographically random; rollback skips destructive cleanup unless this upload created the project)
+- Document Explorer: project-id random suffix widened from 8 to 12 hex chars (32→48 bits; ~16M-name birthday threshold). The previous 32-bit space combined with a retry budget of 3 could produce spurious upload failures under sustained concurrent load with stable filenames; the wider space and a retry budget of 5 make this practically unreachable
 - Document Explorer: Continue button on the folder-upload preflight modal disables on click, preventing double-click double-uploads
 - Document Explorer: a folder containing many unsupported files but few accepted ones no longer trips the 500-file cap (the cap now counts accepted files only)
 - Document Explorer: re-picking the same folder via the folder-input button now works (the input value is reset after each selection)

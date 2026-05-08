@@ -101,18 +101,22 @@ def _validate_doc_id(doc_id: str) -> None:
 
 
 def _make_project_id(filename: str) -> str:
-    """Generate project_id from filename: slugified-name-xxxxxxxx.
+    """Generate project_id from filename: slugified-name-xxxxxxxxxxxx.
 
-    The 8-hex suffix is cryptographically random (`secrets.token_hex(4)`) so
-    two uploads with the same filename in fast succession are vanishingly
-    unlikely to collide. A previous implementation hashed the filename plus
-    a microsecond timestamp, which was deterministic enough that two calls
-    in the same microsecond produced identical IDs — and the rollback path
-    would then destroy the colliding pre-existing project's data.
+    The 12-hex suffix is cryptographically random (`secrets.token_hex(6)` —
+    48-bit space; ~16M-name birthday threshold). The previous 32-bit suffix
+    had a ~65k-name birthday threshold (I14), so under sustained concurrent
+    upload load with stable filenames, the retry-budgeted allocator could
+    plausibly exhaust three picks and report a spurious failure to the
+    caller despite no permanent collision. A previous implementation hashed
+    the filename plus a microsecond timestamp, which was deterministic
+    enough that two calls in the same microsecond produced identical IDs —
+    and the rollback path would then destroy the colliding pre-existing
+    project's data.
     """
     stem = Path(filename).stem
     slug = _slugify(stem) or "document"
-    return f"{slug}-{secrets.token_hex(4)}"
+    return f"{slug}-{secrets.token_hex(6)}"
 
 
 def _failed_row(
@@ -342,11 +346,11 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
 
                 # Allocate an upload dir we know is fresh. Retrying on
                 # FileExistsError protects against `_make_project_id` collisions
-                # — the random 32-bit suffix makes them rare, but a collision
-                # with mkdir(exist_ok=True) would silently overwrite an existing
-                # project's files (C4). Three attempts is plenty given the
-                # birthday-paradox threshold of ~65k uploads.
-                for _attempt in range(3):
+                # — the random 48-bit suffix (I14) makes them rare, but a
+                # collision with mkdir(exist_ok=True) would silently overwrite
+                # an existing project's files (C4). Five attempts is plenty
+                # given the birthday-paradox threshold of ~16M uploads.
+                for _attempt in range(5):
                     project_id = _make_project_id(file.filename)
                     upload_dir = state.uploads_dir / project_id
                     try:

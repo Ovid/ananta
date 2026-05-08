@@ -1152,6 +1152,24 @@ class TestDeleteDocument:
         assert "doc-123" not in topic_mgr.list_items("A")
         mock_ananta.delete_project.assert_called_once_with("doc-123")
 
+    def test_delete_nonexistent_returns_404(
+        self,
+        client: TestClient,
+        mock_ananta: MagicMock,
+    ) -> None:
+        """DELETE on an unknown document returns 404, matching get/rename (I13).
+
+        Previously the route returned ``{"status": "deleted", project_id}`` for
+        any id, even when the project never existed. The misleading 200
+        response hides bugs in callers that rely on proper error signalling
+        (e.g., a stale UI re-issuing deletes after the user removed a
+        document elsewhere).
+        """
+        resp = client.delete("/api/documents/does-not-exist")
+        assert resp.status_code == 404
+        # delete_project must not be called for a missing doc.
+        mock_ananta.delete_project.assert_not_called()
+
 
 class TestCreateTopic:
     def test_create_topic_with_invalid_name_returns_422(

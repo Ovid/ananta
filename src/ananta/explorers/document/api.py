@@ -488,9 +488,14 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
     @router.delete("/documents/{doc_id}")
     def delete_document(doc_id: str) -> dict[str, str]:
         _validate_doc_id(doc_id)
+        # 404 for unknown ids (I13). Without this, the route returned a
+        # confident "deleted" for any id, masking caller bugs that rely on
+        # error signalling and contradicting the get/rename routes' 404s.
+        upload_dir = state.uploads_dir / doc_id
+        if not upload_dir.exists() and _read_upload_meta(state.uploads_dir, doc_id) is None:
+            raise HTTPException(404, f"Document '{doc_id}' not found")
         state.topic_mgr.remove_item_from_all(doc_id)
         # Remove upload files
-        upload_dir = state.uploads_dir / doc_id
         if upload_dir.exists():
             shutil.rmtree(upload_dir)
         # Remove Ananta project

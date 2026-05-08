@@ -118,6 +118,74 @@ def test_normal_request_unaffected_by_size_middleware() -> None:
     assert resp.json() == {"len": 5}
 
 
+# -- Same-origin guard middleware (C2) --
+
+
+def test_post_with_cross_origin_rejected_with_403() -> None:
+    """POST from a foreign Origin header is rejected.
+
+    The drive-by upload threat (C2): the explorer's CORSMiddleware originally
+    set ``allow_origins=["*"]`` and the upload endpoint had no auth, so any
+    web page the user visited could POST a 256 MiB body of attacker-chosen
+    documents into the local RLM corpus. The Origin guard refuses any
+    mutating request whose ``Origin`` header does not match its ``Host``.
+    """
+    state = _make_state()
+    app = create_app(state, title="Test App")
+    _add_echo_route(app)
+    client = TestClient(app)
+    resp = client.post(
+        "/echo",
+        content=b"x",
+        headers={"origin": "http://evil.example.com"},
+    )
+    assert resp.status_code == 403
+
+
+def test_post_with_matching_origin_accepted() -> None:
+    """POST with Origin equal to Host is accepted (same-origin from a browser)."""
+    state = _make_state()
+    app = create_app(state, title="Test App")
+    _add_echo_route(app)
+    client = TestClient(app)
+    # TestClient defaults Host to ``testserver``; mirror it in Origin so the
+    # origin-guard middleware sees a same-origin request.
+    resp = client.post(
+        "/echo",
+        content=b"x",
+        headers={"origin": "http://testserver"},
+    )
+    assert resp.status_code == 200
+
+
+def test_post_without_origin_accepted() -> None:
+    """POST with no Origin header (curl, scripts) is accepted.
+
+    Browsers always set ``Origin`` on cross-origin POSTs — that's the threat
+    surface we cover. Direct API callers from a trusted shell (curl, the
+    user's own scripts) typically omit it; we must not break them.
+    """
+    state = _make_state()
+    app = create_app(state, title="Test App")
+    _add_echo_route(app)
+    client = TestClient(app)
+    resp = client.post("/echo", content=b"x")
+    assert resp.status_code == 200
+
+
+def test_get_with_cross_origin_unaffected_by_origin_guard() -> None:
+    """GET requests are not rejected by the origin guard."""
+    state = _make_state()
+    app = create_app(state, title="Test App")
+    client = TestClient(app)
+    resp = client.get(
+        "/.well-known/anything",
+        headers={"origin": "http://evil.example.com"},
+    )
+    # 204 from the well-known catch-all; the point is it's NOT 403.
+    assert resp.status_code == 204
+
+
 # -- Basic app creation --
 
 

@@ -47,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Document Explorer: per-file upload errors no longer include raw exception text in the API response (which could leak filesystem paths or dependency error details); the original exception is logged server-side
 - Document Explorer: `relative_path` form input is now validated against an allowlist regex (max 512 chars, no `..`, no leading `/`, ASCII-friendly character set). Previously the value was persisted verbatim, allowing disk-fill DoS via giant strings and a path-traversal / prompt-injection surface. The array length is also required to match `files` length
 - Shared explorer factory now rejects requests with bodies above 256 MiB at the middleware layer before any data is spooled to disk. Previously the application's per-route caps fired only after Starlette had finished spooling, leaving a disk-fill DoS reachable
+- Shared explorer factory now refuses mutating HTTP requests (POST/PUT/PATCH/DELETE) whose `Origin` header does not match `Host`. Defends against drive-by uploads from arbitrary webpages: with `allow_origins=["*"]` and no auth on `/api/documents/upload`, any page the user visited could previously inject attacker-chosen documents into the local RLM corpus. Direct API callers (curl, scripts) typically omit `Origin` and remain unaffected
 
 ## [0.24.0] - 2026-03-22
 

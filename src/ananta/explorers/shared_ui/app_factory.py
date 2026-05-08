@@ -30,6 +30,65 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 MAX_REQUEST_BODY_BYTES = 256 * 1024 * 1024
 
 
+_MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+
+
+def _origin_matches_host(origin: str, host: str) -> bool:
+    """Return True iff *origin* (``scheme://host[:port]``) and *host*
+    (``host[:port]``) refer to the same host:port pair.
+
+    Origin is only compared by host:port, not scheme — a same-host upgrade
+    (e.g., http→https on the same loopback port) shouldn't trip the guard
+    even though we have no realistic deployment that does that today.
+    """
+    if "://" not in origin:
+        return False
+    origin_host = origin.split("://", 1)[1]
+    return origin_host == host
+
+
+class _SameOriginGuardMiddleware:
+    """Reject mutating HTTP requests whose Origin does not match the Host.
+
+    Threat model (C2): the explorer is launched as a localhost daemon and
+    has no authentication. Without this guard, any web page the user visits
+    while the explorer is running can submit a multipart POST to
+    ``http://localhost:<port>/api/documents/upload``. Browsers attach an
+    ``Origin`` header to every cross-origin request, so we can refuse a
+    request whose Origin does not match Host. Same-origin requests from the
+    explorer's own served HTML pass through; direct API callers (curl,
+    Python scripts) usually omit Origin and are also allowed — that traffic
+    is not the threat.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self._app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or scope["method"] not in _MUTATING_METHODS:
+            await self._app(scope, receive, send)
+            return
+
+        origin = ""
+        host = ""
+        for name, value in scope["headers"]:
+            if name == b"origin":
+                origin = value.decode("latin-1")
+            elif name == b"host":
+                host = value.decode("latin-1")
+        if origin and not _origin_matches_host(origin, host):
+            await send(
+                {
+                    "type": "http.response.start",
+                    "status": 403,
+                    "headers": [(b"content-type", b"text/plain; charset=utf-8")],
+                }
+            )
+            await send({"type": "http.response.body", "body": b"Cross-origin request refused"})
+            return
+        await self._app(scope, receive, send)
+
+
 async def _send_413(send: Send) -> None:
     """Emit a 413 ASGI response."""
     await send(
@@ -191,11 +250,21 @@ def create_app(
     # downstream middleware allocates resources.
     app.add_middleware(_BodySizeLimitMiddleware, max_bytes=MAX_REQUEST_BODY_BYTES)
 
-    # CORS — allow all origins during development.
-    # allow_credentials intentionally omitted: no cookies/auth headers are
-    # used, and combining credentials=True with wildcard origins causes
-    # Starlette to reflect the request Origin, enabling any page to make
-    # credentialed cross-origin requests.
+    # Same-origin guard for mutating methods. Defends against drive-by
+    # uploads from arbitrary visited pages — see _SameOriginGuardMiddleware
+    # for the full threat model (C2). Added before CORS so the rejection
+    # never reaches CORS-style handling.
+    app.add_middleware(_SameOriginGuardMiddleware)
+
+    # CORS — wildcard origins. The actual cross-origin threat (drive-by
+    # uploads from arbitrary visited pages) is handled by the same-origin
+    # guard above, which compares Origin to Host per request. We don't
+    # restrict CORS by hostname here because operators may bind the
+    # explorer to an internal address (e.g., a LAN host) where the legitimate
+    # Origin is whatever they've deployed under, not just loopback.
+    # allow_credentials is intentionally omitted: no cookies/auth headers
+    # are used, and combining credentials=True with wildcard origins causes
+    # Starlette to reflect the request Origin.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],

@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Document Explorer: multi-file upload now returns per-file partial-success rows instead of failing the whole request on one bad file. Each `DocumentUploadResponse` row carries `status` (`"created"` or `"failed"`) and an optional `reason`. Single-file uploads are observably unchanged.
+- Document Explorer: upload now returns per-file partial-success rows instead of failing the whole request on one bad file. Each `DocumentUploadResponse` row carries `status` (`"created"` or `"failed"`) and an optional `reason`. **Behaviour change for single-file uploads:** a successful single-file upload still returns 200 with a `created` row, but a single-file *failure* (unsupported extension, oversize file, invalid relative_path, etc.) now returns 200 with a `failed` row instead of the previous 4xx. Callers that branched on HTTP status to detect single-file errors must now also inspect the row's `status` field.
 - Document Explorer: upload limits centralized in `src/ananta/explorers/document/config.py`. No behavior change.
 
 ### Fixed

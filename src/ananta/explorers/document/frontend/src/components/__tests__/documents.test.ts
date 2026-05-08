@@ -138,6 +138,32 @@ describe('uploadFolderInBatches', () => {
     ).rejects.toSatisfy((err: unknown) => err instanceof BatchUploadError && err.partial.length === 1)
   })
 
+  it('maps 413 to a friendly error message (I9)', async () => {
+    global.fetch = vi.fn(async () => ({
+      ok: false,
+      status: 413,
+      json: async () => ({}),
+    } as Response))
+    const batches = [[{ file: new File(['x'], 'a.md'), relativePath: 'a.md' }]]
+    await expect(uploadFolderInBatches(batches, 'T', 'sid', () => {})).rejects.toSatisfy(
+      (err: unknown) => err instanceof BatchUploadError && err.message.includes('files too large'),
+    )
+  })
+
+  it('uses FastAPI {detail} body when present (I9)', async () => {
+    global.fetch = vi.fn(async () => ({
+      ok: false,
+      status: 422,
+      json: async () => ({ detail: 'relative_path length must match files length' }),
+    } as Response))
+    const batches = [[{ file: new File(['x'], 'a.md'), relativePath: 'a.md' }]]
+    await expect(uploadFolderInBatches(batches, 'T', 'sid', () => {})).rejects.toSatisfy(
+      (err: unknown) =>
+        err instanceof BatchUploadError &&
+        err.message.includes('relative_path length must match files length'),
+    )
+  })
+
   it('reports progress to the callback', async () => {
     const onProgress = vi.fn()
     const batches = [

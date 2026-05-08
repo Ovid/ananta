@@ -22,6 +22,29 @@ export class BatchUploadError extends Error {
   }
 }
 
+async function formatHttpError(res: Response): Promise<string> {
+  // Prefer FastAPI's structured ``{ detail: string | object }`` body when
+  // present so the user sees the server's actual reason. Fall back to a
+  // status-class-specific phrase, then the bare status. Avoids the
+  // previous cryptic "upload failed: 413" (I9).
+  let detail = ''
+  try {
+    const body = (await res.json()) as { detail?: unknown }
+    if (typeof body.detail === 'string') {
+      detail = body.detail
+    } else if (body.detail) {
+      detail = JSON.stringify(body.detail)
+    }
+  } catch {
+    // Non-JSON body — common for proxy-injected 502/504 pages.
+  }
+  if (detail) return `upload failed: ${detail}`
+  if (res.status === 413) return 'upload failed: files too large for this request'
+  if (res.status === 422) return 'upload failed: server rejected the request as invalid'
+  if (res.status >= 500) return `upload failed: server error (${res.status})`
+  return `upload failed: ${res.status}`
+}
+
 export async function uploadFolderInBatches(
   batches: WalkedFile[][],
   topic: string,
@@ -59,7 +82,7 @@ export async function uploadFolderInBatches(
     try {
       const res = await fetch('/api/documents/upload', { method: 'POST', body: form })
       if (!res.ok) {
-        throw new BatchUploadError(`upload failed: ${res.status}`, all)
+        throw new BatchUploadError(await formatHttpError(res), all)
       }
       rows = (await res.json()) as UploadRow[]
     } catch (err) {

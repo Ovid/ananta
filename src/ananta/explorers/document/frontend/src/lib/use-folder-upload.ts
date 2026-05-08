@@ -27,6 +27,11 @@ export function useFolderUpload() {
   // see whichever AbortController was committed at their definition time —
   // potentially null when an upload was in flight (S6).
   const abortCtlRef = useRef<AbortController | null>(null)
+  // Re-entry guard for the (potentially slow) walkEntries phase (I10). The
+  // abortCtl-based guard only kicks in after confirm() runs; until then a
+  // second drop could race the first walk and clobber its preflight state.
+  // walkingRef is set eagerly at the top of start() and cleared in finally.
+  const walkingRef = useRef(false)
   // Increments whenever uploaded rows have been committed server-side and the
   // caller should refresh its document list. Bumps on summary AND on cancel-
   // mid-flight (the in-flight batch always commits before cancel is honoured —
@@ -34,51 +39,56 @@ export function useFolderUpload() {
   const [commitVersion, setCommitVersion] = useState(0)
 
   const start = useCallback(async (input: FolderInput, topic: string) => {
-    // Refuse a second start while an upload is in flight. Without this guard,
-    // a second drop clobbers state and pending while batch 1 of the first
-    // upload is still committing — the first upload's progress callback
-    // then re-overwrites state, churning the modal (I9). The user must
-    // explicitly cancel before starting a new folder.
-    if (abortCtlRef.current) return
-    let walked: WalkedFile[]
-    if (input.kind === 'entries') {
-      try {
-        walked = await walkEntries(input.entries, input.rootName)
-      } catch (err) {
-        // Only the hard cap-exceeded refusal short-circuits to summary.
-        // walkEntries swallows per-file / per-subtree errors itself, but
-        // an unrelated readAllEntries rejection at the top level would
-        // otherwise be misreported as "folder exceeds the N-file limit".
-        // Discriminate by class, not by message text (I6).
-        if (!(err instanceof FolderCapExceededError)) throw err
+    // Refuse a second start while an upload is in flight or another walk
+    // is still resolving (I10). The abortCtl-based guard only kicks in
+    // after confirm() runs; without walkingRef, a second drop during the
+    // first folder's slow walkEntries could clobber state/pending and the
+    // late-arriving first walk would then overwrite the second's preflight.
+    if (abortCtlRef.current || walkingRef.current) return
+    walkingRef.current = true
+    try {
+      let walked: WalkedFile[]
+      if (input.kind === 'entries') {
+        try {
+          walked = await walkEntries(input.entries, input.rootName)
+        } catch (err) {
+          // Only the hard cap-exceeded refusal short-circuits to summary.
+          // walkEntries swallows per-file / per-subtree errors itself, but
+          // an unrelated readAllEntries rejection at the top level would
+          // otherwise be misreported as "folder exceeds the N-file limit".
+          // Discriminate by class, not by message text (I6).
+          if (!(err instanceof FolderCapExceededError)) throw err
+          setState({
+            kind: 'summary',
+            ingested: 0,
+            failed: [],
+            skipped: [{ name: input.rootName, reason: err.message }],
+          })
+          return
+        }
+      } else {
+        walked = input.files
+      }
+      const { accepted, skipped } = filterFiles(walked)
+      // Count the cap against the *accepted* set only — drag-drop's walkEntries
+      // does the same (Inline 5). Otherwise a folder of mostly unsupported
+      // assets (e.g. a git repo with images) trips the cap on click but
+      // succeeds on drop (I7). Drop path: walkEntries already raised on cap,
+      // so accepted.length <= MAX_FOLDER_FILES here. Click path: enforce now.
+      if (accepted.length > MAX_FOLDER_FILES) {
         setState({
           kind: 'summary',
           ingested: 0,
           failed: [],
-          skipped: [{ name: input.rootName, reason: err.message }],
+          skipped: [{ name: input.rootName, reason: `folder exceeds the ${MAX_FOLDER_FILES}-file limit` }],
         })
         return
       }
-    } else {
-      walked = input.files
+      setState({ kind: 'preflight', accepted, skipped, targetTopic: topic })
+      setPending({ accepted, topic, skipped })
+    } finally {
+      walkingRef.current = false
     }
-    const { accepted, skipped } = filterFiles(walked)
-    // Count the cap against the *accepted* set only — drag-drop's walkEntries
-    // does the same (Inline 5). Otherwise a folder of mostly unsupported
-    // assets (e.g. a git repo with images) trips the cap on click but
-    // succeeds on drop (I7). Drop path: walkEntries already raised on cap,
-    // so accepted.length <= MAX_FOLDER_FILES here. Click path: enforce now.
-    if (accepted.length > MAX_FOLDER_FILES) {
-      setState({
-        kind: 'summary',
-        ingested: 0,
-        failed: [],
-        skipped: [{ name: input.rootName, reason: `folder exceeds the ${MAX_FOLDER_FILES}-file limit` }],
-      })
-      return
-    }
-    setState({ kind: 'preflight', accepted, skipped, targetTopic: topic })
-    setPending({ accepted, topic, skipped })
   }, [])
 
   const confirm = useCallback(async () => {

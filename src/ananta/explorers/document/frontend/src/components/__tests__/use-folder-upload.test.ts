@@ -48,6 +48,90 @@ describe('useFolderUpload', () => {
     expect(result.current.state?.kind).toBe('preflight')
   })
 
+  it('rejects a second concurrent drop while the first walk is in flight (I10)', async () => {
+    // The original abortCtl-based guard only blocked re-entry once
+    // confirm() set the controller. During the (potentially slow)
+    // walkEntries phase, abortCtl was still null and a second drop could
+    // clobber state/pending. With the walkingRef guard, the second start()
+    // must be a no-op until the first walk releases.
+    let resolveFirstFile: ((f: File) => void) | null = null
+    // FakeEntry whose .file() callback is held until we resolve it
+    // explicitly — pins the first walk in mid-flight.
+    const slowFile = {
+      isFile: true,
+      isDirectory: false,
+      name: 'a.md',
+      fullPath: '/A/a.md',
+      file: (cb: (f: File) => void) => {
+        resolveFirstFile = cb
+      },
+    }
+    const slowRoot = {
+      isFile: false,
+      isDirectory: true,
+      name: 'A',
+      fullPath: '/A',
+      createReader: () => {
+        let r = false
+        return {
+          readEntries: (cb: (entries: unknown[]) => void) => {
+            cb(r ? [] : [slowFile])
+            r = true
+          },
+        }
+      },
+    }
+    const fastFile = {
+      isFile: true,
+      isDirectory: false,
+      name: 'b.md',
+      fullPath: '/B/b.md',
+      file: (cb: (f: File) => void) => cb(new File(['y'], 'b.md')),
+    }
+    const fastRoot = {
+      isFile: false,
+      isDirectory: true,
+      name: 'B',
+      fullPath: '/B',
+      createReader: () => {
+        let r = false
+        return {
+          readEntries: (cb: (entries: unknown[]) => void) => {
+            cb(r ? [] : [fastFile])
+            r = true
+          },
+        }
+      },
+    }
+    const { result } = renderHook(() => useFolderUpload())
+    let firstPromise: Promise<void> | null = null
+    let secondPromise: Promise<void> | null = null
+    await act(async () => {
+      firstPromise = result.current.start(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { kind: 'entries', entries: [slowRoot as any], rootName: 'A' },
+        'T',
+      )
+      // Yield once so the first start() runs up to its await on slowFile.
+      await Promise.resolve()
+      secondPromise = result.current.start(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { kind: 'entries', entries: [fastRoot as any], rootName: 'B' },
+        'T',
+      )
+      // Second call must return synchronously (it's a no-op via walkingRef).
+      await secondPromise
+      // Now release the first walk so it can finish.
+      resolveFirstFile?.(new File(['x'], 'a.md'))
+      await firstPromise
+    })
+    expect(result.current.state?.kind).toBe('preflight')
+    if (result.current.state?.kind === 'preflight') {
+      // First walk wins — the accepted list has A's file, not B's.
+      expect(result.current.state.accepted.map((w) => w.file.name)).toEqual(['a.md'])
+    }
+  })
+
   it('walked-file path transitions to preflight without re-walking', async () => {
     const files = [
       { file: new File(['x'], 'a.md'), relativePath: 'a.md' },

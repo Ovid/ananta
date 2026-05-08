@@ -63,19 +63,48 @@ def test_oversized_content_length_rejected_with_413() -> None:
     assert resp.status_code == 413
 
 
-def test_streamed_body_exceeding_cap_aborts() -> None:
-    """A request without Content-Length but exceeding the cap is aborted."""
-    from ananta.explorers.shared_ui.app_factory import MAX_REQUEST_BODY_BYTES
+@pytest.mark.anyio
+async def test_streamed_body_without_content_length_returns_413() -> None:
+    """A chunked / no-Content-Length body exceeding the cap returns 413.
 
-    state = _make_state()
-    app = create_app(state, title="Test App")
-    _add_echo_route(app)
-    client = TestClient(app)
-    # An actual oversized body (TestClient adds Content-Length, so the
-    # header check catches this first — same outcome).
-    big = b"\x00" * (MAX_REQUEST_BODY_BYTES + 1)
-    resp = client.post("/echo", content=big)
-    assert resp.status_code == 413
+    Reproduces the streaming-path gap (C1): httpx's TestClient always sets
+    Content-Length, so the eager header check at the top of the middleware
+    catches it before the streaming counter ever runs. To exercise the
+    streaming branch we drive the app via ASGITransport with an async-
+    generator body, which httpx sends as chunked transfer-encoding (no
+    Content-Length). The middleware must respond with a real 413, not a
+    503/500-via-ClientDisconnect or a partial response.
+
+    The test wires _BodySizeLimitMiddleware directly with a small cap so it
+    runs in milliseconds rather than allocating hundreds of MiB.
+    """
+    from httpx import ASGITransport, AsyncClient
+    from starlette.applications import Starlette
+    from starlette.requests import Request
+    from starlette.responses import JSONResponse
+    from starlette.routing import Route
+
+    from ananta.explorers.shared_ui.app_factory import _BodySizeLimitMiddleware
+
+    cap = 1024  # 1 KiB cap keeps the test fast.
+
+    async def echo(request: Request) -> JSONResponse:
+        body = await request.body()
+        return JSONResponse({"len": len(body)})
+
+    app = Starlette(routes=[Route("/echo", echo, methods=["POST"])])
+    app.add_middleware(_BodySizeLimitMiddleware, max_bytes=cap)
+
+    async def chunked_body() -> Any:
+        # Two 700-byte chunks → 1400 bytes total > 1024 cap. httpx encodes
+        # this with Transfer-Encoding: chunked and no Content-Length header.
+        for _ in range(2):
+            yield b"\x00" * 700
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post("/echo", content=chunked_body())
+        assert resp.status_code == 413
 
 
 def test_normal_request_unaffected_by_size_middleware() -> None:

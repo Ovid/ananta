@@ -14,7 +14,12 @@ Two pressures shape the design:
 Drop a folder onto the explorer, get its supported documents added to the currently selected topic, with sensible bounds on how much can be uploaded at once.
 
 Out of scope for v1 (tracked in TODO.md):
-- Sensitive-info filtering (skipping `.env`, `.py`, dotfiles, cruft directories like `node_modules`)
+- Broader sensitive-info filtering — dot-directories (`.git`), cruft dirs
+  (`node_modules`, `__pycache__`, `.venv`), and other secret-bearing
+  dotfiles. Note that `.env` *is* blocked in v1 (removed from the
+  supported-extension allowlist in `extractors.py`); the deferred work is
+  the broader pruning of *directories* and dotfiles by name rather than
+  by extension.
 - All-or-nothing rollback across batches
 - Auto-creating a topic from the folder name
 
@@ -52,7 +57,13 @@ Out of scope entirely: nested topics (would require a topic-hierarchy redesign),
 - For single-file uploads, `relative_path` is `null`. Existing single-file flow is unchanged.
 - The frontend renders `relative_path` as a subtitle under the filename in the topic's document list, so two `README.md` files in different subdirs are visually disambiguated.
 - The RLM-side document object exposes `relative_path` via `ParsedDocument.metadata["relative_path"]` so the LLM can filter by path if it chooses (e.g., "only consider files under `docs/`").
-- **Project-id collision** is still handled by the existing 8-char hash in `_slugify(stem) + hash` — no change needed there.
+- **Project-id collision** is handled by `_make_project_id` in `api.py`. The
+  implementation in this branch widened the random suffix from a hashed
+  32-bit value to a cryptographically random 12-hex / 48-bit suffix
+  (`secrets.token_hex(6)`) and added a 5-attempt retry loop with
+  `mkdir(exist_ok=False)` so a collision can never silently overwrite an
+  existing project's files. The original "8-char hash, no change needed"
+  position in the design pre-dated review feedback (I14, C4).
 
 ### Filtering policy
 
@@ -150,7 +161,11 @@ Summary modal (ingested / failed / skipped, per-file reasons)
   - Accept and persist `relative_path` and `upload_session_id` in `meta.json`.
   - Include `relative_path` in the `ParsedDocument.metadata` dict so the RLM-side document object exposes it.
   - Topic creation: keep current behavior (route still calls `state.topic_mgr.create(topic)` when `topic` is provided). Folder upload always sends the *currently selected* topic name, so this resolves to a no-op or accept-existing in practice — no change needed if `create()` is idempotent on existing names. Verify during implementation.
-- No new endpoints. No changes to `extractors.py` or `websockets.py`.
+- No new endpoints. No changes to `websockets.py`. `extractors.py` is
+  modified during implementation to (a) remove `.env` from the
+  supported-extension allowlist and (b) translate parser-library
+  exceptions into a single `ValueError` so `api.py` can map them to a
+  partial-success "text extraction failed" row instead of a 500.
 
 ## Frontend changes
 

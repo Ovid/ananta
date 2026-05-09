@@ -35,7 +35,10 @@ export function docToDocumentItem(doc: {
     label: doc.filename,
     sublabel: `${icon} ${formatSize(doc.size)}`,
   }
-  if (doc.relative_path) {
+  // Only render the path subtitle when it adds information. For root-level
+  // folder uploads the server echoes relative_path == filename, in which case
+  // the subtitle would just duplicate the label on a second line.
+  if (doc.relative_path && doc.relative_path !== doc.filename) {
     item.subtitle = doc.relative_path
   }
   return item

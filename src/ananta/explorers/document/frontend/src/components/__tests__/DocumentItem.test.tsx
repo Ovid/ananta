@@ -33,6 +33,21 @@ describe('docToDocumentItem', () => {
     expect(item.subtitle).toBeUndefined()
   })
 
+  it('omits subtitle when relative_path equals filename (root-level folder upload)', () => {
+    const doc: DocumentInfo = {
+      project_id: 'p1',
+      filename: 'README.md',
+      content_type: 'text/markdown',
+      size: 100,
+      upload_date: '2026-05-05T00:00:00Z',
+      page_count: null,
+      relative_path: 'README.md',
+      upload_session_id: null,
+    }
+    const item = docToDocumentItem(doc)
+    expect(item.subtitle).toBeUndefined()
+  })
+
   it('omits subtitle when relative_path is missing', () => {
     const doc: DocumentInfo = {
       project_id: 'p1',

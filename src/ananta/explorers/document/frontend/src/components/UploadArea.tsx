@@ -37,6 +37,10 @@ export default function UploadArea({ onUpload, onFolderUpload, activeTopic }: Up
   }, [onUpload])
 
   const handleDrop = useCallback(async (e: DragEvent<HTMLDivElement>) => {
+    // Always preventDefault, even when disabled: otherwise the browser's
+    // default action for a file drop is to navigate to / open the file,
+    // blowing away the page state. setDragging(false) is also unconditional
+    // so the drop-target highlight clears even when the drop is rejected.
     e.preventDefault()
     setDragging(false)
     if (disabled) return
@@ -78,20 +82,28 @@ export default function UploadArea({ onUpload, onFolderUpload, activeTopic }: Up
     await onFolderUpload({ kind: 'walked', files: walked, rootName })
   }, [onFolderUpload])
 
-  const handlers = disabled
-    ? {}
-    : {
-        onDragOver: (e: DragEvent<HTMLDivElement>) => { e.preventDefault(); setDragging(true) },
-        onDragLeave: () => setDragging(false),
-        onDrop: handleDrop,
-        onClick: () => inputRef.current?.click(),
-        onKeyDown: (e: KeyboardEvent<HTMLDivElement>) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault()
-            inputRef.current?.click()
-          }
-        },
-      }
+  // Drag/drop handlers are always attached, even when disabled, so the
+  // browser doesn't fall back to its default "navigate to dropped file"
+  // behaviour. The handlers themselves no-op when disabled.
+  const handlers = {
+    onDragOver: (e: DragEvent<HTMLDivElement>) => {
+      e.preventDefault()
+      if (!disabled) setDragging(true)
+    },
+    onDragLeave: () => setDragging(false),
+    onDrop: handleDrop,
+    ...(disabled
+      ? {}
+      : {
+          onClick: () => inputRef.current?.click(),
+          onKeyDown: (e: KeyboardEvent<HTMLDivElement>) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              inputRef.current?.click()
+            }
+          },
+        }),
+  }
 
   return (
     <div className="mx-2 mb-2">

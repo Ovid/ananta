@@ -1,3 +1,4 @@
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import FolderUploadModal from '../FolderUploadModal'
 import { SOFT_WARN_FOLDER_FILES } from '../../lib/folder-walk'
@@ -53,9 +54,9 @@ describe('FolderUploadModal pre-flight', () => {
           kind: 'preflight',
           accepted: baseFiles,
           skipped: [
-            { file: new File([''], 'x.png'), reason: 'unsupported extension' },
-            { file: new File([''], 'y.png'), reason: 'unsupported extension' },
-            { file: new File([''], 'big.pdf'), reason: 'file exceeds 50 MB limit' },
+            { file: new File([''], 'x.png'), relativePath: 'x.png', reason: 'unsupported extension' },
+            { file: new File([''], 'y.png'), relativePath: 'y.png', reason: 'unsupported extension' },
+            { file: new File([''], 'big.pdf'), relativePath: 'big.pdf', reason: 'file exceeds 50 MB limit' },
           ],
           targetTopic: 'Barsoom',
         }}
@@ -92,7 +93,7 @@ describe('FolderUploadModal pre-flight', () => {
         state={{
           kind: 'preflight',
           accepted: [],
-          skipped: [{ file: new File([''], 'logo.png'), reason: 'unsupported extension' }],
+          skipped: [{ file: new File([''], 'logo.png'), relativePath: 'logo.png', reason: 'unsupported extension' }],
           targetTopic: 'Barsoom',
         }}
         onContinue={onContinue}

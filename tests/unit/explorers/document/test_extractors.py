@@ -122,6 +122,62 @@ class TestCorruptFileTranslation:
             extract_text(f)
 
 
+class TestExtractedTextSizeCap:
+    """``extract_text`` truncates oversized extractions (I3).
+
+    50 MB upload caps don't bound *extracted* text size. A heavily-compressed
+    xlsx/pptx/docx/pdf can be a few MB on disk and unpack to hundreds of MB
+    of plain text — a decompression-bomb DoS reachable by any caller with
+    upload access. The cap fires at the public ``extract_text`` boundary so
+    every format inherits it, mirroring the ``truncate_code_output`` pattern
+    in ``rlm/prompts.py``.
+    """
+
+    def test_oversized_plain_text_is_truncated(self, tmp_path: Path) -> None:
+        from ananta.explorers.document.config import MAX_EXTRACTED_TEXT_BYTES
+
+        f = tmp_path / "big.txt"
+        # Write something a generous bit larger than the cap; the truncation
+        # marker contributes a few extra bytes so we don't pin to == cap.
+        f.write_text("a" * (MAX_EXTRACTED_TEXT_BYTES + 5_000))
+        result = extract_text(f)
+        assert len(result) <= MAX_EXTRACTED_TEXT_BYTES + 256
+        assert result.startswith("a" * 100)
+        assert "truncated" in result.lower()
+
+    def test_under_cap_returned_unchanged(self, tmp_path: Path) -> None:
+        from ananta.explorers.document.config import MAX_EXTRACTED_TEXT_BYTES
+
+        f = tmp_path / "small.txt"
+        # Use a value comfortably under the cap so the test is fast even with
+        # a high cap.
+        body = "hello world\n" * 100
+        assert len(body) < MAX_EXTRACTED_TEXT_BYTES
+        f.write_text(body)
+        assert extract_text(f) == body
+
+    def test_oversized_pdf_is_truncated(self, tmp_path: Path) -> None:
+        """PDF extractor inherits the cap via the ``extract_text`` boundary."""
+        from ananta.explorers.document.config import MAX_EXTRACTED_TEXT_BYTES
+
+        # Simulate a parser that returns hundreds of MB of text.
+        big_text = "x" * (MAX_EXTRACTED_TEXT_BYTES + 1024)
+        mock_page = MagicMock()
+        mock_page.extract_text.return_value = big_text
+        mock_pdf = MagicMock()
+        mock_pdf.pages = [mock_page]
+        mock_pdf.__enter__ = lambda self: mock_pdf
+        mock_pdf.__exit__ = MagicMock(return_value=False)
+
+        f = tmp_path / "big.pdf"
+        f.write_bytes(b"%PDF-1.4 fake")
+        with patch("ananta.explorers.document.extractors.pdfplumber") as mock_plumber:
+            mock_plumber.open.return_value = mock_pdf
+            result = extract_text(f)
+        assert len(result) <= MAX_EXTRACTED_TEXT_BYTES + 256
+        assert "truncated" in result.lower()
+
+
 class TestPdfExtraction:
     """Tests for PDF text extraction."""
 

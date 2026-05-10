@@ -14,6 +14,8 @@ from openpyxl import load_workbook
 from pptx import Presentation as PptxPresentation
 from striprtf.striprtf import rtf_to_text
 
+from ananta.explorers.document.config import MAX_EXTRACTED_TEXT_BYTES
+
 # Extensions treated as plain text (read with open()).
 #
 # `.env` is intentionally NOT in this list (I8): files named `.env` typically
@@ -68,6 +70,24 @@ def is_supported_extension(filename: str) -> bool:
     return ext in _SUPPORTED_EXTENSIONS
 
 
+def _truncate_to_cap(text: str) -> str:
+    """Truncate *text* to ``MAX_EXTRACTED_TEXT_BYTES`` with a marker (I3).
+
+    Bounds in-process memory and the on-disk document store against
+    decompression-bomb DoS via heavily-compressed xlsx/pptx/docx/pdf,
+    and reduces attacker-controlled bytes flowing into the RLM context.
+    Length is measured in characters; one char ≈ one UTF-8 byte for
+    typical document text, with a small overhead for non-ASCII content.
+    """
+    if len(text) <= MAX_EXTRACTED_TEXT_BYTES:
+        return text
+    return (
+        text[:MAX_EXTRACTED_TEXT_BYTES]
+        + f"\n[Extracted text truncated to {MAX_EXTRACTED_TEXT_BYTES:,} of "
+        f"{len(text):,} characters.]"
+    )
+
+
 def extract_text(path: Path, content_type: str | None = None) -> str:
     """Extract text content from a file.
 
@@ -76,11 +96,14 @@ def extract_text(path: Path, content_type: str | None = None) -> str:
     or for corrupt/unreadable files (translated from per-library errors
     like pdfplumber's PDFSyntaxError, zipfile's BadZipFile, openpyxl's
     InvalidFileException, python-pptx's PackageNotFoundError).
+
+    Output is capped at ``MAX_EXTRACTED_TEXT_BYTES`` characters with an
+    inline truncation marker — see ``_truncate_to_cap``.
     """
     ext = path.suffix.lower()
 
     if ext in _PLAIN_TEXT_EXTENSIONS:
-        return _extract_plain_text(path)
+        return _truncate_to_cap(_extract_plain_text(path))
     fmt_extractors: dict[str, tuple[str, Callable[[Path], str]]] = {
         ".pdf": ("pdf", _extract_pdf),
         ".docx": ("docx", _extract_docx),
@@ -91,7 +114,7 @@ def extract_text(path: Path, content_type: str | None = None) -> str:
     if ext in fmt_extractors:
         fmt_name, fn = fmt_extractors[ext]
         try:
-            return fn(path)
+            return _truncate_to_cap(fn(path))
         except ValueError:
             raise
         except Exception as exc:

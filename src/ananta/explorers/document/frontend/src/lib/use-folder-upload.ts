@@ -95,7 +95,17 @@ export function useFolderUpload() {
           kind: 'summary',
           ingested: 0,
           failed: [],
-          skipped: [{ name: input.rootName, reason: `folder exceeds the ${MAX_FOLDER_FILES}-file limit` }],
+          skipped: [
+            {
+              name: input.rootName,
+              // Reuse the typed error's message so the wording stays
+              // identical to the drag-drop path (which throws the same
+              // class). The FE summary's reason-grouping uses string
+              // equality, so a near-miss diverged copy would render two
+              // near-identical lines (S8).
+              reason: new FolderCapExceededError(MAX_FOLDER_FILES).message,
+            },
+          ],
         })
         return
       }

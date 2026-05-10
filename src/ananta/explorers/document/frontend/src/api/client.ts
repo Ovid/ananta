@@ -31,7 +31,7 @@ export const api = {
         // (I13). Empty string means "no relative path" and is normalised
         // to None server-side. The backend requires the array length to
         // match files.length once any value is supplied.
-        formData.append('relative_path', file.webkitRelativePath ?? '')
+        formData.append('relative_path', file.webkitRelativePath)
       }
       if (topic) formData.append('topic', topic)
       // Override headers to let the browser set Content-Type with boundary for multipart

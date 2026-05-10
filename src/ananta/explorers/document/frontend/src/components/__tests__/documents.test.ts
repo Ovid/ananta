@@ -150,6 +150,42 @@ describe('uploadFolderInBatches', () => {
     )
   })
 
+  it("renders FastAPI auto-422 array detail as a friendly message, not a JSON blob (S2)", async () => {
+    // FastAPI's automatic Pydantic-validation 422 carries an array of
+    // {loc, msg, type} objects, not a string. JSON-stringifying the array
+    // produces a useless toast like
+    //   upload failed: [{"loc":["body","new_name"],"msg":"...","type":"..."}]
+    // Practically rare on this route (most 422s are manual HTTPException
+    // with string detail), but worth fixing — the array-detail branch
+    // should fall back to the friendly status-code phrase rather than
+    // dumping JSON at the user.
+    global.fetch = vi.fn(async () => ({
+      ok: false,
+      status: 422,
+      json: async () => ({
+        detail: [
+          {
+            loc: ['body', 'new_name'],
+            msg: 'ensure this value has at most 512 characters',
+            type: 'value_error.any_str.max_length',
+          },
+        ],
+      }),
+    } as Response))
+    const batches = [[{ file: new File(['x'], 'a.md'), relativePath: 'a.md' }]]
+    await expect(uploadFolderInBatches(batches, 'T', 'sid', () => {})).rejects.toSatisfy(
+      (err: unknown) => {
+        if (!(err instanceof BatchUploadError)) return false
+        // No raw JSON-array text in the message (no "[" or "loc" or
+        // "type":).
+        if (err.message.includes('"loc"')) return false
+        if (err.message.includes('"type"')) return false
+        if (/^upload failed: \[/.test(err.message)) return false
+        return true
+      },
+    )
+  })
+
   it('uses FastAPI {detail} body when present (I9)', async () => {
     global.fetch = vi.fn(async () => ({
       ok: false,

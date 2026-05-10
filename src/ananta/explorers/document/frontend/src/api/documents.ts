@@ -7,8 +7,10 @@ export interface UploadRow {
   reason?: string
   // Echoed back from the server so the FE summary can disambiguate
   // duplicate-named files when the user uploaded a multi-folder structure
-  // (I4). Optional for older server builds that pre-date the field.
-  relative_path?: string
+  // (I4). Server emits `null` for unset values (Pydantic `string | None`);
+  // older server builds that pre-date the field omit it entirely. Both
+  // shapes coalesce to falsy at every consumer site (S7).
+  relative_path?: string | null
 }
 
 // Carries the rows accumulated across earlier successful batches when a
@@ -32,9 +34,20 @@ async function formatHttpError(res: Response): Promise<string> {
     const body = (await res.json()) as { detail?: unknown }
     if (typeof body.detail === 'string') {
       detail = body.detail
-    } else if (body.detail) {
-      detail = JSON.stringify(body.detail)
+    } else if (Array.isArray(body.detail)) {
+      // FastAPI's automatic Pydantic-validation 422 returns an array of
+      // {loc, msg, type} objects (S2). Joining the msg fields gives the
+      // user a friendly summary instead of a JSON blob like
+      //   [{"loc":["body","new_name"],"msg":"...","type":"..."}]
+      const msgs = (body.detail as Array<{ msg?: unknown }>)
+        .map(e => (typeof e?.msg === 'string' ? e.msg : ''))
+        .filter(Boolean)
+      detail = msgs.join('; ')
     }
+    // Other non-string detail shapes (e.g., {error: "..."}) intentionally
+    // fall through to the status-class phrase below — the previous
+    // JSON.stringify produced unfriendly toasts and the friendly fallback
+    // was unreachable.
   } catch {
     // Non-JSON body — common for proxy-injected 502/504 pages.
   }

@@ -1,4 +1,4 @@
-import type { DocumentItem } from '../types'
+import type { DocumentItem as DocumentItemType } from '../types'
 
 const FILE_ICONS: Record<string, string> = {
   'application/pdf': '\uD83D\uDCC4',
@@ -16,17 +16,35 @@ function formatSize(bytes: number): string {
 
 /**
  * Converts a DocumentInfo-like object to the DocumentItem format used by TopicSidebar.
+ *
+ * - `sublabel` is the hover-tooltip (size + icon).
+ * - `subtitle` is rendered as a visible second line under the label and carries
+ *   `relative_path` for documents uploaded as part of a folder, so the original
+ *   directory structure is visible in the sidebar.
  */
 export function docToDocumentItem(doc: {
   project_id: string
   filename: string
   content_type: string
   size: number
-}): DocumentItem {
-  const icon = FILE_ICONS[doc.content_type] || '\uD83D\uDCC1'
-  return {
+  relative_path?: string | null
+}): DocumentItemType {
+  // Strip parameter suffixes ("; charset=utf-8", "; boundary=...") before
+  // the lookup. Browsers may include them and the backend stores
+  // ``UploadFile.content_type`` verbatim, so an exact-match table missed
+  // legitimate "text/plain; charset=utf-8" entries (S37).
+  const baseType = doc.content_type.split(';', 1)[0].trim()
+  const icon = FILE_ICONS[baseType] || '\uD83D\uDCC1'
+  const item: DocumentItemType = {
     id: doc.project_id,
     label: doc.filename,
     sublabel: `${icon} ${formatSize(doc.size)}`,
   }
+  // Only render the path subtitle when it adds information. For root-level
+  // folder uploads the server echoes relative_path == filename, in which case
+  // the subtitle would just duplicate the label on a second line.
+  if (doc.relative_path && doc.relative_path !== doc.filename) {
+    item.subtitle = doc.relative_path
+  }
+  return item
 }

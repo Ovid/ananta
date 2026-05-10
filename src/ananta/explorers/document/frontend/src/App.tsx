@@ -15,7 +15,9 @@ import {
 import { api } from './api/client'
 import UploadArea from './components/UploadArea'
 import DocumentDetail from './components/DocumentDetail'
+import FolderUploadModal from './components/FolderUploadModal'
 import { docToDocumentItem } from './components/DocumentItem'
+import { useFolderUpload } from './lib/use-folder-upload'
 import type {
   DocumentInfo,
   DocumentItem,
@@ -50,21 +52,42 @@ export default function App() {
   const [helpOpen, setHelpOpen] = useState(false)
   const [allowBgKnowledge, setAllowBgKnowledge] = useState(false)
 
+  const folderUpload = useFolderUpload()
+
   const allDocsRef = useRef<DocumentInfo[]>([])
   allDocsRef.current = allDocs
 
   useEffect(() => {
+    // S34: a persistent error here previously left the sidebar empty with
+    // zero diagnostic feedback because the .catch arms swallowed every
+    // exception silently. The first call (on initial mount) may legitimately
+    // fail before the backend is up, but subsequent calls (triggered by
+    // every docsVersion bump) all hit the same hidden-failure path — a 500
+    // would then keep the sidebar empty without telling anyone. Log to the
+    // console so the failure is at least visible to anyone debugging.
     api.documents.list().then(docs => {
       setAllDocs(docs)
-    }).catch(() => {
-      // Documents API may not be available yet
+    }).catch(err => {
+      // eslint-disable-next-line no-console
+      console.warn('Failed to list documents:', err)
     })
     api.documents.listUncategorized().then(docs => {
       setUncategorizedDocs(docs.map(docToDocumentItem))
-    }).catch(() => {
-      // Uncategorized API may not be available yet
+    }).catch(err => {
+      // eslint-disable-next-line no-console
+      console.warn('Failed to list uncategorized documents:', err)
     })
   }, [docsVersion])
+
+  // Refresh the sidebar whenever a folder-upload commit happens. The hook
+  // bumps commitVersion both when the upload reaches summary and when the
+  // user cancels mid-flight (the in-flight batch commits server-side before
+  // the abort is honoured, so cancelled uploads can still leave new docs).
+  useEffect(() => {
+    if (folderUpload.commitVersion > 0) {
+      setDocsVersion(v => v + 1)
+    }
+  }, [folderUpload.commitVersion])
 
   const handleTopicSelect = useCallback((name: string) => {
     if (name !== activeTopic) {
@@ -102,9 +125,16 @@ export default function App() {
 
   const handleUpload = useCallback(async (files: File[]) => {
     try {
-      await api.documents.upload(files, activeTopic || undefined)
-      setDocsVersion(v => v + 1)
-      showToast(`${files.length} file${files.length > 1 ? 's' : ''} uploaded`, 'success')
+      const rows = await api.documents.upload(files, activeTopic || undefined)
+      const created = rows.filter(r => r.status === 'created')
+      const failed = rows.filter(r => r.status === 'failed')
+      if (created.length > 0) {
+        setDocsVersion(v => v + 1)
+        showToast(`${created.length} file${created.length > 1 ? 's' : ''} uploaded`, 'success')
+      }
+      for (const row of failed) {
+        showToast(`${row.filename}: ${row.reason ?? 'upload failed'}`, 'error')
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to upload files'
       showToast(msg, 'error')
@@ -239,7 +269,13 @@ export default function App() {
           createTopic={async name => { await api.topics.create(name) }}
           renameTopic={async (o, n) => { await api.topics.rename(o, n) }}
           deleteTopic={async name => { await api.topics.delete(name) }}
-          addButton={<UploadArea onUpload={handleUpload} />}
+          addButton={
+            <UploadArea
+              onUpload={handleUpload}
+              onFolderUpload={input => folderUpload.start(input, activeTopic ?? '')}
+              activeTopic={activeTopic}
+            />
+          }
           addDocToTopic={handleAddDocToTopic}
           removeDocFromTopic={handleRemoveDocFromTopic}
           deleteDocument={handleDeleteDocument}
@@ -302,6 +338,14 @@ export default function App() {
           onClose={() => setTraceView(null)}
           fetchTrace={api.traces.get}
           downloadTrace={api.traces.download}
+        />
+      )}
+
+      {folderUpload.state && (
+        <FolderUploadModal
+          state={folderUpload.state}
+          onContinue={folderUpload.state.kind === 'preflight' ? folderUpload.confirm : folderUpload.cancel}
+          onCancel={folderUpload.cancel}
         />
       )}
 

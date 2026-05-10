@@ -105,10 +105,23 @@ def test_list_topics(client: TestClient, mock_state: MagicMock) -> None:
 
 def test_create_topic(client: TestClient, mock_state: MagicMock) -> None:
     mock_state.topic_mgr.resolve.return_value = None
-    mock_state.topic_mgr.create.return_value = "2025-01-15-chess"
+    # ``BaseTopicManager.create`` is annotated ``-> None`` (it does not
+    # return a slug); the route must therefore not depend on its return
+    # value (I3). Mirror the real contract here so a regression that
+    # leaks ``null`` into the response body fails this test.
+    mock_state.topic_mgr.create.return_value = None
     resp = client.post("/api/topics", json={"name": "Chess"})
     assert resp.status_code == 201
     mock_state.topic_mgr.create.assert_called_once_with("Chess")
+    body = resp.json()
+    assert body["name"] == "Chess"
+    # project_id must be a non-empty string. Previously the route
+    # assigned ``BaseTopicManager.create()``'s return value (None) to
+    # project_id, so every explorer using ``include_topic_crud=True``
+    # got ``{"project_id": null}`` — which the FE used as a React key,
+    # collapsing all topics onto a single "null" key.
+    assert isinstance(body["project_id"], str)
+    assert body["project_id"]
 
 
 def test_create_topic_already_exists(client: TestClient, mock_state: MagicMock) -> None:
@@ -128,6 +141,34 @@ def test_rename_topic_not_found(client: TestClient, mock_state: MagicMock) -> No
     mock_state.topic_mgr.rename.side_effect = ValueError("not found")
     resp = client.patch("/api/topics/chess", json={"new_name": "Chess 2.0"})
     assert resp.status_code == 404
+
+
+def test_rename_topic_already_exists_returns_409(
+    client: TestClient, mock_state: MagicMock
+) -> None:
+    """``create_shared_router.rename_topic`` must map ValueError to the
+    same status taxonomy as ``create_item_router.rename_topic`` (S41).
+
+    Previously the shared router hardcoded 404 for ALL ValueError, so
+    a "Topic '<x>' already exists" conflict from the topic manager was
+    leaked as 404 — the FE displayed it as "topic not found", the wrong
+    UX. ``_topic_error_to_status`` maps it to 409.
+    """
+    mock_state.topic_mgr.rename.side_effect = ValueError("Topic 'Beta' already exists")
+    resp = client.patch("/api/topics/alpha", json={"new_name": "Beta"})
+    assert resp.status_code == 409
+
+
+def test_rename_topic_validation_error_returns_422(
+    client: TestClient, mock_state: MagicMock
+) -> None:
+    """A validation ValueError (e.g. control bytes, slug collision) maps
+    to 422 — not 404 (S41)."""
+    mock_state.topic_mgr.rename.side_effect = ValueError(
+        "Topic name must not contain control characters: 'bad\\x00name'"
+    )
+    resp = client.patch("/api/topics/alpha", json={"new_name": "bad\x00name"})
+    assert resp.status_code == 422
 
 
 def test_delete_topic(client: TestClient, mock_state: MagicMock) -> None:

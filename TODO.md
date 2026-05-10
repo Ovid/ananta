@@ -60,6 +60,23 @@
 - Audit: all endpoints should return correct status codes. We had one return a
   404 on duplicate topic id when it should have returned a 409:
 - bottom bar for code/arxiv explorer needs size of data retrieved
+- Folder upload: all-or-nothing rollback is deferred. Today, a batch failure
+  mid-upload leaves already-uploaded batches in place (best-effort). Each
+  document records an `upload_session_id` in `meta.json`, so a future
+  `DELETE /api/documents/upload-session/{id}` endpoint could clean up a
+  partial folder upload. See
+  docs/plans/2026-05-05-folder-upload-design.md.
+- Folder upload: broader sensitive-info filtering is deferred. v1 walks
+  every directory and applies the supported-extension allowlist. `.env` is
+  excluded from that allowlist (so a folder containing `.env` will skip it
+  with reason "unsupported extension"), but other secret-bearing dotfiles
+  (`.DS_Store` is harmless; `.netrc`, `.pgpass`, `.aws/credentials`,
+  `id_rsa`, etc. carry no extension and pass the allowlist if they happen
+  to match it) and cruft directories (`.git`, `node_modules`, `__pycache__`,
+  `.venv`) are NOT pre-filtered as a class — they're only filtered when
+  every file inside happens to fall outside the supported-extension list.
+  Auto-create topic from folder name is also deferred. See
+  docs/plans/2026-05-05-folder-upload-design.md.
 
 oolong, choose scale:
 

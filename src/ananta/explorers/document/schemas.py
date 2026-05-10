@@ -8,7 +8,9 @@ DocumentUploadResponse) are defined locally.
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from typing import Literal
+
+from pydantic import BaseModel, Field
 
 # Re-export shared schemas used by the document explorer API.
 from ananta.explorers.shared_ui.schemas import (
@@ -54,13 +56,25 @@ class DocumentInfo(BaseModel):
     size: int
     upload_date: str
     page_count: int | None
+    relative_path: str | None = None
+    upload_session_id: str | None = None
 
 
 class DocumentRename(BaseModel):
-    new_name: str
+    # Length cap mirrors the 512-char relative_path validator (I6).
+    # An unbounded new_name lets a single PATCH write a multi-MB string
+    # into meta.json, ballooning every list-documents call and pushing
+    # useless attacker bytes into the LLM context window.
+    new_name: str = Field(..., max_length=512)
 
 
 class DocumentUploadResponse(BaseModel):
     project_id: str
     filename: str
-    status: str
+    status: Literal["created", "failed"]
+    reason: str | None = None
+    # Echoed back for the multi-folder summary (I4). When a folder has two
+    # files with the same bare filename in different subfolders, the FE
+    # disambiguates skipped/failed rows by ``relative_path`` so the user
+    # can tell which copy was affected.
+    relative_path: str | None = None

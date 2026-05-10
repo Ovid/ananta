@@ -48,6 +48,34 @@ class TestDocumentInfo:
             DocumentInfo(project_id="x")  # type: ignore[call-arg]
 
 
+def test_document_info_accepts_relative_path_and_session_id():
+    info = DocumentInfo(
+        project_id="x-12345678",
+        filename="README.md",
+        content_type="text/markdown",
+        size=42,
+        upload_date="2026-05-05T00:00:00Z",
+        page_count=None,
+        relative_path="docs/api/README.md",
+        upload_session_id="11111111-1111-1111-1111-111111111111",
+    )
+    assert info.relative_path == "docs/api/README.md"
+    assert info.upload_session_id == "11111111-1111-1111-1111-111111111111"
+
+
+def test_document_info_relative_path_optional():
+    info = DocumentInfo(
+        project_id="x-12345678",
+        filename="README.md",
+        content_type="text/markdown",
+        size=42,
+        upload_date="2026-05-05T00:00:00Z",
+        page_count=None,
+    )
+    assert info.relative_path is None
+    assert info.upload_session_id is None
+
+
 class TestDocumentUploadResponse:
     def test_all_fields(self) -> None:
         r = DocumentUploadResponse(
@@ -57,6 +85,24 @@ class TestDocumentUploadResponse:
         )
         assert r.project_id == "doc-abc-1234"
         assert r.status == "created"
+
+
+def test_document_upload_response_status_and_reason():
+    ok = DocumentUploadResponse(
+        project_id="x-12345678",
+        filename="a.md",
+        status="created",
+    )
+    assert ok.reason is None
+
+    failed = DocumentUploadResponse(
+        project_id="",
+        filename="bad.pdf",
+        status="failed",
+        reason="text extraction failed: corrupt PDF",
+    )
+    assert failed.status == "failed"
+    assert failed.reason == "text extraction failed: corrupt PDF"
 
 
 class TestReexportedSharedSchemas:

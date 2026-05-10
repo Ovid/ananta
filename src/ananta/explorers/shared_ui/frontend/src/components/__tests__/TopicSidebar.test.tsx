@@ -367,6 +367,66 @@ describe('TopicSidebar (shared)', () => {
     })
   })
 
+  it("'Add to...' submenu does not hide topics that contain a different doc with the same label (I5)", async () => {
+    // With folder uploads, multiple distinct documents legitimately share
+    // a filename (e.g., two README.md files in different subfolders, each
+    // a separate project_id). Adding the first README.md to topic T must
+    // not make the second README.md un-addable to T. Eligibility is by
+    // project_id, not by label.
+    const addDocToTopic = vi.fn().mockResolvedValue(undefined)
+    // chessDocs has doc-1 'Chess Strategies'. mathDocs has a DIFFERENT id
+    // but the SAME label \u2014 simulating a second README.md uploaded as part
+    // of a different folder.
+    const mathDocs: DocumentItem[] = [
+      { id: 'doc-1-copy', label: 'Chess Strategies', sublabel: 'pkg-b/' },
+    ]
+    const loadDocuments = vi.fn().mockImplementation((name: string) =>
+      Promise.resolve(name === 'chess' ? chessDocs : name === 'math' ? mathDocs : []),
+    )
+    const props = defaultProps({
+      activeTopic: 'chess',
+      loadDocuments,
+      addDocToTopic,
+    })
+    render(<TopicSidebar {...props} />)
+
+    // Wait for chess's docs to load (auto-expand because activeTopic='chess').
+    await screen.findByText('Chess Strategies')
+
+    // Expand 'math' so its same-label doc lands in topicDocs[math]. After
+    // this, the submenu's eligibility check `topicDocs[t.name].some(...)`
+    // sees a same-label entry and (with the bug) hides math.
+    const mathRow = screen.getByText('math')
+    const mathExpand = mathRow.closest('div')!.querySelector('button')!
+    await userEvent.click(mathExpand)
+    await waitFor(() => {
+      expect(loadDocuments).toHaveBeenCalledWith('math')
+    })
+
+    // Re-expand chess so its doc actions are visible (single expandedTopic).
+    const chessRow = screen.getByText('chess')
+    const chessExpand = chessRow.closest('div')!.querySelector('button')!
+    await userEvent.click(chessExpand)
+    await screen.findByText('Chess Strategies')
+
+    // Open chess's doc-1 menu. The 'Add to' submenu should still offer
+    // 'math' because doc-1 is not in math (different project_id, even
+    // though math's doc-1-copy shares the label).
+    const menuButtons = screen.getAllByTitle('Document actions')
+    await userEvent.click(menuButtons[0])
+    await userEvent.click(screen.getByText('Add to\u2026'))
+
+    // The submenu must offer 'math'. (The sidebar topic row also says
+    // 'math', so the topic-list button is always present; we ensure the
+    // submenu didn't suppress its 'math' entry by clicking a 'math'
+    // button and confirming the resulting addDocToTopic call.)
+    const mathButtons = screen.getAllByRole('button', { name: 'math' })
+    await userEvent.click(mathButtons[mathButtons.length - 1])
+    await waitFor(() => {
+      expect(addDocToTopic).toHaveBeenCalledWith('doc-1', 'math')
+    })
+  })
+
   it('shows "Remove from [topic]" for docs inside a topic and calls removeDocFromTopic', async () => {
     const removeDocFromTopic = vi.fn().mockResolvedValue(undefined)
     const props = defaultProps({
@@ -528,9 +588,12 @@ describe('TopicSidebar (shared)', () => {
     expect(screen.getByText('View')).toBeInTheDocument()
   })
 
-  it('excludes topic from "Add to..." when a doc with the same label already exists there', async () => {
-    // "chess" topic already has "Chess Strategies" (doc-1)
-    // An uncategorized doc with a different id but the same label should NOT be eligible for chess
+  it('"Add to..." offers a topic even when it already contains a different doc with the same label (I5)', async () => {
+    // Folder uploads legitimately produce multiple distinct documents
+    // sharing a filename (e.g., several README.md / __init__.py / index.ts
+    // files in different subfolders). Eligibility is by project_id only —
+    // the previous label-equality clause hid the topic from the submenu,
+    // making the duplicates un-addable.
     const addDocToTopic = vi.fn().mockResolvedValue(undefined)
     const uncatDocs: DocumentItem[] = [
       { id: 'doc-99', label: 'Chess Strategies' },
@@ -543,23 +606,20 @@ describe('TopicSidebar (shared)', () => {
     })
     render(<TopicSidebar {...props} />)
 
-    // Wait for chess topic docs to load
     await screen.findByText('Opening Theory')
-    // Find the uncategorized doc's menu button
     const uncatSection = screen.getByText('Uncategorized').closest('div')!.parentElement!
     const menuBtn = within(uncatSection as HTMLElement).getByTitle('Document actions')
     await userEvent.click(menuBtn)
-
-    // "Add to..." shows (math is still eligible — docs not loaded)
     await userEvent.click(screen.getByText('Add to\u2026'))
 
-    // "math" should appear as eligible, but "chess" should NOT (same-label doc already there)
+    // Both topics must be offered — chess is no longer suppressed by a
+    // shared-label heuristic.
     const submenuButtons = screen.getAllByRole('button').filter(
       b => b.textContent === 'math' || b.textContent === 'chess'
     )
     const labels = submenuButtons.map(b => b.textContent)
     expect(labels).toContain('math')
-    expect(labels).not.toContain('chess')
+    expect(labels).toContain('chess')
   })
 
   it('reloads documents for expanded topic when refreshKey changes', async () => {
@@ -605,6 +665,50 @@ describe('TopicSidebar (shared)', () => {
     expect(screen.queryByTestId('bottom-ctrl')).not.toBeInTheDocument()
   })
 
+  describe('subtitle (visible second line under doc label)', () => {
+    it('renders subtitle as a visible second line under doc label in topic docs', async () => {
+      const docsWithSubtitle: DocumentItem[] = [
+        { id: 'doc-1', label: 'README.md', subtitle: 'docs/api/README.md' },
+      ]
+      const props = defaultProps({
+        activeTopic: 'chess',
+        loadDocuments: vi.fn().mockResolvedValue(docsWithSubtitle),
+      })
+      render(<TopicSidebar {...props} />)
+
+      // The subtitle text should appear in the rendered DOM (not just as a tooltip)
+      expect(await screen.findByText('docs/api/README.md')).toBeInTheDocument()
+    })
+
+    it('does not render a visible subtitle node when subtitle is omitted', async () => {
+      const docsNoSubtitle: DocumentItem[] = [
+        { id: 'doc-1', label: 'README.md' },
+      ]
+      const props = defaultProps({
+        activeTopic: 'chess',
+        loadDocuments: vi.fn().mockResolvedValue(docsNoSubtitle),
+      })
+      const { container } = render(<TopicSidebar {...props} />)
+
+      await screen.findByText('README.md')
+      // No element with the doc-subtitle test id should exist
+      expect(container.querySelector('[data-testid="doc-subtitle"]')).toBeNull()
+    })
+
+    it('renders subtitle as visible second line for uncategorized docs', async () => {
+      const uncatDocs: DocumentItem[] = [
+        { id: 'uncat-1', label: 'orphan.md', subtitle: 'inbox/orphan.md' },
+      ]
+      const props = defaultProps({
+        uncategorizedDocs: uncatDocs,
+      })
+      render(<TopicSidebar {...props} />)
+
+      await screen.findByText('chess')
+      expect(screen.getByText('inbox/orphan.md')).toBeInTheDocument()
+    })
+  })
+
   it('shows viewing highlight on the document with viewingDocumentId', async () => {
     const props = defaultProps({
       activeTopic: 'chess',
@@ -614,7 +718,7 @@ describe('TopicSidebar (shared)', () => {
     render(<TopicSidebar {...props} />)
 
     const docLabel = await screen.findByText('Chess Strategies')
-    const docRow = docLabel.closest('div[class*="flex"]')!
+    const docRow = docLabel.closest('div[class*="group"]')!
     expect(docRow.className).toContain('accent')
   })
 
@@ -671,7 +775,7 @@ describe('TopicSidebar (shared)', () => {
       render(<TopicSidebar {...props} />)
 
       await screen.findByText('Chess Strategies')
-      const docRow = screen.getByText('Chess Strategies').closest('div[class*="flex"]')!
+      const docRow = screen.getByText('Chess Strategies').closest('div[class*="group"]')!
       expect(docRow).toHaveAttribute('draggable', 'true')
     })
 
@@ -683,7 +787,7 @@ describe('TopicSidebar (shared)', () => {
       render(<TopicSidebar {...props} />)
 
       await screen.findByText('Chess Strategies')
-      const docRow = screen.getByText('Chess Strategies').closest('div[class*="flex"]')!
+      const docRow = screen.getByText('Chess Strategies').closest('div[class*="group"]')!
       expect(docRow).not.toHaveAttribute('draggable', 'true')
     })
 
@@ -783,7 +887,7 @@ describe('TopicSidebar (shared)', () => {
       render(<TopicSidebar {...props} />)
 
       await screen.findByText('Orphan Doc')
-      const docRow = screen.getByText('Orphan Doc').closest('div[class*="flex"]')!
+      const docRow = screen.getByText('Orphan Doc').closest('div[class*="group"]')!
       expect(docRow).toHaveAttribute('draggable', 'true')
     })
   })
@@ -844,7 +948,7 @@ describe('TopicSidebar (shared)', () => {
       const renameButtons = screen.queryAllByRole('button', { name: 'Rename' })
       const docMenuRenameButtons = renameButtons.filter(b => {
         const menu = b.closest('.absolute')
-        return menu && menu.closest('div[class*="flex"]')
+        return menu && menu.closest('div[class*="group"]')
       })
       expect(docMenuRenameButtons).toHaveLength(0)
     })

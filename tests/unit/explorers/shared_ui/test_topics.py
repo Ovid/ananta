@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -120,6 +121,21 @@ class TestCreateAndListTopics:
         mgr.create("Reports")
         assert mgr.list_topics().count("Reports") == 1
 
+    def test_create_existing_topic_is_idempotent(self, tmp_path: Path) -> None:
+        """Regression guard (Task A5): re-creating an existing topic must not raise.
+
+        The folder-upload flow relies on this — every uploaded file calls
+        ``topic_mgr.create(topic)`` regardless of whether the topic already
+        exists. If this contract regresses, single-file and folder uploads to
+        an existing topic both break.
+        """
+        mgr = BaseTopicManager(tmp_path)
+        mgr.create("Barsoom")
+        mgr.create("Barsoom")  # must not raise
+        assert "Barsoom" in mgr.list_topics()
+        # No duplicates either: idempotent means at most one entry.
+        assert mgr.list_topics().count("Barsoom") == 1
+
     @pytest.mark.parametrize("name", ["!!!", "   ", "---", ""])
     def test_create_rejects_empty_slug(self, tmp_path: Path, name: str) -> None:
         mgr = BaseTopicManager(tmp_path)
@@ -131,6 +147,51 @@ class TestCreateAndListTopics:
         mgr = BaseTopicManager(tmp_path)
         with pytest.raises(ValueError, match="path separator"):
             mgr.create(name)
+
+    def test_create_rejects_overlong_name(self, tmp_path: Path) -> None:
+        """Topic names above the length cap are rejected (I5).
+
+        Without a cap, a hostile direct API caller could submit a multi-MB
+        topic name that gets stored verbatim in topic.json (disk-fill /
+        topic-store bloat) and rendered into the UI sidebar (layout break).
+        The 256 MiB body cap is too coarse for what is meaningfully a
+        human-readable label.
+        """
+        mgr = BaseTopicManager(tmp_path)
+        with pytest.raises(ValueError, match="too long"):
+            mgr.create("x" * 300)
+
+    @pytest.mark.parametrize("name", ["bad\x00name", "tab\there", "newline\nhere", "del\x7fchar"])
+    def test_create_rejects_control_bytes(self, tmp_path: Path, name: str) -> None:
+        """Control bytes in topic names are rejected (I5).
+
+        NUL/CR/LF in stored topic.json values can break consumers that read
+        them as line-oriented files, and rendering them in the UI sidebar
+        can cause unexpected layout effects.
+        """
+        mgr = BaseTopicManager(tmp_path)
+        with pytest.raises(ValueError, match="control"):
+            mgr.create(name)
+
+    def test_create_strips_surrounding_whitespace(self, tmp_path: Path) -> None:
+        """Whitespace around topic names is stripped on create (I12).
+
+        rename_document strips, but upload_documents previously did not. The
+        same display name with and without trailing whitespace produced two
+        topics that slugified to the same directory but had different stored
+        names — _resolve matched names exactly, so subsequent add_item calls
+        failed to find the topic. Normalize whitespace at every entry point.
+        """
+        mgr = BaseTopicManager(tmp_path)
+        mgr.create("  Reports  ")
+        # The stored display name has no surrounding whitespace.
+        assert mgr.list_topics() == ["Reports"]
+        # add_item with the trimmed form must resolve to the same topic.
+        mgr.add_item("Reports", "project-1")
+        assert mgr.list_items("Reports") == ["project-1"]
+        # Re-creating with whitespace is idempotent (same name after strip).
+        mgr.create("Reports")
+        assert mgr.list_topics() == ["Reports"]
 
     def test_create_slug_collision_different_name_raises(self, tmp_path: Path) -> None:
         mgr = BaseTopicManager(tmp_path)
@@ -325,6 +386,56 @@ class TestRenameTopic:
         with pytest.raises(ValueError, match="path separator"):
             mgr.rename("Safe", new_name)
 
+    def test_rename_rejects_collision_with_corrupt_sibling_slug(self, tmp_path: Path) -> None:
+        """Rename must reject a target whose slug matches a corrupt sibling's
+        directory (S17).
+
+        ``rename``'s duplicate-name check skipped corrupt-meta siblings
+        (``_read_meta`` returns None). If a topic dir exists at the slug
+        that ``new_name`` would map to, we cannot tell from the corrupt
+        meta whether that sibling already carries ``new_name`` — so the
+        rename succeeds, and if the corrupt meta is later repaired via
+        ``create(new_name)`` we'd end up with two topics sharing the same
+        display name (soft data corruption).
+
+        Conservative fix: check directory slugs too, so a corrupt sibling
+        squatting on the rename target's slug blocks the rename.
+        """
+        mgr = BaseTopicManager(tmp_path)
+        # Two topics: A (will be corrupted) and B (we will try to rename).
+        mgr.create("A")
+        mgr.create("B")
+        # Corrupt A's topic.json so _read_meta returns None.
+        a_dir = mgr.get_topic_dir("A")
+        (a_dir / "topic.json").write_text("not valid json")
+        # Renaming B → "A" must be rejected — A's slug is occupied by a
+        # sibling we can't introspect, and silently allowing the rename
+        # would later produce two topics named "A" if A's meta is repaired.
+        with pytest.raises(ValueError, match="already exists"):
+            mgr.rename("B", "A")
+
+    @pytest.mark.parametrize("new_name", ["", "   ", "\t", "  \n  "])
+    def test_rename_rejects_whitespace_only(self, tmp_path: Path, new_name: str) -> None:
+        """``rename`` rejects empty or whitespace-only names (I4).
+
+        ``_normalize_name`` strips whitespace before validation. Without
+        an empty-after-strip check in ``_validate_name``, ``rename(old,
+        "   ")`` slipped through and wrote ``meta["name"] = ""``,
+        leaving the topic on disk behind a label-less, unselectable row
+        in the sidebar — soft data corruption: the topic exists but
+        cannot be reached through the UI.
+
+        ``create`` already rejects empty names downstream (via the empty-
+        slug check), so this test pins the rename path to the same
+        contract via the shared validator.
+        """
+        mgr = BaseTopicManager(tmp_path)
+        mgr.create("Reports")
+        with pytest.raises(ValueError, match="empty|whitespace"):
+            mgr.rename("Reports", new_name)
+        # The topic must still be findable under its original name.
+        assert "Reports" in mgr.list_topics()
+
 
 class TestReorderItems:
     @pytest.fixture
@@ -364,3 +475,66 @@ class TestReorderItems:
         mgr.reorder_items("Alpha", ["b", "a"])
         # Topic name should be unchanged
         assert "Alpha" in mgr.list_topics()
+
+
+class TestConcurrentMutation:
+    """Mutating methods are read-modify-write on topic.json. Without a lock,
+    two thread-pool workers servicing concurrent uploads to the same topic
+    can interleave: A reads ``[X]``, B reads ``[X]``, A writes ``[X, Y]``,
+    B writes ``[X, Z]`` — Y is lost. The recent move of ``_persist_one_upload``
+    into ``asyncio.to_thread`` makes this race meaningfully reachable for
+    parallel folder uploads to the same topic (I2).
+    """
+
+    def test_concurrent_add_item_does_not_lose_writes(self, tmp_path: Path) -> None:
+        mgr = BaseTopicManager(tmp_path)
+        mgr.create("Reports")
+
+        n = 50
+        with ThreadPoolExecutor(max_workers=16) as pool:
+            futures = [pool.submit(mgr.add_item, "Reports", f"item-{i}") for i in range(n)]
+            for f in futures:
+                f.result()
+
+        items = mgr.list_items("Reports")
+        assert len(items) == n
+        assert sorted(items) == sorted(f"item-{i}" for i in range(n))
+
+    def test_concurrent_remove_item_does_not_resurrect_others(self, tmp_path: Path) -> None:
+        mgr = BaseTopicManager(tmp_path)
+        mgr.create("Reports")
+        n = 50
+        for i in range(n):
+            mgr.add_item("Reports", f"item-{i}")
+
+        # Remove the first half concurrently. Without a lock, an interleave
+        # where T_remove(item-0) reads [0..49] but T_remove(item-1)'s write
+        # of [0,2..49] lands first will see T_remove(item-0) write [1..49] —
+        # resurrecting item-1.
+        with ThreadPoolExecutor(max_workers=16) as pool:
+            futures = [
+                pool.submit(mgr.remove_item, "Reports", f"item-{i}") for i in range(n // 2)
+            ]
+            for f in futures:
+                f.result()
+
+        items = mgr.list_items("Reports")
+        assert sorted(items) == sorted(f"item-{i}" for i in range(n // 2, n))
+
+    def test_concurrent_remove_item_from_all_drops_every_ref(self, tmp_path: Path) -> None:
+        mgr = BaseTopicManager(tmp_path)
+        mgr.create("Reports")
+        n = 50
+        for i in range(n):
+            mgr.add_item("Reports", f"item-{i}")
+
+        # Issue 50 concurrent remove_item_from_all calls; each removes a
+        # different item. All should be gone afterwards.
+        with ThreadPoolExecutor(max_workers=16) as pool:
+            futures = [
+                pool.submit(mgr.remove_item_from_all, f"item-{i}") for i in range(n)
+            ]
+            for f in futures:
+                f.result()
+
+        assert mgr.list_items("Reports") == []

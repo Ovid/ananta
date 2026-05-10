@@ -824,11 +824,17 @@ class RLMEngine:
         # Matches reference RLM (rlm/core/types.py:244-245).
         context_type = "list"
         context_lengths = str(doc_sizes)
+        # Pass the per-query boundary so the doc_names channel is rendered
+        # inside untrusted-content markers. doc_names typically come from
+        # UploadFile.filename, which is untrusted user input — without the
+        # wrap, a hostile filename injects directly into the assistant
+        # context (the highest-trust position in the prompt).
         context_metadata = self.prompt_loader.render_context_metadata(
             context_type=context_type,
             context_total_length=total_chars,
             context_lengths=context_lengths,
             doc_names=doc_names,
+            boundary=boundary,
         )
 
         # Set up incremental trace writer

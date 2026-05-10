@@ -7,4 +7,6 @@ export interface DocumentInfo {
   size: number
   upload_date: string
   page_count: number | null
+  relative_path?: string | null
+  upload_session_id?: string | null
 }

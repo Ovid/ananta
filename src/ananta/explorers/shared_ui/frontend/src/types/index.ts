@@ -8,7 +8,10 @@ export interface TopicInfo {
 export interface DocumentItem {
   id: string
   label: string
+  /** Hover-tooltip text appended after the label (e.g., size + icon). */
   sublabel?: string
+  /** Visible second line rendered under the label (e.g., relative path). */
+  subtitle?: string
 }
 
 export interface TraceStep {

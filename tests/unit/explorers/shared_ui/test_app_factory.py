@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -25,6 +26,240 @@ def _make_state() -> MagicMock:
     return state
 
 
+# -- Body-size limiting middleware (I11) --
+
+
+def _add_echo_route(app: FastAPI) -> None:
+    """Add a tiny POST endpoint so we can drive the middleware."""
+    from starlette.requests import Request
+    from starlette.routing import Route
+
+    async def echo(request: Request) -> Any:
+        from starlette.responses import JSONResponse
+
+        body = await request.body()
+        return JSONResponse({"len": len(body)})
+
+    app.router.routes.append(Route("/echo", echo, methods=["POST"]))
+
+
+def test_oversized_content_length_rejected_with_413() -> None:
+    """A Content-Length header above the cap is rejected with 413.
+
+    Reproduces I11: a malicious POST without our application-level cap
+    would spool a multi-gigabyte body to disk before the handler ran,
+    enabling disk-fill DoS. The middleware fails fast before any spooling.
+    """
+    from ananta.explorers.shared_ui.app_factory import MAX_REQUEST_BODY_BYTES
+
+    state = _make_state()
+    app = create_app(state, title="Test App")
+    _add_echo_route(app)
+    client = TestClient(app)
+    # We claim more than the cap via Content-Length; the body itself isn't
+    # actually that big — that's the point: the handler never runs.
+    headers = {"Content-Length": str(MAX_REQUEST_BODY_BYTES + 1)}
+    resp = client.post("/echo", content=b"x", headers=headers)
+    assert resp.status_code == 413
+
+
+@pytest.mark.anyio
+async def test_streamed_body_without_content_length_returns_413() -> None:
+    """A chunked / no-Content-Length body exceeding the cap returns 413.
+
+    Reproduces the streaming-path gap (C1): httpx's TestClient always sets
+    Content-Length, so the eager header check at the top of the middleware
+    catches it before the streaming counter ever runs. To exercise the
+    streaming branch we drive the app via ASGITransport with an async-
+    generator body, which httpx sends as chunked transfer-encoding (no
+    Content-Length). The middleware must respond with a real 413, not a
+    503/500-via-ClientDisconnect or a partial response.
+
+    The test wires _BodySizeLimitMiddleware directly with a small cap so it
+    runs in milliseconds rather than allocating hundreds of MiB.
+    """
+    from httpx import ASGITransport, AsyncClient
+    from starlette.applications import Starlette
+    from starlette.requests import Request
+    from starlette.responses import JSONResponse
+    from starlette.routing import Route
+
+    from ananta.explorers.shared_ui.app_factory import _BodySizeLimitMiddleware
+
+    cap = 1024  # 1 KiB cap keeps the test fast.
+
+    async def echo(request: Request) -> JSONResponse:
+        body = await request.body()
+        return JSONResponse({"len": len(body)})
+
+    app = Starlette(routes=[Route("/echo", echo, methods=["POST"])])
+    app.add_middleware(_BodySizeLimitMiddleware, max_bytes=cap)
+
+    async def chunked_body() -> Any:
+        # Two 700-byte chunks → 1400 bytes total > 1024 cap. httpx encodes
+        # this with Transfer-Encoding: chunked and no Content-Length header.
+        for _ in range(2):
+            yield b"\x00" * 700
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post("/echo", content=chunked_body())
+        assert resp.status_code == 413
+
+
+def test_normal_request_unaffected_by_size_middleware() -> None:
+    """A small request still succeeds end-to-end."""
+    state = _make_state()
+    app = create_app(state, title="Test App")
+    _add_echo_route(app)
+    client = TestClient(app)
+    resp = client.post("/echo", content=b"hello")
+    assert resp.status_code == 200
+    assert resp.json() == {"len": 5}
+
+
+# -- Same-origin guard middleware (C2) --
+
+
+def test_post_with_cross_origin_rejected_with_403() -> None:
+    """POST from a foreign Origin header is rejected.
+
+    The drive-by upload threat (C2): the explorer's CORSMiddleware originally
+    set ``allow_origins=["*"]`` and the upload endpoint had no auth, so any
+    web page the user visited could POST a 256 MiB body of attacker-chosen
+    documents into the local RLM corpus. The Origin guard refuses any
+    mutating request whose ``Origin`` header does not match its ``Host``.
+    """
+    state = _make_state()
+    app = create_app(state, title="Test App")
+    _add_echo_route(app)
+    client = TestClient(app)
+    resp = client.post(
+        "/echo",
+        content=b"x",
+        headers={"origin": "http://evil.example.com"},
+    )
+    assert resp.status_code == 403
+
+
+def test_post_with_matching_origin_accepted() -> None:
+    """POST with Origin equal to Host is accepted (same-origin from a browser)."""
+    state = _make_state()
+    app = create_app(state, title="Test App")
+    _add_echo_route(app)
+    client = TestClient(app)
+    # TestClient defaults Host to ``testserver``; mirror it in Origin so the
+    # origin-guard middleware sees a same-origin request.
+    resp = client.post(
+        "/echo",
+        content=b"x",
+        headers={"origin": "http://testserver"},
+    )
+    assert resp.status_code == 200
+
+
+def test_post_without_origin_accepted() -> None:
+    """POST with no Origin header (curl, scripts) is accepted.
+
+    Browsers always set ``Origin`` on cross-origin POSTs — that's the threat
+    surface we cover. Direct API callers from a trusted shell (curl, the
+    user's own scripts) typically omit it; we must not break them.
+    """
+    state = _make_state()
+    app = create_app(state, title="Test App")
+    _add_echo_route(app)
+    client = TestClient(app)
+    resp = client.post("/echo", content=b"x")
+    assert resp.status_code == 200
+
+
+def test_get_with_cross_origin_unaffected_by_origin_guard() -> None:
+    """GET requests are not rejected by the origin guard."""
+    state = _make_state()
+    app = create_app(state, title="Test App")
+    client = TestClient(app)
+    resp = client.get(
+        "/.well-known/anything",
+        headers={"origin": "http://evil.example.com"},
+    )
+    # 204 from the well-known catch-all; the point is it's NOT 403.
+    assert resp.status_code == 204
+
+
+def test_websocket_with_cross_origin_rejected() -> None:
+    """WebSocket handshake from a foreign Origin is rejected (I1).
+
+    The drive-by threat (C2) extends to ``ws://localhost:<port>/api/ws``:
+    without an Origin check, any web page the user visits while the
+    explorer is running can open the WebSocket and submit ``query``
+    payloads — draining the operator's LLM credits, triggering sandbox
+    container starts, or exfiltrating answers/traces via the streamed
+    response. Browsers always send Origin on the WS handshake, so the
+    middleware refuses the connection before ``websocket.accept``.
+    """
+    from starlette.websockets import WebSocketDisconnect
+
+    state = _make_state()
+
+    async def dummy_ws_handler(ws: Any) -> None:
+        await ws.accept()
+        await ws.send_json({"hello": "world"})
+        await ws.close()
+
+    app = create_app(state, title="Test App", ws_handler=dummy_ws_handler)
+    client = TestClient(app)
+
+    with pytest.raises(WebSocketDisconnect) as exc_info:
+        with client.websocket_connect(
+            "/api/ws",
+            headers={"origin": "http://evil.example.com"},
+        ):
+            pass
+    assert exc_info.value.code == 1008  # policy violation
+
+
+def test_websocket_with_matching_origin_accepted() -> None:
+    """WebSocket from same Origin/Host is accepted."""
+    state = _make_state()
+
+    async def dummy_ws_handler(ws: Any) -> None:
+        await ws.accept()
+        await ws.send_json({"hello": "world"})
+        await ws.close()
+
+    app = create_app(state, title="Test App", ws_handler=dummy_ws_handler)
+    client = TestClient(app)
+
+    with client.websocket_connect(
+        "/api/ws",
+        headers={"origin": "http://testserver"},
+    ) as ws:
+        msg = ws.receive_json()
+        assert msg == {"hello": "world"}
+
+
+def test_websocket_without_origin_accepted() -> None:
+    """WebSocket from a non-browser client (no Origin) is accepted.
+
+    Browsers always set Origin on WS handshakes — that is the threat
+    surface we cover. Direct API callers from a trusted shell (curl,
+    the user's own scripts) typically omit it; we must not break them.
+    """
+    state = _make_state()
+
+    async def dummy_ws_handler(ws: Any) -> None:
+        await ws.accept()
+        await ws.send_json({"hello": "world"})
+        await ws.close()
+
+    app = create_app(state, title="Test App", ws_handler=dummy_ws_handler)
+    client = TestClient(app)
+
+    with client.websocket_connect("/api/ws") as ws:
+        msg = ws.receive_json()
+        assert msg == {"hello": "world"}
+
+
 # -- Basic app creation --
 
 
@@ -43,6 +278,38 @@ def test_create_app_has_cors_middleware() -> None:
     # Starlette stores middleware in app.user_middleware
     middleware_classes = [m.cls for m in app.user_middleware]
     assert CORSMiddleware in middleware_classes
+
+
+def test_body_size_middleware_is_outermost() -> None:
+    """_BodySizeLimitMiddleware sits OUTERMOST so oversized bodies are rejected
+    before any downstream middleware allocates resources or reads the body.
+
+    Starlette's add_middleware inserts at index 0 of user_middleware, so the
+    LAST add_middleware call wraps the OUTERMOST runtime layer. That means
+    user_middleware[0] is the outermost, user_middleware[-1] is the innermost.
+    A regression here (e.g., reordering the calls in app_factory.py) would
+    silently route unbounded bodies through other middleware before the cap
+    can fire.
+    """
+    from ananta.explorers.shared_ui.app_factory import (
+        _BodySizeLimitMiddleware,
+        _SameOriginGuardMiddleware,
+    )
+
+    state = _make_state()
+    app = create_app(state, title="Test App")
+    middleware_classes = [m.cls for m in app.user_middleware]
+    assert middleware_classes[0] is _BodySizeLimitMiddleware, (
+        f"BodySizeLimit must be outermost; got order {middleware_classes}"
+    )
+    body_idx = middleware_classes.index(_BodySizeLimitMiddleware)
+    same_origin_idx = middleware_classes.index(_SameOriginGuardMiddleware)
+    cors_idx = middleware_classes.index(CORSMiddleware)
+    assert body_idx < same_origin_idx < cors_idx, (
+        "Expected outermost→innermost ordering "
+        "BodySizeLimit → SameOriginGuard → CORS; got "
+        f"{middleware_classes}"
+    )
 
 
 # -- .well-known route --

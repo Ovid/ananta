@@ -144,6 +144,70 @@ describe('App', () => {
   })
 })
 
+describe('App - handleUpload row partitioning', () => {
+  it('toasts a per-file error for each failed upload row', async () => {
+    const sharedUi = await import('@ananta/shared-ui')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const spy = vi.spyOn(sharedUi as any, 'useAppState')
+    spy.mockReturnValue({
+      ...defaultAppState,
+      activeTopic: 'my-topic',
+    })
+
+    const apiModule = await import('../api/client')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(apiModule.api.documents.upload as any).mockResolvedValueOnce([
+      { project_id: 'p1', filename: 'good.md', status: 'created' },
+      { project_id: '', filename: 'bad.exe', status: 'failed', reason: 'unsupported file type: .exe' },
+    ])
+
+    render(<App />)
+    await flush()
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    const goodFile = new File(['ok'], 'good.md', { type: 'text/markdown' })
+    const badFile = new File(['x'], 'bad.exe', { type: 'application/octet-stream' })
+    await userEvent.upload(input, [goodFile, badFile])
+    await flush()
+
+    // One success toast for the created row, one error toast for the failed row.
+    expect(screen.getByText(/1 file uploaded/i)).toBeInTheDocument()
+    expect(screen.getByText(/bad\.exe.*unsupported file type: \.exe/i)).toBeInTheDocument()
+
+    spy.mockRestore()
+  })
+
+  it('toasts only errors when every row failed', async () => {
+    const sharedUi = await import('@ananta/shared-ui')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const spy = vi.spyOn(sharedUi as any, 'useAppState')
+    spy.mockReturnValue({
+      ...defaultAppState,
+      activeTopic: 'my-topic',
+    })
+
+    const apiModule = await import('../api/client')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(apiModule.api.documents.upload as any).mockResolvedValueOnce([
+      { project_id: '', filename: 'a.exe', status: 'failed', reason: 'unsupported file type: .exe' },
+    ])
+
+    render(<App />)
+    await flush()
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    const file = new File(['x'], 'a.exe', { type: 'application/octet-stream' })
+    await userEvent.upload(input, file)
+    await flush()
+
+    // No success toast — every row failed.
+    expect(screen.queryByText(/uploaded$/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/a\.exe.*unsupported/i)).toBeInTheDocument()
+
+    spy.mockRestore()
+  })
+})
+
 describe('App - More button integration', () => {
   it('renders More button in ChatArea when topic is active', async () => {
     const sharedUi = await import('@ananta/shared-ui')

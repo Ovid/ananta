@@ -11,6 +11,7 @@ import json
 import logging
 import re
 import shutil
+import threading
 import unicodedata
 from pathlib import Path
 from typing import TypedDict
@@ -52,20 +53,71 @@ class BaseTopicManager:
     def __init__(self, topics_dir: Path) -> None:
         self._topics_dir = topics_dir
         self._topics_dir.mkdir(parents=True, exist_ok=True)
+        # Per-instance lock around the read-modify-write cycle of every
+        # mutating method below. The folder-upload route runs
+        # ``_persist_one_upload`` (which calls ``add_item``) inside
+        # ``asyncio.to_thread`` for every file, so two thread-pool workers
+        # servicing concurrent uploads to the same topic can otherwise
+        # interleave: A reads ``[X]``, B reads ``[X]``, A writes ``[X, Y]``,
+        # B writes ``[X, Z]`` — Y is lost. A per-process lock is sufficient;
+        # the explorer is single-process. Cross-process safety would need
+        # ``fcntl.flock`` on the meta file (I2).
+        self._mutation_lock = threading.Lock()
 
     # ------------------------------------------------------------------
     # Topic CRUD
     # ------------------------------------------------------------------
 
+    # Topic names are human-readable labels stored verbatim in topic.json
+    # and rendered in UI sidebars. The cap is generous for a label but well
+    # below anything that would bloat the topic store or break layout.
+    MAX_TOPIC_NAME_LEN = 256
+
+    _CONTROL_BYTES_RE = re.compile(r"[\x00-\x1f\x7f]")
+
     @staticmethod
-    def _validate_name(name: str) -> None:
-        """Reject names that contain path separators."""
+    def _normalize_name(name: str) -> str:
+        """Strip surrounding whitespace from a topic name (I12).
+
+        Without this, ``"Reports "`` and ``"Reports"`` produced two topics
+        that slugified to the same directory but stored different display
+        names, so the second call's ``_resolve`` failed to find the first's
+        topic. Normalising at every entry point keeps lookup symmetric.
+        """
+        return name.strip()
+
+    @classmethod
+    def _validate_name(cls, name: str) -> None:
+        """Reject names that are empty, contain path separators, contain
+        control bytes, or exceed the length cap (I4, I5).
+
+        I4: callers normalise whitespace before validating. Without an
+        empty-after-strip check here, ``rename(old, "   ")`` slipped
+        through and wrote ``meta["name"] = ""``, leaving the topic on
+        disk behind a label-less, unselectable sidebar row — soft data
+        corruption. ``create`` already rejected this downstream via the
+        empty-slug check; centralising the guard means every entry point
+        (create, rename, _resolve, …) gets it for free.
+        """
+        if not name:
+            msg = "Topic name must not be empty or whitespace"
+            raise ValueError(msg)
         if "/" in name or "\\" in name:
             msg = f"Topic name must not contain a path separator: {name!r}"
+            raise ValueError(msg)
+        if cls._CONTROL_BYTES_RE.search(name):
+            msg = f"Topic name must not contain control characters: {name!r}"
+            raise ValueError(msg)
+        if len(name) > cls.MAX_TOPIC_NAME_LEN:
+            msg = (
+                f"Topic name is too long ({len(name)} chars; max "
+                f"{cls.MAX_TOPIC_NAME_LEN}): {name[:32]!r}…"
+            )
             raise ValueError(msg)
 
     def create(self, name: str) -> None:
         """Create a new topic.  Idempotent -- no error if it already exists."""
+        name = self._normalize_name(name)
         self._validate_name(name)
         slug = _slugify(name)
         if not slug:
@@ -74,44 +126,65 @@ class BaseTopicManager:
         topic_dir = self._topics_dir / slug
         meta_path = topic_dir / TOPIC_META_FILE
 
-        if meta_path.exists():
-            existing = self._read_meta(topic_dir)
-            if existing is None:
-                logger.warning("Repairing corrupt topic.json in %s", topic_dir)
-            elif existing["name"] != name:
-                msg = (
-                    f"A topic with a different display name already uses "
-                    f"slug '{slug}': existing {existing['name']!r} vs "
-                    f"requested {name!r}"
-                )
-                raise ValueError(msg)
-            else:
-                return  # already exists with same name
+        with self._mutation_lock:
+            if meta_path.exists():
+                existing = self._read_meta(topic_dir)
+                if existing is None:
+                    logger.warning("Repairing corrupt topic.json in %s", topic_dir)
+                elif existing["name"] != name:
+                    msg = (
+                        f"A topic with a different display name already uses "
+                        f"slug '{slug}': existing {existing['name']!r} vs "
+                        f"requested {name!r}"
+                    )
+                    raise ValueError(msg)
+                else:
+                    return  # already exists with same name
 
-        topic_dir.mkdir(parents=True, exist_ok=True)
-        meta: _TopicMeta = {"name": name, "items": []}
-        meta_path.write_text(json.dumps(meta, indent=2))
+            topic_dir.mkdir(parents=True, exist_ok=True)
+            meta: _TopicMeta = {"name": name, "items": []}
+            meta_path.write_text(json.dumps(meta, indent=2))
 
     def rename(self, old_name: str, new_name: str) -> None:
         """Rename a topic's display name (directory stays the same)."""
+        old_name = self._normalize_name(old_name)
+        new_name = self._normalize_name(new_name)
         self._validate_name(new_name)
-        meta, meta_path = self._resolve(old_name)
-        if new_name != old_name:
-            existing_names: set[str] = set()
-            for d in self._iter_topic_dirs():
-                m = self._read_meta(d)
-                if m is not None and m["name"] != old_name:
-                    existing_names.add(m["name"])
-            if new_name in existing_names:
-                msg = f"Topic '{new_name}' already exists"
-                raise ValueError(msg)
-        meta["name"] = new_name
-        meta_path.write_text(json.dumps(meta, indent=2))
+        with self._mutation_lock:
+            meta, meta_path = self._resolve(old_name)
+            if new_name != old_name:
+                # Check both readable names AND directory slugs (S17).
+                # The previous version only inspected readable names, so a
+                # corrupt sibling whose meta is unreadable but whose slug
+                # matches the rename target's slug let the rename succeed.
+                # If that sibling were later repaired (e.g. via
+                # ``create(new_name)``), we would end up with two topics
+                # sharing the same display name — soft data corruption.
+                source_dir_name = meta_path.parent.name
+                new_slug = _slugify(new_name)
+                for d in self._iter_topic_dirs():
+                    if d.name == source_dir_name:
+                        continue
+                    if d.name == new_slug:
+                        # A sibling directory already squats on this slug.
+                        # We refuse regardless of whether its meta is
+                        # readable: legitimate sibling with the same
+                        # display name → real conflict; corrupt sibling →
+                        # we can't rule out conflict, so bail.
+                        msg = f"Topic '{new_name}' already exists"
+                        raise ValueError(msg)
+                    m = self._read_meta(d)
+                    if m is not None and m["name"] == new_name:
+                        msg = f"Topic '{new_name}' already exists"
+                        raise ValueError(msg)
+            meta["name"] = new_name
+            meta_path.write_text(json.dumps(meta, indent=2))
 
     def delete(self, name: str) -> None:
         """Delete a topic and its directory.  Items are not affected."""
-        _meta, meta_path = self._resolve(name)
-        shutil.rmtree(meta_path.parent)
+        with self._mutation_lock:
+            _meta, meta_path = self._resolve(name)
+            shutil.rmtree(meta_path.parent)
 
     def list_topics(self) -> list[str]:
         """Return display names of all topics, sorted alphabetically."""
@@ -139,21 +212,23 @@ class BaseTopicManager:
 
     def add_item(self, topic: str, project_id: str) -> None:
         """Add an item reference to a topic.  Idempotent."""
-        meta, meta_path = self._resolve(topic)
-        items = meta["items"]
-        if project_id not in items:
-            items.append(project_id)
-            meta_path.write_text(json.dumps(meta, indent=2))
+        with self._mutation_lock:
+            meta, meta_path = self._resolve(topic)
+            items = meta["items"]
+            if project_id not in items:
+                items.append(project_id)
+                meta_path.write_text(json.dumps(meta, indent=2))
 
     def remove_item(self, topic: str, project_id: str) -> None:
         """Remove an item reference from a topic."""
-        meta, meta_path = self._resolve(topic)
-        items = meta["items"]
-        if project_id not in items:
-            msg = f"Item not found in topic '{topic}': {project_id}"
-            raise ValueError(msg)
-        items.remove(project_id)
-        meta_path.write_text(json.dumps(meta, indent=2))
+        with self._mutation_lock:
+            meta, meta_path = self._resolve(topic)
+            items = meta["items"]
+            if project_id not in items:
+                msg = f"Item not found in topic '{topic}': {project_id}"
+                raise ValueError(msg)
+            items.remove(project_id)
+            meta_path.write_text(json.dumps(meta, indent=2))
 
     def list_items(self, topic: str) -> list[str]:
         """Return project_ids referenced by a topic."""
@@ -190,29 +265,31 @@ class BaseTopicManager:
 
     def remove_item_from_all(self, project_id: str) -> None:
         """Remove *project_id* from every topic that contains it."""
-        for topic_dir in self._iter_topic_dirs():
-            meta_path = topic_dir / TOPIC_META_FILE
-            meta = self._read_meta(topic_dir)
-            if meta is None:
-                continue
-            items = meta["items"]
-            if project_id in items:
-                items.remove(project_id)
-                meta_path.write_text(json.dumps(meta, indent=2))
+        with self._mutation_lock:
+            for topic_dir in self._iter_topic_dirs():
+                meta_path = topic_dir / TOPIC_META_FILE
+                meta = self._read_meta(topic_dir)
+                if meta is None:
+                    continue
+                items = meta["items"]
+                if project_id in items:
+                    items.remove(project_id)
+                    meta_path.write_text(json.dumps(meta, indent=2))
 
     def reorder_items(self, topic: str, item_ids: list[str]) -> None:
         """Reorder items in a topic. *item_ids* must contain exactly the same IDs."""
-        meta, meta_path = self._resolve(topic)
-        existing = set(meta["items"])
-        new = set(item_ids)
-        if existing != new:
-            msg = (
-                f"item_ids must contain exactly the same items as the topic "
-                f"(got {len(item_ids)}, expected {len(existing)})"
-            )
-            raise ValueError(msg)
-        meta["items"] = list(item_ids)
-        meta_path.write_text(json.dumps(meta, indent=2))
+        with self._mutation_lock:
+            meta, meta_path = self._resolve(topic)
+            existing = set(meta["items"])
+            new = set(item_ids)
+            if existing != new:
+                msg = (
+                    f"item_ids must contain exactly the same items as the topic "
+                    f"(got {len(item_ids)}, expected {len(existing)})"
+                )
+                raise ValueError(msg)
+            meta["items"] = list(item_ids)
+            meta_path.write_text(json.dumps(meta, indent=2))
 
     def get_topic_dir(self, name: str) -> Path:
         """Return the directory for the topic with *name*.
@@ -227,7 +304,13 @@ class BaseTopicManager:
     # ------------------------------------------------------------------
 
     def _resolve(self, name: str) -> tuple[_TopicMeta, Path]:
-        """Find a topic by display name and return (meta_dict, meta_path)."""
+        """Find a topic by display name and return (meta_dict, meta_path).
+
+        Names are matched against the stored display name after both sides
+        are stripped (I12) — so a topic stored as ``"Reports"`` resolves
+        when looked up as ``"  Reports "`` or vice versa.
+        """
+        name = self._normalize_name(name)
         for topic_dir in self._iter_topic_dirs():
             meta_path = topic_dir / TOPIC_META_FILE
             meta = self._read_meta(topic_dir)

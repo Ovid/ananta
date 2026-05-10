@@ -69,6 +69,34 @@ class TestUnsupportedExtension:
         with pytest.raises(ValueError, match="[Uu]nsupported"):
             extract_text(f)
 
+    def test_dotfile_unsupported_message_includes_filename(self, tmp_path: Path) -> None:
+        """``extract_text`` raises an actionable message for dotfiles.
+
+        ``Path(".env").suffix`` returns ``""``, so a naive
+        ``f"Unsupported file type: {ext}"`` produces ``"Unsupported file
+        type: "`` — a useless reason for the user. The message must
+        include either the filename or a fallback so the client can
+        explain WHY the file was rejected.
+        """
+        f = tmp_path / ".env"
+        f.write_text("API_KEY=secret\n")
+        with pytest.raises(ValueError) as excinfo:
+            extract_text(f)
+        msg = str(excinfo.value)
+        assert ".env" in msg or "no extension" in msg.lower()
+        # Negative: the unhelpful naked-trailing-colon form must not appear.
+        assert not msg.rstrip().endswith(":")
+
+    def test_extensionless_unsupported_message_includes_filename(self, tmp_path: Path) -> None:
+        """Extensionless filenames also surface an actionable reason."""
+        f = tmp_path / "Makefile"
+        f.write_text("all:\n\techo hi\n")
+        with pytest.raises(ValueError) as excinfo:
+            extract_text(f)
+        msg = str(excinfo.value)
+        assert "Makefile" in msg or "no extension" in msg.lower()
+        assert not msg.rstrip().endswith(":")
+
     def test_env_file_is_unsupported(self, tmp_path: Path) -> None:
         """`.env` files must NOT be accepted (I8).
 

@@ -131,7 +131,11 @@ def extract_text(path: Path, content_type: str | None = None) -> str:
             msg = f"could not extract text from {fmt_name}: {exc}"
             raise ValueError(msg) from exc
 
-    msg = f"Unsupported file type: {ext}"
+    # Path.suffix is empty for dotfiles (".env") and extensionless names
+    # ("Makefile"). Surface the filename in those cases so the failure
+    # reason is actionable for the user rather than a naked trailing colon.
+    descriptor = ext if ext else f"{path.name} (no extension)"
+    msg = f"Unsupported file type: {descriptor}"
     raise ValueError(msg)
 
 

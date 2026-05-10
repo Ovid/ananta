@@ -24,7 +24,7 @@ export class BatchUploadError extends Error {
   }
 }
 
-async function formatHttpError(res: Response): Promise<string> {
+export async function formatHttpError(res: Response): Promise<string> {
   // Prefer FastAPI's structured ``{ detail: string | object }`` body when
   // present so the user sees the server's actual reason. Fall back to a
   // status-class-specific phrase, then the bare status. Avoids the

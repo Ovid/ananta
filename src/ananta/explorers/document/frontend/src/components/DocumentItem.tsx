@@ -29,7 +29,12 @@ export function docToDocumentItem(doc: {
   size: number
   relative_path?: string | null
 }): DocumentItemType {
-  const icon = FILE_ICONS[doc.content_type] || '\uD83D\uDCC1'
+  // Strip parameter suffixes ("; charset=utf-8", "; boundary=...") before
+  // the lookup. Browsers may include them and the backend stores
+  // ``UploadFile.content_type`` verbatim, so an exact-match table missed
+  // legitimate "text/plain; charset=utf-8" entries (S37).
+  const baseType = doc.content_type.split(';', 1)[0].trim()
+  const icon = FILE_ICONS[baseType] || '\uD83D\uDCC1'
   const item: DocumentItemType = {
     id: doc.project_id,
     label: doc.filename,

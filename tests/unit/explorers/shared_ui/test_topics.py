@@ -386,6 +386,34 @@ class TestRenameTopic:
         with pytest.raises(ValueError, match="path separator"):
             mgr.rename("Safe", new_name)
 
+    def test_rename_rejects_collision_with_corrupt_sibling_slug(self, tmp_path: Path) -> None:
+        """Rename must reject a target whose slug matches a corrupt sibling's
+        directory (S17).
+
+        ``rename``'s duplicate-name check skipped corrupt-meta siblings
+        (``_read_meta`` returns None). If a topic dir exists at the slug
+        that ``new_name`` would map to, we cannot tell from the corrupt
+        meta whether that sibling already carries ``new_name`` — so the
+        rename succeeds, and if the corrupt meta is later repaired via
+        ``create(new_name)`` we'd end up with two topics sharing the same
+        display name (soft data corruption).
+
+        Conservative fix: check directory slugs too, so a corrupt sibling
+        squatting on the rename target's slug blocks the rename.
+        """
+        mgr = BaseTopicManager(tmp_path)
+        # Two topics: A (will be corrupted) and B (we will try to rename).
+        mgr.create("A")
+        mgr.create("B")
+        # Corrupt A's topic.json so _read_meta returns None.
+        a_dir = mgr.get_topic_dir("A")
+        (a_dir / "topic.json").write_text("not valid json")
+        # Renaming B → "A" must be rejected — A's slug is occupied by a
+        # sibling we can't introspect, and silently allowing the rename
+        # would later produce two topics named "A" if A's meta is repaired.
+        with pytest.raises(ValueError, match="already exists"):
+            mgr.rename("B", "A")
+
     @pytest.mark.parametrize("new_name", ["", "   ", "\t", "  \n  "])
     def test_rename_rejects_whitespace_only(self, tmp_path: Path, new_name: str) -> None:
         """``rename`` rejects empty or whitespace-only names (I4).

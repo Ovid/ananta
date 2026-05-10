@@ -198,6 +198,52 @@ describe('walkEntries multi-folder drop (I4)', () => {
   })
 })
 
+describe('walkEntries readAllEntries sync-throw resilience (S31)', () => {
+  it('rejects (does not hang) when readEntries throws synchronously inside queueMicrotask', async () => {
+    // Bug: readAllEntries' readBatch is recursively scheduled via
+    // queueMicrotask. A synchronous throw from readEntries on the SECOND
+    // (or later) call lands outside the outer Promise constructor's
+    // try/catch — it becomes an unhandled rejection and walkEntries
+    // hangs forever waiting for resolve/reject. Wrap the recursive body
+    // in try/catch and propagate the throw via reject().
+    const broken = {
+      isFile: false as const,
+      isDirectory: true as const,
+      name: 'broken',
+      fullPath: '/broken',
+      createReader: () => {
+        let call = 0
+        return {
+          readEntries: (cb: (e: FakeEntry[]) => void) => {
+            call += 1
+            if (call === 1) {
+              cb([makeFile('seed.md', '/broken/seed.md')])
+              return
+            }
+            // Subsequent call: synchronous throw inside queueMicrotask.
+            throw new Error('reader failed mid-read')
+          },
+        }
+      },
+    } as FakeEntry
+    // Race the walk against a watchdog so a hang fails the test instead
+    // of timing out the whole vitest run.
+    const walk = walkEntries([broken as any], 'broken').then(
+      r => ({ ok: true as const, r }),
+      err => ({ ok: false as const, err: err as Error }),
+    )
+    const watchdog = new Promise<{ ok: 'timeout' }>(resolve =>
+      setTimeout(() => resolve({ ok: 'timeout' }), 500),
+    )
+    const winner = await Promise.race([walk, watchdog])
+    expect(winner).not.toEqual({ ok: 'timeout' })
+    if ('err' in winner) {
+      expect(winner.err).toBeInstanceOf(Error)
+      expect(winner.err.message).toMatch(/reader failed mid-read/)
+    }
+  })
+})
+
 describe('walkEntries error resilience (I8)', () => {
   // Reproduces I8: a single getFile failure (permission, OS quirk, race
   // with file deletion) previously rejected the entire walk. The user

@@ -66,20 +66,32 @@ function readAllEntries(reader: FileSystemDirectoryReader): Promise<FileSystemEn
   return new Promise((resolve, reject) => {
     const all: FileSystemEntry[] = []
     const readBatch = (): void => {
-      reader.readEntries(
-        (batch) => {
-          if (batch.length === 0) {
-            resolve(all)
-          } else {
-            all.push(...batch)
-            // Defer recursion so the reader's bookkeeping (e.g., the
-            // post-callback "returned" flip in tests, and Safari's internal
-            // cursor advance) completes before we ask for the next batch.
-            queueMicrotask(readBatch)
-          }
-        },
-        reject,
-      )
+      // S31: a synchronous throw from ``reader.readEntries`` lands outside
+      // the outer Promise constructor's try/catch on every recursive
+      // invocation after the first (those are scheduled via queueMicrotask).
+      // Without this try/catch, such a throw becomes an unhandled rejection
+      // and the promise hangs forever — walkEntries is stranded and the
+      // upload modal sits in preflight with no recovery path. Wrap and
+      // surface via reject so the caller sees the actual error.
+      try {
+        reader.readEntries(
+          (batch) => {
+            if (batch.length === 0) {
+              resolve(all)
+            } else {
+              all.push(...batch)
+              // Defer recursion so the reader's bookkeeping (e.g., the
+              // post-callback "returned" flip in tests, and Safari's
+              // internal cursor advance) completes before we ask for the
+              // next batch.
+              queueMicrotask(readBatch)
+            }
+          },
+          reject,
+        )
+      } catch (err) {
+        reject(err instanceof Error ? err : new Error(String(err)))
+      }
     }
     readBatch()
   })

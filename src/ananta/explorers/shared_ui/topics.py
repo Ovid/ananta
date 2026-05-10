@@ -153,14 +153,30 @@ class BaseTopicManager:
         with self._mutation_lock:
             meta, meta_path = self._resolve(old_name)
             if new_name != old_name:
-                existing_names: set[str] = set()
+                # Check both readable names AND directory slugs (S17).
+                # The previous version only inspected readable names, so a
+                # corrupt sibling whose meta is unreadable but whose slug
+                # matches the rename target's slug let the rename succeed.
+                # If that sibling were later repaired (e.g. via
+                # ``create(new_name)``), we would end up with two topics
+                # sharing the same display name — soft data corruption.
+                source_dir_name = meta_path.parent.name
+                new_slug = _slugify(new_name)
                 for d in self._iter_topic_dirs():
+                    if d.name == source_dir_name:
+                        continue
+                    if d.name == new_slug:
+                        # A sibling directory already squats on this slug.
+                        # We refuse regardless of whether its meta is
+                        # readable: legitimate sibling with the same
+                        # display name → real conflict; corrupt sibling →
+                        # we can't rule out conflict, so bail.
+                        msg = f"Topic '{new_name}' already exists"
+                        raise ValueError(msg)
                     m = self._read_meta(d)
-                    if m is not None and m["name"] != old_name:
-                        existing_names.add(m["name"])
-                if new_name in existing_names:
-                    msg = f"Topic '{new_name}' already exists"
-                    raise ValueError(msg)
+                    if m is not None and m["name"] == new_name:
+                        msg = f"Topic '{new_name}' already exists"
+                        raise ValueError(msg)
             meta["name"] = new_name
             meta_path.write_text(json.dumps(meta, indent=2))
 

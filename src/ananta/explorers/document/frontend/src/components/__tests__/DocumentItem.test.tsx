@@ -74,4 +74,28 @@ describe('docToDocumentItem', () => {
     const item = docToDocumentItem(doc)
     expect(item.sublabel).toMatch(/100 B/)
   })
+
+  it('matches FILE_ICONS by base type even when content_type carries a charset suffix (S37)', () => {
+    // Browsers may send "text/plain; charset=utf-8" and the backend stores
+    // ``UploadFile.content_type`` verbatim. The previous exact-match
+    // lookup missed this and fell through to the default folder icon.
+    const plain: DocumentInfo = {
+      project_id: 'p1',
+      filename: 'a.txt',
+      content_type: 'text/plain',
+      size: 10,
+      upload_date: '2026-05-05T00:00:00Z',
+      page_count: null,
+    }
+    const plainWithCharset: DocumentInfo = {
+      ...plain,
+      project_id: 'p2',
+      content_type: 'text/plain; charset=utf-8',
+    }
+    const a = docToDocumentItem(plain)
+    const b = docToDocumentItem(plainWithCharset)
+    // Both should produce the same icon prefix (the size suffix differs
+    // only when sizes differ — they are equal here).
+    expect(b.sublabel).toBe(a.sublabel)
+  })
 })

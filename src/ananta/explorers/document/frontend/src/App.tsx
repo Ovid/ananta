@@ -58,15 +58,24 @@ export default function App() {
   allDocsRef.current = allDocs
 
   useEffect(() => {
+    // S34: a persistent error here previously left the sidebar empty with
+    // zero diagnostic feedback because the .catch arms swallowed every
+    // exception silently. The first call (on initial mount) may legitimately
+    // fail before the backend is up, but subsequent calls (triggered by
+    // every docsVersion bump) all hit the same hidden-failure path — a 500
+    // would then keep the sidebar empty without telling anyone. Log to the
+    // console so the failure is at least visible to anyone debugging.
     api.documents.list().then(docs => {
       setAllDocs(docs)
-    }).catch(() => {
-      // Documents API may not be available yet
+    }).catch(err => {
+      // eslint-disable-next-line no-console
+      console.warn('Failed to list documents:', err)
     })
     api.documents.listUncategorized().then(docs => {
       setUncategorizedDocs(docs.map(docToDocumentItem))
-    }).catch(() => {
-      // Uncategorized API may not be available yet
+    }).catch(err => {
+      // eslint-disable-next-line no-console
+      console.warn('Failed to list uncategorized documents:', err)
     })
   }, [docsVersion])
 

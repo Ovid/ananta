@@ -52,17 +52,32 @@ export function useFolderUpload() {
         try {
           walked = await walkEntries(input.entries, input.rootName)
         } catch (err) {
-          // Only the hard cap-exceeded refusal short-circuits to summary.
-          // walkEntries swallows per-file / per-subtree errors itself, but
-          // an unrelated readAllEntries rejection at the top level would
-          // otherwise be misreported as "folder exceeds the N-file limit".
-          // Discriminate by class, not by message text (I6).
-          if (!(err instanceof FolderCapExceededError)) throw err
+          // Two failure classes need to surface as a summary instead of
+          // bubbling out of start(): the hard cap-exceeded refusal AND any
+          // other top-level readAllEntries rejection (browser permission
+          // failure, Safari quirk, DOMException, etc.). Without surfacing
+          // the second class, the modal never opens and the user has no
+          // feedback about why their drop did nothing — App.tsx wraps
+          // start() with no .catch (I6).
+          //
+          // Discriminate cap by class so the user sees the cap-specific
+          // message; for everything else, record the failure against the
+          // dropped folder name so the user has SOME visible feedback.
+          if (err instanceof FolderCapExceededError) {
+            setState({
+              kind: 'summary',
+              ingested: 0,
+              failed: [],
+              skipped: [{ name: input.rootName, reason: err.message }],
+            })
+            return
+          }
+          const reason = err instanceof Error ? err.message : String(err)
           setState({
             kind: 'summary',
             ingested: 0,
-            failed: [],
-            skipped: [{ name: input.rootName, reason: err.message }],
+            failed: [{ name: input.rootName, reason: `walk failed: ${reason}` }],
+            skipped: [],
           })
           return
         }

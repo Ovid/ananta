@@ -132,6 +132,55 @@ describe('useFolderUpload', () => {
     }
   })
 
+  it('non-cap walkEntries rejection surfaces as a summary instead of swallowing (I6)', async () => {
+    // Bug: the entries-path catch in start() only special-cased
+    // FolderCapExceededError; any other rejection (a top-level
+    // readAllEntries failure, browser permission denial, an unexpected
+    // Safari/Chromium quirk) would re-throw past the hook's caller
+    // (App.tsx wraps start in an arrow with no .catch). Result: the
+    // modal never opens, no toast, no feedback — the user clicks/drags
+    // again with no idea why nothing happened.
+    //
+    // Fix: in the catch, surface the error as a summary state with the
+    // failure recorded (ingested=0, failed=[{name: rootName, ...}]).
+    const explodingRoot = {
+      isFile: false,
+      isDirectory: true,
+      name: 'broken',
+      fullPath: '/broken',
+      createReader: () => ({
+        // Reject readEntries to simulate a top-level browser failure that
+        // walkEntries doesn't otherwise know how to handle. The cap path
+        // throws FolderCapExceededError inside visit() — this is the OTHER
+        // class of failure.
+        readEntries: (
+          _ok: (entries: unknown[]) => void,
+          err: (e: unknown) => void,
+        ) => err(new DOMException('permission denied', 'NotAllowedError')),
+      }),
+    }
+    const { result } = renderHook(() => useFolderUpload())
+    await act(async () => {
+      await result.current.start(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { kind: 'entries', entries: [explodingRoot as any], rootName: 'broken' },
+        'Barsoom',
+      )
+    })
+    // The hook must have transitioned to a summary, not silently no-opped.
+    expect(result.current.state?.kind).toBe('summary')
+    if (result.current.state?.kind === 'summary') {
+      expect(result.current.state.ingested).toBe(0)
+      // The failure should be recorded against the dropped folder name so
+      // the user has SOME visible feedback.
+      const allReasons = [
+        ...result.current.state.failed.map((f) => f.name),
+        ...result.current.state.skipped.map((s) => s.name),
+      ]
+      expect(allReasons).toContain('broken')
+    }
+  })
+
   it('walked-file path transitions to preflight without re-walking', async () => {
     const files = [
       { file: new File(['x'], 'a.md'), relativePath: 'a.md' },

@@ -374,6 +374,66 @@ class TestExtractedTextSizeCap:
             f"streaming should bail early, but {consumed[0]} rows were consumed"
         )
 
+    def test_xlsx_bails_inside_a_single_row_with_many_cells(self, tmp_path: Path) -> None:
+        """``_extract_xlsx`` must bail out *inside* a single row when its
+        cumulative cells exceed the cap (I6).
+
+        The previous implementation materialised every cell in a row via a
+        single list comprehension before any cap check fired. A maliciously
+        crafted single-row workbook with millions of populated cells could
+        therefore allocate hundreds of MB of Python strings before
+        ``_truncate_to_cap`` ran. The 50 MiB upload cap doesn't bound the
+        in-memory expansion: ``read_only=True`` iterates lazily by row, but
+        the per-row list comprehension realises all cells at once.
+
+        Sheet structure for this test: a SINGLE row containing many cells.
+        With a small cap, the per-cell counter must trigger a break inside
+        the row before all cells are consumed.
+        """
+        from ananta.explorers.document import extractors as ext_mod
+
+        cells_consumed: list[int] = [0]
+
+        def cell_gen() -> Iterator[Any]:
+            # 10,000 cells of 1 KiB each = ~10 MiB of in-memory string data
+            # if naively materialised. With a 100 KiB cap the cap should
+            # fire inside the row well before all cells are visited.
+            for _ in range(10_000):
+                cells_consumed[0] += 1
+                cell = MagicMock()
+                cell.value = "x" * 1024
+                yield cell
+
+        # Single-row sheet: iter_rows yields ONE row, but that row has
+        # thousands of cells. Iteration over the row triggers cell_gen.
+        def row_gen() -> Iterator[Any]:
+            yield cell_gen()
+
+        mock_sheet = MagicMock()
+        mock_sheet.iter_rows.return_value = row_gen()
+        mock_wb = MagicMock()
+        mock_wb.sheetnames = ["Sheet1"]
+        mock_wb.__getitem__.return_value = mock_sheet
+
+        f = tmp_path / "single-row-bomb.xlsx"
+        f.write_bytes(b"PK fake xlsx")
+
+        cap = 100 * 1024  # 100 KiB
+        with (
+            patch.object(ext_mod, "MAX_EXTRACTED_TEXT_BYTES", cap),
+            patch("ananta.explorers.document.extractors.load_workbook") as mock_load,
+        ):
+            mock_load.return_value = mock_wb
+            extract_text(f)
+
+        # Cell counter should be well under the 10,000 total. With a 100 KiB
+        # cap and 1 KiB cells, ~100 cells suffice to hit the cap; allow
+        # headroom for the tab-separator counter and per-row overhead.
+        assert cells_consumed[0] < 1000, (
+            f"streaming should bail inside the row, but {cells_consumed[0]} "
+            "cells were consumed before the cap fired"
+        )
+
     def test_truncation_does_not_split_multibyte_character(self, tmp_path: Path) -> None:
         """Boundary slice must not split a multi-byte UTF-8 sequence.
 

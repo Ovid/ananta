@@ -203,11 +203,21 @@ def _extract_xlsx(path: Path) -> str:
         for sheet_name in wb.sheetnames:
             sheet = wb[sheet_name]
             rows: list[str] = []
+            # Stream cells one at a time inside the row, accumulating into
+            # ``cells`` and checking ``cumulative`` mid-row (I6). The
+            # previous list-comprehension realised every cell of the row
+            # before any cap check fired — a single-row workbook with
+            # millions of populated cells could allocate hundreds of MB
+            # of Python strings before the post-row check ran.
             for row in sheet.iter_rows():
-                cells = [str(cell.value) if cell.value is not None else "" for cell in row]
-                row_text = "\t".join(cells)
-                rows.append(row_text)
-                cumulative += len(row_text.encode("utf-8")) + 1  # "\n" separator
+                cells: list[str] = []
+                for cell in row:
+                    val = str(cell.value) if cell.value is not None else ""
+                    cells.append(val)
+                    cumulative += len(val.encode("utf-8")) + 1  # "\t" separator
+                    if cumulative >= MAX_EXTRACTED_TEXT_BYTES:
+                        break
+                rows.append("\t".join(cells))
                 if cumulative >= MAX_EXTRACTED_TEXT_BYTES:
                     break
             parts.append(f"--- {sheet_name} ---\n" + "\n".join(rows))

@@ -374,6 +374,52 @@ class TestExtractedTextSizeCap:
             f"streaming should bail early, but {consumed[0]} rows were consumed"
         )
 
+    def test_pptx_bails_inside_a_slide_with_many_shapes(self, tmp_path: Path) -> None:
+        """``_extract_pptx`` must bail out *inside* a single slide when its
+        cumulative shape text exceeds the cap (S3).
+
+        Same class as I6 (xlsx). The previous implementation accumulated
+        every shape's text frame on a slide before the per-slide cap check
+        fired, so a slide with thousands of shapes could allocate large
+        in-memory strings before the cap had a chance to interrupt.
+        """
+        from ananta.explorers.document import extractors as ext_mod
+
+        shapes_consumed: list[int] = [0]
+
+        def shape_gen() -> Iterator[Any]:
+            # 5,000 shapes of ~1 KiB each = ~5 MiB of in-memory strings if
+            # naively materialised. With a 100 KiB cap, only ~100 shapes
+            # are needed to trip the cap.
+            for _ in range(5_000):
+                shapes_consumed[0] += 1
+                shape = MagicMock()
+                shape.has_text_frame = True
+                shape.text_frame.text = "x" * 1024
+                yield shape
+
+        # A SINGLE slide that contains many shapes.
+        mock_slide = MagicMock()
+        mock_slide.shapes = shape_gen()
+        mock_prs = MagicMock()
+        mock_prs.slides = [mock_slide]
+
+        f = tmp_path / "single-slide-bomb.pptx"
+        f.write_bytes(b"PK fake pptx")
+
+        cap = 100 * 1024  # 100 KiB
+        with (
+            patch.object(ext_mod, "MAX_EXTRACTED_TEXT_BYTES", cap),
+            patch("ananta.explorers.document.extractors.PptxPresentation") as mock_pptx,
+        ):
+            mock_pptx.return_value = mock_prs
+            extract_text(f)
+
+        assert shapes_consumed[0] < 1000, (
+            f"streaming should bail inside the slide, but {shapes_consumed[0]} "
+            "shapes were consumed before the cap fired"
+        )
+
     def test_xlsx_bails_inside_a_single_row_with_many_cells(self, tmp_path: Path) -> None:
         """``_extract_xlsx`` must bail out *inside* a single row when its
         cumulative cells exceed the cap (I6).
@@ -598,6 +644,43 @@ class TestRtfExtraction:
             result = extract_text(f)
 
         assert result == "Hello RTF"
+
+    def test_rtf_with_cp1252_bytes_does_not_replace_to_fffd(self, tmp_path: Path) -> None:
+        """RTF files commonly include raw 8-bit bytes (CP1252 / Windows-1252)
+        in legacy Word output (S1). Reading them as UTF-8 with errors="replace"
+        substituted U+FFFD for every non-ASCII byte before striprtf could
+        decode it, producing silent data loss on legitimate RTF uploads.
+
+        Read as cp1252 so each 8-bit byte round-trips to its expected
+        Unicode code point. The actual non-ASCII characters in standard
+        RTF come from the ``\\'XX`` escape codes that striprtf decodes,
+        but raw 8-bit bytes appear in real-world RTFs too.
+        """
+        f = tmp_path / "doc.rtf"
+        # 0x93 / 0x94 are CP1252 left/right double quotation marks. In
+        # UTF-8 they're invalid leading bytes — replace=replace would
+        # produce U+FFFD. The pass-through behaviour we want is that the
+        # raw bytes round-trip into the string given to rtf_to_text.
+        raw_bytes = b"{\\rtf1 \x93Hello\x94 RTF}"
+        f.write_bytes(raw_bytes)
+
+        captured: list[str] = []
+
+        def capture_rtf(source: str) -> str:
+            captured.append(source)
+            return source
+
+        with patch(
+            "ananta.explorers.document.extractors.rtf_to_text",
+            side_effect=capture_rtf,
+        ):
+            extract_text(f)
+
+        assert captured, "rtf_to_text was not called"
+        # The 0x93/0x94 bytes must round-trip — no replacement chars.
+        assert "�" not in captured[0], (
+            "Reading RTF as utf-8 substituted U+FFFD for legitimate CP1252 bytes"
+        )
 
 
 class TestGetPageCount:

@@ -183,15 +183,25 @@ def _extract_pptx(path: Path) -> str:
     cumulative = 0
     for i, slide in enumerate(prs.slides, 1):
         slide_texts: list[str] = []
+        # Stream shapes inside the slide and bail mid-slide once the cap
+        # is reached (S3). Without this, a slide with thousands of text
+        # frames builds up a large in-memory list before the per-slide
+        # check runs — same class as the xlsx row-materialisation bug.
+        slide_overflow = False
         for shape in slide.shapes:
             if shape.has_text_frame:
-                slide_texts.append(shape.text_frame.text)
+                text = shape.text_frame.text
+                slide_texts.append(text)
+                cumulative += len(text.encode("utf-8")) + 1  # "\n" separator
+                if cumulative >= MAX_EXTRACTED_TEXT_BYTES:
+                    slide_overflow = True
+                    break
         if slide_texts:
             joined = f"--- Slide {i} ---\n" + "\n".join(slide_texts)
             parts.append(joined)
-            cumulative += len(joined.encode("utf-8")) + 2
-            if cumulative >= MAX_EXTRACTED_TEXT_BYTES:
-                break
+            cumulative += len(f"--- Slide {i} ---\n".encode()) + 2  # header + "\n\n"
+        if slide_overflow or cumulative >= MAX_EXTRACTED_TEXT_BYTES:
+            break
     return "\n\n".join(parts)
 
 
@@ -229,7 +239,13 @@ def _extract_xlsx(path: Path) -> str:
 
 
 def _extract_rtf(path: Path) -> str:
-    raw = path.read_text(encoding="utf-8", errors="replace")
+    # RTF files in the wild commonly contain raw 8-bit bytes (CP1252 /
+    # Windows-1252), not just ASCII + ``\'XX`` escapes. Reading as utf-8
+    # with errors="replace" would substitute U+FFFD for every non-ASCII
+    # byte before striprtf could decode it — silent data loss on
+    # legitimate non-ASCII content (S1). CP1252 is a single-byte encoding
+    # that round-trips any byte to a Unicode code point.
+    raw = path.read_text(encoding="cp1252", errors="replace")
     return str(rtf_to_text(raw))
 
 

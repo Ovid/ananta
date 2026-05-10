@@ -59,6 +59,12 @@ export async function uploadFolderInBatches(
   for (let i = 0; i < batches.length; i++) {
     if (signal?.aborted) break
     const batch = batches[i]
+    // Emit a "batch starting" progress event BEFORE the network round-trip
+    // so the modal label advances to "batch K of N" while batch K is
+    // actually in flight (I5). Without this, onProgress only fires on the
+    // post-batch line below and the label trails one batch behind reality
+    // for batches 2+ (the hook's initial setState covers batch 1 only).
+    onProgress(completed, total, i + 1, batches.length)
     const form = new FormData()
     for (const wf of batch) {
       form.append('files', wf.file, wf.file.name)

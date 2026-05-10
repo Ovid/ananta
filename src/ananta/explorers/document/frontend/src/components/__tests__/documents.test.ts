@@ -174,4 +174,67 @@ describe('uploadFolderInBatches', () => {
     expect(onProgress).toHaveBeenCalledWith(1, 2, 1, 2)
     expect(onProgress).toHaveBeenCalledWith(2, 2, 2, 2)
   })
+
+  it('currentBatch label advances BEFORE batch K\'s fetch resolves (I5)', async () => {
+    // Bug: onProgress was only fired AFTER each batch completed, with the
+    // batch index that had just finished. The hook initialised currentBatch=1
+    // for batch 1 (so batch 1 displays correctly), but for batches 2+ the
+    // label only ticked AFTER they finished — so during batch K (K>=2) the
+    // modal still showed "batch K-1 of N". Fix: also emit a "batch starting"
+    // callback at the top of each iteration BEFORE awaiting fetch, so the
+    // label advances to K before batch K's network round-trip.
+    const fetchCalls: number[] = []
+    const progressCalls: { completed: number; currentBatch: number }[] = []
+    let resolveFetch: (() => void) | null = null
+    global.fetch = vi.fn(async () => {
+      // Block on a manually-resolved promise so the test can observe what
+      // onProgress has been called with BEFORE fetch resolves.
+      fetchCalls.push(fetchCalls.length + 1)
+      await new Promise<void>(resolve => {
+        resolveFetch = resolve
+      })
+      return {
+        ok: true,
+        status: 200,
+        json: async () => [
+          { project_id: 'p', filename: 'x.md', status: 'created' },
+        ],
+      } as Response
+    })
+    const onProgress = (
+      completed: number,
+      _total: number,
+      currentBatch: number,
+      _totalBatches: number,
+    ): void => {
+      progressCalls.push({ completed, currentBatch })
+    }
+    const batches = [
+      [{ file: new File(['x'], 'a.md'), relativePath: 'a.md' }],
+      [{ file: new File(['y'], 'b.md'), relativePath: 'b.md' }],
+    ]
+    const promise = uploadFolderInBatches(batches, 'Barsoom', 'sid', onProgress)
+
+    // Drain microtasks until fetch is in-flight for batch 1.
+    await Promise.resolve()
+    await Promise.resolve()
+    // Batch 1 is in flight. There must already be a progress emission for
+    // currentBatch=1 (this is the starting event; without it the modal
+    // would briefly read "batch 0 of N").
+    expect(progressCalls.some(c => c.currentBatch === 1)).toBe(true)
+    // No progress emission for batch 2 yet — we haven't gotten there.
+    expect(progressCalls.some(c => c.currentBatch === 2)).toBe(false)
+
+    // Resolve batch 1's fetch and wait for batch 2 to start its fetch.
+    resolveFetch!()
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+    // Batch 2's starting emission must arrive BEFORE its fetch resolves.
+    expect(progressCalls.some(c => c.currentBatch === 2)).toBe(true)
+
+    // Resolve batch 2 and let the upload finish.
+    resolveFetch!()
+    await promise
+  })
 })

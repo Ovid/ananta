@@ -5,6 +5,7 @@ Provides document upload, CRUD, and topic-document reference routes.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
@@ -377,9 +378,16 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                 original_path = upload_dir / f"original{ext}"
                 original_path.write_bytes(content)
 
-                # Extract text
+                # Run synchronous, CPU-bound parser libraries off the event
+                # loop (I2). pdfplumber / openpyxl / python-docx / python-pptx
+                # can spend seconds per file on large inputs; with up to 500
+                # files per request, doing this work inline starves every
+                # other request on the same process (websocket pings, RLM
+                # streams, document-list polls, concurrent uploads) for the
+                # duration. asyncio.to_thread releases the loop between
+                # files so other handlers progress.
                 try:
-                    text = extract_text(original_path)
+                    text = await asyncio.to_thread(extract_text, original_path)
                 except ValueError as exc:
                     shutil.rmtree(upload_dir, ignore_errors=True)
                     results.append(
@@ -389,9 +397,10 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
 
                 # Compute page/sheet/slide count where applicable. A failure
                 # here must not abort the upload — the file already extracted
-                # cleanly. page_count is purely informational.
+                # cleanly. page_count is purely informational. Same off-loop
+                # treatment as extract_text (I2).
                 try:
-                    page_count = get_page_count(original_path)
+                    page_count = await asyncio.to_thread(get_page_count, original_path)
                 except Exception:
                     _logger.exception("get_page_count failed for %r", file.filename)
                     page_count = None

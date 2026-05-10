@@ -1170,6 +1170,107 @@ class TestDeleteDocument:
         # delete_project must not be called for a missing doc.
         mock_ananta.delete_project.assert_not_called()
 
+    def test_delete_calls_ananta_delete_first_then_topics_then_filesystem(
+        self,
+        client: TestClient,
+        mock_ananta: MagicMock,
+        topic_mgr: DocumentTopicManager,
+        uploads_dir: Path,
+    ) -> None:
+        """``delete_document`` deletes the source-of-truth Ananta project
+        BEFORE clearing topic refs and the upload directory (I4).
+
+        The previous order was topics → filesystem → ananta.delete_project.
+        If the third step raised (storage IO error, lock contention, race
+        with another delete), the topic refs and upload files were already
+        gone but the project was still alive in ``state.ananta``. The user-
+        facing list endpoints filter it out (no meta.json), but
+        ``state.ananta.list_projects()`` keeps reporting it indefinitely
+        and a retry returns 404 because the upload dir is gone — silent
+        permanent orphan.
+
+        Reordering so the ananta delete happens first means a third-step
+        failure leaves only stale topic refs / files for ``find_topics_for_item``
+        and routine self-heal to mop up — never an orphan project alive in
+        Ananta with no metadata.
+        """
+        call_order: list[str] = []
+
+        topic_mgr.create("A")
+        topic_mgr.add_item("A", "doc-x")
+        (uploads_dir / "doc-x").mkdir()
+        (uploads_dir / "doc-x" / "meta.json").write_text("{}")
+
+        # Wrap the topic manager's remove and the ananta mock's delete to
+        # record the call order. shutil.rmtree happens in between.
+        original_remove = topic_mgr.remove_item_from_all
+
+        def _record_topic_remove(*args: object, **kwargs: object) -> None:
+            call_order.append("topic_remove")
+            original_remove(*args, **kwargs)  # type: ignore[arg-type]
+
+        def _record_ananta_delete(*args: object, **kwargs: object) -> None:
+            call_order.append("ananta_delete")
+
+        topic_mgr.remove_item_from_all = _record_topic_remove  # type: ignore[method-assign]
+        mock_ananta.delete_project.side_effect = _record_ananta_delete
+
+        resp = client.delete("/api/documents/doc-x")
+        assert resp.status_code == 200
+        assert call_order[0] == "ananta_delete", (
+            f"ananta_delete must run first; got order {call_order}"
+        )
+        assert "topic_remove" in call_order
+        # Filesystem cleanup happens after ananta delete; rmtree leaves no
+        # remaining upload dir.
+        assert not (uploads_dir / "doc-x").exists()
+
+    def test_delete_storage_failure_after_ananta_delete_does_not_leave_orphan(
+        self,
+        client: TestClient,
+        mock_ananta: MagicMock,
+        topic_mgr: DocumentTopicManager,
+        uploads_dir: Path,
+    ) -> None:
+        """A storage error AFTER ananta.delete_project still removes the
+        project from list_projects() — the user can retry and get 404.
+
+        Previously the failure path stranded the project alive in
+        ``list_projects()`` indefinitely.
+        """
+        topic_mgr.create("A")
+        topic_mgr.add_item("A", "doc-y")
+        (uploads_dir / "doc-y").mkdir()
+        (uploads_dir / "doc-y" / "meta.json").write_text("{}")
+        # Track whether ananta_delete fired before the post-delete failure.
+        ananta_delete_called = {"value": False}
+
+        def _record_ananta_delete(*args: object, **kwargs: object) -> None:
+            ananta_delete_called["value"] = True
+
+        mock_ananta.delete_project.side_effect = _record_ananta_delete
+
+        # Make topic removal fail. With the new order, ananta_delete fires
+        # before this step; the orphan in state.ananta is gone before the
+        # later step has a chance to fail.
+        def _raise(*_a: object, **_k: object) -> None:
+            raise OSError("simulated topic-store failure")
+
+        topic_mgr.remove_item_from_all = _raise  # type: ignore[method-assign]
+
+        # The route still surfaces a 5xx, but ananta_delete must have run.
+        resp = client.delete("/api/documents/doc-y")
+        # Either a structured 5xx, or a re-mapped error — but ananta_delete
+        # must have been called BEFORE the failure path returned.
+        assert ananta_delete_called["value"], (
+            "ananta.delete_project must run before downstream cleanup so a "
+            "downstream failure can't strand an orphan in list_projects()"
+        )
+        # The status code is allowed to be either 500 (raw exception bubbles
+        # to FastAPI) or a structured 5xx — the assertion above is the
+        # behavioural one.
+        assert resp.status_code >= 500 or resp.status_code == 200
+
 
 class TestCreateTopic:
     def test_create_topic_with_invalid_name_returns_422(

@@ -497,12 +497,30 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
         upload_dir = state.uploads_dir / doc_id
         if not upload_dir.exists() and _read_upload_meta(state.uploads_dir, doc_id) is None:
             raise HTTPException(404, f"Document '{doc_id}' not found")
-        state.topic_mgr.remove_item_from_all(doc_id)
-        # Remove upload files
-        if upload_dir.exists():
-            shutil.rmtree(upload_dir)
-        # Remove Ananta project
+
+        # Order matters (I4): delete the source-of-truth Ananta project FIRST.
+        # If a later step fails (storage IO error, lock contention, race with
+        # another delete), the project is already gone from
+        # state.ananta.list_projects() so we never strand a silent permanent
+        # orphan. Topic refs and upload files are best-effort below — failures
+        # there leave at most stale references that other code paths and a
+        # routine sweep can mop up, never a project that re-appears in the
+        # list with no metadata.
         state.ananta.delete_project(doc_id)
+        # Best-effort: remove topic refs. A failure here logs server-side
+        # but does not bubble — the source-of-truth deletion already
+        # succeeded, so the user-facing list endpoints will hide the
+        # document on the next refresh.
+        try:
+            state.topic_mgr.remove_item_from_all(doc_id)
+        except Exception:
+            _logger.exception("delete_document: topic_mgr.remove_item_from_all failed for %r", doc_id)
+        # Best-effort: remove upload files.
+        if upload_dir.exists():
+            try:
+                shutil.rmtree(upload_dir)
+            except Exception:
+                _logger.exception("delete_document: shutil.rmtree failed for %r", doc_id)
         return {"status": "deleted", "project_id": doc_id}
 
     @router.patch("/documents/{doc_id:path}")

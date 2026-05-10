@@ -294,7 +294,13 @@ export default function TopicSidebar({
           {addDocToTopic && (() => {
             const eligible = topics.filter(t => {
               const loaded = topicDocs[t.name]
-              return !loaded || !loaded.some(d => d.id === doc.id || d.label === doc.label)
+              // Eligibility is by project_id only. With folder uploads,
+              // multiple distinct documents legitimately share a filename
+              // (e.g., several README.md / __init__.py / index.ts files in
+              // different subfolders). A label-equality clause here would
+              // hide T from the submenu after the first same-label doc was
+              // added, making the duplicates un-addable to T (I5).
+              return !loaded || !loaded.some(d => d.id === doc.id)
             })
             if (eligible.length === 0) return null
             return (

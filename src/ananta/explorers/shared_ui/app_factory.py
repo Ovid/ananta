@@ -48,24 +48,40 @@ def _origin_matches_host(origin: str, host: str) -> bool:
 
 
 class _SameOriginGuardMiddleware:
-    """Reject mutating HTTP requests whose Origin does not match the Host.
+    """Reject mutating HTTP requests and WebSocket handshakes whose Origin
+    does not match the Host.
 
     Threat model (C2): the explorer is launched as a localhost daemon and
     has no authentication. Without this guard, any web page the user visits
     while the explorer is running can submit a multipart POST to
-    ``http://localhost:<port>/api/documents/upload``. Browsers attach an
-    ``Origin`` header to every cross-origin request, so we can refuse a
-    request whose Origin does not match Host. Same-origin requests from the
-    explorer's own served HTML pass through; direct API callers (curl,
-    Python scripts) usually omit Origin and are also allowed — that traffic
-    is not the threat.
+    ``http://localhost:<port>/api/documents/upload`` — and the same threat
+    applies to ``ws://localhost:<port>/api/ws`` (drain LLM credits via
+    expensive iterative queries, exfiltrate streamed answers/traces, trigger
+    sandbox container starts the operator pays for; I1).
+
+    Browsers attach an ``Origin`` header to every cross-origin HTTP request
+    and to every WebSocket handshake, so we can refuse a request whose
+    Origin does not match Host. Same-origin requests from the explorer's
+    own served HTML pass through; direct API callers (curl, Python scripts)
+    usually omit Origin and are also allowed — that traffic is not the
+    threat.
+
+    Read-only HTTP methods (GET/HEAD) are exempt — the same-origin policy
+    already prevents reading their bodies cross-origin in a browser. WS
+    connections, by contrast, are always treated as mutating: there is no
+    read-only WS in this app, and an open socket is itself a credit drain.
     """
 
     def __init__(self, app: ASGIApp) -> None:
         self._app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http" or scope["method"] not in _MUTATING_METHODS:
+        scope_type = scope["type"]
+        if scope_type == "http":
+            if scope["method"] not in _MUTATING_METHODS:
+                await self._app(scope, receive, send)
+                return
+        elif scope_type != "websocket":
             await self._app(scope, receive, send)
             return
 
@@ -77,14 +93,18 @@ class _SameOriginGuardMiddleware:
             elif name == b"host":
                 host = value.decode("latin-1")
         if origin and not _origin_matches_host(origin, host):
-            await send(
-                {
-                    "type": "http.response.start",
-                    "status": 403,
-                    "headers": [(b"content-type", b"text/plain; charset=utf-8")],
-                }
-            )
-            await send({"type": "http.response.body", "body": b"Cross-origin request refused"})
+            if scope_type == "http":
+                await send(
+                    {
+                        "type": "http.response.start",
+                        "status": 403,
+                        "headers": [(b"content-type", b"text/plain; charset=utf-8")],
+                    }
+                )
+                await send({"type": "http.response.body", "body": b"Cross-origin request refused"})
+            else:
+                # WebSocket close before accept. 1008 = policy violation.
+                await send({"type": "websocket.close", "code": 1008})
             return
         await self._app(scope, receive, send)
 

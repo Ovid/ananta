@@ -186,6 +186,80 @@ def test_get_with_cross_origin_unaffected_by_origin_guard() -> None:
     assert resp.status_code == 204
 
 
+def test_websocket_with_cross_origin_rejected() -> None:
+    """WebSocket handshake from a foreign Origin is rejected (I1).
+
+    The drive-by threat (C2) extends to ``ws://localhost:<port>/api/ws``:
+    without an Origin check, any web page the user visits while the
+    explorer is running can open the WebSocket and submit ``query``
+    payloads — draining the operator's LLM credits, triggering sandbox
+    container starts, or exfiltrating answers/traces via the streamed
+    response. Browsers always send Origin on the WS handshake, so the
+    middleware refuses the connection before ``websocket.accept``.
+    """
+    from starlette.websockets import WebSocketDisconnect
+
+    state = _make_state()
+
+    async def dummy_ws_handler(ws: Any) -> None:
+        await ws.accept()
+        await ws.send_json({"hello": "world"})
+        await ws.close()
+
+    app = create_app(state, title="Test App", ws_handler=dummy_ws_handler)
+    client = TestClient(app)
+
+    with pytest.raises(WebSocketDisconnect) as exc_info:
+        with client.websocket_connect(
+            "/api/ws",
+            headers={"origin": "http://evil.example.com"},
+        ):
+            pass
+    assert exc_info.value.code == 1008  # policy violation
+
+
+def test_websocket_with_matching_origin_accepted() -> None:
+    """WebSocket from same Origin/Host is accepted."""
+    state = _make_state()
+
+    async def dummy_ws_handler(ws: Any) -> None:
+        await ws.accept()
+        await ws.send_json({"hello": "world"})
+        await ws.close()
+
+    app = create_app(state, title="Test App", ws_handler=dummy_ws_handler)
+    client = TestClient(app)
+
+    with client.websocket_connect(
+        "/api/ws",
+        headers={"origin": "http://testserver"},
+    ) as ws:
+        msg = ws.receive_json()
+        assert msg == {"hello": "world"}
+
+
+def test_websocket_without_origin_accepted() -> None:
+    """WebSocket from a non-browser client (no Origin) is accepted.
+
+    Browsers always set Origin on WS handshakes — that is the threat
+    surface we cover. Direct API callers from a trusted shell (curl,
+    the user's own scripts) typically omit it; we must not break them.
+    """
+    state = _make_state()
+
+    async def dummy_ws_handler(ws: Any) -> None:
+        await ws.accept()
+        await ws.send_json({"hello": "world"})
+        await ws.close()
+
+    app = create_app(state, title="Test App", ws_handler=dummy_ws_handler)
+    client = TestClient(app)
+
+    with client.websocket_connect("/api/ws") as ws:
+        msg = ws.receive_json()
+        assert msg == {"hello": "world"}
+
+
 # -- Basic app creation --
 
 

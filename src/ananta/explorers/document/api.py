@@ -67,6 +67,17 @@ _logger = logging.getLogger(__name__)
 _MAX_RELATIVE_PATH_LEN = 512
 _CONTROL_BYTES = re.compile(r"[\x00-\x1f\x7f]")
 
+# Single source of truth for the aggregate-cap failed-row reason — the
+# string is emitted from two arms of the upload loop (the loop-top
+# already-tripped check, and the mid-loop tripping check) and must stay
+# byte-identical: the FE summary modal groups failed rows by reason
+# string equality, so a near-miss diverged copy renders two near-
+# identical lines (S5 same shape).
+_AGGREGATE_CAP_REASON = (
+    f"aggregate upload size exceeds the "
+    f"{MAX_AGGREGATE_UPLOAD_BYTES // (1024 * 1024)} MB limit"
+)
+
 
 def _is_valid_relative_path(rel_path: str) -> bool:
     """Return True if *rel_path* is safe to persist as a document path.
@@ -132,15 +143,17 @@ def _make_project_id(filename: str) -> str:
     """Generate project_id from filename: slugified-name-xxxxxxxxxxxx.
 
     The 12-hex suffix is cryptographically random (`secrets.token_hex(6)` —
-    48-bit space; ~16M-name birthday threshold). The previous 32-bit suffix
-    had a ~65k-name birthday threshold (I14), so under sustained concurrent
-    upload load with stable filenames, the retry-budgeted allocator could
-    plausibly exhaust three picks and report a spurious failure to the
-    caller despite no permanent collision. A previous implementation hashed
-    the filename plus a microsecond timestamp, which was deterministic
-    enough that two calls in the same microsecond produced identical IDs —
-    and the rollback path would then destroy the colliding pre-existing
-    project's data.
+    48-bit space; ~16M-name birthday threshold). The caller's allocator
+    retries up to 5 times on collision; with the 48-bit space this is
+    practically unreachable. The previous 32-bit suffix combined with a
+    3-pick retry budget had a ~65k-name birthday threshold (I14), so
+    under sustained concurrent upload load with stable filenames the
+    allocator could plausibly exhaust its picks and report a spurious
+    failure to the caller despite no permanent collision. An even earlier
+    implementation hashed the filename plus a microsecond timestamp,
+    which was deterministic enough that two calls in the same microsecond
+    produced identical IDs — and the rollback path would then destroy
+    the colliding pre-existing project's data.
     """
     stem = Path(filename).stem
     slug = _slugify(stem) or "document"
@@ -448,12 +461,7 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
             # don't break — direct API callers benefit from a row per file.
             if aggregate_cap_reached:
                 results.append(
-                    _failed_row(
-                        file.filename,
-                        f"aggregate upload size exceeds the "
-                        f"{MAX_AGGREGATE_UPLOAD_BYTES // (1024 * 1024)} MB limit",
-                        rel_path,
-                    )
+                    _failed_row(file.filename, _AGGREGATE_CAP_REASON, rel_path)
                 )
                 continue
 
@@ -483,12 +491,15 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                 continue
 
             # Cap read to avoid memory exhaustion from oversized uploads.
+            # Reason text matches the FE folder-walk skip reason verbatim
+            # (S5): the summary modal groups failed rows by string equality,
+            # so a near-miss diverged copy renders two near-identical lines.
             content = await file.read(MAX_UPLOAD_BYTES + 1)
             if len(content) > MAX_UPLOAD_BYTES:
                 results.append(
                     _failed_row(
                         file.filename,
-                        f"file exceeds the {MAX_UPLOAD_BYTES // (1024 * 1024)} MB upload limit",
+                        f"file exceeds {MAX_UPLOAD_BYTES // (1024 * 1024)} MB limit",
                         rel_path,
                     )
                 )
@@ -503,12 +514,7 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                 # successes (C1).
                 aggregate_cap_reached = True
                 results.append(
-                    _failed_row(
-                        file.filename,
-                        f"aggregate upload size exceeds the "
-                        f"{MAX_AGGREGATE_UPLOAD_BYTES // (1024 * 1024)} MB limit",
-                        rel_path,
-                    )
+                    _failed_row(file.filename, _AGGREGATE_CAP_REASON, rel_path)
                 )
                 continue
 

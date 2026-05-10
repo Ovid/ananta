@@ -323,7 +323,7 @@ describe('useFolderUpload', () => {
       { project_id: 'p2', filename: 'second.md', status: 'created' as const },
     ]
     vi.spyOn(documentsApi, 'uploadFolderInBatches').mockImplementation(async () => {
-      throw new documentsApi.BatchUploadError('upload failed: 500', partial)
+      throw new documentsApi.BatchUploadError('upload failed: server error (500)', partial)
     })
     const { result } = renderHook(() => useFolderUpload())
     await act(async () => {
@@ -336,9 +336,85 @@ describe('useFolderUpload', () => {
     if (result.current.state?.kind === 'summary') {
       // The two earlier-batch successes must be reflected as "ingested".
       expect(result.current.state.ingested).toBe(2)
-      // The error reason must still appear in failed rows.
-      expect(result.current.state.failed.some(f => /upload failed/.test(f.reason))).toBe(true)
+      // The error reason must appear in a failed row. The hook strips the
+      // "upload failed: " prefix (S30) so the reason carries the friendly
+      // suffix only — assert the suffix is present.
+      expect(
+        result.current.state.failed.some(
+          f => f.name === 'upload' && /server error/.test(f.reason),
+        ),
+      ).toBe(true)
     }
+  })
+
+  it("does not double-prefix the error reason in the summary 'upload' row (S30)", async () => {
+    // ``uploadFolderInBatches`` already prefixes every BatchUploadError
+    // message with "upload failed: ...". Pushing ``uploadError.message``
+    // verbatim into a failed row whose ``name`` is "upload" produced a
+    // doubled-up rendering ("Failed: upload — upload failed: 413 ...")
+    // that regressed the I9 friendly-error work.
+    const files = [{ file: new File(['x'], 'a.md'), relativePath: 'a.md' }]
+    vi.spyOn(documentsApi, 'uploadFolderInBatches').mockImplementation(async () => {
+      throw new documentsApi.BatchUploadError(
+        'upload failed: files too large for this request',
+        [],
+      )
+    })
+    const { result } = renderHook(() => useFolderUpload())
+    await act(async () => {
+      await result.current.start({ kind: 'walked', files, rootName: 'x' }, 'Barsoom')
+    })
+    await act(async () => {
+      await result.current.confirm()
+    })
+    expect(result.current.state?.kind).toBe('summary')
+    if (result.current.state?.kind === 'summary') {
+      const uploadRow = result.current.state.failed.find(f => f.name === 'upload')
+      expect(uploadRow).toBeDefined()
+      // The reason must be the friendly suffix only — no doubled-up
+      // "upload failed: upload failed: ..." or duplicate prefix.
+      expect(uploadRow!.reason).not.toMatch(/^upload failed: upload failed:/)
+      expect(uploadRow!.reason).toContain('files too large')
+    }
+  })
+
+  it('logs the upload error to the console when the user cancels mid-flight (S25)', async () => {
+    // Race: an upload errors mid-flight just as the user clicks Cancel.
+    // The aborted-branch silently dropped ``uploadError`` (it returned
+    // before pushing the error into the summary), so the user saw a
+    // clean cancel without learning the upload had also failed. At the
+    // very least, log the error so it's visible to anyone debugging.
+    const files = [{ file: new File(['x'], 'a.md'), relativePath: 'a.md' }]
+    let abortCalls: AbortSignal | null = null
+    const failureMessage = 'upload failed: server returned 500'
+    vi.spyOn(documentsApi, 'uploadFolderInBatches').mockImplementation(
+      async (_batches, _topic, _sid, _onProg, signal) => {
+        abortCalls = signal ?? null
+        // Wait one tick so cancel() can run, then both abort and reject.
+        await Promise.resolve()
+        throw new documentsApi.BatchUploadError(failureMessage, [])
+      },
+    )
+    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { result } = renderHook(() => useFolderUpload())
+    await act(async () => {
+      await result.current.start({ kind: 'walked', files, rootName: 'x' }, 'Barsoom')
+    })
+    await act(async () => {
+      // Fire confirm (which awaits) and cancel synchronously after — so
+      // the cancel lands before the rejection propagates.
+      const p = result.current.confirm()
+      result.current.cancel()
+      await p
+    })
+    expect(abortCalls?.aborted).toBe(true)
+    // The hook must surface the error somewhere — console.warn at minimum.
+    const warned = consoleSpy.mock.calls.some(call =>
+      call.some(arg => typeof arg === 'string' && arg.includes(failureMessage))
+        || (call.some(arg => arg instanceof Error && arg.message.includes(failureMessage))),
+    )
+    expect(warned).toBe(true)
+    consoleSpy.mockRestore()
   })
 
   it('upload error transitions to summary with the error reason', async () => {
@@ -348,7 +424,7 @@ describe('useFolderUpload', () => {
     // Cancel button (I4).
     const files = [{ file: new File(['x'], 'a.md'), relativePath: 'a.md' }]
     vi.spyOn(documentsApi, 'uploadFolderInBatches').mockRejectedValue(
-      new Error('upload failed: 500'),
+      new Error('upload failed: server error (500)'),
     )
     const { result } = renderHook(() => useFolderUpload())
     await act(async () => {
@@ -359,13 +435,15 @@ describe('useFolderUpload', () => {
     })
     expect(result.current.state?.kind).toBe('summary')
     if (result.current.state?.kind === 'summary') {
-      // The error must appear somewhere in the summary so the user sees what
-      // went wrong instead of being stranded on progress.
+      // The error must appear somewhere in the summary so the user sees
+      // what went wrong instead of being stranded on progress. The hook
+      // strips the "upload failed: " prefix (S30); assert the friendly
+      // suffix shows up in a failed row instead.
       const allReasons = [
         ...result.current.state.failed.map(f => f.reason),
         ...result.current.state.skipped.map(s => s.reason),
       ]
-      expect(allReasons.some(r => r.includes('upload failed'))).toBe(true)
+      expect(allReasons.some(r => r.includes('server error'))).toBe(true)
     }
   })
 

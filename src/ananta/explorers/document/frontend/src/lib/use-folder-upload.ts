@@ -171,6 +171,14 @@ export function useFolderUpload() {
       // User cancelled mid-flight: cancel() already cleared state and bumped
       // commitVersion. Do not emit a summary — that would re-mount the modal
       // the user just closed.
+      // S25: an upload that errored AT THE SAME TIME as the user pressed
+      // Cancel previously had its error silently swallowed — the user saw
+      // a clean cancel without learning the upload had also failed. Log
+      // it (console.warn) so the error is at least visible for debugging.
+      if (uploadError) {
+        // eslint-disable-next-line no-console
+        console.warn('Folder upload errored during cancel:', uploadError)
+      }
       // I3: guard the setPending(null) with the same identity-check pattern
       // the C3 fix used for abortCtlRef. If cancel(A) → start(B) installed a
       // new pending while we were awaiting, an unconditional clear would
@@ -190,7 +198,15 @@ export function useFolderUpload() {
       .filter(r => r.status === 'failed')
       .map(r => ({ name: summaryName(r.filename, r.relative_path), reason: r.reason ?? 'failed' }))
     if (uploadError) {
-      failed.push({ name: 'upload', reason: uploadError.message })
+      // S30: BatchUploadError messages are pre-prefixed with
+      // "upload failed: ..." by uploadFolderInBatches. The summary already
+      // labels the row as "upload" (failed.name), so leaving the prefix
+      // in the reason renders as "Failed: upload — upload failed: ..." —
+      // a doubled-up "upload" + "upload failed" the user reads twice.
+      // Strip the prefix so the reason carries the friendly suffix only.
+      const raw = uploadError.message
+      const reason = raw.startsWith('upload failed: ') ? raw.slice('upload failed: '.length) : raw
+      failed.push({ name: 'upload', reason })
     }
     // Carry pre-flight skipped rows through to the summary so the user sees
     // every file that did not get ingested, not just upload-time failures.

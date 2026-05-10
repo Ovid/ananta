@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Shared explorer factory: `POST /api/topics` (via `create_shared_router` with `include_topic_crud=True`) now returns a non-null `project_id` in the response body. Previously the route assigned `BaseTopicManager.create()`'s return value (which is `None`) to `project_id`, so every successful create-topic call leaked `{"project_id": null}` to the frontend. The frontend uses `project_id` as a React key, so all topics created via this route collided on the same `null` key. The synthetic `topic:<name>` form now matches what `create_item_router` (the document-explorer's variant of the same logical operation) already returns. (I3)
 - Codebase analysis no longer crashes with `AttributeError` when the LLM returns a bare string in the `components` or `external_dependencies` arrays — strings are now promoted to `{"name": <string>}` to match the expected element shape
 - Code Explorer now shows an "Analysis in progress…" status on the repo detail page while an analysis is running — the action buttons are hidden so the in-progress state is unambiguous, and the state is preserved when the user navigates away and returns (previously the page reverted to "Generate Analysis", letting users start a duplicate run)
 - Code Explorer repo "analysis status" badge now refreshes from "not analyzed" to "current" as soon as analysis completes (previously the badge stayed stale until the page was reloaded)

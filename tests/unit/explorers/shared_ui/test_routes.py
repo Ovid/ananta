@@ -105,10 +105,23 @@ def test_list_topics(client: TestClient, mock_state: MagicMock) -> None:
 
 def test_create_topic(client: TestClient, mock_state: MagicMock) -> None:
     mock_state.topic_mgr.resolve.return_value = None
-    mock_state.topic_mgr.create.return_value = "2025-01-15-chess"
+    # ``BaseTopicManager.create`` is annotated ``-> None`` (it does not
+    # return a slug); the route must therefore not depend on its return
+    # value (I3). Mirror the real contract here so a regression that
+    # leaks ``null`` into the response body fails this test.
+    mock_state.topic_mgr.create.return_value = None
     resp = client.post("/api/topics", json={"name": "Chess"})
     assert resp.status_code == 201
     mock_state.topic_mgr.create.assert_called_once_with("Chess")
+    body = resp.json()
+    assert body["name"] == "Chess"
+    # project_id must be a non-empty string. Previously the route
+    # assigned ``BaseTopicManager.create()``'s return value (None) to
+    # project_id, so every explorer using ``include_topic_crud=True``
+    # got ``{"project_id": null}`` — which the FE used as a React key,
+    # collapsing all topics onto a single "null" key.
+    assert isinstance(body["project_id"], str)
+    assert body["project_id"]
 
 
 def test_create_topic_already_exists(client: TestClient, mock_state: MagicMock) -> None:

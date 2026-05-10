@@ -273,8 +273,16 @@ def create_shared_router(
             existing = state.topic_mgr.resolve(body.name)
             if existing:
                 raise HTTPException(409, f"Topic '{body.name}' already exists")
-            project_id = state.topic_mgr.create(body.name)
-            return {"name": body.name, "project_id": project_id}
+            try:
+                state.topic_mgr.create(body.name)
+            except ValueError as e:
+                raise HTTPException(_topic_error_to_status(e), str(e)) from e
+            # ``BaseTopicManager.create`` does not return a slug; the
+            # synthetic ``topic:<name>`` ID matches what
+            # ``create_item_router`` returns from the same logical
+            # operation. Without this the response leaks ``null`` to
+            # the FE, which uses ``project_id`` as a React key (I3).
+            return {"name": body.name, "project_id": f"topic:{body.name}"}
 
         @router.patch("/api/topics/{name}")
         def rename_topic(name: str, body: TopicRename) -> dict[str, str]:

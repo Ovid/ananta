@@ -385,6 +385,28 @@ class TestRenameTopic:
         with pytest.raises(ValueError, match="path separator"):
             mgr.rename("Safe", new_name)
 
+    @pytest.mark.parametrize("new_name", ["", "   ", "\t", "  \n  "])
+    def test_rename_rejects_whitespace_only(self, tmp_path: Path, new_name: str) -> None:
+        """``rename`` rejects empty or whitespace-only names (I4).
+
+        ``_normalize_name`` strips whitespace before validation. Without
+        an empty-after-strip check in ``_validate_name``, ``rename(old,
+        "   ")`` slipped through and wrote ``meta["name"] = ""``,
+        leaving the topic on disk behind a label-less, unselectable row
+        in the sidebar — soft data corruption: the topic exists but
+        cannot be reached through the UI.
+
+        ``create`` already rejects empty names downstream (via the empty-
+        slug check), so this test pins the rename path to the same
+        contract via the shared validator.
+        """
+        mgr = BaseTopicManager(tmp_path)
+        mgr.create("Reports")
+        with pytest.raises(ValueError, match="empty|whitespace"):
+            mgr.rename("Reports", new_name)
+        # The topic must still be findable under its original name.
+        assert "Reports" in mgr.list_topics()
+
 
 class TestReorderItems:
     @pytest.fixture

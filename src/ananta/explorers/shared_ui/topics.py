@@ -77,8 +77,20 @@ class BaseTopicManager:
 
     @classmethod
     def _validate_name(cls, name: str) -> None:
-        """Reject names that contain path separators, control bytes, or
-        exceed the length cap (I5)."""
+        """Reject names that are empty, contain path separators, contain
+        control bytes, or exceed the length cap (I4, I5).
+
+        I4: callers normalise whitespace before validating. Without an
+        empty-after-strip check here, ``rename(old, "   ")`` slipped
+        through and wrote ``meta["name"] = ""``, leaving the topic on
+        disk behind a label-less, unselectable sidebar row — soft data
+        corruption. ``create`` already rejected this downstream via the
+        empty-slug check; centralising the guard means every entry point
+        (create, rename, _resolve, …) gets it for free.
+        """
+        if not name:
+            msg = "Topic name must not be empty or whitespace"
+            raise ValueError(msg)
         if "/" in name or "\\" in name:
             msg = f"Topic name must not contain a path separator: {name!r}"
             raise ValueError(msg)

@@ -263,6 +263,48 @@ class TestUploadDocument:
         assert row["status"] == "failed"
         assert ".xyz" in row["reason"] or "unsupported" in row["reason"].lower()
 
+    def test_per_file_disk_work_runs_off_event_loop(
+        self,
+        client: TestClient,
+        mock_ananta: MagicMock,
+        uploads_dir: Path,
+    ) -> None:
+        """The per-file mkdir/write/extract/store/add_item block runs in a
+        worker thread (I2 full).
+
+        The previous I2 fix wrapped only ``extract_text`` and
+        ``get_page_count`` in ``asyncio.to_thread``. The remaining per-file
+        sync ops (``mkdir``, ``write_bytes`` of up to 50 MiB,
+        ``meta.json`` write, ``create_project``, ``store_document`` of up
+        to 16 MiB extracted text, ``topic_mgr.add_item``) still ran on the
+        event loop — bulk uploads of 500 files starve websocket pings,
+        RLM streams, document-list polls, and concurrent handlers.
+        """
+        import asyncio as asyncio_mod
+
+        from ananta.explorers.document import api as api_mod
+
+        real = asyncio_mod.to_thread
+        seen: list[str] = []
+
+        async def tracker(func, /, *args, **kwargs):  # type: ignore[no-untyped-def]
+            seen.append(func.__name__)
+            return await real(func, *args, **kwargs)
+
+        mock_ananta.create_project.return_value = MagicMock()
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(api_mod.asyncio, "to_thread", tracker)
+            resp = client.post(
+                "/api/documents/upload",
+                files=[("files", ("hello.txt", b"hi there", "text/plain"))],
+            )
+        assert resp.status_code == 200
+        # The sync-per-file work was extracted into a single helper that
+        # the route awaits via to_thread.
+        assert any("persist" in n for n in seen), (
+            f"expected a persist helper to be dispatched off-loop; saw: {seen}"
+        )
+
     def test_upload_dotfile_failure_reason_includes_filename(
         self,
         client: TestClient,

@@ -136,6 +136,135 @@ def _failed_row(
     )
 
 
+def _persist_one_upload(
+    state: DocumentExplorerState,
+    *,
+    filename: str,
+    content_type: str | None,
+    content: bytes,
+    ext: str,
+    rel_path: str | None,
+    upload_session_id: str | None,
+    topic: str | None,
+) -> DocumentUploadResponse:
+    """Persist a single uploaded file to disk + storage + topic.
+
+    Synchronous: invoked via ``asyncio.to_thread`` from the upload route
+    so the entire per-file disk-and-storage block (mkdir-with-retry,
+    write_bytes of up to 50 MiB, extract_text, get_page_count, meta.json
+    write, create_project, store_document of up to 16 MiB extracted text,
+    topic add_item) runs off the event loop. Bulk uploads of up to 500
+    files would otherwise starve websocket pings, RLM streams,
+    document-list polls, and concurrent handlers (I2 full).
+
+    Per-file rollback runs in-thread on any failure: if this call created
+    the upload directory or the Ananta project, both are cleaned up so an
+    interrupted persist doesn't strand orphan state.
+    """
+    upload_dir: Path | None = None
+    project_id: str | None = None
+    created_upload_dir = False
+    created_project = False
+    try:
+        # Allocate an upload dir we know is fresh. The 48-bit random
+        # suffix (I14) makes collisions rare; mkdir(exist_ok=False) +
+        # retry-on-FileExistsError is the defence against the small
+        # remaining birthday-collision risk. Five attempts is plenty
+        # given the ~16M-name birthday threshold.
+        for _attempt in range(5):
+            project_id = _make_project_id(filename)
+            upload_dir = state.uploads_dir / project_id
+            try:
+                upload_dir.mkdir(parents=True, exist_ok=False)
+                created_upload_dir = True
+                break
+            except FileExistsError:
+                upload_dir = None
+                project_id = None
+                continue
+        if not created_upload_dir or upload_dir is None or project_id is None:
+            return _failed_row(filename, "could not allocate a unique upload directory", rel_path)
+        original_path = upload_dir / f"original{ext}"
+        original_path.write_bytes(content)
+
+        try:
+            text = extract_text(original_path)
+        except ValueError as exc:
+            shutil.rmtree(upload_dir, ignore_errors=True)
+            return _failed_row(filename, f"text extraction failed: {exc}", rel_path)
+
+        # Page count is purely informational; a failure here must not
+        # abort the upload — the file already extracted cleanly.
+        try:
+            page_count = get_page_count(original_path)
+        except Exception:
+            _logger.exception("get_page_count failed for %r", filename)
+            page_count = None
+
+        meta: dict[str, Any] = {
+            "filename": filename,
+            "content_type": content_type or "application/octet-stream",
+            "size": len(content),
+            "upload_date": datetime.now(UTC).isoformat(),
+            "page_count": page_count,
+        }
+        if rel_path is not None:
+            meta["relative_path"] = rel_path
+        if upload_session_id is not None:
+            meta["upload_session_id"] = upload_session_id
+        (upload_dir / "meta.json").write_text(json.dumps(meta, indent=2))
+
+        state.ananta.create_project(project_id)
+        created_project = True
+        doc_metadata: dict[str, str | int | float | bool] = {
+            "filename": filename,
+            "size": len(content),
+        }
+        if rel_path is not None:
+            doc_metadata["relative_path"] = rel_path
+        if upload_session_id is not None:
+            doc_metadata["upload_session_id"] = upload_session_id
+        doc = ParsedDocument(
+            name=filename,
+            content=text,
+            format=ext.lstrip(".") or "txt",
+            metadata=doc_metadata,
+            char_count=len(text),
+        )
+        state.ananta.storage.store_document(project_id, doc)
+
+        if topic:
+            state.topic_mgr.add_item(topic, project_id)
+
+        return DocumentUploadResponse(
+            project_id=project_id,
+            filename=filename,
+            status="created",
+            relative_path=rel_path,
+        )
+    except Exception as exc:
+        # Per-file rollback: clean up only this file's state. Critical
+        # (C4): only rmtree the upload_dir if THIS request created it.
+        if upload_dir is not None and created_upload_dir:
+            shutil.rmtree(upload_dir, ignore_errors=True)
+        # Critical (I6): only delete the project if THIS upload created
+        # it. If create_project raised on an id collision, the project
+        # belongs to someone else — deleting it would destroy unrelated data.
+        if project_id is not None and created_project:
+            try:
+                state.topic_mgr.remove_item_from_all(project_id)
+            except Exception:
+                pass  # Best-effort cleanup — original error takes priority
+            try:
+                state.ananta.delete_project(project_id)
+            except Exception:
+                pass  # Best-effort cleanup — original error takes priority
+        # Log the original exception server-side; return a generic reason
+        # to avoid leaking filesystem paths or dependency error details.
+        _logger.exception("Unexpected error processing upload %r: %s", filename, exc)
+        return _failed_row(filename, "unexpected upload error", rel_path)
+
+
 def _read_upload_meta(uploads_dir: Path, project_id: str) -> dict[str, Any] | None:
     """Read upload metadata for a document, or None if missing/corrupt."""
     meta_path = uploads_dir / project_id / "meta.json"
@@ -302,190 +431,68 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                 )
                 continue
 
-            upload_dir: Path | None = None
-            project_id: str | None = None
-            created_project = False
-            created_upload_dir = False
-            try:
-                # Validate extension before reading body — only needs filename,
-                # avoids allocating memory for files we'll reject anyway.
-                ext = Path(file.filename).suffix.lower()
-                if not is_supported_extension(file.filename):
-                    # Path.suffix is empty for dotfiles (".env") and
-                    # extensionless names ("Makefile"). Surface the filename
-                    # so the client renders an actionable reason instead of
-                    # a naked trailing colon.
-                    descriptor = ext if ext else f"{file.filename} (no extension)"
-                    results.append(
-                        _failed_row(file.filename, f"unsupported file type: {descriptor}", rel_path)
-                    )
-                    continue
-
-                # Cap read to avoid memory exhaustion from oversized uploads.
-                content = await file.read(MAX_UPLOAD_BYTES + 1)
-                if len(content) > MAX_UPLOAD_BYTES:
-                    results.append(
-                        _failed_row(
-                            file.filename,
-                            f"file exceeds the {MAX_UPLOAD_BYTES // (1024 * 1024)} MB upload limit",
-                            rel_path,
-                        )
-                    )
-                    continue
-
-                total_bytes += len(content)
-                if total_bytes > MAX_AGGREGATE_UPLOAD_BYTES:
-                    # Aggregate cap reached: respect the partial-success
-                    # contract by emitting a failed row for this file (and
-                    # all remaining files via the loop-top check above)
-                    # instead of raising 413 mid-loop and stranding earlier
-                    # successes (C1).
-                    aggregate_cap_reached = True
-                    results.append(
-                        _failed_row(
-                            file.filename,
-                            f"aggregate upload size exceeds the "
-                            f"{MAX_AGGREGATE_UPLOAD_BYTES // (1024 * 1024)} MB limit",
-                            rel_path,
-                        )
-                    )
-                    continue
-
-                # Allocate an upload dir we know is fresh. Retrying on
-                # FileExistsError protects against `_make_project_id` collisions
-                # — the random 48-bit suffix (I14) makes them rare, but a
-                # collision with mkdir(exist_ok=True) would silently overwrite
-                # an existing project's files (C4). Five attempts is plenty
-                # given the birthday-paradox threshold of ~16M uploads.
-                for _attempt in range(5):
-                    project_id = _make_project_id(file.filename)
-                    upload_dir = state.uploads_dir / project_id
-                    try:
-                        upload_dir.mkdir(parents=True, exist_ok=False)
-                        created_upload_dir = True
-                        break
-                    except FileExistsError:
-                        upload_dir = None
-                        project_id = None
-                        continue
-                if not created_upload_dir or upload_dir is None or project_id is None:
-                    results.append(
-                        _failed_row(
-                            file.filename,
-                            "could not allocate a unique upload directory",
-                            rel_path,
-                        )
-                    )
-                    continue
-                # mypy: after the guard above, project_id and upload_dir are non-None
-                assert project_id is not None
-                assert upload_dir is not None
-                original_path = upload_dir / f"original{ext}"
-                original_path.write_bytes(content)
-
-                # Run synchronous, CPU-bound parser libraries off the event
-                # loop (I2). pdfplumber / openpyxl / python-docx / python-pptx
-                # can spend seconds per file on large inputs; with up to 500
-                # files per request, doing this work inline starves every
-                # other request on the same process (websocket pings, RLM
-                # streams, document-list polls, concurrent uploads) for the
-                # duration. asyncio.to_thread releases the loop between
-                # files so other handlers progress.
-                try:
-                    text = await asyncio.to_thread(extract_text, original_path)
-                except ValueError as exc:
-                    shutil.rmtree(upload_dir, ignore_errors=True)
-                    results.append(
-                        _failed_row(file.filename, f"text extraction failed: {exc}", rel_path)
-                    )
-                    continue
-
-                # Compute page/sheet/slide count where applicable. A failure
-                # here must not abort the upload — the file already extracted
-                # cleanly. page_count is purely informational. Same off-loop
-                # treatment as extract_text (I2).
-                try:
-                    page_count = await asyncio.to_thread(get_page_count, original_path)
-                except Exception:
-                    _logger.exception("get_page_count failed for %r", file.filename)
-                    page_count = None
-
-                # Save upload metadata. Apply the same conditional rule for
-                # relative_path / upload_session_id to both meta.json and
-                # ParsedDocument.metadata so consumers see a consistent shape
-                # regardless of which store they read (I3).
-                meta: dict[str, Any] = {
-                    "filename": file.filename,
-                    "content_type": file.content_type or "application/octet-stream",
-                    "size": len(content),
-                    "upload_date": datetime.now(UTC).isoformat(),
-                    "page_count": page_count,
-                }
-                if rel_path is not None:
-                    meta["relative_path"] = rel_path
-                if upload_session_id is not None:
-                    meta["upload_session_id"] = upload_session_id
-                (upload_dir / "meta.json").write_text(json.dumps(meta, indent=2))
-
-                state.ananta.create_project(project_id)
-                created_project = True
-                doc_metadata: dict[str, str | int | float | bool] = {
-                    "filename": file.filename,
-                    "size": len(content),
-                }
-                if rel_path is not None:
-                    doc_metadata["relative_path"] = rel_path
-                if upload_session_id is not None:
-                    doc_metadata["upload_session_id"] = upload_session_id
-                doc = ParsedDocument(
-                    name=file.filename,
-                    content=text,
-                    format=ext.lstrip(".") or "txt",
-                    metadata=doc_metadata,
-                    char_count=len(text),
-                )
-                state.ananta.storage.store_document(project_id, doc)
-
-                if topic:
-                    state.topic_mgr.add_item(topic, project_id)
-
+            # Validate extension before reading body — only needs filename,
+            # avoids allocating memory for files we'll reject anyway.
+            ext = Path(file.filename).suffix.lower()
+            if not is_supported_extension(file.filename):
+                # Path.suffix is empty for dotfiles (".env") and
+                # extensionless names ("Makefile"). Surface the filename
+                # so the client renders an actionable reason instead of
+                # a naked trailing colon.
+                descriptor = ext if ext else f"{file.filename} (no extension)"
                 results.append(
-                    DocumentUploadResponse(
-                        project_id=project_id,
-                        filename=file.filename,
-                        status="created",
-                        relative_path=rel_path,
+                    _failed_row(file.filename, f"unsupported file type: {descriptor}", rel_path)
+                )
+                continue
+
+            # Cap read to avoid memory exhaustion from oversized uploads.
+            content = await file.read(MAX_UPLOAD_BYTES + 1)
+            if len(content) > MAX_UPLOAD_BYTES:
+                results.append(
+                    _failed_row(
+                        file.filename,
+                        f"file exceeds the {MAX_UPLOAD_BYTES // (1024 * 1024)} MB upload limit",
+                        rel_path,
                     )
                 )
-            except HTTPException:
-                raise  # MAX_FOLDER_FILES 413 and topic-validation 422 propagate
-            except Exception as exc:
-                # Per-file rollback: clean up only this file's state. Critical
-                # (C4): only rmtree the upload_dir if THIS request created it.
-                # With mkdir(exist_ok=False) above, created_upload_dir is true
-                # only on a successful fresh creation; legacy callers reading
-                # an unrelated colliding directory must NOT have it deleted.
-                if upload_dir is not None and created_upload_dir:
-                    shutil.rmtree(upload_dir, ignore_errors=True)
-                # Critical (I6): only delete the project if THIS upload created
-                # it. If create_project raised (e.g., ProjectExistsError on an
-                # id collision), the project belongs to someone else — deleting
-                # it would destroy unrelated data.
-                if project_id is not None and created_project:
-                    try:
-                        state.topic_mgr.remove_item_from_all(project_id)
-                    except Exception:
-                        pass  # Best-effort cleanup — original error takes priority
-                    try:
-                        state.ananta.delete_project(project_id)
-                    except Exception:
-                        pass  # Best-effort cleanup — original error takes priority
-                # Log the original exception server-side for diagnosis but
-                # return a generic reason to the client — raw exception text
-                # can leak internal details (filesystem paths, dependency
-                # errors, stack-trace fragments).
-                _logger.exception("Unexpected error processing upload %r: %s", file.filename, exc)
-                results.append(_failed_row(file.filename, "unexpected upload error", rel_path))
+                continue
+
+            total_bytes += len(content)
+            if total_bytes > MAX_AGGREGATE_UPLOAD_BYTES:
+                # Aggregate cap reached: respect the partial-success
+                # contract by emitting a failed row for this file (and
+                # all remaining files via the loop-top check above)
+                # instead of raising 413 mid-loop and stranding earlier
+                # successes (C1).
+                aggregate_cap_reached = True
+                results.append(
+                    _failed_row(
+                        file.filename,
+                        f"aggregate upload size exceeds the "
+                        f"{MAX_AGGREGATE_UPLOAD_BYTES // (1024 * 1024)} MB limit",
+                        rel_path,
+                    )
+                )
+                continue
+
+            # Dispatch the entire per-file disk-and-storage block off the
+            # event loop in a single thread (I2 full). The previous I2 fix
+            # only wrapped extract_text and get_page_count; the remaining
+            # sync ops (mkdir, write_bytes of up to 50 MiB, meta.json
+            # write, create_project, store_document of up to 16 MiB
+            # extracted text, topic_mgr.add_item) still ran on the loop.
+            row = await asyncio.to_thread(
+                _persist_one_upload,
+                state,
+                filename=file.filename,
+                content_type=file.content_type,
+                content=content,
+                ext=ext,
+                rel_path=rel_path,
+                upload_session_id=upload_session_id,
+                topic=topic,
+            )
+            results.append(row)
 
         return results
 

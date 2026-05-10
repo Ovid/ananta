@@ -31,5 +31,5 @@ cover:
 
 loc:
 	@cloc src arxiv-explorer code-explorer document-explorer examples pyproject.toml Makefile \
-		--exclude-dir=node_modules,dist \
+		--exclude-dir=node_modules,dist,.mypy_cache,.pytest_cache,coverage,__pycache__ \
 		--not-match-f='package-lock\.json'

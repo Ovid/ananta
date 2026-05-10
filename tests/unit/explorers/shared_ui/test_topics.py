@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -446,3 +447,66 @@ class TestReorderItems:
         mgr.reorder_items("Alpha", ["b", "a"])
         # Topic name should be unchanged
         assert "Alpha" in mgr.list_topics()
+
+
+class TestConcurrentMutation:
+    """Mutating methods are read-modify-write on topic.json. Without a lock,
+    two thread-pool workers servicing concurrent uploads to the same topic
+    can interleave: A reads ``[X]``, B reads ``[X]``, A writes ``[X, Y]``,
+    B writes ``[X, Z]`` — Y is lost. The recent move of ``_persist_one_upload``
+    into ``asyncio.to_thread`` makes this race meaningfully reachable for
+    parallel folder uploads to the same topic (I2).
+    """
+
+    def test_concurrent_add_item_does_not_lose_writes(self, tmp_path: Path) -> None:
+        mgr = BaseTopicManager(tmp_path)
+        mgr.create("Reports")
+
+        n = 50
+        with ThreadPoolExecutor(max_workers=16) as pool:
+            futures = [pool.submit(mgr.add_item, "Reports", f"item-{i}") for i in range(n)]
+            for f in futures:
+                f.result()
+
+        items = mgr.list_items("Reports")
+        assert len(items) == n
+        assert sorted(items) == sorted(f"item-{i}" for i in range(n))
+
+    def test_concurrent_remove_item_does_not_resurrect_others(self, tmp_path: Path) -> None:
+        mgr = BaseTopicManager(tmp_path)
+        mgr.create("Reports")
+        n = 50
+        for i in range(n):
+            mgr.add_item("Reports", f"item-{i}")
+
+        # Remove the first half concurrently. Without a lock, an interleave
+        # where T_remove(item-0) reads [0..49] but T_remove(item-1)'s write
+        # of [0,2..49] lands first will see T_remove(item-0) write [1..49] —
+        # resurrecting item-1.
+        with ThreadPoolExecutor(max_workers=16) as pool:
+            futures = [
+                pool.submit(mgr.remove_item, "Reports", f"item-{i}") for i in range(n // 2)
+            ]
+            for f in futures:
+                f.result()
+
+        items = mgr.list_items("Reports")
+        assert sorted(items) == sorted(f"item-{i}" for i in range(n // 2, n))
+
+    def test_concurrent_remove_item_from_all_drops_every_ref(self, tmp_path: Path) -> None:
+        mgr = BaseTopicManager(tmp_path)
+        mgr.create("Reports")
+        n = 50
+        for i in range(n):
+            mgr.add_item("Reports", f"item-{i}")
+
+        # Issue 50 concurrent remove_item_from_all calls; each removes a
+        # different item. All should be gone afterwards.
+        with ThreadPoolExecutor(max_workers=16) as pool:
+            futures = [
+                pool.submit(mgr.remove_item_from_all, f"item-{i}") for i in range(n)
+            ]
+            for f in futures:
+                f.result()
+
+        assert mgr.list_items("Reports") == []

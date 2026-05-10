@@ -15,6 +15,52 @@ from ananta.explorers.document.dependencies import DocumentExplorerState
 from ananta.explorers.document.topics import DocumentTopicManager
 
 
+class TestIsValidFilename:
+    """Direct tests for ``_is_valid_filename`` (I5/I6 defense).
+
+    The validator is invoked at both the upload route and the rename
+    route. HTTP-level tests can't reach the validator with raw control
+    bytes (httpx URL-encodes them in multipart filename headers), but a
+    hand-crafted multipart request — or a malicious direct API caller —
+    can. Pin the contract directly so the validator's behaviour doesn't
+    drift.
+    """
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "report.pdf",
+            "John's docs (final, v1+2) [draft] #1.pdf",
+            "中文.pdf",
+            "..hidden.txt",
+            "v1.0..final.txt",  # `..` inside a segment is fine
+        ],
+    )
+    def test_valid_filenames_are_accepted(self, name: str) -> None:
+        from ananta.explorers.document.api import _is_valid_filename
+
+        assert _is_valid_filename(name) is True
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "",
+            "evil\x00.pdf",
+            "newline\n.pdf",
+            "tab\t.pdf",
+            "carriage\r.pdf",
+            "delete\x7f.pdf",
+            "foo/bar.pdf",
+            "back\\slash.pdf",
+            "..",
+        ],
+    )
+    def test_invalid_filenames_are_rejected(self, name: str) -> None:
+        from ananta.explorers.document.api import _is_valid_filename
+
+        assert _is_valid_filename(name) is False
+
+
 class TestMakeProjectId:
     def test_hash_suffix_is_12_hex_chars(self) -> None:
         """Format pinned to slug-<12 hex> (I14 widened from 8 to 12)."""
@@ -1568,3 +1614,75 @@ class TestRenameDocument:
             json={"new_name": "evil.pdf"},
         )
         assert resp.status_code == 400
+
+    def test_rename_rejects_overlong_name(self, client: TestClient, uploads_dir: Path) -> None:
+        """A multi-MB ``new_name`` must be rejected (I6).
+
+        Without an upper bound on ``DocumentRename.new_name``, a single
+        PATCH could write a giant string to ``meta.json`` — ballooning
+        every list-documents call and pushing useless attacker bytes
+        into the LLM context window. Mirror the 512-char relative_path
+        cap.
+        """
+        self._setup_doc(uploads_dir, "report-a3f2", "report.pdf")
+        resp = client.patch(
+            "/api/documents/report-a3f2",
+            json={"new_name": "x" * 1024},
+        )
+        assert resp.status_code == 422
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "evil\x00.pdf",
+            "tab\tname.pdf",
+            "newline\nname.pdf",
+            "carriage\rreturn.pdf",
+            "delete\x7f.pdf",
+        ],
+    )
+    def test_rename_rejects_control_bytes(
+        self, client: TestClient, uploads_dir: Path, name: str
+    ) -> None:
+        """Control bytes in filenames combine with I5 to inject newlines /
+        boundary-marker text into the prompt context. Reject upfront."""
+        self._setup_doc(uploads_dir, "report-a3f2", "report.pdf")
+        resp = client.patch(
+            "/api/documents/report-a3f2",
+            json={"new_name": name},
+        )
+        assert resp.status_code == 422
+
+    @pytest.mark.parametrize("name", ["foo/bar.pdf", "back\\slash.pdf", "a/b/c.pdf"])
+    def test_rename_rejects_path_separators(
+        self, client: TestClient, uploads_dir: Path, name: str
+    ) -> None:
+        """Filenames must not contain path separators — they're filenames,
+        not paths, and a `/`-bearing filename creates rendering ambiguity
+        wherever it surfaces (UI, prompt context, Content-Disposition)."""
+        self._setup_doc(uploads_dir, "report-a3f2", "report.pdf")
+        resp = client.patch(
+            "/api/documents/report-a3f2",
+            json={"new_name": name},
+        )
+        assert resp.status_code == 422
+
+    def test_rename_rejects_dotdot_filename(self, client: TestClient, uploads_dir: Path) -> None:
+        """A bare `..` filename is path-traversal vocabulary."""
+        self._setup_doc(uploads_dir, "report-a3f2", "report.pdf")
+        resp = client.patch(
+            "/api/documents/report-a3f2",
+            json={"new_name": ".."},
+        )
+        assert resp.status_code == 422
+
+    def test_rename_accepts_normal_punctuation(self, client: TestClient, uploads_dir: Path) -> None:
+        """Common filename punctuation (apostrophes, parens, commas, +,
+        ampersands, brackets, hash) must still be accepted — same denylist
+        philosophy as the relative_path validator."""
+        self._setup_doc(uploads_dir, "report-a3f2", "report.pdf")
+        resp = client.patch(
+            "/api/documents/report-a3f2",
+            json={"new_name": "John's docs (final, v1+2) [draft] #1.pdf"},
+        )
+        assert resp.status_code == 200

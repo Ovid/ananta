@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 # Re-export shared schemas used by the document explorer API.
 from ananta.explorers.shared_ui.schemas import (
@@ -61,7 +61,11 @@ class DocumentInfo(BaseModel):
 
 
 class DocumentRename(BaseModel):
-    new_name: str
+    # Length cap mirrors the 512-char relative_path validator (I6).
+    # An unbounded new_name lets a single PATCH write a multi-MB string
+    # into meta.json, ballooning every list-documents call and pushing
+    # useless attacker bytes into the LLM context window.
+    new_name: str = Field(..., max_length=512)
 
 
 class DocumentUploadResponse(BaseModel):

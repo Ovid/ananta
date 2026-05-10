@@ -87,6 +87,32 @@ def _is_valid_relative_path(rel_path: str) -> bool:
     return True
 
 
+def _is_valid_filename(filename: str) -> bool:
+    """Return True if *filename* is safe to persist as ``meta["filename"]``.
+
+    Mirrors the relative-path denylist (I6) but rejects any path
+    separator (filenames are not paths) and the bare `..` traversal
+    vocabulary. Length is bounded by the schema's ``max_length=512``;
+    callers should also strip whitespace before this check.
+
+    Defends two surfaces:
+      1. The filename is rendered into the per-query LLM context (I5
+         channel `_build_doc_context`); control bytes / newlines /
+         boundary-marker characters allow prompt injection.
+      2. The filename surfaces in HTTP Content-Disposition headers and
+         UI labels; control bytes break headers and confuse layouts.
+    """
+    if not filename:
+        return False
+    if "/" in filename or "\\" in filename:
+        return False
+    if _CONTROL_BYTES.search(filename):
+        return False
+    if filename == "..":
+        return False
+    return True
+
+
 # Allow / for old-style arXiv IDs (e.g. cs/9808001v1), but block .. traversal.
 # This regex IS the path-traversal defence in this module: handlers below use
 # `state.uploads_dir / doc_id` directly without further sanitisation, so the
@@ -431,6 +457,17 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                 )
                 continue
 
+            # Reject filenames with control bytes / path separators / `..`
+            # before reading the body (I5 defense + I6 mirror at upload).
+            # The filename is rendered into the per-query LLM context
+            # unwrapped via _build_doc_context — newlines / boundary-marker
+            # punctuation in a filename let an attacker inject content past
+            # the `--- Document: ... ---` marker and into the highest-trust
+            # user-message position.
+            if not _is_valid_filename(file.filename):
+                results.append(_failed_row(file.filename, "invalid filename", rel_path))
+                continue
+
             # Validate extension before reading body — only needs filename,
             # avoids allocating memory for files we'll reject anyway.
             ext = Path(file.filename).suffix.lower()
@@ -553,6 +590,11 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
         new_name = body.new_name.strip()
         if not new_name:
             raise HTTPException(422, "new_name must not be empty or whitespace")
+        if not _is_valid_filename(new_name):
+            raise HTTPException(
+                422,
+                "new_name must not contain control bytes, '/', '\\', or be '..'",
+            )
         meta = _read_upload_meta(state.uploads_dir, doc_id)
         if meta is None:
             raise HTTPException(404, f"Document '{doc_id}' not found")

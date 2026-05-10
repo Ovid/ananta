@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any
 
 from fastapi import WebSocket
@@ -26,6 +27,29 @@ from ananta.explorers.shared_ui.websockets import (
 
 logger = logging.getLogger(__name__)
 
+# Defense-in-depth scrubbing for the per-document context line (I5).
+#
+# The output of `_build_doc_context` is appended to `full_question` (the
+# user-role message) without any boundary marker — so an unscrubbed
+# attacker-controlled `meta["filename"]` could break out of the
+# `--- Document: ... ---` line and inject content into the highest-trust
+# position in the prompt. The upload + rename routes now reject filenames
+# with control bytes / path separators / `..` (I5/I6 at the API layer),
+# but legacy meta.json entries written before validation existed remain
+# on disk indefinitely and must also be defended against.
+#
+# Scrub: replace any control byte (incl. newline / tab / CR / NUL / ESC)
+# with a single space, and collapse runs of three-or-more dashes (the
+# marker delimiter) to two dashes so an attacker can't synthesise a
+# `--- ...` boundary inside the line.
+_CONTROL_BYTES_RE = re.compile(r"[\x00-\x1f\x7f]")
+_DASH_RUN_RE = re.compile(r"-{3,}")
+
+
+def _scrub_for_context(value: str) -> str:
+    """Sanitise an attacker-controlled string for inline prompt rendering."""
+    return _DASH_RUN_RE.sub("--", _CONTROL_BYTES_RE.sub(" ", value))
+
 
 async def _build_doc_context(state: Any, project_ids: list[str]) -> str:
     """Build context from upload metadata (filename, content_type)."""
@@ -35,8 +59,8 @@ async def _build_doc_context(state: Any, project_ids: list[str]) -> str:
         if meta_path.exists():
             try:
                 meta = json.loads(meta_path.read_text())
-                filename = meta.get("filename", pid)
-                content_type = meta.get("content_type", "unknown")
+                filename = _scrub_for_context(str(meta.get("filename", pid)))
+                content_type = _scrub_for_context(str(meta.get("content_type", "unknown")))
                 parts.append(f"--- Document: {filename} (type: {content_type}) ---")
             except (OSError, json.JSONDecodeError):
                 logger.debug("Skipping unreadable metadata for %s", pid, exc_info=True)

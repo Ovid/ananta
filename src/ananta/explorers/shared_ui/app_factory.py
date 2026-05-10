@@ -245,32 +245,48 @@ def create_app(
 
     app = FastAPI(title=title, lifespan=lifespan)
 
-    # Body-size middleware MUST be added before CORS so it runs first on
-    # the inbound path; oversized requests are rejected before any
-    # downstream middleware allocates resources.
-    app.add_middleware(_BodySizeLimitMiddleware, max_bytes=MAX_REQUEST_BODY_BYTES)
-
-    # Same-origin guard for mutating methods. Defends against drive-by
-    # uploads from arbitrary visited pages — see _SameOriginGuardMiddleware
-    # for the full threat model (C2). Added before CORS so the rejection
-    # never reaches CORS-style handling.
-    app.add_middleware(_SameOriginGuardMiddleware)
+    # Middleware ordering note: Starlette's add_middleware inserts at
+    # index 0 of user_middleware, so the LAST add_middleware call wraps
+    # the OUTERMOST layer at runtime. The desired runtime order
+    # (outermost → innermost on the inbound path) is:
+    #
+    #   _BodySizeLimitMiddleware  ← outermost: rejects oversized bodies
+    #                                before any downstream middleware
+    #                                allocates resources
+    #   _SameOriginGuardMiddleware ← drive-by upload defence (C2)
+    #   CORSMiddleware             ← innermost
+    #
+    # To achieve that, add them in REVERSE order: CORS first (innermost),
+    # then SameOrigin, then BodySizeLimit last (outermost).
 
     # CORS — wildcard origins. The actual cross-origin threat (drive-by
     # uploads from arbitrary visited pages) is handled by the same-origin
-    # guard above, which compares Origin to Host per request. We don't
-    # restrict CORS by hostname here because operators may bind the
-    # explorer to an internal address (e.g., a LAN host) where the legitimate
-    # Origin is whatever they've deployed under, not just loopback.
+    # guard, which compares Origin to Host per request. We don't restrict
+    # CORS by hostname here because operators may bind the explorer to
+    # an internal address (e.g., a LAN host) where the legitimate Origin
+    # is whatever they've deployed under, not just loopback.
     # allow_credentials is intentionally omitted: no cookies/auth headers
-    # are used, and combining credentials=True with wildcard origins causes
-    # Starlette to reflect the request Origin.
+    # are used, and combining credentials=True with wildcard origins
+    # causes Starlette to reflect the request Origin.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Same-origin guard for mutating methods. Defends against drive-by
+    # uploads from arbitrary visited pages — see _SameOriginGuardMiddleware
+    # for the full threat model (C2).
+    app.add_middleware(_SameOriginGuardMiddleware)
+
+    # Body-size middleware is added LAST so it sits OUTERMOST at runtime;
+    # oversized requests are rejected before any downstream middleware
+    # allocates resources or reads the body. Future maintainers adding
+    # a body-reading middleware (request logging, metrics, audit) MUST
+    # add it before this line — anything added after will land outside
+    # the cap and process unbounded bodies.
+    app.add_middleware(_BodySizeLimitMiddleware, max_bytes=MAX_REQUEST_BODY_BYTES)
 
     # Suppress Chrome DevTools probing (e.g. /.well-known/appspecific/...)
     @app.get("/.well-known/{path:path}", include_in_schema=False)

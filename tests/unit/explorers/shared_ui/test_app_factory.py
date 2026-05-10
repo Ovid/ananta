@@ -206,6 +206,38 @@ def test_create_app_has_cors_middleware() -> None:
     assert CORSMiddleware in middleware_classes
 
 
+def test_body_size_middleware_is_outermost() -> None:
+    """_BodySizeLimitMiddleware sits OUTERMOST so oversized bodies are rejected
+    before any downstream middleware allocates resources or reads the body.
+
+    Starlette's add_middleware inserts at index 0 of user_middleware, so the
+    LAST add_middleware call wraps the OUTERMOST runtime layer. That means
+    user_middleware[0] is the outermost, user_middleware[-1] is the innermost.
+    A regression here (e.g., reordering the calls in app_factory.py) would
+    silently route unbounded bodies through other middleware before the cap
+    can fire.
+    """
+    from ananta.explorers.shared_ui.app_factory import (
+        _BodySizeLimitMiddleware,
+        _SameOriginGuardMiddleware,
+    )
+
+    state = _make_state()
+    app = create_app(state, title="Test App")
+    middleware_classes = [m.cls for m in app.user_middleware]
+    assert middleware_classes[0] is _BodySizeLimitMiddleware, (
+        f"BodySizeLimit must be outermost; got order {middleware_classes}"
+    )
+    body_idx = middleware_classes.index(_BodySizeLimitMiddleware)
+    same_origin_idx = middleware_classes.index(_SameOriginGuardMiddleware)
+    cors_idx = middleware_classes.index(CORSMiddleware)
+    assert body_idx < same_origin_idx < cors_idx, (
+        "Expected outermost→innermost ordering "
+        "BodySizeLimit → SameOriginGuard → CORS; got "
+        f"{middleware_classes}"
+    )
+
+
 # -- .well-known route --
 
 

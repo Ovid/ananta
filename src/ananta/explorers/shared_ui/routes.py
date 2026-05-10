@@ -289,7 +289,12 @@ def create_shared_router(
             try:
                 state.topic_mgr.rename(name, body.new_name)
             except ValueError as e:
-                raise HTTPException(404, str(e)) from e
+                # Use the shared mapper so a duplicate-name conflict
+                # surfaces as 409 and a validation failure as 422 — the
+                # sibling ``create_item_router.rename_topic`` already does
+                # this. Hardcoding 404 leaked every error class as
+                # "not found" in the FE (S41).
+                raise HTTPException(_topic_error_to_status(e), str(e)) from e
             return {"name": body.new_name}
 
         @router.delete("/api/topics/{name}")
@@ -297,7 +302,7 @@ def create_shared_router(
             try:
                 state.topic_mgr.delete(name)
             except ValueError as e:
-                raise HTTPException(404, str(e)) from e
+                raise HTTPException(_topic_error_to_status(e), str(e)) from e
             return {"status": "deleted", "name": name}
 
     # --- Traces ---

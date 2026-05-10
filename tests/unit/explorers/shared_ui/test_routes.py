@@ -143,6 +143,34 @@ def test_rename_topic_not_found(client: TestClient, mock_state: MagicMock) -> No
     assert resp.status_code == 404
 
 
+def test_rename_topic_already_exists_returns_409(
+    client: TestClient, mock_state: MagicMock
+) -> None:
+    """``create_shared_router.rename_topic`` must map ValueError to the
+    same status taxonomy as ``create_item_router.rename_topic`` (S41).
+
+    Previously the shared router hardcoded 404 for ALL ValueError, so
+    a "Topic '<x>' already exists" conflict from the topic manager was
+    leaked as 404 — the FE displayed it as "topic not found", the wrong
+    UX. ``_topic_error_to_status`` maps it to 409.
+    """
+    mock_state.topic_mgr.rename.side_effect = ValueError("Topic 'Beta' already exists")
+    resp = client.patch("/api/topics/alpha", json={"new_name": "Beta"})
+    assert resp.status_code == 409
+
+
+def test_rename_topic_validation_error_returns_422(
+    client: TestClient, mock_state: MagicMock
+) -> None:
+    """A validation ValueError (e.g. control bytes, slug collision) maps
+    to 422 — not 404 (S41)."""
+    mock_state.topic_mgr.rename.side_effect = ValueError(
+        "Topic name must not contain control characters: 'bad\\x00name'"
+    )
+    resp = client.patch("/api/topics/alpha", json={"new_name": "bad\x00name"})
+    assert resp.status_code == 422
+
+
 def test_delete_topic(client: TestClient, mock_state: MagicMock) -> None:
     mock_state.topic_mgr.resolve.return_value = "some-id"
     resp = client.delete("/api/topics/chess")

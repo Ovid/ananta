@@ -439,6 +439,96 @@ class TestUploadDocument:
         assert by_filename["big.md"]["status"] == "failed"
         assert "limit" in by_filename["big.md"]["reason"].lower()
 
+    def test_upload_rolls_back_newly_created_topic_on_full_failure(
+        self,
+        client: TestClient,
+        mock_ananta: MagicMock,
+        topic_mgr: DocumentTopicManager,
+        uploads_dir: Path,
+    ) -> None:
+        """When the upload route auto-creates a topic and EVERY per-file
+        persist then fails, the empty topic must be rolled back (S6).
+
+        Without rollback, the user sees a label-less stub topic (no items)
+        in the sidebar — soft data corruption since no UI element added it.
+        Pre-existing topics (created by the user explicitly, or carrying
+        items from prior uploads) must NOT be deleted on full failure.
+        """
+        mock_ananta.create_project.return_value = MagicMock()
+        # Every file is unsupported, so every row will be "failed" and
+        # nothing reaches _persist_one_upload.
+        response = client.post(
+            "/api/documents/upload",
+            files=[
+                ("files", ("a.exe", b"junk", "application/octet-stream")),
+                ("files", ("b.exe", b"junk", "application/octet-stream")),
+            ],
+            data={"topic": "FreshTopic"},
+        )
+        assert response.status_code == 200
+        rows = response.json()
+        assert all(r["status"] == "failed" for r in rows)
+        # The auto-created empty topic must NOT remain.
+        assert "FreshTopic" not in topic_mgr.list_topics()
+
+    def test_upload_does_not_roll_back_pre_existing_topic_on_full_failure(
+        self,
+        client: TestClient,
+        mock_ananta: MagicMock,
+        topic_mgr: DocumentTopicManager,
+        uploads_dir: Path,
+    ) -> None:
+        """A topic that EXISTED before the request must survive a
+        full-failure upload (S6).
+
+        Two cases land here:
+        1. User explicitly created the topic via POST /api/topics, then
+           uploaded into it — even if the upload fails entirely, the
+           topic the user explicitly named must remain.
+        2. A previous upload populated the topic with items; the next
+           upload fully fails — those existing items must remain.
+        """
+        mock_ananta.create_project.return_value = MagicMock()
+        topic_mgr.create("UserTopic")
+
+        response = client.post(
+            "/api/documents/upload",
+            files=[
+                ("files", ("a.exe", b"junk", "application/octet-stream")),
+            ],
+            data={"topic": "UserTopic"},
+        )
+        assert response.status_code == 200
+        assert response.json()[0]["status"] == "failed"
+        # The user-created topic must remain.
+        assert "UserTopic" in topic_mgr.list_topics()
+
+    def test_upload_does_not_roll_back_topic_when_at_least_one_file_succeeds(
+        self,
+        client: TestClient,
+        mock_ananta: MagicMock,
+        topic_mgr: DocumentTopicManager,
+        uploads_dir: Path,
+    ) -> None:
+        """If even one file's persist succeeds, the auto-created topic
+        survives (S6). Partial-success contract: the topic now references
+        the successful project_id, so deleting it would orphan that ref.
+        """
+        mock_ananta.create_project.return_value = MagicMock()
+        response = client.post(
+            "/api/documents/upload",
+            files=[
+                ("files", ("good.md", b"hello", "text/markdown")),
+                ("files", ("bad.xyz", b"junk", "application/octet-stream")),
+            ],
+            data={"topic": "MixedTopic"},
+        )
+        assert response.status_code == 200
+        rows = response.json()
+        assert any(r["status"] == "created" for r in rows)
+        assert any(r["status"] == "failed" for r in rows)
+        assert "MixedTopic" in topic_mgr.list_topics()
+
     def test_upload_persists_relative_path_and_session_id(
         self,
         client: TestClient,

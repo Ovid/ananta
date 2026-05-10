@@ -423,6 +423,11 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
         # files or projects — avoids orphaned data on invalid topics.
         # Topic-validation is still all-or-nothing; only per-file work is
         # partial-success.
+        # Track whether THIS request created the topic so we can roll it
+        # back on full failure (S6). A topic the user explicitly created
+        # via POST /api/topics — or a topic that already carries items
+        # from a previous upload — must NOT be deleted.
+        topic_existed_before = bool(topic) and topic in state.topic_mgr.list_topics()
         if topic:
             try:
                 state.topic_mgr.create(topic)
@@ -531,6 +536,18 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                 topic=topic,
             )
             results.append(row)
+
+        # If we auto-created the topic for this request and not a single
+        # file got persisted, roll it back so the user is not left with
+        # a label-less stub in the sidebar (S6).
+        if topic and not topic_existed_before:
+            any_created = any(r.status == "created" for r in results)
+            if not any_created:
+                try:
+                    state.topic_mgr.delete(topic)
+                except ValueError:
+                    # Already gone (e.g. a concurrent caller raced ahead).
+                    pass
 
         return results
 

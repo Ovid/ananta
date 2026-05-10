@@ -263,6 +263,44 @@ class TestUploadDocument:
         assert row["status"] == "failed"
         assert ".xyz" in row["reason"] or "unsupported" in row["reason"].lower()
 
+    def test_upload_dotfile_failure_reason_includes_filename(
+        self,
+        client: TestClient,
+        uploads_dir: Path,
+    ) -> None:
+        """Dotfile rejections must surface an actionable reason.
+
+        ``Path('.env').suffix`` is ``''``, so the previous
+        ``f"unsupported file type: {ext}"`` produced
+        ``"unsupported file type: "`` — useless for the client to render.
+        """
+        resp = client.post(
+            "/api/documents/upload",
+            files=[("files", (".env", b"API_KEY=secret", "text/plain"))],
+        )
+        assert resp.status_code == 200
+        [row] = resp.json()
+        assert row["status"] == "failed"
+        reason = row["reason"]
+        assert ".env" in reason or "no extension" in reason.lower()
+        assert not reason.rstrip().endswith(":")
+
+    def test_upload_extensionless_failure_reason_includes_filename(
+        self,
+        client: TestClient,
+        uploads_dir: Path,
+    ) -> None:
+        resp = client.post(
+            "/api/documents/upload",
+            files=[("files", ("Makefile", b"all:\n", "text/plain"))],
+        )
+        assert resp.status_code == 200
+        [row] = resp.json()
+        assert row["status"] == "failed"
+        reason = row["reason"]
+        assert "Makefile" in reason or "no extension" in reason.lower()
+        assert not reason.rstrip().endswith(":")
+
     def test_upload_partial_success_unsupported_extension(
         self,
         client: TestClient,

@@ -311,8 +311,13 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                 # avoids allocating memory for files we'll reject anyway.
                 ext = Path(file.filename).suffix.lower()
                 if not is_supported_extension(file.filename):
+                    # Path.suffix is empty for dotfiles (".env") and
+                    # extensionless names ("Makefile"). Surface the filename
+                    # so the client renders an actionable reason instead of
+                    # a naked trailing colon.
+                    descriptor = ext if ext else f"{file.filename} (no extension)"
                     results.append(
-                        _failed_row(file.filename, f"unsupported file type: {ext}", rel_path)
+                        _failed_row(file.filename, f"unsupported file type: {descriptor}", rel_path)
                     )
                     continue
 

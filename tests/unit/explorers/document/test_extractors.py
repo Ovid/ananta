@@ -177,6 +177,56 @@ class TestExtractedTextSizeCap:
         assert len(result) <= MAX_EXTRACTED_TEXT_BYTES + 256
         assert "truncated" in result.lower()
 
+    def test_cap_is_bytes_not_characters_for_multibyte_text(self, tmp_path: Path) -> None:
+        """Cap is enforced in UTF-8 bytes, not characters.
+
+        The constant is named ``MAX_EXTRACTED_TEXT_BYTES`` and the config
+        docstring describes a byte cap (decompression-bomb defence). For
+        non-ASCII content, character count != byte count: 'é' is 2 bytes,
+        '中' is 3 bytes. A character-based slice for a body of 2-byte chars
+        would let through 2x the advertised cap. This test pins the byte
+        semantics by patching the cap small and writing multi-byte content
+        whose char count is under the cap but byte count is well over it.
+        """
+        from ananta.explorers.document import extractors as ext_mod
+
+        f = tmp_path / "multibyte.txt"
+        # 'é' is 2 bytes in UTF-8. 1000 chars = 2000 bytes.
+        body = "é" * 1000
+        f.write_text(body, encoding="utf-8")
+
+        with patch.object(ext_mod, "MAX_EXTRACTED_TEXT_BYTES", 1000):
+            result = extract_text(f)
+
+        # The body content must be truncated to at most 1000 bytes; allow
+        # a small marker overhead for the truncation message.
+        assert len(result.encode("utf-8")) <= 1000 + 256
+        assert "truncated" in result.lower()
+
+    def test_truncation_does_not_split_multibyte_character(self, tmp_path: Path) -> None:
+        """Boundary slice must not split a multi-byte UTF-8 sequence.
+
+        Slicing bytes mid-character would produce a string containing a
+        replacement char or fail to decode; the result must remain valid
+        UTF-8 with no replacement characters introduced by the truncation.
+        """
+        from ananta.explorers.document import extractors as ext_mod
+
+        f = tmp_path / "boundary.txt"
+        # 3-byte char '中' x 1000 = 3000 bytes. With cap=1000, the boundary
+        # slice falls on a 3-byte boundary if naive — proving it doesn't
+        # produce a U+FFFD replacement character.
+        body = "中" * 1000
+        f.write_text(body, encoding="utf-8")
+
+        with patch.object(ext_mod, "MAX_EXTRACTED_TEXT_BYTES", 1000):
+            result = extract_text(f)
+
+        # No U+FFFD replacement character should appear in the body portion;
+        # we strip the marker and assert the body is clean.
+        body_part = result.split("\n[Extracted text truncated")[0]
+        assert "�" not in body_part
+
 
 class TestPdfExtraction:
     """Tests for PDF text extraction."""

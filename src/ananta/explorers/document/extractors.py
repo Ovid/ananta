@@ -71,20 +71,26 @@ def is_supported_extension(filename: str) -> bool:
 
 
 def _truncate_to_cap(text: str) -> str:
-    """Truncate *text* to ``MAX_EXTRACTED_TEXT_BYTES`` with a marker (I3).
+    """Truncate *text* to ``MAX_EXTRACTED_TEXT_BYTES`` UTF-8 bytes (I3).
 
     Bounds in-process memory and the on-disk document store against
     decompression-bomb DoS via heavily-compressed xlsx/pptx/docx/pdf,
     and reduces attacker-controlled bytes flowing into the RLM context.
-    Length is measured in characters; one char ≈ one UTF-8 byte for
-    typical document text, with a small overhead for non-ASCII content.
     """
-    if len(text) <= MAX_EXTRACTED_TEXT_BYTES:
+    # Fast path: each UTF-8 char is at most 4 bytes, so a char count well
+    # under the cap can't possibly encode to more bytes than the cap. Skips
+    # an unnecessary bytes-copy for the common (under-cap) case.
+    if len(text) * 4 <= MAX_EXTRACTED_TEXT_BYTES:
         return text
+    encoded = text.encode("utf-8")
+    if len(encoded) <= MAX_EXTRACTED_TEXT_BYTES:
+        return text
+    # errors='ignore' drops a partial multi-byte sequence at the boundary
+    # so the result is always valid UTF-8 with no replacement characters.
+    truncated = encoded[:MAX_EXTRACTED_TEXT_BYTES].decode("utf-8", errors="ignore")
     return (
-        text[:MAX_EXTRACTED_TEXT_BYTES]
-        + f"\n[Extracted text truncated to {MAX_EXTRACTED_TEXT_BYTES:,} of "
-        f"{len(text):,} characters.]"
+        truncated + f"\n[Extracted text truncated to {MAX_EXTRACTED_TEXT_BYTES:,} of "
+        f"{len(encoded):,} bytes.]"
     )
 
 
@@ -97,7 +103,7 @@ def extract_text(path: Path, content_type: str | None = None) -> str:
     like pdfplumber's PDFSyntaxError, zipfile's BadZipFile, openpyxl's
     InvalidFileException, python-pptx's PackageNotFoundError).
 
-    Output is capped at ``MAX_EXTRACTED_TEXT_BYTES`` characters with an
+    Output is capped at ``MAX_EXTRACTED_TEXT_BYTES`` UTF-8 bytes with an
     inline truncation marker — see ``_truncate_to_cap``.
     """
     ext = path.suffix.lower()

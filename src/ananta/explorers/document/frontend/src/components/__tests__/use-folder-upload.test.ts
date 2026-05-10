@@ -604,6 +604,62 @@ describe('useFolderUpload', () => {
     })
   })
 
+  it("aborted-branch setPending(null) does not clobber a newer upload's pending (I3)", async () => {
+    // Race: cancel(A) → start(B) → A's finally settles → A's aborted-branch
+    // unconditionally setPending(null) → wipes B's pending → B's Continue
+    // becomes a silent no-op (confirm early-returns at `if (!pending) return`).
+    //
+    // The C3 fix added an identity guard for abortCtlRef.current === ctl on
+    // the same path, but did NOT apply the same guard to setPending(null).
+    // Verify B's pending survives A's late settling.
+    const filesA = [{ file: new File(['x'], 'a.md'), relativePath: 'a.md' }]
+    const filesB = [{ file: new File(['y'], 'b.md'), relativePath: 'b.md' }]
+    let resolveA: (rows: UploadRow[]) => void = () => {}
+    let resolveB: (rows: UploadRow[]) => void = () => {}
+    const promiseA = new Promise<UploadRow[]>((r) => { resolveA = r })
+    const promiseB = new Promise<UploadRow[]>((r) => { resolveB = r })
+    const uploadSpy = vi.spyOn(documentsApi, 'uploadFolderInBatches')
+    uploadSpy.mockImplementationOnce(async () => promiseA)
+    uploadSpy.mockImplementationOnce(async () => promiseB)
+
+    const { result } = renderHook(() => useFolderUpload())
+
+    // Upload A: start, confirm, then cancel mid-flight.
+    await act(async () => {
+      await result.current.start({ kind: 'walked', files: filesA, rootName: 'a' }, 'T')
+    })
+    let confirmA: Promise<void> = Promise.resolve()
+    act(() => { confirmA = result.current.confirm() })
+    expect(result.current.state?.kind).toBe('progress')
+    act(() => { result.current.cancel() })
+
+    // Upload B: start (now pending = B). A's promise still in flight.
+    await act(async () => {
+      await result.current.start({ kind: 'walked', files: filesB, rootName: 'b' }, 'T')
+    })
+    expect(result.current.state?.kind).toBe('preflight')
+
+    // A's promise resolves NOW — A's aborted-branch runs setPending(null)
+    // and would wipe B's pending unless guarded by an identity check.
+    await act(async () => {
+      resolveA([{ project_id: 'pa', filename: 'a.md', status: 'created' }])
+      await confirmA
+    })
+
+    // The user clicks Continue on B's preflight. confirm() must run B's
+    // upload — not silently no-op because pending was wiped.
+    let confirmB: Promise<void> = Promise.resolve()
+    act(() => { confirmB = result.current.confirm() })
+    expect(result.current.state?.kind).toBe('progress')
+    expect(uploadSpy).toHaveBeenCalledTimes(2)
+
+    // Clean up B
+    await act(async () => {
+      resolveB([{ project_id: 'pb', filename: 'b.md', status: 'created' }])
+      await confirmB
+    })
+  })
+
   it('cancel during upload bails before summary fires', async () => {
     // Reproduces the bug where a late onProgress callback (or the post-upload
     // summary setState) reanimated the modal after the user clicked Cancel.

@@ -161,7 +161,11 @@ export function useFolderUpload() {
       // User cancelled mid-flight: cancel() already cleared state and bumped
       // commitVersion. Do not emit a summary — that would re-mount the modal
       // the user just closed.
-      setPending(null)
+      // I3: guard the setPending(null) with the same identity-check pattern
+      // the C3 fix used for abortCtlRef. If cancel(A) → start(B) installed a
+      // new pending while we were awaiting, an unconditional clear would
+      // silently wipe B's pending and B's Continue would no-op.
+      setPending(prev => (prev?.accepted === accepted ? null : prev))
       return
     }
     const ingested = rows.filter(r => r.status === 'created').length

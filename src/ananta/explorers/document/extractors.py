@@ -143,31 +143,55 @@ def _extract_plain_text(path: Path) -> str:
     return path.read_text(encoding="utf-8", errors="replace")
 
 
+# Per-format extractors stream-and-bail using this cumulative-bytes guard
+# so peak memory is bounded too — not just the on-disk store. Without the
+# in-loop bail, a heavily-compressed file under the 50 MiB upload cap can
+# decompress to hundreds of MB of plain text before _truncate_to_cap fires
+# at the boundary. The boundary truncator still applies on top to enforce
+# the exact byte cap.
 def _extract_pdf(path: Path) -> str:
     pages: list[str] = []
+    cumulative = 0
     with pdfplumber.open(path) as pdf:
         for page in pdf.pages:
             text = page.extract_text()
             if text:
                 pages.append(text)
+                cumulative += len(text.encode("utf-8")) + 2  # "\n\n" separator
+                if cumulative >= MAX_EXTRACTED_TEXT_BYTES:
+                    break
     return "\n\n".join(pages)
 
 
 def _extract_docx(path: Path) -> str:
     doc = DocxDocument(str(path))
-    return "\n\n".join(p.text for p in doc.paragraphs if p.text)
+    parts: list[str] = []
+    cumulative = 0
+    for p in doc.paragraphs:
+        if not p.text:
+            continue
+        parts.append(p.text)
+        cumulative += len(p.text.encode("utf-8")) + 2  # "\n\n" separator
+        if cumulative >= MAX_EXTRACTED_TEXT_BYTES:
+            break
+    return "\n\n".join(parts)
 
 
 def _extract_pptx(path: Path) -> str:
     prs = PptxPresentation(str(path))
     parts: list[str] = []
+    cumulative = 0
     for i, slide in enumerate(prs.slides, 1):
         slide_texts: list[str] = []
         for shape in slide.shapes:
             if shape.has_text_frame:
                 slide_texts.append(shape.text_frame.text)
         if slide_texts:
-            parts.append(f"--- Slide {i} ---\n" + "\n".join(slide_texts))
+            joined = f"--- Slide {i} ---\n" + "\n".join(slide_texts)
+            parts.append(joined)
+            cumulative += len(joined.encode("utf-8")) + 2
+            if cumulative >= MAX_EXTRACTED_TEXT_BYTES:
+                break
     return "\n\n".join(parts)
 
 
@@ -175,13 +199,20 @@ def _extract_xlsx(path: Path) -> str:
     wb = load_workbook(path, read_only=True, data_only=True)
     try:
         parts: list[str] = []
+        cumulative = 0
         for sheet_name in wb.sheetnames:
             sheet = wb[sheet_name]
             rows: list[str] = []
             for row in sheet.iter_rows():
                 cells = [str(cell.value) if cell.value is not None else "" for cell in row]
-                rows.append("\t".join(cells))
+                row_text = "\t".join(cells)
+                rows.append(row_text)
+                cumulative += len(row_text.encode("utf-8")) + 1  # "\n" separator
+                if cumulative >= MAX_EXTRACTED_TEXT_BYTES:
+                    break
             parts.append(f"--- {sheet_name} ---\n" + "\n".join(rows))
+            if cumulative >= MAX_EXTRACTED_TEXT_BYTES:
+                break
         return "\n\n".join(parts)
     finally:
         wb.close()

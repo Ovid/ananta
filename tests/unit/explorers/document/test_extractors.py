@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -230,6 +232,147 @@ class TestExtractedTextSizeCap:
         # a small marker overhead for the truncation message.
         assert len(result.encode("utf-8")) <= 1000 + 256
         assert "truncated" in result.lower()
+
+    def test_pdf_streams_and_stops_after_cap_reached(self, tmp_path: Path) -> None:
+        """``_extract_pdf`` stops iterating pages once the cap is reached.
+
+        I1 (full): the 16 MiB cap previously fired on the joined string AFTER
+        every page was read into memory. A heavily-compressed PDF could
+        therefore decompress hundreds of MB into RAM before the truncator
+        bounded it. The fix tracks cumulative bytes inside the per-page
+        loop and bails as soon as the cap is crossed, so peak memory is
+        bounded too — not just the on-disk store.
+        """
+        from ananta.explorers.document import extractors as ext_mod
+
+        # 100 pages × 1 MB-ish each = 100 MB if naive. With cap=5 MB the
+        # streaming loop should bail after ~5-6 pages — extract_text on the
+        # later pages must not be called.
+        pages = []
+        for _ in range(100):
+            p = MagicMock()
+            p.extract_text.return_value = "x" * (1024 * 1024)
+            pages.append(p)
+        mock_pdf = MagicMock()
+        mock_pdf.pages = pages
+        mock_pdf.__enter__ = lambda self: mock_pdf
+        mock_pdf.__exit__ = MagicMock(return_value=False)
+
+        f = tmp_path / "big.pdf"
+        f.write_bytes(b"%PDF-1.4 fake")
+
+        with (
+            patch.object(ext_mod, "MAX_EXTRACTED_TEXT_BYTES", 5 * 1024 * 1024),
+            patch("ananta.explorers.document.extractors.pdfplumber") as mock_plumber,
+        ):
+            mock_plumber.open.return_value = mock_pdf
+            extract_text(f)
+
+        # Streaming bail: only the first ~6 pages should have been read.
+        # Without the fix all 100 pages get extract_text called.
+        called = sum(1 for p in pages if p.extract_text.called)
+        assert called < 20, f"streaming should bail early, but {called} pages were read"
+
+    def test_docx_streams_and_stops_after_cap_reached(self, tmp_path: Path) -> None:
+        """``_extract_docx`` stops iterating paragraphs once the cap is reached.
+
+        Counts how many paragraphs were yielded by the source iterator —
+        without streaming, all 100 are consumed and ~100 MB is built in
+        Python memory before the cap fires at the public boundary.
+        """
+        from ananta.explorers.document import extractors as ext_mod
+
+        consumed: list[int] = [0]
+
+        def para_gen() -> Iterator[Any]:
+            for _ in range(100):
+                consumed[0] += 1
+                p = MagicMock()
+                p.text = "x" * (1024 * 1024)
+                yield p
+
+        mock_doc = MagicMock()
+        mock_doc.paragraphs = para_gen()
+
+        f = tmp_path / "big.docx"
+        f.write_bytes(b"PK fake docx")
+
+        with (
+            patch.object(ext_mod, "MAX_EXTRACTED_TEXT_BYTES", 5 * 1024 * 1024),
+            patch("ananta.explorers.document.extractors.DocxDocument") as mock_cls,
+        ):
+            mock_cls.return_value = mock_doc
+            extract_text(f)
+
+        assert consumed[0] < 20, (
+            f"streaming should bail early, but {consumed[0]} paragraphs were consumed"
+        )
+
+    def test_pptx_streams_and_stops_after_cap_reached(self, tmp_path: Path) -> None:
+        """``_extract_pptx`` stops iterating slides once the cap is reached."""
+        from ananta.explorers.document import extractors as ext_mod
+
+        consumed: list[int] = [0]
+
+        def slide_gen() -> Iterator[Any]:
+            for _ in range(100):
+                consumed[0] += 1
+                shape = MagicMock()
+                shape.has_text_frame = True
+                shape.text_frame.text = "x" * (1024 * 1024)
+                slide = MagicMock()
+                slide.shapes = [shape]
+                yield slide
+
+        mock_prs = MagicMock()
+        mock_prs.slides = slide_gen()
+
+        f = tmp_path / "big.pptx"
+        f.write_bytes(b"PK fake pptx")
+
+        with (
+            patch.object(ext_mod, "MAX_EXTRACTED_TEXT_BYTES", 5 * 1024 * 1024),
+            patch("ananta.explorers.document.extractors.PptxPresentation") as mock_cls,
+        ):
+            mock_cls.return_value = mock_prs
+            extract_text(f)
+
+        assert consumed[0] < 20, (
+            f"streaming should bail early, but {consumed[0]} slides were consumed"
+        )
+
+    def test_xlsx_streams_and_stops_after_cap_reached(self, tmp_path: Path) -> None:
+        """``_extract_xlsx`` stops iterating sheets/rows once the cap is reached."""
+        from ananta.explorers.document import extractors as ext_mod
+
+        consumed: list[int] = [0]
+
+        def row_gen() -> Iterator[Any]:
+            for _ in range(100):
+                consumed[0] += 1
+                cell = MagicMock()
+                cell.value = "x" * (1024 * 1024)
+                yield [cell]
+
+        mock_sheet = MagicMock()
+        mock_sheet.iter_rows.return_value = row_gen()
+        mock_wb = MagicMock()
+        mock_wb.sheetnames = ["Sheet1"]
+        mock_wb.__getitem__.return_value = mock_sheet
+
+        f = tmp_path / "big.xlsx"
+        f.write_bytes(b"PK fake xlsx")
+
+        with (
+            patch.object(ext_mod, "MAX_EXTRACTED_TEXT_BYTES", 5 * 1024 * 1024),
+            patch("ananta.explorers.document.extractors.load_workbook") as mock_load,
+        ):
+            mock_load.return_value = mock_wb
+            extract_text(f)
+
+        assert consumed[0] < 20, (
+            f"streaming should bail early, but {consumed[0]} rows were consumed"
+        )
 
     def test_truncation_does_not_split_multibyte_character(self, tmp_path: Path) -> None:
         """Boundary slice must not split a multi-byte UTF-8 sequence.

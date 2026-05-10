@@ -45,11 +45,18 @@ export default function UploadArea({ onUpload, onFolderUpload, activeTopic }: Up
     setDragging(false)
     if (disabled) return
 
-    const items = Array.from(e.dataTransfer.items ?? [])
+    // webkitGetAsEntry is non-standard. All current major browsers ship it,
+    // but webviews / older browsers / test harnesses may deliver
+    // DataTransferItems without it — calling it unconditionally would throw
+    // and break ALL drag-drop (even plain file drops). Probe per-item and
+    // fall back to the flat file list when no entries can be enumerated.
+    type DTIWithEntry = DataTransferItem & { webkitGetAsEntry?: () => FileSystemEntry | null }
+    const items = Array.from(e.dataTransfer.items ?? []) as DTIWithEntry[]
     const entries: FileSystemEntry[] = []
     let rootName = ''
     for (const item of items) {
-      const entry = (item as DataTransferItem & { webkitGetAsEntry: () => FileSystemEntry | null }).webkitGetAsEntry()
+      if (typeof item.webkitGetAsEntry !== 'function') continue
+      const entry = item.webkitGetAsEntry()
       if (entry) {
         entries.push(entry)
         if (entry.isDirectory && !rootName) rootName = entry.name

@@ -100,6 +100,31 @@ describe('UploadArea', () => {
     expect(onUpload).not.toHaveBeenCalled()
   })
 
+  it('falls back to onUpload when webkitGetAsEntry is not available on items', async () => {
+    // Defensive: webkitGetAsEntry is non-standard. Some webviews / older
+    // browsers / test harnesses can deliver DataTransferItems without it.
+    // The previous unconditional type-cast threw, taking down ALL drag-drop
+    // (even plain file drops). Verify a safe fallback to handleFiles.
+    const onFolderUpload = vi.fn(async () => {})
+    const onUpload = vi.fn(async () => {})
+    render(<UploadArea onUpload={onUpload} onFolderUpload={onFolderUpload} activeTopic="Barsoom" />)
+
+    const file = new File(['x'], 'a.md')
+    // items[0] has NO webkitGetAsEntry property — simulates the unsupported
+    // browser. files[] is the plain file list.
+    const dataTransfer = {
+      files: [file],
+      items: [{ kind: 'file', type: 'text/markdown' }],
+    } as unknown as DataTransfer
+
+    const zone = screen.getByRole('button', { name: 'Upload files' })
+    fireEvent.drop(zone, { dataTransfer })
+
+    await waitFor(() => expect(onUpload).toHaveBeenCalled())
+    expect(onFolderUpload).not.toHaveBeenCalled()
+    expect(onUpload).toHaveBeenCalledWith([expect.objectContaining({ name: 'a.md' })])
+  })
+
   it('routes plain file drops to onUpload', async () => {
     const onFolderUpload = vi.fn(async () => {})
     const onUpload = vi.fn(async () => {})

@@ -46,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Document Explorer: the folder-upload progress modal no longer briefly displays "batch 0 of N" before the first batch completes
 - Document Explorer: corrupt PDFs / DOCX / PPTX / XLSX files now report "text extraction failed: …" instead of a generic "unexpected upload error"
 - Document Explorer: rejection messages for dotfiles (`.env`, `.gitignore`) and extensionless files (`Makefile`) now include the filename or `(no extension)` instead of leaving the reason as `unsupported file type:` with nothing after the colon — `Path.suffix` returns an empty string for those filenames, making the previous message useless to the client. Applies to both the upload route and direct `extract_text()` callers
+- Document Explorer: drag-drop uploads no longer break in browsers / webviews / test harnesses where `DataTransferItem.webkitGetAsEntry` is unavailable — the handler now feature-detects per-item and falls back to the flat file list, so plain file drops still work even when no `webkitGetAsEntry` is present
 - Document Explorer: a get_page_count failure no longer rejects the entire upload — page count falls back to None and the file still ingests
 - Document Explorer: dropping multiple folders at once now strips each top-level folder's own name from its files' relative paths (previously only the first folder's prefix was stripped)
 - Document Explorer: a single unreadable file in a dropped folder no longer abandons the whole walk — readable files still reach the summary

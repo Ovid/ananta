@@ -74,8 +74,7 @@ _CONTROL_BYTES = re.compile(r"[\x00-\x1f\x7f]")
 # string equality, so a near-miss diverged copy renders two near-
 # identical lines (S5 same shape).
 _AGGREGATE_CAP_REASON = (
-    f"aggregate upload size exceeds the "
-    f"{MAX_AGGREGATE_UPLOAD_BYTES // (1024 * 1024)} MB limit"
+    f"aggregate upload size exceeds the {MAX_AGGREGATE_UPLOAD_BYTES // (1024 * 1024)} MB limit"
 )
 
 
@@ -460,9 +459,7 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
             # failed row so the caller can reconcile the request count. We
             # don't break — direct API callers benefit from a row per file.
             if aggregate_cap_reached:
-                results.append(
-                    _failed_row(file.filename, _AGGREGATE_CAP_REASON, rel_path)
-                )
+                results.append(_failed_row(file.filename, _AGGREGATE_CAP_REASON, rel_path))
                 continue
 
             # Reject filenames with control bytes / path separators / `..`
@@ -513,9 +510,7 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
                 # instead of raising 413 mid-loop and stranding earlier
                 # successes (C1).
                 aggregate_cap_reached = True
-                results.append(
-                    _failed_row(file.filename, _AGGREGATE_CAP_REASON, rel_path)
-                )
+                results.append(_failed_row(file.filename, _AGGREGATE_CAP_REASON, rel_path))
                 continue
 
             # Dispatch the entire per-file disk-and-storage block off the

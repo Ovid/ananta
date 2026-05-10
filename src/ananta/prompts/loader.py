@@ -3,8 +3,8 @@
 import os
 from pathlib import Path
 
-from ananta.rlm.boundary import wrap_untrusted
 from ananta.prompts.validator import PROMPT_SCHEMAS, validate_prompt
+from ananta.rlm.boundary import wrap_untrusted
 
 
 def get_default_prompts_dir() -> Path:

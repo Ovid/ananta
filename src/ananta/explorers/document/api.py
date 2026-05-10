@@ -523,7 +523,10 @@ def _create_document_router(state: DocumentExplorerState) -> APIRouter:
         try:
             state.topic_mgr.remove_item_from_all(doc_id)
         except Exception:
-            _logger.exception("delete_document: topic_mgr.remove_item_from_all failed for %r", doc_id)
+            _logger.exception(
+                "delete_document: topic_mgr.remove_item_from_all failed for %r",
+                doc_id,
+            )
         # Best-effort: remove upload files.
         if upload_dir.exists():
             try:

@@ -1,0 +1,6 @@
+{
+  "enabledPlugins": {
+    "paad@paad": true,
+    "superpowers@claude-plugins-official": true
+  }
+}

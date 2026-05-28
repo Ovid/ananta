@@ -35,6 +35,7 @@ Thumbs.db
 HANDOFF.md
 
 # Development
+.devcontainer/
 scratch/
 .env
 research/

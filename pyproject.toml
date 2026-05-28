@@ -126,4 +126,6 @@ pythonpath = ["."]
 asyncio_mode = "auto"
 filterwarnings = [
     "ignore::DeprecationWarning:litellm.*:",  # litellm uses deprecated asyncio.iscoroutinefunction
+    # fastapi.testclient -> starlette.testclient emits this at import; nothing to fix here.
+    "ignore::starlette.exceptions.StarletteDeprecationWarning",
 ]

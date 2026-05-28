@@ -328,6 +328,26 @@ class TestBuildFrontend:
         assert mock_run.call_count == 2  # type: ignore[attr-defined]
 
     @patch("ananta.explorers.launcher.subprocess.run")
+    def test_npm_install_uses_quiet_not_silent(
+        self, mock_run: object, tmp_path: Path
+    ) -> None:
+        """npm install must use --quiet, not --silent, so warnings and fatal
+        errors still reach the user when a build fails."""
+        frontend = tmp_path / "frontend"
+        frontend.mkdir()
+        config = self._make_config(frontend_dir=str(frontend))
+        build_frontend(config, str(tmp_path), rebuild=False)
+        npm_install_calls = [
+            call for call in mock_run.call_args_list  # type: ignore[attr-defined]
+            if call.args[0][:2] == ["npm", "install"]
+        ]
+        assert npm_install_calls, "expected at least one npm install call"
+        for call in npm_install_calls:
+            cmd = call.args[0]
+            assert "--silent" not in cmd, f"--silent suppresses warnings; use --quiet: {cmd}"
+            assert "--quiet" in cmd, f"npm install should use --quiet: {cmd}"
+
+    @patch("ananta.explorers.launcher.subprocess.run")
     def test_skip_when_dist_exists(self, mock_run: object, tmp_path: Path) -> None:
         frontend = tmp_path / "frontend"
         frontend.mkdir()

@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Explorer launcher scripts rewritten: bash logic moved to testable Python (`src/ananta/explorers/launcher.py`), shell scripts reduced to venv-bootstrap shims
+- Explorer frontend builds now use `npm install --quiet` instead of `--silent`, so npm warnings and fatal errors reach the terminal when a build fails
 
 ### Removed
 

@@ -116,10 +116,10 @@ def build_frontend(config: LauncherConfig, project_root: str, *, rebuild: bool) 
         if not shared_path.is_absolute():
             shared_path = Path(project_root) / shared_path
         print("[ananta] Installing shared UI dependencies...")
-        subprocess.run(["npm", "install", "--silent"], cwd=shared_path, check=True)
+        subprocess.run(["npm", "install", "--quiet"], cwd=shared_path, check=True)
 
     print("[ananta] Building frontend...")
-    subprocess.run(["npm", "install", "--silent"], cwd=frontend_path, check=True)
+    subprocess.run(["npm", "install", "--quiet"], cwd=frontend_path, check=True)
     subprocess.run(["npm", "run", "build"], cwd=frontend_path, check=True)
 
 

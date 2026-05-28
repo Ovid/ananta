@@ -113,19 +113,30 @@ BOOKS = {
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    """Parse command line arguments.
+    """Parse command-line arguments and validate environment configuration.
+
+    This function sets up the CLI parser, processes flags, and ensures the
+    required environment variables for the LLM providers are configured.
+    If the selected model is an Ollama model, ANANTA_API_KEY is automatically
+    mocked to 'ollama'.
 
     Args:
-        argv: Command line arguments. If None, uses sys.argv.
+        argv: Command-line arguments. If None, uses sys.argv.
 
     Returns:
         Parsed arguments namespace with:
-            - setup: Re-upload novels (prompts for confirmation if project exists)
-            - force: Skip the --setup confirmation prompt (for scripted runs)
-            - prompt: Single query for non-interactive mode (optional)
-            - verify: Enable semantic verification of results
+            - setup (bool): Force re-upload of novels even if project exists.
+            - prompt (str | None): Single query for non-interactive mode.
+            - verify (bool | None): Enable semantic verification of results.
+            - model (str): LLM model name to execute against.
+            - ANANTA_API_KEY (str): Resolved API key for the LLM provider.
+
+    Raises:
+        SystemExit: If required arguments or environment variables are missing.
     """
-    parser = argparse.ArgumentParser(description="Explore the Barsoom novels using Ananta RLM")
+    parser = argparse.ArgumentParser(
+        description="Interactive Barsoom novel explorer using Ananta."
+    )
     parser.add_argument(
         "--setup",
         action="store_true",
@@ -159,9 +170,40 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--model",
         type=str,
-        help="LLM model name (overrides ANANTA_MODEL env var)",
+        default=os.environ.get("ANANTA_MODEL") or "claude-sonnet-4-20250514",
+        help="LLM model name (overrides the ANANTA_MODEL environment variable)",
     )
-    return parser.parse_args(argv)
+    env_group = parser.add_argument_group("environment variables")
+    env_group.add_argument(
+        dest=argparse.SUPPRESS, # Documentation.
+        metavar="ANANTA_API_KEY",
+        nargs="?",
+        default=os.environ.get("ANANTA_API_KEY"),
+        help="Required. API key for your LLM provider."
+    )
+    env_group.add_argument(
+        dest=argparse.SUPPRESS, # Documentation. The actual argument is parsed in --model.
+        metavar="ANANTA_MODEL",
+        nargs="?",
+        help=(
+            "Optional. Model name (default: claude-sonnet-4-20250514). "
+            "Overridden by --model flag. Examples: claude-sonnet-4-20250514, "
+            "gpt-4o, gemini/gemini-1.5-pro, ollama/llama3.1. "
+            "The provider will be auto-detected by LiteLLM."
+        )
+    )
+
+    args = parser.parse_args(argv)
+
+    # Check for API key
+    if args.model.startswith("ollama/"):
+        os.environ["ANANTA_API_KEY"] = "ollama"
+        args.__setattr__("ANANTA_API_KEY", "ollama")
+
+    if os.environ["ANANTA_API_KEY"] is None:
+        parser.error("Error: ANANTA_API_KEY environment variable not set.")
+
+    return args
 
 
 STORAGE_PATH = "./barsoom_data"
@@ -240,32 +282,19 @@ def main() -> None:
     """Main entry point for the Barsoom explorer CLI.
 
     Orchestrates the complete workflow:
-    1. Validates environment (ANANTA_API_KEY required)
-    2. Initializes Ananta with local storage configuration
-    3. Sets up the project on first run; if --setup is passed against an
-       existing project, prompts before deleting and re-uploading (or skips
-       the prompt with --force)
+    1. Installs clean-up hooks and parses command-line arguments.
+    2. Initializes Ananta configuration and backend clients.
+    3. Triggers initial project setup on first run or if forced via --setup;
+       if --setup is passed against an existing project, prompts before deleting
+       and re-uploading (or skips the prompt with --force)
     4. Handles single query (--prompt) or launches TUI for interactive mode
 
     Raises:
-        SystemExit: If ANANTA_API_KEY is not set or project cannot be loaded.
+        SystemExit: If the target project cannot be found or an error occurs 
+                    during prompt execution.
     """
     install_urllib3_cleanup_hook()
     args = parse_args()
-
-    # Check for API key
-    if not os.environ.get("ANANTA_API_KEY"):
-        print("Error: ANANTA_API_KEY environment variable not set.")
-        print()
-        print("Environment variables:")
-        print("  ANANTA_API_KEY   (required) API key for your LLM provider")
-        print("  ANANTA_MODEL     (optional) Model name, e.g.:")
-        print("                   - claude-sonnet-4-20250514 (default, Anthropic)")
-        print("                   - gpt-4o (OpenAI)")
-        print("                   - gemini/gemini-1.5-pro (Google)")
-        print()
-        print("The provider is auto-detected from the model name via LiteLLM.")
-        sys.exit(1)
 
     # Initialize Ananta with config from environment
     config = AnantaConfig.load(storage_path=STORAGE_PATH, verify=args.verify, model=args.model)

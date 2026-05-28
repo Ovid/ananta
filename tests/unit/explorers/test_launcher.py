@@ -5,6 +5,7 @@ import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
+from ananta.config import DEFAULT_SANDBOX_IMAGE
 from ananta.explorers.launcher import (
     LauncherConfig,
     build_frontend,
@@ -182,6 +183,15 @@ class TestCheckDockerRunning:
 
 
 class TestEnsureSandboxImage:
+    def test_default_matches_anantaconfig(self) -> None:
+        """The launcher's fallback image name must equal AnantaConfig.sandbox_image
+        so the launcher builds the same image the engine will look for."""
+        from ananta.config import AnantaConfig
+        from ananta.explorers import launcher
+
+        assert launcher.DEFAULT_SANDBOX_IMAGE == AnantaConfig.sandbox_image
+        assert launcher.DEFAULT_SANDBOX_IMAGE == DEFAULT_SANDBOX_IMAGE
+
     @patch("ananta.explorers.launcher.shutil.which", return_value="/usr/bin/docker")
     def test_image_exists(self, _mock_which: object) -> None:
         with patch("ananta.explorers.launcher.subprocess.run") as mock_run:

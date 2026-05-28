@@ -9,6 +9,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from ananta.config import DEFAULT_SANDBOX_IMAGE
+
 
 @dataclass(frozen=True)
 class LauncherConfig:
@@ -72,8 +74,7 @@ def check_docker_running() -> str | None:
 
 def ensure_sandbox_image(project_root: str) -> str | None:
     """Build the sandbox image if missing. Return error string on failure, else None."""
-    # Default must match AnantaConfig.sandbox_image in config.py
-    image = os.environ.get("ANANTA_SANDBOX_IMAGE", "ananta-sandbox")
+    image = os.environ.get("ANANTA_SANDBOX_IMAGE", DEFAULT_SANDBOX_IMAGE)
     if shutil.which("docker") is None:
         return None  # check_command will catch this
     try:

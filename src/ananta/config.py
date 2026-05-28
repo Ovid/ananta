@@ -11,6 +11,10 @@ import yaml
 _BOOL_TRUE = {"true", "1", "yes"}
 _BOOL_FALSE = {"false", "0", "no"}
 
+# Default Docker image name for the sandbox. Used both as the AnantaConfig default
+# and as the fallback when the launcher / app factory resolve ANANTA_SANDBOX_IMAGE.
+DEFAULT_SANDBOX_IMAGE = "ananta-sandbox"
+
 
 def _parse_bool_env(env_var: str, value: str) -> bool:
     """Parse a boolean environment variable, raising on unrecognized values."""
@@ -41,7 +45,7 @@ class AnantaConfig:
     pool_size: int = 3
     container_memory_mb: int = 512
     execution_timeout_sec: int = 30
-    sandbox_image: str = "ananta-sandbox"
+    sandbox_image: str = DEFAULT_SANDBOX_IMAGE
 
     # RLM behavior
     max_iterations: int = 20

@@ -1,7 +1,18 @@
-.PHONY: install test test-frontend lint typecheck typecheck-examples typecheck-frontend format all loc cover
+.PHONY: install rebuild test test-frontend lint typecheck typecheck-examples typecheck-frontend format all loc cover
 
 install:
 	pip install -e ".[dev]"
+
+# Recreate .venv from scratch. Use when the venv is stale (e.g. moved between
+# hosts) or when `pip install -e ".[dev]"` fails due to an outdated pip.
+rebuild:
+	rm -rf .venv
+	python3 -m venv .venv
+	.venv/bin/python -m pip install --upgrade pip
+	.venv/bin/pip install -e ".[dev]"
+	@echo
+	@echo "[ananta] .venv rebuilt. Re-activate it in your shell:"
+	@echo "    source .venv/bin/activate"
 
 # -W filter suppresses RequestsDependencyWarning from urllib3/chardet version skew in transitive deps;
 # must be on the interpreter to catch import-time warnings before pytest resets filters.

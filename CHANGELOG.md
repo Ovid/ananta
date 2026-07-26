@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-07-26
+
+### Added
+
+- `make rebuild` — recreates `.venv` from scratch, for recovering from a stale venv (e.g. one moved between hosts) or a `pip install -e ".[dev]"` failure caused by an outdated pip
+
+### Changed
+
+- Explorer launcher scripts rewritten: bash logic moved to testable Python (`src/ananta/explorers/launcher.py`), shell scripts reduced to venv-bootstrap shims
+- Explorer frontend builds now use `npm install --quiet` instead of `--silent`, so npm warnings and fatal errors reach the terminal when a build fails
+
+### Removed
+
+- `scripts/common.sh` — replaced by Python launcher module
+- `examples/arxiv-explorer.sh` — stale launcher pointing at old paths
+
 ## [0.25.0] - 2026-05-28
 
 ### Added
@@ -660,7 +676,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Security hardening with untrusted content tagging
 - Network isolation with egress whitelist for LLM APIs
 
-[unreleased]: https://github.com/Ovid/ananta/compare/v0.25.0...HEAD
+[unreleased]: https://github.com/Ovid/ananta/compare/v0.26.0...HEAD
+[0.26.0]: https://github.com/Ovid/ananta/compare/v0.25.0...v0.26.0
 [0.25.0]: https://github.com/Ovid/ananta/compare/v0.24.0...v0.25.0
 [0.24.0]: https://github.com/Ovid/ananta/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/Ovid/ananta/compare/v0.22.0...v0.23.0

@@ -314,16 +314,16 @@ The [arXiv Explorer](arxiv-explorer/) is a web-based research tool that lets you
 
 _The screenshot above shows Ananta searching through nearly 25 MB of research papers to answer a complex question._
 
-## Document Explorer (Experimental)
+## Document Explorer
 
 A web-based interface for uploading documents, organizing them into topics, and querying them with Ananta. Upload PDFs, Word documents, PowerPoint, Excel, RTF, or plain text files, group them by topic, then ask questions across your collection.
 
 ```bash
 # Launch the Document Explorer
-python -m ananta.experimental.document_explorer
+./document-explorer/document-explorer.sh
 
 # Options
-python -m ananta.experimental.document_explorer --port 8003 --open --model gpt-4o
+./document-explorer/document-explorer.sh --port 8003 --open --model gpt-4o
 ```
 
 The explorer provides:
@@ -331,8 +331,6 @@ The explorer provides:
 - **Topic organization** — group related documents and query within a topic
 - **Live query streaming** via WebSocket — watch Ananta think in real time
 - **Conversation history** per topic for follow-up questions
-
-> **Note:** This is experimental and under active development.
 
 ## DeepWiki
 

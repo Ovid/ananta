@@ -14,27 +14,65 @@ User Query → RLM Core Loop → Docker Sandbox
            Trace Recorder
 ```
 
-**Components:** `src/ananta/{rlm,sandbox,storage,parser,llm}/`
+**Core engine** (`src/ananta/`):
+- `rlm/` — RLM engine (core loop, prompts, trace, semantic verification, boundary handling)
+- `sandbox/` — Docker executor, container pool, in-container runner
+- `storage/` — Pluggable storage backends (filesystem default)
+- `parser/` — Document parsers (PDF, DOCX, HTML, code, text)
+- `llm/` — LiteLLM wrapper
+- `analysis/` — Analysis shortcut classifier
+- `security/` — Path traversal, redaction, boundary tokens
+- `repo/` — Git repository ingestion for code analysis
+- `prompts/` — External prompt templates (packaged into the wheel)
+- `tui/` — Terminal UI
+
+**Explorers** (`src/ananta/explorers/`) — user-facing apps built on the engine:
+- `arxiv/`, `code/`, `document/` — three web explorers (FastAPI + React frontends)
+- `shared_ui/` — shared backend (app factory, routes, websockets, session) and frontend package (`@ananta/shared-ui`) consumed by all three. **When extending or adding an explorer, read `docs/extending-web-tools.md` first.**
+- `launcher.py` — Python launcher that replaced the old shell scripts (see current branch)
 
 **Security:** Two untrusted content tag patterns:
-- `llm_query(instruction, content)` - instruction trusted, content wrapped in `<untrusted_document_content>` tags
+- `llm_query(instruction, content)` — instruction trusted, content wrapped in `<untrusted_document_content>` tags
 - REPL output shown to LLM wrapped in `<repl_output type="untrusted_document_content">` tags
 
-Containers network-isolated (egress whitelist for LLM APIs only).
+Per-query boundary tokens (`secrets.token_hex(16)`) prevent forged closing tags. Containers are network-isolated with no egress; LLM sub-calls are made from the host.
 
 ## Commands
+
+Python 3.11+ required (per `pyproject.toml`; mypy/ruff target py311).
 
 ```bash
 python -m venv .venv             # Create virtual environment
 source .venv/bin/activate        # Activate venv (use .venv first!)
-pip install -e ".[dev]"          # Install
-make all                         # All tests
-pytest tests/path::test_name -v  # Single test
-mypy src/ananta                  # Type check
-ruff check src tests             # Lint
-ruff format src tests            # Format
-make all                         # Format + lint + typecheck + test
+pip install -e ".[dev]"          # Install with dev extras
+
+# Sandbox container — required before running anything end-to-end
+docker build -t ananta-sandbox -f src/ananta/sandbox/Dockerfile src/ananta/sandbox/
+
+# Make targets (preferred over raw tool invocations)
+make all                         # Format + lint + typecheck (py & ts) + test (py & frontend)
+make test                        # Python tests only
+make test-frontend               # Vitest (src/ananta/explorers/arxiv/frontend)
+make typecheck                   # mypy src/ananta
+make typecheck-frontend          # tsc on shared_ui frontend
+make lint                        # ruff check
+make format                      # ruff format + ruff check --fix
+make cover                       # pytest with coverage
+make loc                         # cloc summary
+
+# Single test
+pytest tests/path/test_file.py::test_name -v
 ```
+
+**Test layout:** `tests/{unit,integration,explorers,examples,fixtures}/`. Frontend tests live next to their source under `src/ananta/explorers/*/frontend/`.
+
+**Console scripts** (installed by `pip install -e .`):
+
+| Script | Launches |
+|---|---|
+| `ananta-web` | arXiv Explorer |
+| `ananta-code` | Code Explorer |
+| `ananta-document-explorer` | Document Explorer |
 
 ## MANDATORY TDD
 
@@ -135,7 +173,3 @@ Comparison links at the bottom of CHANGELOG.md are mandatory. Format:
 [unreleased]: https://github.com/Ovid/ananta/compare/vLATEST...HEAD
 [X.Y.Z]: https://github.com/Ovid/ananta/compare/vPREVIOUS...vX.Y.Z
 ```
-
-### git
-
-CRITICAL: git commit messages MUST be plain text. Never do things similar to `git commit -m "$(cat <<'COMMITEOF'`

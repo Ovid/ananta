@@ -20,7 +20,7 @@ Ananta lets you ask plain-English questions across dozens of arXiv papers at onc
 
 ## Setup
 
-If you're comfortable with software development, you can run `./examples/arxiv-explorer.sh` to launch this quickly. It's not well tested (it still requires Docker because the Python code runs in a locked-down Docker container). Otherwise, you `cd arxiv-explorer; docker compose up`, after ensuring the prerequisites are satisfied. Note, the docker and shell script solutions share different data storage, so using one means it won't see what you put in the other.
+If you're comfortable with software development, you can run `./arxiv-explorer/arxiv-explorer.sh` to launch this quickly. It still requires Docker because the Python code runs in a locked-down Docker container. Otherwise, you `cd arxiv-explorer; docker compose up`, after ensuring the prerequisites are satisfied. Note, the docker and shell script solutions share different data storage, so using one means it won't see what you put in the other.
 
 ### Installing Docker
 

@@ -21,6 +21,8 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import Response
 
+from ananta.config import DEFAULT_SANDBOX_IMAGE
+
 
 def create_app(
     state: Any,
@@ -64,7 +66,7 @@ def create_app(
             raise SystemExit(1) from e
         except ImageNotFound as e:
             explanation = getattr(e, "explanation", str(e))
-            image = os.environ.get("ANANTA_SANDBOX_IMAGE", "ananta-sandbox")
+            image = os.environ.get("ANANTA_SANDBOX_IMAGE", DEFAULT_SANDBOX_IMAGE)
             print(
                 f"\n[ananta] Error: Docker image not found: {explanation}\n"
                 "\n  Build it with:"

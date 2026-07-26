@@ -135,7 +135,8 @@ def _extract_xlsx(path: Path) -> str:
 
 def _extract_rtf(path: Path) -> str:
     raw = path.read_text(encoding="utf-8", errors="replace")
-    return str(rtf_to_text(raw))
+    # striprtf ships a py.typed marker but doesn't annotate rtf_to_text.
+    return str(rtf_to_text(raw))  # type: ignore[no-untyped-call]
 
 
 def get_page_count(path: Path) -> int | None:

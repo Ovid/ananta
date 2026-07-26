@@ -1,0 +1,100 @@
+{
+ "points": [
+  {
+   "date": "2026-02-03",
+   "src": "backfill",
+   "stars": 1
+  },
+  {
+   "date": "2026-02-05",
+   "src": "backfill",
+   "stars": 4
+  },
+  {
+   "date": "2026-02-06",
+   "src": "backfill",
+   "stars": 6
+  },
+  {
+   "date": "2026-02-09",
+   "src": "backfill",
+   "stars": 8
+  },
+  {
+   "date": "2026-02-10",
+   "src": "backfill",
+   "stars": 9
+  },
+  {
+   "date": "2026-02-12",
+   "src": "backfill",
+   "stars": 10
+  },
+  {
+   "date": "2026-02-15",
+   "src": "backfill",
+   "stars": 11
+  },
+  {
+   "date": "2026-02-19",
+   "src": "backfill",
+   "stars": 12
+  },
+  {
+   "date": "2026-03-03",
+   "src": "backfill",
+   "stars": 13
+  },
+  {
+   "date": "2026-03-05",
+   "src": "backfill",
+   "stars": 14
+  },
+  {
+   "date": "2026-03-06",
+   "src": "backfill",
+   "stars": 15
+  },
+  {
+   "date": "2026-03-09",
+   "src": "backfill",
+   "stars": 17
+  },
+  {
+   "date": "2026-03-11",
+   "src": "backfill",
+   "stars": 18
+  },
+  {
+   "date": "2026-03-21",
+   "src": "backfill",
+   "stars": 19
+  },
+  {
+   "date": "2026-03-30",
+   "src": "backfill",
+   "stars": 20
+  },
+  {
+   "date": "2026-03-31",
+   "src": "backfill",
+   "stars": 21
+  },
+  {
+   "date": "2026-04-08",
+   "src": "backfill",
+   "stars": 22
+  },
+  {
+   "date": "2026-05-27",
+   "src": "backfill",
+   "stars": 23
+  },
+  {
+   "date": "2026-05-28",
+   "src": "backfill",
+   "stars": 24
+  }
+ ],
+ "repo": "Ovid/ananta"
+}

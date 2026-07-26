@@ -16,6 +16,16 @@ _**Note** for fans of [Perl's Dancer2 framework](https://github.com/PerlDancer/D
 
 **How it's different:** The AI writes Python code to actively explore your documents in a secure sandbox, iterating until confident in the answer—no context window limits, no lost information. This approach is based on [Recursive Language Models](https://arxiv.org/abs/2512.24601), a new technique that gives AI effectively unlimited reading capacity.
 
+# Star History
+
+<a href="https://github.com/Ovid/star-history">
+  <picture>
+    <source media="(prefers-color-scheme: dark)"  srcset=".github/star-history/dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset=".github/star-history/light.svg">
+    <img alt="Star history for Ovid/ananta: 24 stars as of 2026-05-28" src=".github/star-history/light.svg" width="800">
+  </picture>
+</a>
+
 ## See It in Action
 
 Here's a real session querying 7 novels (~2.8M characters), demonstrating three key capabilities:

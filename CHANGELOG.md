@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `make rebuild` — recreates `.venv` from scratch, for recovering from a stale venv (e.g. one moved between hosts) or a `pip install -e ".[dev]"` failure caused by an outdated pip
+
 ### Changed
 
 - Explorer launcher scripts rewritten: bash logic moved to testable Python (`src/ananta/explorers/launcher.py`), shell scripts reduced to venv-bootstrap shims

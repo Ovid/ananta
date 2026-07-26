@@ -94,6 +94,11 @@
    "date": "2026-05-28",
    "src": "backfill",
    "stars": 24
+  },
+  {
+   "date": "2026-07-26",
+   "src": "snapshot",
+   "stars": 24
   }
  ],
  "repo": "Ovid/ananta"

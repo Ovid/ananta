@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400" width="800" height="400" role="img" aria-label="Star history for Ovid/ananta: 26 stars as of 2026-10-03">
-<title>Star history for Ovid/ananta: 26 stars as of 2026-10-03</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400" width="800" height="400" role="img" aria-label="Star history for Ovid/ananta: 26 stars as of 2026-10-04">
+<title>Star history for Ovid/ananta: 26 stars as of 2026-10-04</title>
 <desc>Cumulative GitHub stars for Ovid/ananta over time.</desc>
 <line x1="60" y1="350" x2="780" y2="350" stroke="#30363d" stroke-width="1"/>
 <text x="52" y="354" text-anchor="end" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8b949e">0</text>
@@ -9,12 +9,12 @@
 <text x="52" y="141" text-anchor="end" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8b949e">20</text>
 <line x1="60" y1="30" x2="780" y2="30" stroke="#30363d" stroke-width="1"/>
 <text x="52" y="34" text-anchor="end" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8b949e">30</text>
-<text x="768" y="370" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8b949e">Oct 03</text>
-<text x="670" y="370" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8b949e">Aug 27</text>
-<text x="396" y="370" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8b949e">May 27</text>
+<text x="768" y="370" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8b949e">Oct 04</text>
+<text x="667" y="370" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8b949e">Aug 27</text>
+<text x="395" y="370" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8b949e">May 27</text>
 <text x="60" y="370" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8b949e">Feb 03</text>
-<polyline fill="none" stroke="#e5533d" stroke-width="2" stroke-dasharray="5 4" points="60,339 66,307 69,286 78,265 81,254 87,243 96,233 108,222 143,211 149,201 152,190 161,169 167,158 197,147 224,137 227,126 250,115 396,105 399,94 575,94"/>
-<polyline fill="none" stroke="#e5533d" stroke-width="2" points="575,94 578,83 581,83 584,83 587,83 590,83 593,83 596,83 599,73 601,73 604,73 607,73 610,73 613,73 616,73 619,73 622,73 625,73 628,73 631,73 634,73 637,73 640,73 643,73 646,73 649,73 652,73 655,73 658,73 661,73 664,73 667,73 670,73 673,73 676,73 679,73 682,73 685,73 688,73 691,73 694,73 697,73 700,73 703,73 706,73 709,73 712,73 715,73 718,73 720,73 723,73 726,73 729,73 732,73 735,73 738,73 741,73 744,73 747,73 750,73 753,73 756,73 759,73 762,73 765,73 768,73 771,73 774,73 777,73 780,73"/>
+<polyline fill="none" stroke="#e5533d" stroke-width="2" stroke-dasharray="5 4" points="60,339 66,307 69,286 78,265 81,254 87,243 96,233 107,222 143,211 149,201 152,190 161,169 167,158 196,147 223,137 226,126 250,115 395,105 398,94 573,94"/>
+<polyline fill="none" stroke="#e5533d" stroke-width="2" points="573,94 576,83 579,83 581,83 584,83 587,83 590,83 593,83 596,73 599,73 602,73 605,73 608,73 611,73 614,73 617,73 620,73 623,73 626,73 629,73 632,73 635,73 638,73 641,73 644,73 647,73 650,73 653,73 656,73 659,73 661,73 664,73 667,73 670,73 673,73 676,73 679,73 682,73 685,73 688,73 691,73 694,73 697,73 700,73 703,73 706,73 709,73 712,73 715,73 718,73 721,73 724,73 727,73 730,73 733,73 736,73 739,73 741,73 744,73 747,73 750,73 753,73 756,73 759,73 762,73 765,73 768,73 771,73 774,73 777,73 780,73"/>
 <circle cx="780" cy="73" r="3.5" fill="#e5533d"/>
 <rect x="60" y="10" width="10" height="10" fill="#e5533d"/>
 <text x="76" y="19" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="13" fill="#c9d1d9">Ovid/ananta — dashed is reconstructed</text>
